@@ -2885,6 +2885,9 @@ function Home() {
               ext: i.ext || "mp4",
             }),
             headline: i.headline,
+            ...(i.clipTags?.length ? { clipTags: i.clipTags } : {}),
+            ...(typeof i.score === "number" ? { score: i.score } : {}),
+            ...(i.clip ? { seconds: Math.max(0, i.clip.end - i.clip.start) } : {}),
           }))}
       />
 
