@@ -252,7 +252,7 @@ function AgendaPage() {
                       className="flex items-center gap-3 rounded-xl border border-border bg-surface-2 px-3 py-2.5"
                     >
                       <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-primary/35 bg-primary/12 text-primary">
-                        {a.platform === "youtube" ? <Youtube className="size-4" /> : a.platform === "tiktok" ? <Video className="size-4" /> : <Instagram className="size-4" />}
+                        {a.platform === "youtube" ? <Youtube className="size-4" /> : a.platform === "tiktok" ? <Video className="size-4" /> : a.platform === "facebook" ? <Facebook className="size-4" /> : <Instagram className="size-4" />}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">@{a.username}</span>
