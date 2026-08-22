@@ -31,6 +31,7 @@ import { Route as ApiPublicCleanerCallbackRouteImport } from './routes/api/publi
 import { Route as ApiPublicCleanerUploadRouteImport } from './routes/api/public/cleaner-upload'
 import { Route as ApiPublicHlsProxyRouteImport } from './routes/api/public/hls-proxy'
 import { Route as ApiPublicMediaProxyRouteImport } from './routes/api/public/media-proxy'
+import { Route as IntegracoesFacebookCallbackRouteImport } from './routes/integracoes_.facebook.callback'
 import { Route as IntegracoesInstagramCallbackRouteImport } from './routes/integracoes_.instagram.callback'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
 
@@ -148,6 +149,12 @@ const ApiPublicMediaProxyRoute = ApiPublicMediaProxyRouteImport.update({
   path: '/api/public/media-proxy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IntegracoesFacebookCallbackRoute =
+  IntegracoesFacebookCallbackRouteImport.update({
+    id: '/integracoes_/facebook/callback',
+    path: '/integracoes/facebook/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const IntegracoesInstagramCallbackRoute =
   IntegracoesInstagramCallbackRouteImport.update({
     id: '/integracoes_/instagram/callback',
@@ -184,6 +191,7 @@ export interface FileRoutesByFullPath {
   '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
+  '/integracoes/facebook/callback': typeof IntegracoesFacebookCallbackRoute
   '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
@@ -210,6 +218,7 @@ export interface FileRoutesByTo {
   '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
+  '/integracoes/facebook/callback': typeof IntegracoesFacebookCallbackRoute
   '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
@@ -237,6 +246,7 @@ export interface FileRoutesById {
   '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
+  '/integracoes_/facebook/callback': typeof IntegracoesFacebookCallbackRoute
   '/integracoes_/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
@@ -265,6 +275,7 @@ export interface FileRouteTypes {
     | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
+    | '/integracoes/facebook/callback'
     | '/integracoes/instagram/callback'
     | '/api/public/hooks/publish-due'
   fileRoutesByTo: FileRoutesByTo
@@ -291,6 +302,7 @@ export interface FileRouteTypes {
     | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
+    | '/integracoes/facebook/callback'
     | '/integracoes/instagram/callback'
     | '/api/public/hooks/publish-due'
   id:
@@ -317,6 +329,7 @@ export interface FileRouteTypes {
     | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
+    | '/integracoes_/facebook/callback'
     | '/integracoes_/instagram/callback'
     | '/api/public/hooks/publish-due'
   fileRoutesById: FileRoutesById
@@ -344,6 +357,7 @@ export interface RootRouteChildren {
   ApiPublicCleanerUploadRoute: typeof ApiPublicCleanerUploadRoute
   ApiPublicHlsProxyRoute: typeof ApiPublicHlsProxyRoute
   ApiPublicMediaProxyRoute: typeof ApiPublicMediaProxyRoute
+  IntegracoesFacebookCallbackRoute: typeof IntegracoesFacebookCallbackRoute
   IntegracoesInstagramCallbackRoute: typeof IntegracoesInstagramCallbackRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
 }
@@ -504,6 +518,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMediaProxyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/integracoes_/facebook/callback': {
+      id: '/integracoes_/facebook/callback'
+      path: '/integracoes/facebook/callback'
+      fullPath: '/integracoes/facebook/callback'
+      preLoaderRoute: typeof IntegracoesFacebookCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/integracoes_/instagram/callback': {
       id: '/integracoes_/instagram/callback'
       path: '/integracoes/instagram/callback'
@@ -545,6 +566,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicCleanerUploadRoute: ApiPublicCleanerUploadRoute,
   ApiPublicHlsProxyRoute: ApiPublicHlsProxyRoute,
   ApiPublicMediaProxyRoute: ApiPublicMediaProxyRoute,
+  IntegracoesFacebookCallbackRoute: IntegracoesFacebookCallbackRoute,
   IntegracoesInstagramCallbackRoute: IntegracoesInstagramCallbackRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
 }
