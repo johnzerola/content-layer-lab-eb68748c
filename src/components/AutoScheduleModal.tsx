@@ -116,7 +116,7 @@ export function AutoScheduleModal({
         const up = await uploadPostVideo(item.blob, item.fileName);
 
         // Schedule
-        await schedulePost({
+        const postId = await schedulePost({
           accountId,
           kind,
           caption: item.headline || baseCaption,
@@ -124,7 +124,18 @@ export function AutoScheduleModal({
           videoPath: up.path,
           videoUrl: up.url,
           fileName: item.fileName,
+          consent: true,
         });
+
+        // fecha o ciclo: guarda a "aposta" da IA para comparar com as métricas reais
+        if (postId && item.clipTags?.length) {
+          await recordClipOutcome({
+            postId,
+            tags: item.clipTags,
+            score: item.score ?? 0,
+            seconds: item.seconds ?? 0,
+          });
+        }
 
         setProgress(Math.round(((i + 1) / items.length) * 100));
       }
