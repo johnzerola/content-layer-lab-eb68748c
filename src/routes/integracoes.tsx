@@ -15,7 +15,7 @@ import {
 import { toast } from "sonner";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 import { listAccounts, removeAccount, type SocialAccount } from "@/lib/social";
-import { beginInstagramOAuth } from "@/lib/meta-oauth.functions";
+
 import { beginFacebookOAuth } from "@/lib/facebook-oauth.functions";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { listJobs } from "@/lib/jobs";
@@ -85,7 +85,7 @@ function IntegrationsPage() {
   const [user, setUser] = useState<CloudUser | null>(null);
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [busy, setBusy] = useState<PlatformKey | null>(null);
-  const startInstagram = useServerFn(beginInstagramOAuth);
+
   const startFacebook = useServerFn(beginFacebookOAuth);
 
   useEffect(() => {
@@ -109,8 +109,10 @@ function IntegrationsPage() {
     async (platform: PlatformKey) => {
       setBusy(platform);
       try {
-        const response =
-          platform === "instagram" ? await startInstagram() : await startFacebook();
+        // Instagram Business é autorizado pelo Facebook Login for Business
+        // (o login direto do Instagram exige um app do tipo Instagram API).
+        const response = await startFacebook();
+
         if (!response.ok) {
           toast.error(response.error);
           return;
@@ -122,7 +124,7 @@ function IntegrationsPage() {
         setBusy(null);
       }
     },
-    [startFacebook, startInstagram],
+    [startFacebook],
   );
 
   const disconnect = useCallback(
