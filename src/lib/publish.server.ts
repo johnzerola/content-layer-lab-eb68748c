@@ -115,6 +115,7 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
     };
   }
 
+  if (input.platform === "facebook") return publishFacebookPage(input);
   if (provider === "ayrshare") return publishAyrshare(input);
   if (provider === "youtube") return publishYoutube(input);
   if (provider === "tiktok") return publishTikTokAssist(input);
