@@ -751,6 +751,7 @@ function Home() {
           maxLen: Math.max(clipMinLen, clipMaxLen),
           max: clipMax,
           minScore: clipMinScore,
+          tagWeights,
           ...(sentences.length ? { transcript: sentences } : {}),
         });
         if (!clips.length) {
@@ -826,6 +827,7 @@ function Home() {
       clipUseTranscript,
       clipTrimSilence,
       clipDynamicZoom,
+      tagWeights,
       setItems,
       setSelectedId,
     ],
