@@ -74,6 +74,8 @@ export async function listAccounts(): Promise<SocialAccount[]> {
 }
 
 export async function removeAccount(id: string) {
+  // Remove a conexão antes da conta para não esbarrar na chave estrangeira.
+  await supabase.from("social_connections").delete().eq("social_account_id", id);
   const { error } = await supabase.from("social_accounts").delete().eq("id", id);
   if (error) throw error;
 }
