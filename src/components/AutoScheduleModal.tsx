@@ -25,6 +25,7 @@ import {
   type SocialAccount,
   type PostKind,
 } from "@/lib/social";
+import { recordClipOutcome } from "@/lib/clip-feedback";
 import { toast } from "sonner";
 
 // I need to check the exact path for Dialog components in this project.
@@ -34,7 +35,14 @@ import { toast } from "sonner";
 interface AutoScheduleModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  items: { blob: Blob; fileName: string; headline?: string }[];
+  items: {
+    blob: Blob;
+    fileName: string;
+    headline?: string;
+    clipTags?: string[];
+    score?: number;
+    seconds?: number;
+  }[];
   onComplete: () => void;
   onAutoConfig?: (config: any) => void;
 }
