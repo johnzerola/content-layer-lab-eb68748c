@@ -1,5 +1,5 @@
 import type { PostKind, PublishErrorCode, SocialProvider } from "@/lib/publishing";
-import { globalMetaCredentials, metaGraphBase } from "@/lib/meta.server";
+import { facebookGraphBase, globalMetaCredentials, metaGraphBase } from "@/lib/meta.server";
 
 export type PublishInput = {
   kind: PostKind;
@@ -276,6 +276,82 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
       code: "PROVIDER_TEMPORARY_ERROR",
       retryable: true,
       error: error instanceof Error ? error.message : "Meta indisponivel.",
+    };
+  }
+}
+
+/** Publica em Página do Facebook: Reels (3 fases) ou vídeo no Feed. */
+async function publishFacebookPage(input: PublishInput): Promise<PublishResult> {
+  const token = input.providerAccessToken;
+  const pageId = input.providerAccountId;
+  if (!token || !pageId) {
+    return {
+      ok: false,
+      code: "AUTH_INVALID",
+      retryable: false,
+      error: "A Página do Facebook não possui credencial conectada.",
+    };
+  }
+  const base = `${facebookGraphBase()}/${pageId}`;
+
+  try {
+    if (input.kind === "feed") {
+      const body = new URLSearchParams({
+        file_url: input.videoUrl,
+        description: input.caption,
+        access_token: token,
+      });
+      const response = await fetch(`${base}/videos`, { method: "POST", body });
+      const payload: unknown = await response.json().catch(() => null);
+      const providerPostId = nestedString(payload, ["id"]);
+      if (!response.ok || !providerPostId) {
+        return providerFailure("Facebook vídeo", response.status, payload);
+      }
+      return { ok: true, providerPostId, permalink: `https://www.facebook.com/${providerPostId}` };
+    }
+
+    const start = await fetch(`${base}/video_reels`, {
+      method: "POST",
+      body: new URLSearchParams({ upload_phase: "start", access_token: token }),
+    });
+    const startPayload: unknown = await start.json().catch(() => null);
+    const videoId = nestedString(startPayload, ["video_id"]);
+    const uploadUrl = nestedString(startPayload, ["upload_url"]);
+    if (!start.ok || !videoId || !uploadUrl) {
+      return providerFailure("Facebook Reels iniciar", start.status, startPayload);
+    }
+
+    const upload = await fetch(uploadUrl, {
+      method: "POST",
+      headers: { Authorization: `OAuth ${token}`, file_url: input.videoUrl },
+    });
+    const uploadPayload: unknown = await upload.json().catch(() => null);
+    if (!upload.ok) return providerFailure("Facebook Reels upload", upload.status, uploadPayload);
+
+    const finish = await fetch(`${base}/video_reels`, {
+      method: "POST",
+      body: new URLSearchParams({
+        upload_phase: "finish",
+        video_id: videoId,
+        video_state: "PUBLISHED",
+        description: input.caption,
+        access_token: token,
+      }),
+    });
+    const finishPayload: unknown = await finish.json().catch(() => null);
+    if (!finish.ok) return providerFailure("Facebook Reels publicar", finish.status, finishPayload);
+
+    return {
+      ok: true,
+      providerPostId: videoId,
+      permalink: `https://www.facebook.com/reel/${videoId}`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      code: "PROVIDER_TEMPORARY_ERROR",
+      retryable: true,
+      error: error instanceof Error ? error.message : "Facebook indisponivel.",
     };
   }
 }
