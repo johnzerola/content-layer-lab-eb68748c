@@ -1,8 +1,9 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CalendarClock, Instagram, Loader2, Plus, Trash2, UploadCloud, X, Youtube, Video } from "lucide-react";
+import { CalendarClock, Facebook, Instagram, Loader2, Plus, Trash2, UploadCloud, X, Youtube, Video } from "lucide-react";
+
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
