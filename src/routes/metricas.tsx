@@ -59,6 +59,11 @@ function MetricsPage() {
     queryKey: ['metrics'],
     queryFn: () => getMetrics()
   });
+  const { data: feedback, isLoading: feedbackLoading } = useQuery({
+    queryKey: ['clip-feedback'],
+    queryFn: () => getClipFeedback(),
+  });
+
 
   const refreshMutation = useMutation({
     mutationFn: (postId: string) => refreshPostMetrics({ data: { postId } }),
