@@ -109,8 +109,10 @@ function IntegrationsPage() {
     async (platform: PlatformKey) => {
       setBusy(platform);
       try {
-        const response =
-          platform === "instagram" ? await startInstagram() : await startFacebook();
+        // Instagram Business é autorizado pelo Facebook Login for Business
+        // (o login direto do Instagram exige um app do tipo Instagram API).
+        const response = await startFacebook();
+
         if (!response.ok) {
           toast.error(response.error);
           return;
