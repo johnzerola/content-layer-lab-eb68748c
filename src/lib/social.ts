@@ -126,18 +126,23 @@ export async function schedulePost(p: NewPost) {
     throw new Error("Esta conta ainda nao tem conexao OAuth/API valida. Conecte pelo provedor oficial antes de agendar.");
   }
 
-  const { error } = await supabase.from("scheduled_posts").insert({
-    user_id: user.id,
-    account_id: p.accountId,
-    kind: p.kind,
-    caption: p.caption,
-    scheduled_at: p.scheduledAt.toISOString(),
-    video_path: p.videoPath ?? null,
-    video_url: p.videoUrl ?? null,
-    file_name: p.fileName ?? null,
-    status: "agendado",
-  });
+  const { data, error } = await supabase
+    .from("scheduled_posts")
+    .insert({
+      user_id: user.id,
+      account_id: p.accountId,
+      kind: p.kind,
+      caption: p.caption,
+      scheduled_at: p.scheduledAt.toISOString(),
+      video_path: p.videoPath ?? null,
+      video_url: p.videoUrl ?? null,
+      file_name: p.fileName ?? null,
+      status: "agendado",
+    })
+    .select("id")
+    .single();
   if (error) throw error;
+  return data?.id as string;
 }
 
 export async function listPosts(limit = 200): Promise<ScheduledPost[]> {

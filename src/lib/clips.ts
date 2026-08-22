@@ -42,6 +42,8 @@ export interface ClipOptions {
   minScore?: number;
   /** frases transcritas do vídeo — quando presentes, os cortes seguem o texto */
   transcript?: Sentence[];
+  /** pesos aprendidos por etiqueta (desempenho real dos posts) */
+  tagWeights?: Record<string, number>;
   onProgress?: (p: number) => void;
   signal?: AbortSignal;
 }
@@ -477,10 +479,18 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
       for (const t of text.tags) if (!tags.includes(t)) tags.push(t);
     }
 
+    // realimentação: o desempenho real dos posts ajusta o peso de cada etiqueta
+    const learned = opts.tagWeights;
+    let tagBoost = 1;
+    if (learned) {
+      const ws = tags.map((t) => learned[t]).filter((w): w is number => typeof w === "number");
+      if (ws.length) tagBoost = ws.reduce((a, b) => a + b, 0) / ws.length;
+    }
+
     return {
       start: s,
       end: e,
-      raw,
+      raw: raw * tagBoost,
       hook,
       energy,
       dynamics,

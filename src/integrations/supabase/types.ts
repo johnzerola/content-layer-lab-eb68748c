@@ -351,6 +351,38 @@ export type Database = {
         }
         Relationships: []
       }
+      social_connection_credentials: {
+        Row: {
+          access_token_ciphertext: string
+          connection_id: string
+          created_at: string
+          expires_at: string
+          updated_at: string
+        }
+        Insert: {
+          access_token_ciphertext: string
+          connection_id: string
+          created_at?: string
+          expires_at: string
+          updated_at?: string
+        }
+        Update: {
+          access_token_ciphertext?: string
+          connection_id?: string
+          created_at?: string
+          expires_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_connection_credentials_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: true
+            referencedRelation: "social_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       social_connections: {
         Row: {
           created_at: string
@@ -391,38 +423,6 @@ export type Database = {
             columns: ["social_account_id"]
             isOneToOne: true
             referencedRelation: "social_accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      social_connection_credentials: {
-        Row: {
-          access_token_ciphertext: string
-          connection_id: string
-          created_at: string
-          expires_at: string
-          updated_at: string
-        }
-        Insert: {
-          access_token_ciphertext: string
-          connection_id: string
-          created_at?: string
-          expires_at: string
-          updated_at?: string
-        }
-        Update: {
-          access_token_ciphertext?: string
-          connection_id?: string
-          created_at?: string
-          expires_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "social_connection_credentials_connection_id_fkey"
-            columns: ["connection_id"]
-            isOneToOne: true
-            referencedRelation: "social_connections"
             referencedColumns: ["id"]
           },
         ]

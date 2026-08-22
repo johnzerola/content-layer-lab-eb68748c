@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getMetrics, refreshPostMetrics, type PostInsight } from '@/lib/metrics.functions';
+import { getClipFeedback } from '@/lib/clip-feedback';
 import { currentUser } from '@/lib/cloud';
 import { AuthGate } from '@/components/AuthGate';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,8 @@ import {
   Bookmark, 
   RefreshCcw,
   TrendingUp,
+  TrendingDown,
+  Brain,
   Instagram,
   Youtube,
   PlaySquare
@@ -56,6 +59,11 @@ function MetricsPage() {
     queryKey: ['metrics'],
     queryFn: () => getMetrics()
   });
+  const { data: feedback, isLoading: feedbackLoading } = useQuery({
+    queryKey: ['clip-feedback'],
+    queryFn: () => getClipFeedback(),
+  });
+
 
   const refreshMutation = useMutation({
     mutationFn: (postId: string) => refreshPostMetrics({ data: { postId } }),
@@ -177,6 +185,67 @@ function MetricsPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Aprendizado da IA */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5 text-primary" />
+              Aprendizado da IA
+            </CardTitle>
+            <CardDescription>
+              Etiquetas usadas nos cortes, comparadas com o desempenho real das publicações.
+              O peso é aplicado automaticamente nos próximos cortes.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {feedbackLoading ? (
+              <p className="text-sm text-muted-foreground">Calculando…</p>
+            ) : !feedback || feedback.tags.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                <Brain className="mx-auto h-10 w-10 opacity-20 mb-3" />
+                <p>Ainda não há dados suficientes. Agende cortes e aguarde as métricas chegarem.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Base: {feedback.samples} publicações · engajamento médio{' '}
+                  {(feedback.baseline * 100).toFixed(1)}%
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {feedback.tags.map((t) => {
+                    const up = t.weight >= 1;
+                    return (
+                      <div
+                        key={t.tag}
+                        className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium capitalize">{t.tag}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {t.samples} posts · {(t.engagement * 100).toFixed(1)}% eng.
+                          </p>
+                        </div>
+                        <span
+                          className={`flex items-center gap-1 text-sm font-semibold ${
+                            up ? 'text-emerald-500' : 'text-destructive'
+                          }`}
+                        >
+                          {up ? (
+                            <TrendingUp className="h-3.5 w-3.5" />
+                          ) : (
+                            <TrendingDown className="h-3.5 w-3.5" />
+                          )}
+                          ×{t.weight.toFixed(2)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Recent Posts Table */}
         <Card>

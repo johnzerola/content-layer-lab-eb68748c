@@ -74,6 +74,7 @@ import { webCodecsSupported } from "@/lib/encode";
 import { defaultAntiDup, describeVariation, makeVariation } from "@/lib/variation";
 import { autoFrame } from "@/lib/autoframe";
 import { findClips, formatTime } from "@/lib/clips";
+import { getClipFeedback } from "@/lib/clip-feedback";
 import { cuesToSentences, speechKeepSegments, zoomKeys, type Sentence } from "@/lib/transcript-clips";
 import { resolveVideoLink } from "@/lib/import.functions";
 import { downloadAsZip, fsAccessSupported, saveToFolder } from "@/lib/zip";
@@ -322,6 +323,19 @@ function Home() {
   /** zoom dinâmico ritmado pela fala */
   const [clipDynamicZoom, setClipDynamicZoom] = useState(true);
   const [clipStage, setClipStage] = useState<string | null>(null);
+  /** pesos por etiqueta aprendidos com o desempenho real dos posts */
+  const [tagWeights, setTagWeights] = useState<Record<string, number>>({});
+  useEffect(() => {
+    let alive = true;
+    void getClipFeedback()
+      .then((f) => {
+        if (alive) setTagWeights(f.weights);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
   const [variants, setVariants] = useState(1);
   const [previewVariant, setPreviewVariant] = useState(0);
 
@@ -737,6 +751,7 @@ function Home() {
           maxLen: Math.max(clipMinLen, clipMaxLen),
           max: clipMax,
           minScore: clipMinScore,
+          tagWeights,
           ...(sentences.length ? { transcript: sentences } : {}),
         });
         if (!clips.length) {
@@ -812,6 +827,7 @@ function Home() {
       clipUseTranscript,
       clipTrimSilence,
       clipDynamicZoom,
+      tagWeights,
       setItems,
       setSelectedId,
     ],
@@ -2869,6 +2885,9 @@ function Home() {
               ext: i.ext || "mp4",
             }),
             headline: i.headline,
+            ...(i.clipTags?.length ? { clipTags: i.clipTags } : {}),
+            ...(typeof i.score === "number" ? { score: i.score } : {}),
+            ...(i.clip ? { seconds: Math.max(0, i.clip.end - i.clip.start) } : {}),
           }))}
       />
 
