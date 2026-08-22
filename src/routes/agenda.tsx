@@ -231,16 +231,18 @@ function AgendaPage() {
                   <div className="flex flex-1 items-center gap-2 rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm">
                     <Instagram className="size-4 text-pink-400" />
                     <span>Instagram</span>
+                    <Facebook className="size-4 text-sky-400" />
+                    <span>Facebook</span>
                   </div>
-                  <button
-                    onClick={onAddAccount}
-                    disabled={linkingAccount}
+                  <Link
+                    to="/integracoes"
                     className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground"
                   >
-                    {linkingAccount ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-                    {linkingAccount ? "Abrindo…" : "Add"}
-                  </button>
+                    <Plus className="size-4" />
+                    Add
+                  </Link>
                 </div>
+
 
                 <ul className="mt-3 flex flex-col gap-2">
                   {accounts.map((a) => (
