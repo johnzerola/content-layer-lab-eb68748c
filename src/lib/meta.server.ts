@@ -21,3 +21,7 @@ export function globalMetaCredentials(
   const igUserId = environment["META_IG_USER_ID"]?.trim();
   return accessToken && igUserId ? { accessToken, igUserId } : null;
 }
+
+export function facebookGraphBase(environment: NodeJS.ProcessEnv = process.env): string {
+  return `https://graph.facebook.com/${metaGraphVersion(environment)}`;
+}
