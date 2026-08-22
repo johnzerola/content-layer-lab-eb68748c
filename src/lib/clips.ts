@@ -42,6 +42,8 @@ export interface ClipOptions {
   minScore?: number;
   /** frases transcritas do vídeo — quando presentes, os cortes seguem o texto */
   transcript?: Sentence[];
+  /** pesos aprendidos por etiqueta (desempenho real dos posts) */
+  tagWeights?: Record<string, number>;
   onProgress?: (p: number) => void;
   signal?: AbortSignal;
 }
