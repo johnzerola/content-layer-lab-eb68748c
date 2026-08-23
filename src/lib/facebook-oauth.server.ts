@@ -14,7 +14,7 @@ export const FACEBOOK_SCOPES = [
   "instagram_content_publish",
 ];
 
-type OAuthConfiguration = { appId: string; appSecret: string; redirectUri: string };
+type OAuthConfiguration = { appId: string; appSecret: string; redirectUri: string; configId: string };
 
 function callbackFromEnvironment(environment: NodeJS.ProcessEnv): string {
   const explicit = environment["FACEBOOK_REDIRECT_URI"]?.trim();
@@ -33,13 +33,14 @@ export function facebookOAuthConfiguration(
   const appId = environment["META_APP_ID"]?.trim();
   const appSecret = environment["META_APP_SECRET"]?.trim();
   const redirectUri = callbackFromEnvironment(environment);
-  if (!appId || !appSecret || !redirectUri) {
+  const configId = environment["META_LOGIN_CONFIG_ID"]?.trim();
+  if (!appId || !appSecret || !redirectUri || !configId) {
     throw new MetaLinkError(
       "SERVER_CONFIG_MISSING",
-      "O login do Facebook ainda não está configurado no servidor.",
+      "O Login do Facebook para Empresas ainda não está configurado no servidor.",
     );
   }
-  return { appId, appSecret, redirectUri };
+  return { appId, appSecret, redirectUri, configId };
 }
 
 function signState(payload: string, secret: string): string {
@@ -95,14 +96,10 @@ export function facebookAuthorizationUrl(
   url.searchParams.set("redirect_uri", configuration.redirectUri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("state", createFacebookOAuthState(userId, environment));
-  // Login do Facebook para Empresas: quando existe uma configuração criada no painel,
-  // usamos o config_id (as permissões vêm da configuração, não do parâmetro scope).
-  const configId = environment["META_LOGIN_CONFIG_ID"]?.trim();
-  if (configId) {
-    url.searchParams.set("config_id", configId);
-  } else {
-    url.searchParams.set("scope", FACEBOOK_SCOPES.join(","));
-  }
+  // No Login para Empresas, as permissões pertencem à configuração da Meta.
+  // Enviar `scope` junto (ou cair no OAuth clássico) faz a Meta rejeitar permissões
+  // empresariais como pages_read_engagement antes mesmo de abrir o consentimento.
+  url.searchParams.set("config_id", configuration.configId);
   return url.toString();
 }
 
