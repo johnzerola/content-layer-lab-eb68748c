@@ -33,6 +33,7 @@ import { Route as ApiPublicHlsProxyRouteImport } from './routes/api/public/hls-p
 import { Route as ApiPublicMediaProxyRouteImport } from './routes/api/public/media-proxy'
 import { Route as IntegracoesFacebookCallbackRouteImport } from './routes/integracoes_.facebook.callback'
 import { Route as IntegracoesInstagramCallbackRouteImport } from './routes/integracoes_.instagram.callback'
+import { Route as IntegracoesTiktokCallbackRouteImport } from './routes/integracoes_.tiktok.callback'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
 
 const IndexRoute = IndexRouteImport.update({
@@ -161,6 +162,12 @@ const IntegracoesInstagramCallbackRoute =
     path: '/integracoes/instagram/callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const IntegracoesTiktokCallbackRoute =
+  IntegracoesTiktokCallbackRouteImport.update({
+    id: '/integracoes_/tiktok/callback',
+    path: '/integracoes/tiktok/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksPublishDueRoute =
   ApiPublicHooksPublishDueRouteImport.update({
     id: '/api/public/hooks/publish-due',
@@ -193,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
   '/integracoes/facebook/callback': typeof IntegracoesFacebookCallbackRoute
   '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
+  '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
 export interface FileRoutesByTo {
@@ -220,6 +228,7 @@ export interface FileRoutesByTo {
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
   '/integracoes/facebook/callback': typeof IntegracoesFacebookCallbackRoute
   '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
+  '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
 export interface FileRoutesById {
@@ -248,6 +257,7 @@ export interface FileRoutesById {
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
   '/integracoes_/facebook/callback': typeof IntegracoesFacebookCallbackRoute
   '/integracoes_/instagram/callback': typeof IntegracoesInstagramCallbackRoute
+  '/integracoes_/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
 export interface FileRouteTypes {
@@ -277,6 +287,7 @@ export interface FileRouteTypes {
     | '/api/public/media-proxy'
     | '/integracoes/facebook/callback'
     | '/integracoes/instagram/callback'
+    | '/integracoes/tiktok/callback'
     | '/api/public/hooks/publish-due'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -304,6 +315,7 @@ export interface FileRouteTypes {
     | '/api/public/media-proxy'
     | '/integracoes/facebook/callback'
     | '/integracoes/instagram/callback'
+    | '/integracoes/tiktok/callback'
     | '/api/public/hooks/publish-due'
   id:
     | '__root__'
@@ -331,6 +343,7 @@ export interface FileRouteTypes {
     | '/api/public/media-proxy'
     | '/integracoes_/facebook/callback'
     | '/integracoes_/instagram/callback'
+    | '/integracoes_/tiktok/callback'
     | '/api/public/hooks/publish-due'
   fileRoutesById: FileRoutesById
 }
@@ -359,6 +372,7 @@ export interface RootRouteChildren {
   ApiPublicMediaProxyRoute: typeof ApiPublicMediaProxyRoute
   IntegracoesFacebookCallbackRoute: typeof IntegracoesFacebookCallbackRoute
   IntegracoesInstagramCallbackRoute: typeof IntegracoesInstagramCallbackRoute
+  IntegracoesTiktokCallbackRoute: typeof IntegracoesTiktokCallbackRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
 }
 
@@ -532,6 +546,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IntegracoesInstagramCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/integracoes_/tiktok/callback': {
+      id: '/integracoes_/tiktok/callback'
+      path: '/integracoes/tiktok/callback'
+      fullPath: '/integracoes/tiktok/callback'
+      preLoaderRoute: typeof IntegracoesTiktokCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/publish-due': {
       id: '/api/public/hooks/publish-due'
       path: '/api/public/hooks/publish-due'
@@ -568,6 +589,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicMediaProxyRoute: ApiPublicMediaProxyRoute,
   IntegracoesFacebookCallbackRoute: IntegracoesFacebookCallbackRoute,
   IntegracoesInstagramCallbackRoute: IntegracoesInstagramCallbackRoute,
+  IntegracoesTiktokCallbackRoute: IntegracoesTiktokCallbackRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
 }
 export const routeTree = rootRouteImport
