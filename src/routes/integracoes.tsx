@@ -52,7 +52,8 @@ const PLATFORMS: Array<{
   {
     platform: "instagram",
     name: "Instagram",
-    description: "Reels, Feed e Stories via login oficial da Meta.",
+    description:
+      "Reels, Feed e Stories. A autorização é feita pelo Facebook (o Instagram Profissional precisa estar vinculado a uma Página).",
     icon: Instagram,
     available: true,
   },
