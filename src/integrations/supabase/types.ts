@@ -357,6 +357,8 @@ export type Database = {
           connection_id: string
           created_at: string
           expires_at: string
+          refresh_expires_at: string | null
+          refresh_token_ciphertext: string | null
           updated_at: string
         }
         Insert: {
@@ -364,6 +366,8 @@ export type Database = {
           connection_id: string
           created_at?: string
           expires_at: string
+          refresh_expires_at?: string | null
+          refresh_token_ciphertext?: string | null
           updated_at?: string
         }
         Update: {
@@ -371,6 +375,8 @@ export type Database = {
           connection_id?: string
           created_at?: string
           expires_at?: string
+          refresh_expires_at?: string | null
+          refresh_token_ciphertext?: string | null
           updated_at?: string
         }
         Relationships: [
