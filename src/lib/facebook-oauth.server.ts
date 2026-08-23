@@ -94,10 +94,18 @@ export function facebookAuthorizationUrl(
   url.searchParams.set("client_id", configuration.appId);
   url.searchParams.set("redirect_uri", configuration.redirectUri);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", FACEBOOK_SCOPES.join(","));
   url.searchParams.set("state", createFacebookOAuthState(userId, environment));
+  // Login do Facebook para Empresas: quando existe uma configuração criada no painel,
+  // usamos o config_id (as permissões vêm da configuração, não do parâmetro scope).
+  const configId = environment["META_LOGIN_CONFIG_ID"]?.trim();
+  if (configId) {
+    url.searchParams.set("config_id", configId);
+  } else {
+    url.searchParams.set("scope", FACEBOOK_SCOPES.join(","));
+  }
   return url.toString();
 }
+
 
 function asObject(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
