@@ -73,7 +73,7 @@ import { downloadBlob, grabPoster, outputIsWebm, renderVideo } from "@/lib/rende
 import { webCodecsSupported } from "@/lib/encode";
 import { defaultAntiDup, describeVariation, makeVariation } from "@/lib/variation";
 import { autoFrame } from "@/lib/autoframe";
-import { findClips, formatTime } from "@/lib/clips";
+import { findClips, formatTime, type ClipMetrics } from "@/lib/clips";
 import { getClipFeedback } from "@/lib/clip-feedback";
 import { cuesToSentences, speechKeepSegments, zoomKeys, type Sentence } from "@/lib/transcript-clips";
 import { resolveVideoLink } from "@/lib/import.functions";
@@ -136,6 +136,11 @@ interface Item {
   clipReason?: string | undefined;
   /** rótulos detectados no trecho */
   clipTags?: string[] | undefined;
+  /** detalhamento do score viral */
+  clipMetrics?: ClipMetrics | undefined;
+  /** hashtags sugeridas pela IA */
+  clipHashtags?: string[] | undefined;
+
   status: Status;
   progress: number;
   /** etapa atual legível (transcrição, render de cada variação, etc.) */
@@ -789,6 +794,9 @@ function Home() {
           clipTitle: c.title,
           clipReason: c.reason,
           clipTags: c.tags,
+          ...(c.metrics ? { clipMetrics: c.metrics } : {}),
+          ...(c.hashtags?.length ? { clipHashtags: c.hashtags } : {}),
+
           status: "pendente" as Status,
           progress: 0,
           ...(preEdit ? { preEdit } : {}),
