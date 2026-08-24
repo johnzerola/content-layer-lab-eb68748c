@@ -568,6 +568,38 @@ function ClipCard({
             </button>
             {showReport && (
               <div className="space-y-1.5 border-t border-border/40 p-2">
+                <div className="flex items-center gap-2 pb-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void checkAudio();
+                    }}
+                    className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground hover:border-primary hover:text-foreground"
+                  >
+                    <AudioLines className="size-3" />
+                    {analyzing ? "analisando áudio…" : "analisar áudio"}
+                  </button>
+                  {health && (
+                    <span
+                      className={`font-mono text-[9px] ${
+                        health.hasAudio ? "text-primary" : "text-destructive"
+                      }`}
+                    >
+                      {health.hasAudio
+                        ? `${health.dbfs.toFixed(1)} dBFS · silêncio ${Math.round(health.silenceRatio * 100)}% · nota ${Math.round(health.score * 100)}`
+                        : "sem áudio"}
+                    </span>
+                  )}
+                </div>
+                {health?.issues.length ? (
+                  <ul className="space-y-0.5 pb-1">
+                    {health.issues.map((i) => (
+                      <li key={i} className="font-mono text-[9px] text-warn">
+                        • {i}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
                 {item.clipMetrics &&
                   (
                     [
