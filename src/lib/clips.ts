@@ -332,6 +332,38 @@ function describe(c: Candidate, index: number, duration: number) {
   };
 }
 
+const STOP_WORDS = new Set([
+  "para","com","que","uma","dos","das","por","mais","como","isso","aqui","você","voce",
+  "ele","ela","nos","tem","the","and","você","então","entao","muito","quando","porque",
+  "todo","toda","meu","minha","seu","sua","este","esta","esse","essa","tudo","nada",
+]);
+
+/** Hashtags sugeridas a partir das etiquetas da IA e das palavras fortes do trecho. */
+export function suggestHashtags(tags: string[], text?: string): string[] {
+  const out: string[] = ["#shorts", "#reels"];
+  if (tags.includes("gancho") || tags.includes("gancho de texto")) out.push("#viral");
+  if (tags.includes("pico")) out.push("#momento");
+  if (tags.includes("reação")) out.push("#reacao");
+  if (tags.includes("desfecho")) out.push("#historia");
+
+  const words = (text ?? "")
+    .toLowerCase()
+    .replace(/[^\p{L}\s]/gu, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 5 && !STOP_WORDS.has(w));
+  const freq = new Map<string, number>();
+  for (const w of words) freq.set(w, (freq.get(w) ?? 0) + 1);
+  const top = [...freq.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([w]) => `#${w}`);
+
+  for (const t of top) if (!out.includes(t)) out.push(t);
+  return out.slice(0, 6);
+}
+
+
+
 /** Encontra os melhores trechos de um vídeo longo. */
 export async function findClips(file: File, opts: ClipOptions = {}): Promise<Clip[]> {
   const target = Math.max(3, opts.target ?? 30);
