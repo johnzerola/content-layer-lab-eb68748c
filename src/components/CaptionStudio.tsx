@@ -4,6 +4,7 @@ import { drawCaptions } from "@/lib/draw";
 import { BUILTIN_FONTS, fileToFont } from "@/lib/fonts";
 import { CAPTION_PRESETS, type CaptionStyle, type CustomFont } from "@/lib/template";
 import type { CaptionCue } from "@/lib/captions";
+import { CaptionTemplateGallery } from "./CaptionTemplateGallery";
 
 interface Props {
   style: CaptionStyle;
@@ -141,6 +142,8 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
       </div>
 
       <div className="space-y-3">
+        <CaptionTemplateGallery style={style} onChange={onChange} cues={cues} />
+
         <div>
           <p className="mono-label mb-1.5">Presets</p>
           <div className="flex flex-wrap gap-1.5">
