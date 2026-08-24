@@ -252,10 +252,20 @@ function ClipCard({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const url = useMediaObjectUrl(item.file);
+  const audio = useClipAudio();
 
   const start = item.clip?.start ?? 0;
   const end = item.clip?.end ?? item.duration;
+
+  // mantém volume/mudo sincronizados com o controle global do estúdio
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.volume = audio.volume;
+    v.muted = audio.muted;
+  }, [audio.volume, audio.muted, url]);
 
   const play = async () => {
     const v = videoRef.current;
@@ -268,7 +278,9 @@ function ClipCard({
 
     try {
       await prepareClipPlayback(v, start, end);
-      await v.play();
+      v.volume = audio.volume;
+      v.muted = audio.muted;
+      await playWithAudio(v);
       setPlaying(true);
     } catch (e) {
       const err = e as Error;
@@ -282,6 +294,19 @@ function ClipCard({
 
   const [pos, setPos] = useState(0);
   const len = Math.max(0.1, end - start);
+
+  /** clique/arraste na barra move o cabeçote dentro do corte */
+  const scrub = useCallback(
+    (clientX: number, el: HTMLElement) => {
+      const v = videoRef.current;
+      if (!v) return;
+      const r = el.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (clientX - r.left) / Math.max(1, r.width)));
+      v.currentTime = start + ratio * len;
+      setPos(ratio * len);
+    },
+    [start, len],
+  );
 
   return (
     <div
@@ -297,10 +322,11 @@ function ClipCard({
           ref={videoRef}
           src={url || undefined}
           preload="metadata"
-          muted
           playsInline
           poster={item.poster ?? undefined}
           className="size-full object-cover"
+          onPlay={(e) => claimPlayback(e.currentTarget)}
+          onPause={() => setPlaying(false)}
           onTimeUpdate={(e) => {
             const v = e.currentTarget;
             setPos(Math.max(0, Math.min(len, v.currentTime - start)));
@@ -312,6 +338,7 @@ function ClipCard({
             }
           }}
         />
+
 
         {/* faixa de título estilo capa de corte */}
         {item.clipTitle && (
