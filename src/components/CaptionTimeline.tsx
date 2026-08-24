@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pause, Play, Scissors, Trash2, ZoomIn, ZoomOut } from "lucide-react";
+import { Pause, Play, Scissors, Trash2, Volume2, VolumeX, ZoomIn, ZoomOut } from "lucide-react";
 import type { CaptionCue, CaptionWord } from "@/lib/captions";
 
 interface Props {
