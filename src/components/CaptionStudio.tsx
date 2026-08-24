@@ -365,6 +365,14 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
                 suffix="px"
                 onChange={(v) => onChange({ boxBorderWidth: v })}
               />
+              <Field label="Cor da borda">
+                <input
+                  type="color"
+                  className="h-8 w-full rounded-lg border border-border bg-transparent"
+                  value={style.boxBorderColor ?? "#ffffff"}
+                  onChange={(e) => onChange({ boxBorderColor: e.target.value })}
+                />
+              </Field>
               <Range
                 label="Respiro da caixa"
                 value={Math.round((style.boxPad ?? 0.28) * 100)}
