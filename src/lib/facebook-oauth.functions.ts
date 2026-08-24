@@ -3,6 +3,7 @@ import { z } from "zod";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
+  diagnoseFacebookOAuth,
   exchangeFacebookAuthorizationCode,
   facebookAuthorizationUrl,
   fetchFacebookPages,
@@ -11,24 +12,25 @@ import {
 import { persistFacebookPages } from "@/lib/facebook-persistence.server";
 import { MetaLinkError, linkingServerRuntimeReady } from "@/lib/social-linking.server";
 
-function oauthError(error: unknown) {
-  if (error instanceof MetaLinkError) {
-    return { ok: false as const, code: error.code, error: error.message };
-  }
-  return {
-    ok: false as const,
-    code: "META_AUTH_INVALID" as const,
-    error: "Não foi possível conectar o Facebook.",
-  };
-}
-
 export const beginFacebookOAuth = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .handler(async ({ context }) => {
     try {
-      return { ok: true as const, authorizationUrl: facebookAuthorizationUrl(context.userId) };
+      const diagnostics = diagnoseFacebookOAuth();
+      return {
+        ok: true as const,
+        authorizationUrl: facebookAuthorizationUrl(context.userId),
+        diagnostics,
+      };
     } catch (error) {
-      return oauthError(error);
+      if (error instanceof MetaLinkError) {
+        return { ok: false as const, code: error.code, error: error.message };
+      }
+      return {
+        ok: false as const,
+        code: "META_AUTH_INVALID" as const,
+        error: "Não foi possível validar a configuração do Facebook.",
+      };
     }
   });
 
@@ -62,6 +64,13 @@ export const completeFacebookOAuth = createServerFn({ method: "POST" })
       });
       return { ok: true as const, accounts };
     } catch (error) {
-      return oauthError(error);
+      if (error instanceof MetaLinkError) {
+        return { ok: false as const, code: error.code, error: error.message };
+      }
+      return {
+        ok: false as const,
+        code: "META_AUTH_INVALID" as const,
+        error: "Não foi possível conectar o Facebook.",
+      };
     }
   });

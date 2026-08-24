@@ -9,6 +9,8 @@ const callbackSearch = z.object({
   code: z.string().optional(),
   state: z.string().optional(),
   error: z.string().optional(),
+  error_code: z.string().optional(),
+  error_reason: z.string().optional(),
   error_description: z.string().optional(),
 });
 
@@ -33,9 +35,14 @@ function FacebookOAuthCallback() {
     if (started.current) return;
     started.current = true;
     if (search.error || !search.code || !search.state) {
+      const providerCode = search.error_code ? ` (código ${search.error_code})` : "";
       setResult({
         ok: false,
-        message: search.error_description || "A autorização do Facebook foi cancelada.",
+        message: search.error_description
+          ? `A Meta recusou a autorização${providerCode}: ${search.error_description}`
+          : search.error_reason
+            ? `A Meta recusou a autorização${providerCode}: ${search.error_reason}`
+            : "A autorização do Facebook foi cancelada ou não retornou os dados necessários.",
       });
       return;
     }
@@ -53,7 +60,15 @@ function FacebookOAuthCallback() {
         );
       })
       .catch(() => setResult({ ok: false, message: "Não foi possível concluir a conexão." }));
-  }, [completeOAuth, search.code, search.error, search.error_description, search.state]);
+  }, [
+    completeOAuth,
+    search.code,
+    search.error,
+    search.error_code,
+    search.error_description,
+    search.error_reason,
+    search.state,
+  ]);
 
   return (
     <main className="grid min-h-dvh place-items-center bg-background p-4">
