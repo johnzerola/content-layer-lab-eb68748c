@@ -90,6 +90,22 @@ export interface CaptionStyle extends BoxLayer {
   boxRadius?: number;
   /** opacidade da caixa de fundo (0–1) */
   boxOpacity?: number;
+  /** espaçamento entre letras, em px do canvas 1080 */
+  letterSpacing?: number;
+  /** cor da sombra do texto */
+  shadowColor?: string;
+  /** desfoque da sombra (multiplicador do tamanho da fonte) */
+  shadowBlur?: number;
+  /** deslocamento vertical da sombra (multiplicador do tamanho da fonte) */
+  shadowY?: number;
+  /** deslocamento horizontal da sombra (multiplicador do tamanho da fonte) */
+  shadowX?: number;
+  /** opacidade da sombra (0–1) */
+  shadowOpacity?: number;
+  /** cor da borda da caixa de fundo */
+  boxBorderColor?: string;
+  /** espessura da borda da caixa de fundo, em px do canvas 1080 */
+  boxBorderWidth?: number;
 }
 
 
