@@ -237,6 +237,13 @@ export function drawCaptions(
   ctx.globalAlpha = (s.opacity ?? 1) * alphaIn;
   ctx.font = `${s.weight} ${s.size}px ${s.font}`;
   ctx.textBaseline = "top";
+  // espaçamento entre letras (Chrome/Edge; ignorado silenciosamente onde não há suporte)
+  const ls = s.letterSpacing ?? 0;
+  try {
+    (ctx as unknown as { letterSpacing: string }).letterSpacing = `${ls}px`;
+  } catch {
+    /* sem suporte */
+  }
 
   const norm = (txt: string) => (s.uppercase ? txt.toUpperCase() : txt);
   const space = ctx.measureText(" ").width;
