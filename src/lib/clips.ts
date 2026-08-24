@@ -27,7 +27,23 @@ export interface Clip {
   tags?: string[];
   /** transcrição do trecho, quando o corte foi guiado pela fala */
   text?: string;
+  /** detalhamento do score (0..1 cada) para o relatório viral */
+  metrics?: ClipMetrics;
+  /** hashtags sugeridas para a publicação */
+  hashtags?: string[];
 }
+
+export interface ClipMetrics {
+  hook: number;
+  density: number;
+  cadence: number;
+  clarity: number;
+  motion: number;
+  edgeQuality: number;
+  /** retenção estimada 0..1 */
+  retention: number;
+}
+
 
 export interface ClipOptions {
   /** duração alvo (compat) — usada quando min/max não são informados */
@@ -316,6 +332,38 @@ function describe(c: Candidate, index: number, duration: number) {
   };
 }
 
+const STOP_WORDS = new Set([
+  "para","com","que","uma","dos","das","por","mais","como","isso","aqui","você","voce",
+  "ele","ela","nos","tem","the","and","você","então","entao","muito","quando","porque",
+  "todo","toda","meu","minha","seu","sua","este","esta","esse","essa","tudo","nada",
+]);
+
+/** Hashtags sugeridas a partir das etiquetas da IA e das palavras fortes do trecho. */
+export function suggestHashtags(tags: string[], text?: string): string[] {
+  const out: string[] = ["#shorts", "#reels"];
+  if (tags.includes("gancho") || tags.includes("gancho de texto")) out.push("#viral");
+  if (tags.includes("pico")) out.push("#momento");
+  if (tags.includes("reação")) out.push("#reacao");
+  if (tags.includes("desfecho")) out.push("#historia");
+
+  const words = (text ?? "")
+    .toLowerCase()
+    .replace(/[^\p{L}\s]/gu, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 5 && !STOP_WORDS.has(w));
+  const freq = new Map<string, number>();
+  for (const w of words) freq.set(w, (freq.get(w) ?? 0) + 1);
+  const top = [...freq.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([w]) => `#${w}`);
+
+  for (const t of top) if (!out.includes(t)) out.push(t);
+  return out.slice(0, 6);
+}
+
+
+
 /** Encontra os melhores trechos de um vídeo longo. */
 export async function findClips(file: File, opts: ClipOptions = {}): Promise<Clip[]> {
   const target = Math.max(3, opts.target ?? 30);
@@ -560,6 +608,10 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
     .sort((a, b) => a.start - b.start)
     .map((c, i) => {
       const meta = describe(c, i, duration);
+      const retention = Math.max(
+        0,
+        Math.min(1, c.hook * 0.4 + c.density * 0.3 + c.cadence * 0.2 + c.edgeQuality * 0.1),
+      );
       return {
         start: Number(c.start.toFixed(2)),
         end: Number(Math.min(duration, c.end).toFixed(2)),
@@ -567,9 +619,20 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
         title: meta.title,
         reason: meta.reason,
         tags: c.tags,
+        metrics: {
+          hook: c.hook,
+          density: c.density,
+          cadence: c.cadence,
+          clarity: c.clarity,
+          motion: c.motion,
+          edgeQuality: c.edgeQuality,
+          retention,
+        },
+        hashtags: suggestHashtags(c.tags, c.text),
         ...(c.text ? { text: c.text } : {}),
       };
     });
+
 
   opts.onProgress?.(1);
   return clips;
