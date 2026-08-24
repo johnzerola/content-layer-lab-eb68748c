@@ -665,7 +665,8 @@ function SelectedClip({
     }
     try {
       await prepareClipPlayback(v, start, end);
-      await v.play();
+      await playWithAudio(v);
+
       setPlaying(true);
     } catch (error) {
       if ((error as Error)?.name === "AbortError") return;
