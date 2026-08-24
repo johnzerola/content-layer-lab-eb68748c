@@ -32,6 +32,7 @@ export function CaptionTimeline({ file, cues, onChange }: Props) {
   const [dur, setDur] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [pps, setPps] = useState(120); // pixels por segundo
+  const [muted, setMuted] = useState(false);
   const [sel, setSel] = useState<Sel>(null);
 
   const url = useMemo(() => URL.createObjectURL(file), [file]);
