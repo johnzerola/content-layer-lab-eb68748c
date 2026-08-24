@@ -311,8 +311,60 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
             suffix="%"
             onChange={(v) => onChange({ opacity: v / 100 })}
           />
+          <Range
+            label="Espaço entre letras"
+            value={style.letterSpacing ?? 0}
+            min={-6}
+            max={24}
+            suffix="px"
+            onChange={(v) => onChange({ letterSpacing: v })}
+          />
+          {style.bg === "shadow" && (
+            <>
+              <Range
+                label="Desfoque da sombra"
+                value={Math.round((style.shadowBlur ?? 0.25) * 100)}
+                min={0}
+                max={150}
+                suffix="%"
+                onChange={(v) => onChange({ shadowBlur: v / 100 })}
+              />
+              <Range
+                label="Sombra · vertical"
+                value={Math.round((style.shadowY ?? 0.06) * 100)}
+                min={-50}
+                max={50}
+                suffix="%"
+                onChange={(v) => onChange({ shadowY: v / 100 })}
+              />
+              <Range
+                label="Sombra · horizontal"
+                value={Math.round((style.shadowX ?? 0) * 100)}
+                min={-50}
+                max={50}
+                suffix="%"
+                onChange={(v) => onChange({ shadowX: v / 100 })}
+              />
+              <Range
+                label="Opacidade da sombra"
+                value={Math.round((style.shadowOpacity ?? 0.65) * 100)}
+                min={0}
+                max={100}
+                suffix="%"
+                onChange={(v) => onChange({ shadowOpacity: v / 100 })}
+              />
+            </>
+          )}
           {style.bg === "box" && (
             <>
+              <Range
+                label="Borda da caixa"
+                value={style.boxBorderWidth ?? 0}
+                min={0}
+                max={20}
+                suffix="px"
+                onChange={(v) => onChange({ boxBorderWidth: v })}
+              />
               <Range
                 label="Respiro da caixa"
                 value={Math.round((style.boxPad ?? 0.28) * 100)}
