@@ -27,7 +27,23 @@ export interface Clip {
   tags?: string[];
   /** transcrição do trecho, quando o corte foi guiado pela fala */
   text?: string;
+  /** detalhamento do score (0..1 cada) para o relatório viral */
+  metrics?: ClipMetrics;
+  /** hashtags sugeridas para a publicação */
+  hashtags?: string[];
 }
+
+export interface ClipMetrics {
+  hook: number;
+  density: number;
+  cadence: number;
+  clarity: number;
+  motion: number;
+  edgeQuality: number;
+  /** retenção estimada 0..1 */
+  retention: number;
+}
+
 
 export interface ClipOptions {
   /** duração alvo (compat) — usada quando min/max não são informados */
