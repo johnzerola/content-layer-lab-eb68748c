@@ -1,6 +1,6 @@
 /** Facebook Login for Business: autoriza Páginas do Facebook e contas IG Business. */
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { facebookGraphBase } from "@/lib/meta.server";
+import { facebookGraphBase, metaGraphVersion } from "@/lib/meta.server";
 import { MetaLinkError } from "@/lib/social-linking.server";
 
 const OAUTH_TTL_MS = 10 * 60 * 1000;
@@ -91,9 +91,9 @@ export function facebookAuthorizationUrl(
   environment: NodeJS.ProcessEnv = process.env,
 ): string {
   const configuration = facebookOAuthConfiguration(environment);
-  // Sem versão no caminho: a Meta usa a versão padrão do app.
-  // Fixar uma versão inexistente (ex.: v26.0) faz o diálogo abrir "Sorry, something went wrong".
-  const url = new URL("https://www.facebook.com/dialog/oauth");
+  // O Login for Business deve usar a mesma versão configurada para as chamadas Graph.
+  // Isso evita a Meta resolver o diálogo com uma versão padrão diferente da configuração.
+  const url = new URL(`https://www.facebook.com/${metaGraphVersion(environment)}/dialog/oauth`);
   url.searchParams.set("client_id", configuration.appId);
   url.searchParams.set("redirect_uri", configuration.redirectUri);
   url.searchParams.set("response_type", "code");
