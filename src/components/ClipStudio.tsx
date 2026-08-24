@@ -184,7 +184,13 @@ async function playWithAudio(el: HTMLVideoElement) {
     el.muted = true;
     try {
       await el.play();
-      toast.info("O navegador bloqueou o som — clique no ícone de volume para ativar.");
+      toast.info("O navegador bloqueou o som — ele volta assim que você clicar na página.");
+      // religa o som sozinho no primeiro gesto do usuário
+      unlockAudioOnGesture(() => {
+        if (audioStore.muted) return;
+        el.muted = false;
+        el.volume = audioStore.volume;
+      });
     } catch {
       /* ignora */
     }
