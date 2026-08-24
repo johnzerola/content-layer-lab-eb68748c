@@ -16,9 +16,12 @@ import {
   VolumeX,
   BarChart3,
   Copy,
+  AudioLines,
+  Gauge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatTime, type ClipMetrics } from "@/lib/clips";
+import { analyzeAudio, unlockAudioOnGesture, type AudioHealth } from "@/lib/audio-health";
 import { toast } from "sonner";
 
 
