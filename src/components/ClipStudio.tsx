@@ -466,6 +466,22 @@ function ClipCard({
                 onChange={(e) => audio.setVolume(Number(e.target.value))}
                 className="h-1 w-12 accent-primary"
               />
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const steps = [1, 1.25, 1.5, 2, 0.5];
+                  const next = steps[(steps.indexOf(rate) + 1) % steps.length] ?? 1;
+                  setRate(next);
+                  const v = videoRef.current;
+                  if (v) v.playbackRate = next;
+                }}
+                title="velocidade de reprodução"
+                aria-label="velocidade de reprodução"
+                className="flex items-center gap-0.5 font-mono text-[10px] text-white/80 hover:text-white"
+              >
+                <Gauge className="size-3" />
+                {rate}x
+              </button>
               <p
                 className={`font-mono text-[10px] ${
                   item.status === "pronto"
