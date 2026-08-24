@@ -262,8 +262,23 @@ function ClipCard({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [rate, setRate] = useState(1);
+  const [health, setHealth] = useState<AudioHealth | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const url = useMediaObjectUrl(item.file);
   const audio = useClipAudio();
+
+  const checkAudio = useCallback(async () => {
+    if (analyzing) return;
+    setAnalyzing(true);
+    try {
+      const s = item.clip?.start ?? 0;
+      const e = item.clip?.end ?? item.duration;
+      setHealth(await analyzeAudio(item.file, { start: s, end: e }));
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [analyzing, item.clip, item.duration, item.file]);
 
   const start = item.clip?.start ?? 0;
   const end = item.clip?.end ?? item.duration;
