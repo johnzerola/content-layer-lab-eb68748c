@@ -329,6 +329,12 @@ export function drawCaptions(
       s.size * (s.boxRadius ?? 0.18),
     );
     ctx.fill();
+    if ((s.boxBorderWidth ?? 0) > 0) {
+      ctx.globalAlpha = prev;
+      ctx.lineWidth = s.boxBorderWidth!;
+      ctx.strokeStyle = s.boxBorderColor ?? "#ffffff";
+      ctx.stroke();
+    }
     ctx.globalAlpha = prev;
   }
 
