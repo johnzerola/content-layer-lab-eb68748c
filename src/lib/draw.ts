@@ -76,6 +76,18 @@ export function preloadImage(src: string) {
   });
 }
 
+/** aplica opacidade a uma cor hex (#rgb/#rrggbb); outras notações passam direto */
+export function withAlpha(color: string, alpha: number) {
+  const a = Math.min(1, Math.max(0, alpha));
+  const hex = color.trim();
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const h = m[1]!;
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const n = parseInt(full, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
+
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   const rr = Math.min(r, w / 2, h / 2);
   ctx.beginPath();
