@@ -698,10 +698,12 @@ function SelectedClip({
           ref={videoRef}
           src={url || undefined}
           preload="metadata"
-          muted
           playsInline
           poster={item.poster ?? undefined}
           className="size-full object-cover"
+          onPlay={(e) => claimPlayback(e.currentTarget)}
+          onPause={() => setPlaying(false)}
+
           onTimeUpdate={(e) => {
             const v = e.currentTarget;
             if (v.currentTime >= end) {
