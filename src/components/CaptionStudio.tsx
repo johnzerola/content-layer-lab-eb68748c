@@ -231,7 +231,7 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
           </Field>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
           {(
             [
               ["Cor do texto", "color"],
@@ -239,6 +239,7 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
               ["Contorno", "strokeColor"],
               ["Caixa/realce", "highlightColor"],
               ["Fundo (caixa)", "boxColor"],
+              ["Cor da sombra", "shadowColor"],
             ] as const
           ).map(([label, key]) => (
             <Field key={key} label={label}>
