@@ -77,7 +77,7 @@ describe("Facebook Login for Business", () => {
     });
     expect(result.accessToken).toBe("long");
     const firstUrl = new URL(String(request.mock.calls[0]?.[0]));
-    expect(firstUrl.searchParams.get("redirect_uri")).toBe(environment.FACEBOOK_REDIRECT_URI);
+    expect(firstUrl.searchParams.get("redirect_uri")).toBe(environment["FACEBOOK_REDIRECT_URI"]);
     expect(firstUrl.searchParams.get("code")).toBe("authorization-code");
   });
 
