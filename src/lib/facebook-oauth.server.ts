@@ -102,6 +102,8 @@ export function facebookAuthorizationUrl(
   // Enviar `scope` junto (ou cair no OAuth clássico) faz a Meta rejeitar permissões
   // empresariais como pages_read_engagement antes mesmo de abrir o consentimento.
   url.searchParams.set("config_id", configuration.configId);
+  // Obrigatório para receber `code` no Login para Empresas.
+  url.searchParams.set("override_default_response_type", "true");
   return url.toString();
 }
 
