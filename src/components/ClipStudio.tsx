@@ -651,9 +651,18 @@ function SelectedClip({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const url = useMediaObjectUrl(item.file);
+  const audio = useClipAudio();
 
   const start = item.clip?.start ?? 0;
   const end = item.clip?.end ?? item.duration;
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.volume = audio.volume;
+    v.muted = audio.muted;
+  }, [audio.volume, audio.muted, url]);
+
 
   const toggle = async () => {
     const v = videoRef.current;
