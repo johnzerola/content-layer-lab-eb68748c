@@ -794,6 +794,9 @@ function Home() {
           clipTitle: c.title,
           clipReason: c.reason,
           clipTags: c.tags,
+          ...(c.metrics ? { clipMetrics: c.metrics } : {}),
+          ...(c.hashtags?.length ? { clipHashtags: c.hashtags } : {}),
+
           status: "pendente" as Status,
           progress: 0,
           ...(preEdit ? { preEdit } : {}),
