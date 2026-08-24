@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   Scissors,
   Play,
@@ -12,10 +12,15 @@ import {
   Check,
   Flame,
   GripVertical,
+  Volume2,
+  VolumeX,
+  BarChart3,
+  Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatTime } from "@/lib/clips";
+import { formatTime, type ClipMetrics } from "@/lib/clips";
 import { toast } from "sonner";
+
 
 
 export interface ClipItem {
