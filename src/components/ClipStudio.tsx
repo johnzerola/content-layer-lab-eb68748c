@@ -289,7 +289,8 @@ function ClipCard({
     if (!v) return;
     v.volume = audio.volume;
     v.muted = audio.muted;
-  }, [audio.volume, audio.muted, url]);
+    v.playbackRate = rate;
+  }, [audio.volume, audio.muted, url, rate]);
 
   const play = async () => {
     const v = videoRef.current;
