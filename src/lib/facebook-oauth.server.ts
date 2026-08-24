@@ -16,6 +16,14 @@ export const FACEBOOK_SCOPES = [
 
 type OAuthConfiguration = { appId: string; appSecret: string; redirectUri: string; configId: string };
 
+export type FacebookOAuthDiagnostics = {
+  ready: true;
+  flowVersion: "facebook-login-for-business-v1";
+  graphVersion: string;
+  redirectOrigin: string;
+  redirectPath: "/integracoes/facebook/callback";
+};
+
 function callbackFromEnvironment(environment: NodeJS.ProcessEnv): string {
   const explicit = environment["FACEBOOK_REDIRECT_URI"]?.trim();
   if (explicit) return explicit;
@@ -40,7 +48,44 @@ export function facebookOAuthConfiguration(
       "O Login do Facebook para Empresas ainda não está configurado no servidor.",
     );
   }
+  if (!/^\d+$/.test(appId) || !/^\d+$/.test(configId)) {
+    throw new MetaLinkError(
+      "SERVER_CONFIG_MISSING",
+      "O App ID ou o ID da configuração empresarial da Meta é inválido.",
+    );
+  }
+  let callback: URL;
+  try {
+    callback = new URL(redirectUri);
+  } catch {
+    throw new MetaLinkError("SERVER_CONFIG_MISSING", "A URL de retorno do Facebook é inválida.");
+  }
+  if (
+    callback.protocol !== "https:" ||
+    callback.pathname !== "/integracoes/facebook/callback" ||
+    callback.search ||
+    callback.hash
+  ) {
+    throw new MetaLinkError(
+      "SERVER_CONFIG_MISSING",
+      "A URL de retorno deve ser HTTPS e terminar exatamente em /integracoes/facebook/callback.",
+    );
+  }
   return { appId, appSecret, redirectUri, configId };
+}
+
+export function diagnoseFacebookOAuth(
+  environment: NodeJS.ProcessEnv = process.env,
+): FacebookOAuthDiagnostics {
+  const configuration = facebookOAuthConfiguration(environment);
+  const callback = new URL(configuration.redirectUri);
+  return {
+    ready: true,
+    flowVersion: "facebook-login-for-business-v1",
+    graphVersion: metaGraphVersion(environment),
+    redirectOrigin: callback.origin,
+    redirectPath: "/integracoes/facebook/callback",
+  };
 }
 
 function signState(payload: string, secret: string): string {

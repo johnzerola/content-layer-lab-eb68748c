@@ -18,6 +18,7 @@ import { listAccounts, removeAccount, type SocialAccount } from "@/lib/social";
 
 import { beginFacebookOAuth } from "@/lib/facebook-oauth.functions";
 import { AppShell, type AppMode } from "@/components/AppShell";
+import { Button } from "@/components/ui/button";
 import { listJobs } from "@/lib/jobs";
 
 export const Route = createFileRoute("/integracoes")({
@@ -118,6 +119,15 @@ function IntegrationsPage() {
           toast.error(response.error);
           return;
         }
+        const authorizationUrl = new URL(response.authorizationUrl);
+        if (
+          authorizationUrl.pathname !== `/${response.diagnostics.graphVersion}/dialog/oauth` ||
+          authorizationUrl.searchParams.get("redirect_uri") !==
+            `${response.diagnostics.redirectOrigin}${response.diagnostics.redirectPath}`
+        ) {
+          toast.error("A configuração gerada para o Facebook não passou na validação de segurança.");
+          return;
+        }
         window.location.href = response.authorizationUrl;
       } catch {
         toast.error("Não foi possível iniciar a autorização.");
@@ -209,24 +219,26 @@ function IntegrationsPage() {
                               {connected ? "Pronta para publicar" : "Precisa reautorizar"}
                             </p>
                           </div>
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="icon"
                             onClick={() => void disconnect(account)}
                             aria-label={`Remover ${account.username}`}
-                            className="rounded-lg border border-border p-2 text-muted-foreground transition hover:text-destructive"
+                            className="border border-border text-muted-foreground hover:text-destructive"
                           >
                             <Trash2 className="size-4" />
-                          </button>
+                          </Button>
                         </li>
                       );
                     })}
                   </ul>
 
-                  <button
+                  <Button
                     type="button"
                     disabled={!platform.available || busy === platform.platform}
                     onClick={() => void connect(platform.platform)}
-                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground transition disabled:cursor-not-allowed disabled:opacity-50"
+                    className="mt-4 w-full"
                   >
                     {busy === platform.platform ? (
                       <Loader2 className="size-4 animate-spin" />
@@ -234,7 +246,7 @@ function IntegrationsPage() {
                       <Plus className="size-4" />
                     )}
                     {platform.available ? "Adicionar conta" : "Em preparação"}
-                  </button>
+                  </Button>
                 </article>
               );
             })}
