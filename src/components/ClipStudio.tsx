@@ -33,11 +33,16 @@ export interface ClipItem {
   clipTitle?: string | undefined;
   clipReason?: string | undefined;
   clipTags?: string[] | undefined;
+  /** detalhamento do score viral */
+  clipMetrics?: ClipMetrics | undefined;
+  /** hashtags sugeridas pela IA */
+  clipHashtags?: string[] | undefined;
   status: "pendente" | "na fila" | "processando" | "pronto" | "erro";
   progress: number;
   blob?: Blob | undefined;
   ext?: string | undefined;
 }
+
 
 export interface ClipSettings {
   minLen: number;
