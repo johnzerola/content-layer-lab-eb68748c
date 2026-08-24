@@ -576,6 +576,10 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
     .sort((a, b) => a.start - b.start)
     .map((c, i) => {
       const meta = describe(c, i, duration);
+      const retention = Math.max(
+        0,
+        Math.min(1, c.hook * 0.4 + c.density * 0.3 + c.cadence * 0.2 + c.edgeQuality * 0.1),
+      );
       return {
         start: Number(c.start.toFixed(2)),
         end: Number(Math.min(duration, c.end).toFixed(2)),
@@ -583,9 +587,20 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
         title: meta.title,
         reason: meta.reason,
         tags: c.tags,
+        metrics: {
+          hook: c.hook,
+          density: c.density,
+          cadence: c.cadence,
+          clarity: c.clarity,
+          motion: c.motion,
+          edgeQuality: c.edgeQuality,
+          retention,
+        },
+        hashtags: suggestHashtags(c.tags, c.text),
         ...(c.text ? { text: c.text } : {}),
       };
     });
+
 
   opts.onProgress?.(1);
   return clips;
