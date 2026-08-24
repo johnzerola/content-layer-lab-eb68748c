@@ -389,34 +389,76 @@ function ClipCard({
         )}
 
         <div className="absolute inset-x-0 bottom-0 space-y-1.5 bg-gradient-to-t from-black/90 to-transparent px-2 pb-2 pt-6">
-          <div className="h-1 overflow-hidden rounded-full bg-white/25">
-            <div
-              className="h-full bg-white"
-              style={{
-                width: `${(item.status === "processando" ? item.progress : pos / len) * 100}%`,
-              }}
-            />
+          <div
+            role="slider"
+            aria-label="linha do tempo do corte"
+            aria-valuemin={0}
+            aria-valuemax={Math.round(len)}
+            aria-valuenow={Math.round(pos)}
+            tabIndex={0}
+            onClick={(e) => {
+              e.stopPropagation();
+              scrub(e.clientX, e.currentTarget);
+            }}
+            onPointerMove={(e) => {
+              if (e.buttons === 1) scrub(e.clientX, e.currentTarget);
+            }}
+            className="group/bar -my-1 cursor-pointer py-1"
+          >
+            <div className="h-1 overflow-hidden rounded-full bg-white/25 transition-all group-hover/bar:h-1.5">
+              <div
+                className="h-full bg-white"
+                style={{
+                  width: `${(item.status === "processando" ? item.progress : pos / len) * 100}%`,
+                }}
+              />
+            </div>
           </div>
           <div className="flex items-center justify-between gap-2">
             <p className="font-mono text-[10px] text-white/85">
               {formatTime(pos)} / {formatTime(len)}
             </p>
-            <p
-              className={`font-mono text-[10px] ${
-                item.status === "pronto"
-                  ? "text-primary"
-                  : item.status === "erro"
-                    ? "text-destructive"
-                    : item.status === "processando"
-                      ? "text-warn"
-                      : "text-white/60"
-              }`}
-            >
-              ● {item.status}
-              {item.status === "processando" ? ` ${Math.round(item.progress * 100)}%` : ""}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  audio.toggleMuted();
+                }}
+                title={audio.muted ? "ativar som" : "silenciar"}
+                aria-label={audio.muted ? "ativar som" : "silenciar"}
+                className="text-white/80 hover:text-white"
+              >
+                {audio.muted ? <VolumeX className="size-3.5" /> : <Volume2 className="size-3.5" />}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={audio.muted ? 0 : audio.volume}
+                aria-label="volume"
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => audio.setVolume(Number(e.target.value))}
+                className="h-1 w-12 accent-primary"
+              />
+              <p
+                className={`font-mono text-[10px] ${
+                  item.status === "pronto"
+                    ? "text-primary"
+                    : item.status === "erro"
+                      ? "text-destructive"
+                      : item.status === "processando"
+                        ? "text-warn"
+                        : "text-white/60"
+                }`}
+              >
+                ● {item.status}
+                {item.status === "processando" ? ` ${Math.round(item.progress * 100)}%` : ""}
+              </p>
+            </div>
           </div>
         </div>
+
       </div>
 
       {/* barra de ações */}
