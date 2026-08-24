@@ -91,7 +91,9 @@ export function facebookAuthorizationUrl(
   environment: NodeJS.ProcessEnv = process.env,
 ): string {
   const configuration = facebookOAuthConfiguration(environment);
-  const url = new URL(`https://www.facebook.com/${metaGraphVersion(environment)}/dialog/oauth`);
+  // Sem versão no caminho: a Meta usa a versão padrão do app.
+  // Fixar uma versão inexistente (ex.: v26.0) faz o diálogo abrir "Sorry, something went wrong".
+  const url = new URL("https://www.facebook.com/dialog/oauth");
   url.searchParams.set("client_id", configuration.appId);
   url.searchParams.set("redirect_uri", configuration.redirectUri);
   url.searchParams.set("response_type", "code");
