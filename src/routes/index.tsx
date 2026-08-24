@@ -136,6 +136,11 @@ interface Item {
   clipReason?: string | undefined;
   /** rótulos detectados no trecho */
   clipTags?: string[] | undefined;
+  /** detalhamento do score viral */
+  clipMetrics?: ClipMetrics | undefined;
+  /** hashtags sugeridas pela IA */
+  clipHashtags?: string[] | undefined;
+
   status: Status;
   progress: number;
   /** etapa atual legível (transcrição, render de cada variação, etc.) */
