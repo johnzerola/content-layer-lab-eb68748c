@@ -528,6 +528,75 @@ function ClipCard({
             ))}
           </div>
         )}
+
+        {(item.clipMetrics || item.clipHashtags?.length) && (
+          <div className="rounded-lg border border-border/40 bg-surface-3/40">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowReport((s) => !s);
+              }}
+              className="flex w-full items-center gap-1.5 px-2 py-1.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              <BarChart3 className="size-3" />
+              {showReport ? "ocultar relatório viral" : "relatório do viral score"}
+            </button>
+            {showReport && (
+              <div className="space-y-1.5 border-t border-border/40 p-2">
+                {item.clipMetrics &&
+                  (
+                    [
+                      ["Gancho", item.clipMetrics.hook],
+                      ["Densidade de fala", item.clipMetrics.density],
+                      ["Ritmo", item.clipMetrics.cadence],
+                      ["Clareza do áudio", item.clipMetrics.clarity],
+                      ["Movimento", item.clipMetrics.motion],
+                      ["Corte limpo", item.clipMetrics.edgeQuality],
+                      ["Retenção estimada", item.clipMetrics.retention],
+                    ] as const
+                  ).map(([label, value]) => (
+                    <div key={label} className="flex items-center gap-2">
+                      <span className="w-28 shrink-0 font-mono text-[9px] text-muted-foreground">
+                        {label}
+                      </span>
+                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-surface-2">
+                        <div
+                          className="h-full bg-primary"
+                          style={{ width: `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="w-7 text-right font-mono text-[9px] text-muted-foreground">
+                        {Math.round(Math.max(0, Math.min(1, value)) * 100)}
+                      </span>
+                    </div>
+                  ))}
+                {item.clipHashtags && item.clipHashtags.length > 0 && (
+                  <div className="flex items-center gap-1.5 pt-1">
+                    <p className="flex-1 font-mono text-[10px] text-primary">
+                      {item.clipHashtags.join(" ")}
+                    </p>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void navigator.clipboard
+                          .writeText(
+                            `${item.clipTitle?.replace(/ · #\d+$/, "") ?? ""}\n${item.clipHashtags?.join(" ") ?? ""}`.trim(),
+                          )
+                          .then(() => toast.success("Título e hashtags copiados"))
+                          .catch(() => toast.error("Não foi possível copiar"));
+                      }}
+                      className="rounded p-1 text-muted-foreground hover:text-foreground"
+                      title="copiar título e hashtags"
+                    >
+                      <Copy className="size-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="mt-auto space-y-1 pt-1">
           <Button
             className="w-full"
