@@ -1,6 +1,6 @@
 /** Facebook Login for Business: autoriza Páginas do Facebook e contas IG Business. */
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { facebookGraphBase, metaGraphVersion } from "@/lib/meta.server";
+import { facebookGraphBase } from "@/lib/meta.server";
 import { MetaLinkError } from "@/lib/social-linking.server";
 
 const OAUTH_TTL_MS = 10 * 60 * 1000;
