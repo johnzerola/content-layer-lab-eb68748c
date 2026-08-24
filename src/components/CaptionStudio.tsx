@@ -4,6 +4,7 @@ import { drawCaptions } from "@/lib/draw";
 import { BUILTIN_FONTS, fileToFont } from "@/lib/fonts";
 import { CAPTION_PRESETS, type CaptionStyle, type CustomFont } from "@/lib/template";
 import type { CaptionCue } from "@/lib/captions";
+import { CaptionTemplateGallery } from "./CaptionTemplateGallery";
 
 interface Props {
   style: CaptionStyle;
