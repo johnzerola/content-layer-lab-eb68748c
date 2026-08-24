@@ -76,6 +76,18 @@ export function preloadImage(src: string) {
   });
 }
 
+/** aplica opacidade a uma cor hex (#rgb/#rrggbb); outras notações passam direto */
+export function withAlpha(color: string, alpha: number) {
+  const a = Math.min(1, Math.max(0, alpha));
+  const hex = color.trim();
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const h = m[1]!;
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const n = parseInt(full, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
+
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   const rr = Math.min(r, w / 2, h / 2);
   ctx.beginPath();
@@ -237,6 +249,13 @@ export function drawCaptions(
   ctx.globalAlpha = (s.opacity ?? 1) * alphaIn;
   ctx.font = `${s.weight} ${s.size}px ${s.font}`;
   ctx.textBaseline = "top";
+  // espaçamento entre letras (Chrome/Edge; ignorado silenciosamente onde não há suporte)
+  const ls = s.letterSpacing ?? 0;
+  try {
+    (ctx as unknown as { letterSpacing: string }).letterSpacing = `${ls}px`;
+  } catch {
+    /* sem suporte */
+  }
 
   const norm = (txt: string) => (s.uppercase ? txt.toUpperCase() : txt);
   const space = ctx.measureText(" ").width;
@@ -310,6 +329,12 @@ export function drawCaptions(
       s.size * (s.boxRadius ?? 0.18),
     );
     ctx.fill();
+    if ((s.boxBorderWidth ?? 0) > 0) {
+      ctx.globalAlpha = prev;
+      ctx.lineWidth = s.boxBorderWidth!;
+      ctx.strokeStyle = s.boxBorderColor ?? "#ffffff";
+      ctx.stroke();
+    }
     ctx.globalAlpha = prev;
   }
 
@@ -341,9 +366,10 @@ export function drawCaptions(
       }
 
       if (s.bg === "shadow") {
-        ctx.shadowColor = "rgba(0,0,0,0.65)";
-        ctx.shadowBlur = s.size * 0.25;
-        ctx.shadowOffsetY = s.size * 0.06;
+        ctx.shadowColor = withAlpha(s.shadowColor ?? "#000000", s.shadowOpacity ?? 0.65);
+        ctx.shadowBlur = s.size * (s.shadowBlur ?? 0.25);
+        ctx.shadowOffsetY = s.size * (s.shadowY ?? 0.06);
+        ctx.shadowOffsetX = s.size * (s.shadowX ?? 0);
       }
       if (s.stroke > 0) {
         ctx.lineJoin = "round";
