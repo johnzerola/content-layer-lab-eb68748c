@@ -348,9 +348,10 @@ export function drawCaptions(
       }
 
       if (s.bg === "shadow") {
-        ctx.shadowColor = "rgba(0,0,0,0.65)";
-        ctx.shadowBlur = s.size * 0.25;
-        ctx.shadowOffsetY = s.size * 0.06;
+        ctx.shadowColor = withAlpha(s.shadowColor ?? "#000000", s.shadowOpacity ?? 0.65);
+        ctx.shadowBlur = s.size * (s.shadowBlur ?? 0.25);
+        ctx.shadowOffsetY = s.size * (s.shadowY ?? 0.06);
+        ctx.shadowOffsetX = s.size * (s.shadowX ?? 0);
       }
       if (s.stroke > 0) {
         ctx.lineJoin = "round";
