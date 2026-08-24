@@ -73,7 +73,7 @@ import { downloadBlob, grabPoster, outputIsWebm, renderVideo } from "@/lib/rende
 import { webCodecsSupported } from "@/lib/encode";
 import { defaultAntiDup, describeVariation, makeVariation } from "@/lib/variation";
 import { autoFrame } from "@/lib/autoframe";
-import { findClips, formatTime } from "@/lib/clips";
+import { findClips, formatTime, type ClipMetrics } from "@/lib/clips";
 import { getClipFeedback } from "@/lib/clip-feedback";
 import { cuesToSentences, speechKeepSegments, zoomKeys, type Sentence } from "@/lib/transcript-clips";
 import { resolveVideoLink } from "@/lib/import.functions";
