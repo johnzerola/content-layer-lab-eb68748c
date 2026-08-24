@@ -16,9 +16,12 @@ import {
   VolumeX,
   BarChart3,
   Copy,
+  AudioLines,
+  Gauge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatTime, type ClipMetrics } from "@/lib/clips";
+import { analyzeAudio, unlockAudioOnGesture, type AudioHealth } from "@/lib/audio-health";
 import { toast } from "sonner";
 
 
@@ -181,7 +184,13 @@ async function playWithAudio(el: HTMLVideoElement) {
     el.muted = true;
     try {
       await el.play();
-      toast.info("O navegador bloqueou o som — clique no ícone de volume para ativar.");
+      toast.info("O navegador bloqueou o som — ele volta assim que você clicar na página.");
+      // religa o som sozinho no primeiro gesto do usuário
+      unlockAudioOnGesture(() => {
+        if (audioStore.muted) return;
+        el.muted = false;
+        el.volume = audioStore.volume;
+      });
     } catch {
       /* ignora */
     }
@@ -253,8 +262,23 @@ function ClipCard({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [rate, setRate] = useState(1);
+  const [health, setHealth] = useState<AudioHealth | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const url = useMediaObjectUrl(item.file);
   const audio = useClipAudio();
+
+  const checkAudio = useCallback(async () => {
+    if (analyzing) return;
+    setAnalyzing(true);
+    try {
+      const s = item.clip?.start ?? 0;
+      const e = item.clip?.end ?? item.duration;
+      setHealth(await analyzeAudio(item.file, { start: s, end: e }));
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [analyzing, item.clip, item.duration, item.file]);
 
   const start = item.clip?.start ?? 0;
   const end = item.clip?.end ?? item.duration;
@@ -265,7 +289,8 @@ function ClipCard({
     if (!v) return;
     v.volume = audio.volume;
     v.muted = audio.muted;
-  }, [audio.volume, audio.muted, url]);
+    v.playbackRate = rate;
+  }, [audio.volume, audio.muted, url, rate]);
 
   const play = async () => {
     const v = videoRef.current;
@@ -441,6 +466,22 @@ function ClipCard({
                 onChange={(e) => audio.setVolume(Number(e.target.value))}
                 className="h-1 w-12 accent-primary"
               />
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const steps = [1, 1.25, 1.5, 2, 0.5];
+                  const next = steps[(steps.indexOf(rate) + 1) % steps.length] ?? 1;
+                  setRate(next);
+                  const v = videoRef.current;
+                  if (v) v.playbackRate = next;
+                }}
+                title="velocidade de reprodução"
+                aria-label="velocidade de reprodução"
+                className="flex items-center gap-0.5 font-mono text-[10px] text-white/80 hover:text-white"
+              >
+                <Gauge className="size-3" />
+                {rate}x
+              </button>
               <p
                 className={`font-mono text-[10px] ${
                   item.status === "pronto"
@@ -543,6 +584,38 @@ function ClipCard({
             </button>
             {showReport && (
               <div className="space-y-1.5 border-t border-border/40 p-2">
+                <div className="flex items-center gap-2 pb-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void checkAudio();
+                    }}
+                    className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground hover:border-primary hover:text-foreground"
+                  >
+                    <AudioLines className="size-3" />
+                    {analyzing ? "analisando áudio…" : "analisar áudio"}
+                  </button>
+                  {health && (
+                    <span
+                      className={`font-mono text-[9px] ${
+                        health.hasAudio ? "text-primary" : "text-destructive"
+                      }`}
+                    >
+                      {health.hasAudio
+                        ? `${health.dbfs.toFixed(1)} dBFS · silêncio ${Math.round(health.silenceRatio * 100)}% · nota ${Math.round(health.score * 100)}`
+                        : "sem áudio"}
+                    </span>
+                  )}
+                </div>
+                {health?.issues.length ? (
+                  <ul className="space-y-0.5 pb-1">
+                    {health.issues.map((i) => (
+                      <li key={i} className="font-mono text-[9px] text-warn">
+                        • {i}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
                 {item.clipMetrics &&
                   (
                     [
