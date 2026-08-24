@@ -129,6 +129,67 @@ function useMediaObjectUrl(file: File) {
   return url;
 }
 
+/* ---------- áudio compartilhado entre todos os players do CorteIA ---------- */
+
+const audioStore = {
+  volume: 1,
+  muted: false,
+  listeners: new Set<() => void>(),
+  snapshot: { volume: 1, muted: false },
+  emit() {
+    audioStore.snapshot = { volume: audioStore.volume, muted: audioStore.muted };
+    audioStore.listeners.forEach((l) => l());
+  },
+  set(volume: number, muted: boolean) {
+    audioStore.volume = Math.max(0, Math.min(1, volume));
+    audioStore.muted = muted;
+    audioStore.emit();
+  },
+  subscribe(l: () => void) {
+    audioStore.listeners.add(l);
+    return () => audioStore.listeners.delete(l);
+  },
+};
+
+/** Volume/mudo globais do estúdio — o áudio nasce ligado. */
+function useClipAudio() {
+  const state = useSyncExternalStore(
+    audioStore.subscribe,
+    () => audioStore.snapshot,
+    () => audioStore.snapshot,
+  );
+  return {
+    ...state,
+    setVolume: (v: number) => audioStore.set(v, v === 0 ? true : false),
+    toggleMuted: () => audioStore.set(audioStore.volume || 1, !audioStore.muted),
+  };
+}
+
+/** Só um vídeo toca por vez: evita sobreposição de áudio entre cortes. */
+let activeVideo: HTMLVideoElement | null = null;
+function claimPlayback(el: HTMLVideoElement) {
+  if (activeVideo && activeVideo !== el) activeVideo.pause();
+  activeVideo = el;
+}
+
+/** Navegadores bloqueiam autoplay com som: cai para mudo em vez de falhar. */
+async function playWithAudio(el: HTMLVideoElement) {
+  claimPlayback(el);
+  try {
+    await el.play();
+  } catch {
+    el.muted = true;
+    try {
+      await el.play();
+      toast.info("O navegador bloqueou o som — clique no ícone de volume para ativar.");
+    } catch {
+      /* ignora */
+    }
+  }
+}
+
+
+
 function waitForMediaEvent(video: HTMLVideoElement, event: "loadedmetadata" | "loadeddata" | "seeked") {
   return new Promise<void>((resolve, reject) => {
     const done = () => {
