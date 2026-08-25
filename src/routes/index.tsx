@@ -225,7 +225,32 @@ function cleanOnly(t: Template, src?: { w: number; h: number }): Template {
 /** Lembra qual template estava ativo entre sessões. */
 const ACTIVE_KEY = "vv.active-template";
 
+/** Estado do lote em nível de MÓDULO: continua vivo quando o usuário sai
+ *  desta tela e volta (o render/transcrição não é perdido na navegação). */
+const queuesState = externalState<Record<Mode, Item[]>>({
+  lote: [],
+  clip: [],
+  limpar: [],
+  "limpar-ia": [],
+});
+const selectedIdsState = externalState<Record<Mode, string | null>>({
+  lote: null,
+  clip: null,
+  limpar: null,
+  "limpar-ia": null,
+});
+const runningState = externalState(false);
+const pausedState = externalState(false);
+const reportState = externalState<{
+  ok: number;
+  fail: number;
+  seconds: number;
+  fails: { name: string; error: string }[];
+} | null>(null);
+const queueCtrl: QueueCtrl = { paused: false, cancelled: false, aborts: new Map() };
+
 function Home() {
+
   const [mode, setMode] = useState<Mode>("lote");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [active, setActive] = useState<Template>(() => createTemplate("Padrão"));
