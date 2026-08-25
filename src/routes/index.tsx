@@ -329,7 +329,23 @@ function Home() {
   const [zipping, setZipping] = useState(false);
   // Canvas, decoder e encoder disputam a mesma thread/GPU. Dois vídeos em
   // paralelo frequentemente deixam ambos presos em 0% em máquinas comuns.
-  const [concurrency, setConcurrency] = useState(1);
+  // padrão automático pelo hardware (metade dos núcleos, teto 4)
+  const [concurrency, setConcurrency] = useState(() => {
+    const cores =
+      typeof navigator !== "undefined" && navigator.hardwareConcurrency
+        ? navigator.hardwareConcurrency
+        : 2;
+    return Math.max(1, Math.min(4, Math.floor(cores / 2)));
+  });
+  /** modo turbo: fps/bitrate menores para lotes grandes */
+  const [turbo, setTurbo] = useState(false);
+  /** padrão de renomeação em massa */
+  const [namePattern, setNamePattern] = useState("{nome}-{indice}");
+  /** banco de headlines (uma por linha) distribuído em rodízio */
+  const [headlineBank, setHeadlineBank] = useState("");
+  /** variação automática de headline por vídeo */
+  const [headlineAuto, setHeadlineAuto] = useState(true);
+  const [headlinePanel, setHeadlinePanel] = useState(false);
   const [bitrate, setBitrate] = useState(10);
   const [autoBitrate, setAutoBitrate] = useState(true);
   const [platforms, setPlatforms] = useState<string[]>(["reels"]);
