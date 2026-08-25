@@ -2927,17 +2927,12 @@ function Home() {
                         }
                         onClick={(e) => {
                           e.stopPropagation();
-                          const base = it.file.name.replace(/\.\w+$/, "");
                           const outs = it.outputs ?? [
                             { blob: it.blob!, ext: it.ext ?? "mp4", label: "" },
                           ];
                           outs.forEach((o, k) =>
                             setTimeout(
-                              () =>
-                                downloadBlob(
-                                  o.blob,
-                                  `${base}-vv${o.label ? `-${o.label}` : ""}.${o.ext}`,
-                                ),
+                              () => downloadBlob(o.blob, finalName(it, i, o)),
                               k * 250,
                             ),
                           );
