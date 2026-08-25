@@ -92,7 +92,7 @@ export function StagePreview({
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [videoRef]);
+  }, [videoRef, visible]);
 
   return (
     <div className={`relative ${className ?? ""}`}>
