@@ -114,6 +114,8 @@ export function AuthGate({
           Recuperar senha
         </Button>
       </div>
+      {fallbackExtra}
+
     </div>
   );
 }
