@@ -348,6 +348,8 @@ function Home() {
   /** variação automática de headline por vídeo */
   const [headlineAuto, setHeadlineAuto] = useState(true);
   const [headlinePanel, setHeadlinePanel] = useState(false);
+  /** ids dos vídeos escolhidos para edição manual de headline */
+  const [headlineEdit, setHeadlineEdit] = useState<Set<string>>(new Set());
   const turboRef = useRef(turbo);
   turboRef.current = turbo;
   const headlineForRef = useRef<(i: Item, idx: number) => ReturnType<typeof headlineTweak>>(
