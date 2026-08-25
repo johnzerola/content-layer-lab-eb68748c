@@ -131,6 +131,8 @@ interface Item {
   h: number;
   duration: number;
   headline: string;
+  /** nome de saída escolhido pelo usuário (sem extensão) */
+  outName?: string | undefined;
   offsetX: number;
   offsetY: number;
   autoFrameSource?: string | undefined;
