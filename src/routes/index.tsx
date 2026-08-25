@@ -387,6 +387,9 @@ function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
   const ctrlRef = useRef<QueueCtrl>(queueCtrl);
+  const togglePauseRef = useRef<() => void>(() => {});
+  const cancelAllRef = useRef<() => void>(() => {});
+
   const itemsRef = useRef<Item[]>([]);
   const startedAt = useRef(0);
   const doneCount = useRef(0);
@@ -1408,6 +1411,11 @@ function Home() {
       ),
     );
   };
+
+  // permitem pausar/cancelar o lote a partir do indicador global (qualquer tela)
+  togglePauseRef.current = togglePause;
+  cancelAllRef.current = cancelAll;
+
 
   const retryErrors = () => {
     const ids = items.filter((i) => i.status === "erro").map((i) => i.id);
