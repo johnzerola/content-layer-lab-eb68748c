@@ -1523,24 +1523,59 @@ function Home() {
 
   const flow = FLOWS[mode];
 
+  /** nome final de um arquivo: usa o nome escolhido pelo usuário quando existir */
+  const finalName = useCallback(
+    (i: Item, idx: number, o: { label?: string; ext: string }) => {
+      if (i.outName?.trim()) {
+        const suffix = o.label ? `-${o.label}` : "";
+        return `${sanitizeName(i.outName)}${suffix}.${o.ext}`;
+      }
+      return outputName(mode, {
+        index: idx,
+        sourceName: i.file.name,
+        templateName: active.name,
+        ...(o.label ? { label: o.label } : {}),
+        ext: o.ext,
+      });
+    },
+    [mode, active.name],
+  );
+
   const outFiles = () => {
     const files: { name: string; blob: Blob }[] = [];
     items.forEach((i, idx) => {
       const outs = i.outputs ?? (i.blob ? [{ blob: i.blob, ext: i.ext ?? "mp4", label: "" }] : []);
       outs.forEach((o) => {
-        files.push({
-          name: outputName(mode, {
-            index: idx,
-            sourceName: i.file.name,
-            templateName: active.name,
-            label: o.label,
-            ext: o.ext,
-          }),
-          blob: o.blob,
-        });
+        files.push({ name: finalName(i, idx, o), blob: o.blob });
       });
     });
-    return files;
+    const names = dedupeNames(files.map((f) => f.name));
+    return files.map((f, k) => ({ ...f, name: names[k]! }));
+  };
+
+  /** headline efetiva de um vídeo (própria → banco em rodízio → template) */
+  const headlineFor = useCallback(
+    (i: Item, idx: number) => {
+      const bank = parseBank(headlineBank);
+      const base = i.headline?.trim() || bankPick(bank, idx) || "";
+      return headlineTweak(base, `${i.file.name}:${i.id}`, headlineAuto);
+    },
+    [headlineBank, headlineAuto],
+  );
+
+  /** aplica o padrão de renomeação a todos os itens */
+  const applyNamePattern = () => {
+    setItems((p) =>
+      p.map((i, idx) => ({
+        ...i,
+        outName: expandPattern(namePattern, {
+          index: idx,
+          sourceName: i.file.name,
+          templateName: active.name,
+        }),
+      })),
+    );
+    toast.success("Nomes atualizados para o lote.");
   };
 
   const downloadZipAll = async () => {
