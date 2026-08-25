@@ -68,7 +68,7 @@ export function LayoutPreview({
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [videoRef]);
+  }, [videoRef, visible]);
 
   return (
     <canvas
