@@ -335,6 +335,17 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
                   </button>
                 ))}
               </div>
+              {signedIn && sub && (
+                <Link
+                  to="/checkout"
+                  search={{ plano: plan.id }}
+                  title="Plano e créditos"
+                  className="hidden rounded-full border border-border bg-surface-2 px-3 py-1.5 font-mono text-[11px] text-muted-foreground transition hover:text-foreground sm:inline-flex"
+                >
+                  {plan.name}
+                  {plan.credits === null ? " · ilimitado" : ` · ${sub.credits} créditos`}
+                </Link>
+              )}
               <span className="rounded-full border border-primary/35 bg-accent px-3 py-1.5 font-mono text-[11px] text-accent-foreground">
                 ● {count} vídeo{count === 1 ? "" : "s"}
               </span>
