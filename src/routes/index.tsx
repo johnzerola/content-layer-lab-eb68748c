@@ -1240,6 +1240,7 @@ function Home() {
             }
           }
 
+          let lastTick = 0;
           // headline personalizada deste vídeo (própria, banco em rodízio ou variação)
           const itemIndex = Math.max(
             0,
