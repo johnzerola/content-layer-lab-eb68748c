@@ -1,4 +1,5 @@
-﻿import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
+﻿import { RequireAuth } from "@/components/RequireAuth";
+import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Download, Loader2, Pencil, Radio, Scissors, Sparkles, Square, Trash2 } from "lucide-react";
@@ -16,23 +17,7 @@ import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 import { AuthGate } from "@/components/AuthGate";
 
 export const Route = createFileRoute("/live")({
-  beforeLoad: async () => {
-    const user = await currentUser();
-    if (!user) throw redirect({ to: "/" });
-  },
-  errorComponent: ({ error }) => {
-    if (error.message === "Unauthorized") {
-      return (
-        <div className="flex min-h-dvh flex-col items-center justify-center p-4">
-          <AuthGate>
-            <div className="hidden">Autenticado com sucesso!</div>
-          </AuthGate>
-        </div>
-      );
-    }
-    return <div>Erro ao carregar monitoramento: {error.message}</div>;
-  },
-  component: LivePage,
+  component: GuardedLivePage,
   head: () => ({
     meta: [
       { title: "Monitora Live — cortes automáticos de lives do X" },
@@ -603,5 +588,16 @@ function LivePage() {
         />
       )}
     </AppShell>
+  );
+}
+
+function GuardedLivePage() {
+  return (
+    <RequireAuth
+      title={"Monitora Live requer login"}
+      description={"Entre para monitorar lives e gerar cortes automáticos salvos na sua conta."}
+    >
+      <LivePage />
+    </RequireAuth>
   );
 }

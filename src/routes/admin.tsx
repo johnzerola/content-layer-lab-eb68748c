@@ -1,3 +1,4 @@
+import { RequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -9,11 +10,7 @@ import { currentUser } from "@/lib/cloud";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/admin")({
-  beforeLoad: async () => {
-    const user = await currentUser();
-    if (!user) throw redirect({ to: "/" });
-  },
-  component: AdminPage,
+  component: GuardedAdminPage,
 });
 
 function AdminPage() {
@@ -155,5 +152,16 @@ function AdminPage() {
         </div>
       </AppShell>
     </div>
+  );
+}
+
+function GuardedAdminPage() {
+  return (
+    <RequireAuth
+      title={"Painel admin requer login"}
+      description={"Entre com uma conta administradora para gerenciar usuários."}
+    >
+      <AdminPage />
+    </RequireAuth>
   );
 }

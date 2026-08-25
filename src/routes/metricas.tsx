@@ -1,3 +1,4 @@
+import { RequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getMetrics, refreshPostMetrics, type PostInsight } from '@/lib/metrics.functions';
@@ -34,23 +35,7 @@ import {
 import { AppShell } from '@/components/AppShell';
 
 export const Route = createFileRoute('/metricas')({
-  beforeLoad: async () => {
-    const user = await currentUser();
-    if (!user) throw redirect({ to: "/" });
-  },
-  errorComponent: ({ error }) => {
-    if (error.message === "Unauthorized") {
-      return (
-        <div className="flex min-h-dvh flex-col items-center justify-center p-4">
-          <AuthGate>
-            <div className="hidden">Autenticado com sucesso!</div>
-          </AuthGate>
-        </div>
-      );
-    }
-    return <div>Erro ao carregar métricas: {error.message}</div>;
-  },
-  component: MetricsPage,
+  component: GuardedMetricsPage,
 });
 
 function MetricsPage() {
@@ -311,5 +296,16 @@ function MetricsPage() {
         </Card>
       </div>
     </AppShell>
+  );
+}
+
+function GuardedMetricsPage() {
+  return (
+    <RequireAuth
+      title={"Métricas requer login"}
+      description={"Entre para ver o desempenho real dos seus posts publicados."}
+    >
+      <MetricsPage />
+    </RequireAuth>
   );
 }
