@@ -47,11 +47,12 @@ function TemplateCard({
   onPick: () => void;
 }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
+  const visible = useInView(ref);
 
   useEffect(() => {
     const cv = ref.current;
     const ctx = cv?.getContext("2d");
-    if (!cv || !ctx) return;
+    if (!cv || !ctx || !visible) return;
     const style = { ...base, ...tpl.style, visible: true } as CaptionStyle;
     const start = cues[0]?.start ?? 0;
     const end = cues[0]?.end ?? 3;
@@ -72,7 +73,8 @@ function TemplateCard({
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [tpl, base, cues]);
+  }, [tpl, base, cues, visible]);
+
 
   return (
     <button
