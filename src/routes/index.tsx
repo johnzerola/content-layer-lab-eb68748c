@@ -2396,6 +2396,16 @@ function Home() {
                     />
                     {concurrency}x
                   </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={turbo}
+                      disabled={running}
+                      onChange={(e) => setTurbo(e.target.checked)}
+                      className="accent-[var(--primary)]"
+                    />
+                    turbo (24 fps · 5 Mbps — lotes grandes)
+                  </label>
                   <label className={`flex items-center gap-2 ${autoBitrate ? "opacity-50" : ""}`}>
                     bitrate
                     <input
