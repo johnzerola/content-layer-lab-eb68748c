@@ -125,6 +125,8 @@ interface Props {
 export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, children }: Props) {
   const [open, setOpen] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const { signedIn, sub, isAdmin } = useAccess();
+  const plan = planFromId(sub?.plan);
 
   useEffect(() => {
     import("@/lib/cloud").then(({ currentUser, onAuth }) => {
