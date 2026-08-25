@@ -288,8 +288,9 @@ function Home() {
     [],
   );
 
-  const [running, setRunning] = useState(false);
-  const [paused, setPaused] = useState(false);
+  const [running, setRunning] = useExternalState(runningState);
+  const [paused, setPaused] = useExternalState(pausedState);
+
   const [zipping, setZipping] = useState(false);
   // Canvas, decoder e encoder disputam a mesma thread/GPU. Dois vídeos em
   // paralelo frequentemente deixam ambos presos em 0% em máquinas comuns.
@@ -352,17 +353,13 @@ function Home() {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
-  const ctrlRef = useRef<QueueCtrl>({ paused: false, cancelled: false, aborts: new Map() });
+  const ctrlRef = useRef<QueueCtrl>(queueCtrl);
   const itemsRef = useRef<Item[]>([]);
   const startedAt = useRef(0);
   const doneCount = useRef(0);
   const failures = useRef<{ name: string; error: string }[]>([]);
-  const [report, setReport] = useState<{
-    ok: number;
-    fail: number;
-    seconds: number;
-    fails: { name: string; error: string }[];
-  } | null>(null);
+  const [report, setReport] = useExternalState(reportState);
+
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [autoScheduleConfig, setAutoScheduleConfig] = useState<any>(null);
 
