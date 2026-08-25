@@ -263,18 +263,9 @@ function Home() {
   }, []);
 
   // filas totalmente separadas por ferramenta
-  const [queues, setQueues] = useState<Record<Mode, Item[]>>({
-    lote: [],
-    clip: [],
-    limpar: [],
-    "limpar-ia": [],
-  });
-  const [selectedIds, setSelectedIds] = useState<Record<Mode, string | null>>({
-    lote: null,
-    clip: null,
-    limpar: null,
-    "limpar-ia": null,
-  });
+  const [queues, setQueues] = useExternalState(queuesState);
+  const [selectedIds, setSelectedIds] = useExternalState(selectedIdsState);
+
   const queuesRef = useRef(queues);
   queuesRef.current = queues;
   const selectedIdsRef = useRef(selectedIds);
