@@ -1934,6 +1934,18 @@ function Home() {
                       </div>
                     )}
                     <div className="space-y-2 pt-1">
+                      <input
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                        placeholder="Nome do arquivo de saída (opcional)"
+                        value={selected.outName ?? ""}
+                        onChange={(e) =>
+                          setItems((p) =>
+                            p.map((x) =>
+                              x.id === selected.id ? { ...x, outName: e.target.value } : x,
+                            ),
+                          )
+                        }
+                      />
                       {mode === "lote" && (
                         <input
                           className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
