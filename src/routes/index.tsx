@@ -1294,10 +1294,14 @@ function Home() {
                 variation: variationOf(item, k),
                 offsetX: item.offsetX,
                 offsetY: item.offsetY,
-                headline: item.headline || undefined,
+                headline: head.text || undefined,
                 // modo seguro: menos quadros e bitrate menor para destravar o render
-                fps: safe ? 24 : plat.fps,
-                bitrate: safe ? 4_000_000 : (autoBitrate ? plat.bitrate : bitrate) * 1_000_000,
+                fps: safe ? 24 : turboRef.current ? Math.min(plat.fps, 24) : plat.fps,
+                bitrate: safe
+                  ? 4_000_000
+                  : turboRef.current
+                    ? 5_000_000
+                    : (autoBitrate ? plat.bitrate : bitrate) * 1_000_000,
                 clip: item.clip,
                 pre: item.preEdit,
                 captions: cues,
