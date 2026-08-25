@@ -348,6 +348,11 @@ function Home() {
   /** variação automática de headline por vídeo */
   const [headlineAuto, setHeadlineAuto] = useState(true);
   const [headlinePanel, setHeadlinePanel] = useState(false);
+  const turboRef = useRef(turbo);
+  turboRef.current = turbo;
+  const headlineForRef = useRef<(i: Item, idx: number) => ReturnType<typeof headlineTweak>>(
+    () => headlineTweak("", "", false),
+  );
   const [bitrate, setBitrate] = useState(10);
   const [autoBitrate, setAutoBitrate] = useState(true);
   const [platforms, setPlatforms] = useState<string[]>(["reels"]);
