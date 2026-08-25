@@ -1345,6 +1345,8 @@ function Home() {
 
     await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
     setRunning(false);
+    endBatchProgress();
+
     if (!ctrl.cancelled) {
       const seconds = Math.max(1, Math.round((performance.now() - startedAt.current) / 1000));
       setReport({
@@ -1388,6 +1390,7 @@ function Home() {
   const togglePause = () => {
     ctrlRef.current.paused = !ctrlRef.current.paused;
     setPaused(ctrlRef.current.paused);
+    updateBatchProgress({ paused: ctrlRef.current.paused });
   };
 
   const cancelAll = () => {
@@ -1397,6 +1400,8 @@ function Home() {
     ctrlRef.current.aborts.clear();
     setPaused(false);
     setRunning(false);
+    endBatchProgress();
+
     setItems((p) =>
       p.map((x) =>
         x.status === "processando" || x.status === "na fila" ? { ...x, status: "pendente" } : x,
