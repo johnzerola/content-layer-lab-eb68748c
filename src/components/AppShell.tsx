@@ -19,6 +19,7 @@ import {
   BarChart3,
   Shield,
 } from "lucide-react";
+import { PlanGate } from "@/components/PlanGate";
 import { useAccess } from "@/lib/subscription";
 import { planFromId } from "@/lib/plan";
 
@@ -389,7 +390,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             </section>
           )}
 
-          {children}
+          {isAdmin ? children : <PlanGate>{children}</PlanGate>}
         </div>
       </div>
     </div>
