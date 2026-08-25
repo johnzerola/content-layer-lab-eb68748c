@@ -88,6 +88,14 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { ImportPanel } from "@/components/ImportPanel";
 import { FLOWS, outputName, zipName, type Mode } from "@/lib/flows";
+import { externalState, useExternalState } from "@/lib/external-state";
+import {
+  endBatchProgress,
+  registerBatchControls,
+  startBatchProgress,
+  updateBatchProgress,
+} from "@/lib/batch-runtime";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -225,7 +233,32 @@ function cleanOnly(t: Template, src?: { w: number; h: number }): Template {
 /** Lembra qual template estava ativo entre sessões. */
 const ACTIVE_KEY = "vv.active-template";
 
+/** Estado do lote em nível de MÓDULO: continua vivo quando o usuário sai
+ *  desta tela e volta (o render/transcrição não é perdido na navegação). */
+const queuesState = externalState<Record<Mode, Item[]>>({
+  lote: [],
+  clip: [],
+  limpar: [],
+  "limpar-ia": [],
+});
+const selectedIdsState = externalState<Record<Mode, string | null>>({
+  lote: null,
+  clip: null,
+  limpar: null,
+  "limpar-ia": null,
+});
+const runningState = externalState(false);
+const pausedState = externalState(false);
+const reportState = externalState<{
+  ok: number;
+  fail: number;
+  seconds: number;
+  fails: { name: string; error: string }[];
+} | null>(null);
+const queueCtrl: QueueCtrl = { paused: false, cancelled: false, aborts: new Map() };
+
 function Home() {
+
   const [mode, setMode] = useState<Mode>("lote");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [active, setActive] = useState<Template>(() => createTemplate("Padrão"));
@@ -263,18 +296,9 @@ function Home() {
   }, []);
 
   // filas totalmente separadas por ferramenta
-  const [queues, setQueues] = useState<Record<Mode, Item[]>>({
-    lote: [],
-    clip: [],
-    limpar: [],
-    "limpar-ia": [],
-  });
-  const [selectedIds, setSelectedIds] = useState<Record<Mode, string | null>>({
-    lote: null,
-    clip: null,
-    limpar: null,
-    "limpar-ia": null,
-  });
+  const [queues, setQueues] = useExternalState(queuesState);
+  const [selectedIds, setSelectedIds] = useExternalState(selectedIdsState);
+
   const queuesRef = useRef(queues);
   queuesRef.current = queues;
   const selectedIdsRef = useRef(selectedIds);
@@ -297,8 +321,9 @@ function Home() {
     [],
   );
 
-  const [running, setRunning] = useState(false);
-  const [paused, setPaused] = useState(false);
+  const [running, setRunning] = useExternalState(runningState);
+  const [paused, setPaused] = useExternalState(pausedState);
+
   const [zipping, setZipping] = useState(false);
   // Canvas, decoder e encoder disputam a mesma thread/GPU. Dois vídeos em
   // paralelo frequentemente deixam ambos presos em 0% em máquinas comuns.
@@ -361,17 +386,16 @@ function Home() {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
-  const ctrlRef = useRef<QueueCtrl>({ paused: false, cancelled: false, aborts: new Map() });
+  const ctrlRef = useRef<QueueCtrl>(queueCtrl);
+  const togglePauseRef = useRef<() => void>(() => {});
+  const cancelAllRef = useRef<() => void>(() => {});
+
   const itemsRef = useRef<Item[]>([]);
   const startedAt = useRef(0);
   const doneCount = useRef(0);
   const failures = useRef<{ name: string; error: string }[]>([]);
-  const [report, setReport] = useState<{
-    ok: number;
-    fail: number;
-    seconds: number;
-    fails: { name: string; error: string }[];
-  } | null>(null);
+  const [report, setReport] = useExternalState(reportState);
+
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [autoScheduleConfig, setAutoScheduleConfig] = useState<any>(null);
 
@@ -1030,10 +1054,14 @@ function Home() {
     doneCount.current = 0;
     failures.current = [];
     setReport(null);
+    registerBatchControls({ pause: () => togglePauseRef.current(), cancel: () => cancelAllRef.current() });
+
 
     const pending = listNow()
       .filter((i) => (onlyIds ? onlyIds.includes(i.id) : i.status !== "pronto"))
       .map((i) => i.id);
+    startBatchProgress(pending.length, FLOWS[runMode]?.brand ?? "Processando");
+
     const queue = [...pending];
     setItems((p) =>
       p.map((x) =>
@@ -1251,6 +1279,8 @@ function Home() {
           }
 
           doneCount.current++;
+          updateBatchProgress({ done: doneCount.current });
+
           const firstOut = outputs[0]!;
           await finishJob(id, `${outputs.length} arquivo(s) prontos`, { blob: firstOut.blob, fileName: item.file.name });
           setItems((p) =>
@@ -1318,6 +1348,8 @@ function Home() {
 
     await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
     setRunning(false);
+    endBatchProgress();
+
     if (!ctrl.cancelled) {
       const seconds = Math.max(1, Math.round((performance.now() - startedAt.current) / 1000));
       setReport({
@@ -1361,6 +1393,7 @@ function Home() {
   const togglePause = () => {
     ctrlRef.current.paused = !ctrlRef.current.paused;
     setPaused(ctrlRef.current.paused);
+    updateBatchProgress({ paused: ctrlRef.current.paused });
   };
 
   const cancelAll = () => {
@@ -1370,12 +1403,19 @@ function Home() {
     ctrlRef.current.aborts.clear();
     setPaused(false);
     setRunning(false);
+    endBatchProgress();
+
     setItems((p) =>
       p.map((x) =>
         x.status === "processando" || x.status === "na fila" ? { ...x, status: "pendente" } : x,
       ),
     );
   };
+
+  // permitem pausar/cancelar o lote a partir do indicador global (qualquer tela)
+  togglePauseRef.current = togglePause;
+  cancelAllRef.current = cancelAll;
+
 
   const retryErrors = () => {
     const ids = items.filter((i) => i.status === "erro").map((i) => i.id);

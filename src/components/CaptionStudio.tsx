@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Play, Type, Upload } from "lucide-react";
+import { useInView } from "@/hooks/use-in-view";
 import { drawCaptions } from "@/lib/draw";
+
 import { BUILTIN_FONTS, fileToFont } from "@/lib/fonts";
 import { CAPTION_PRESETS, type CaptionStyle, type CustomFont } from "@/lib/template";
 import type { CaptionCue } from "@/lib/captions";
@@ -81,9 +83,11 @@ function Range({
 
 export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const visible = useInView(canvasRef);
   const [playing, setPlaying] = useState(true);
   const demo = useMemo(() => demoCues(), []);
   const useCues = cues?.length ? cues : demo;
+
   const start = useCues[0]?.start ?? 0;
   const end = useCues[0]?.end ?? 3;
 
@@ -100,7 +104,7 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
 
   useEffect(() => {
     const cv = canvasRef.current;
-    if (!cv) return;
+    if (!cv || !visible) return;
     const ctx = cv.getContext("2d");
     if (!ctx) return;
     let raf = 0;
@@ -121,7 +125,8 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [style, useCues, playing, start, end]);
+  }, [style, useCues, playing, start, end, visible]);
+
 
   return (
     <div className="grid gap-4 lg:grid-cols-[240px_1fr]">

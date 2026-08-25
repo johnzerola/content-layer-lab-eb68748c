@@ -14,15 +14,16 @@ const EMPTY: BatchProgress = { running: false, paused: false, done: 0, total: 0,
 export const batchProgress = externalState<BatchProgress>(EMPTY);
 
 interface Controls {
-  pause?: () => void;
-  cancel?: () => void;
+  pause: (() => void) | undefined;
+  cancel: (() => void) | undefined;
 }
-const controls: Controls = {};
+const controls: Controls = { pause: undefined, cancel: undefined };
 
-export function registerBatchControls(c: Controls) {
+export function registerBatchControls(c: { pause?: () => void; cancel?: () => void }) {
   controls.pause = c.pause;
   controls.cancel = c.cancel;
 }
+
 
 export function pauseBatch() {
   controls.pause?.();

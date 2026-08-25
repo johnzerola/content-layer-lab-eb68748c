@@ -29,6 +29,7 @@ export function StagePreview({
   className?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const visible = useInView(canvasRef);
   const preRef = useRef(pre);
   preRef.current = pre;
   const clipRef = useRef(clip);
@@ -40,7 +41,8 @@ export function StagePreview({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !visible) return;
+
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -90,7 +92,7 @@ export function StagePreview({
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [videoRef]);
+  }, [videoRef, visible]);
 
   return (
     <div className={`relative ${className ?? ""}`}>
