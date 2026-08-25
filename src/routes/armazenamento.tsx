@@ -18,6 +18,7 @@ import { CloudPanel } from "@/components/CloudPanel";
 import { listJobs } from "@/lib/jobs";
 
 export const Route = createFileRoute("/armazenamento")({
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Armazenamento e versões de templates — VaiViral" },
