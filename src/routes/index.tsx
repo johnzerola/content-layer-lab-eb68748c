@@ -2894,6 +2894,8 @@ function Home() {
                         {it.clip ? ` · corte ${formatTime(it.clip.start)}` : ""}
                         {it.score ? ` · ${it.score}` : ""}
                         {hasPreEdit(it.preEdit) ? " · editado" : ""}
+                        {it.outName?.trim() ? ` · ${sanitizeName(it.outName)}` : ""}
+                        {mode === "lote" && it.headline?.trim() ? " · headline própria" : ""}
                       </p>
                       <p
                         className={`font-mono text-[11px] ${
