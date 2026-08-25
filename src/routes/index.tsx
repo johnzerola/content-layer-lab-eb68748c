@@ -2752,6 +2752,93 @@ function Home() {
                   limpar todos
                 </button>
               </div>
+
+              {items.length > 0 && (
+                <div className="mb-3 space-y-2 rounded-xl border border-border bg-surface-2 p-3">
+                  <p className="mono-label">Nome dos arquivos</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      className="min-w-0 flex-1 rounded-lg border border-input bg-background px-2.5 py-1.5 font-mono text-xs"
+                      value={namePattern}
+                      onChange={(e) => setNamePattern(e.target.value)}
+                      placeholder="{nome}-{indice}"
+                    />
+                    <button className="btn-ghost text-xs" onClick={applyNamePattern}>
+                      aplicar a todos
+                    </button>
+                    <button
+                      className="btn-ghost text-xs"
+                      onClick={() => setItems((p) => p.map((i) => ({ ...i, outName: undefined })))}
+                    >
+                      limpar
+                    </button>
+                  </div>
+                  <p className="font-mono text-[10px] text-muted-foreground">
+                    tokens: {"{nome}"} {"{indice}"} {"{data}"} {"{template}"} · exemplo:{" "}
+                    {items[0]
+                      ? expandPattern(namePattern, {
+                          index: 0,
+                          sourceName: items[0].file.name,
+                          templateName: active.name,
+                        })
+                      : "—"}
+                  </p>
+                  {mode === "lote" && (
+                    <button
+                      className="btn-ghost w-full text-xs"
+                      onClick={() => setHeadlinePanel((v) => !v)}
+                    >
+                      {headlinePanel ? "fechar" : "editar"} headlines do lote
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {mode === "lote" && headlinePanel && (
+                <div className="mb-3 space-y-3 rounded-xl border border-primary/40 bg-surface-2 p-3">
+                  <p className="mono-label">Headlines do lote</p>
+                  <textarea
+                    className="h-20 w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs"
+                    placeholder={"Banco de variações — uma headline por linha"}
+                    value={headlineBank}
+                    onChange={(e) => setHeadlineBank(e.target.value)}
+                  />
+                  <label className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={headlineAuto}
+                      onChange={(e) => setHeadlineAuto(e.target.checked)}
+                      className="accent-[var(--primary)]"
+                    />
+                    variar automaticamente (caixa, posição e tamanho)
+                  </label>
+                  <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                    {items.map((it, idx) => {
+                      const h = headlineFor(it, idx);
+                      return (
+                        <div key={it.id} className="space-y-1">
+                          <input
+                            className="w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs"
+                            placeholder={`${String(idx + 1).padStart(2, "0")} · headline deste vídeo`}
+                            value={it.headline}
+                            onChange={(e) =>
+                              setItems((p) =>
+                                p.map((x) =>
+                                  x.id === it.id ? { ...x, headline: e.target.value } : x,
+                                ),
+                              )
+                            }
+                          />
+                          <p className="truncate font-mono text-[10px] text-muted-foreground">
+                            {h.text || "usa o texto do template"} · {h.label}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2 overflow-y-auto pr-1">
                 {items.map((it, i) => (
                   <button
