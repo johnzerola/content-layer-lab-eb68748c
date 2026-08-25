@@ -348,6 +348,8 @@ function Home() {
   /** variação automática de headline por vídeo */
   const [headlineAuto, setHeadlineAuto] = useState(true);
   const [headlinePanel, setHeadlinePanel] = useState(false);
+  /** ids dos vídeos escolhidos para edição manual de headline */
+  const [headlineEdit, setHeadlineEdit] = useState<Set<string>>(new Set());
   const turboRef = useRef(turbo);
   turboRef.current = turbo;
   const headlineForRef = useRef<(i: Item, idx: number) => ReturnType<typeof headlineTweak>>(
@@ -2834,23 +2836,72 @@ function Home() {
                     />
                     variar automaticamente (caixa, posição e tamanho)
                   </label>
-                  <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                  <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] text-muted-foreground">
+                    <span>editar:</span>
+                    <button
+                      className="btn-ghost h-6 px-2 text-[10px]"
+                      onClick={() =>
+                        setHeadlineEdit(selectedId ? new Set([selectedId]) : new Set())
+                      }
+                    >
+                      só o selecionado
+                    </button>
+                    <button
+                      className="btn-ghost h-6 px-2 text-[10px]"
+                      onClick={() => setHeadlineEdit(new Set(items.map((x) => x.id)))}
+                    >
+                      todos
+                    </button>
+                    <button
+                      className="btn-ghost h-6 px-2 text-[10px]"
+                      onClick={() => setHeadlineEdit(new Set())}
+                    >
+                      nenhum
+                    </button>
+                  </div>
+                  <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
                     {items.map((it, idx) => {
                       const h = headlineFor(it, idx);
+                      const editing = headlineEdit.has(it.id) || Boolean(it.headline?.trim());
                       return (
                         <div key={it.id} className="space-y-1">
-                          <input
-                            className="w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs"
-                            placeholder={`${String(idx + 1).padStart(2, "0")} · headline deste vídeo`}
-                            value={it.headline}
-                            onChange={(e) =>
-                              setItems((p) =>
-                                p.map((x) =>
-                                  x.id === it.id ? { ...x, headline: e.target.value } : x,
-                                ),
-                              )
-                            }
-                          />
+                          <label className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
+                            <input
+                              type="checkbox"
+                              checked={editing}
+                              onChange={(e) => {
+                                const on = e.target.checked;
+                                setHeadlineEdit((p) => {
+                                  const n = new Set(p);
+                                  if (on) n.add(it.id);
+                                  else n.delete(it.id);
+                                  return n;
+                                });
+                                if (!on)
+                                  setItems((p) =>
+                                    p.map((x) => (x.id === it.id ? { ...x, headline: "" } : x)),
+                                  );
+                              }}
+                              className="accent-[var(--primary)]"
+                            />
+                            <span className="truncate">
+                              {String(idx + 1).padStart(2, "0")} · {it.file.name}
+                            </span>
+                          </label>
+                          {editing && (
+                            <input
+                              className="w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs"
+                              placeholder="headline deste vídeo"
+                              value={it.headline}
+                              onChange={(e) =>
+                                setItems((p) =>
+                                  p.map((x) =>
+                                    x.id === it.id ? { ...x, headline: e.target.value } : x,
+                                  ),
+                                )
+                              }
+                            />
+                          )}
                           <p className="truncate font-mono text-[10px] text-muted-foreground">
                             {h.text || "usa o texto do template"} · {h.label}
                           </p>
