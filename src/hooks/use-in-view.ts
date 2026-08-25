@@ -1,12 +1,15 @@
 import { useEffect, useState, type RefObject } from "react";
 
-/** true quando o elemento está visível na tela — usado para pausar loops de canvas. */
+/** true quando o elemento está visível na tela (e a aba está ativa).
+ *  Usado para pausar loops de canvas e aliviar a CPU. */
 export function useInView(ref: RefObject<Element | null>, rootMargin = "120px"): boolean {
-  const [visible, setVisible] = useState(true);
+  const [inView, setInView] = useState(true);
+  const [tabActive, setTabActive] = useState(true);
+
   useEffect(() => {
     const el = ref.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver((entries) => setVisible(entries.some((e) => e.isIntersecting)), {
+    const io = new IntersectionObserver((entries) => setInView(entries.some((e) => e.isIntersecting)), {
       rootMargin,
     });
     io.observe(el);
@@ -14,10 +17,11 @@ export function useInView(ref: RefObject<Element | null>, rootMargin = "120px"):
   }, [ref, rootMargin]);
 
   useEffect(() => {
-    const onVis = () => setVisible(document.visibilityState === "visible" ? true : false);
+    const onVis = () => setTabActive(document.visibilityState === "visible");
+    onVis();
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
 
-  return visible;
+  return inView && tabActive;
 }
