@@ -275,14 +275,16 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             <BarChart3 className="size-[18px] shrink-0" />
             {open && "Métricas"}
           </Link>
-          <Link
-            to="/admin"
-            title="Painel Administrativo"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <Shield className="size-[18px] shrink-0" />
-            {open && "Admin"}
-          </Link>
+          {isAdmin && (
+            <Link
+              to="/admin"
+              title="Painel Administrativo"
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+            >
+              <Shield className="size-[18px] shrink-0" />
+              {open && "Admin"}
+            </Link>
+          )}
           <button
             onClick={onCloud}
             title="Nuvem"
