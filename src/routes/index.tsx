@@ -1051,10 +1051,14 @@ function Home() {
     doneCount.current = 0;
     failures.current = [];
     setReport(null);
+    registerBatchControls({ pause: () => togglePauseRef.current(), cancel: () => cancelAllRef.current() });
+
 
     const pending = listNow()
       .filter((i) => (onlyIds ? onlyIds.includes(i.id) : i.status !== "pronto"))
       .map((i) => i.id);
+    startBatchProgress(pending.length, FLOWS[runMode]?.title ?? "Processando");
+
     const queue = [...pending];
     setItems((p) =>
       p.map((x) =>
