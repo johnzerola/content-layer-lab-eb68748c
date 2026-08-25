@@ -1,10 +1,9 @@
 import { RequireAuth } from "@/components/RequireAuth";
-import { createFileRoute, redirect } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getMetrics, refreshPostMetrics, type PostInsight } from '@/lib/metrics.functions';
 import { getClipFeedback } from '@/lib/clip-feedback';
 import { currentUser } from '@/lib/cloud';
-import { AuthGate } from '@/components/AuthGate';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { 

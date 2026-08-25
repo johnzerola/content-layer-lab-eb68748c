@@ -1,5 +1,5 @@
 import { RequireAuth } from "@/components/RequireAuth";
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Shield, ShieldAlert, Check, Loader2, RotateCcw } from "lucide-react";

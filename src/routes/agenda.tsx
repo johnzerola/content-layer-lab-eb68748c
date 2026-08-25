@@ -1,5 +1,5 @@
 import { RequireAuth } from "@/components/RequireAuth";
-import { createFileRoute, redirect, Link } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -28,7 +28,6 @@ import {
 
 import { beginInstagramOAuth } from "@/lib/meta-oauth.functions";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
-import { AuthGate } from "@/components/AuthGate";
 
 export const Route = createFileRoute("/agenda")({
   component: GuardedAgendaPage,

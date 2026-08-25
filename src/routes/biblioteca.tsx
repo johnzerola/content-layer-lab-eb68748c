@@ -1,5 +1,5 @@
 import { RequireAuth } from "@/components/RequireAuth";
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { ResultLibrary } from "@/components/ResultLibrary";
@@ -8,7 +8,6 @@ import { CloudPanel } from "@/components/CloudPanel";
 import { listJobs } from "@/lib/jobs";
 import type { Template } from "@/lib/template";
 import { currentUser } from "@/lib/cloud";
-import { AuthGate } from "@/components/AuthGate";
 
 export const Route = createFileRoute("/biblioteca")({
   component: GuardedBibliotecaPage,

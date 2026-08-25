@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Eraser, Sparkles, Upload, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
-import { AuthGate } from "@/components/AuthGate";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { listCleanerJobs } from "@/lib/cleaner.functions";
