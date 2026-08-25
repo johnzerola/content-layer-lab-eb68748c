@@ -19,6 +19,8 @@ import {
   BarChart3,
   Shield,
 } from "lucide-react";
+import { useAccess } from "@/lib/subscription";
+import { planFromId } from "@/lib/plan";
 
 
 export type AppMode = "lote" | "clip" | "limpar" | "limpar-ia" | "external";
