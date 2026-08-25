@@ -194,39 +194,109 @@ export async function generateCaptions(
     );
   }
 
-  const cues: CaptionCue[] = [];
+  // transcreve em paralelo limitado, com retentativa e resultado parcial
+  const results: (CaptionCue | null)[] = new Array(segments.length).fill(null);
   let done = 0;
   let lastErr: string | null = null;
   let failures = 0;
-  for (const seg of segments) {
-    if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
+  let fatal: string | null = null;
+  let next = 0;
+
+  const runOne = async (index: number) => {
+    const seg = segments[index]!;
     const wav = encodeWav(buf, seg.start, seg.end);
-    try {
-      const res = await transcribeChunk({
-        data: { audio: toBase64(wav), ...(opts.language ? { language: opts.language } : {}) },
-      });
-      const words = wordsFor(res.text ?? "", seg);
-      if (words.length) cues.push({ start: seg.start, end: seg.end, words });
-    } catch (err) {
-      failures++;
-      lastErr = String((err as Error)?.message ?? err);
-      console.warn("segmento sem transcrição", err);
-      // erros de conta/limite não adianta insistir nos próximos segmentos
-      if (/crédito|limite|indisponível/i.test(lastErr)) throw new Error(lastErr);
+    const audio = toBase64(wav);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
+      try {
+        const res = await transcribeChunk({
+          data: { audio, ...(opts.language ? { language: opts.language } : {}) },
+        });
+        const words = wordsFor(res.text ?? "", seg);
+        if (words.length) results[index] = { start: seg.start, end: seg.end, words };
+        return;
+      } catch (err) {
+        const raw = String((err as Error)?.message ?? err);
+        const status = statusOf(raw);
+        lastErr = friendly(raw, status);
+        if (status === 401 && attempt === 0) {
+          // sessão expirada: renova o token e tenta de novo uma vez
+          const ok = await refreshSession();
+          if (ok) continue;
+          fatal = "Sua sessão expirou. Entre de novo na conta para gerar legendas.";
+          throw new Error(fatal);
+        }
+        if (status === 402 || status === 403 || status === 404) {
+          fatal = lastErr;
+          throw new Error(fatal);
+        }
+        if (attempt < 2 && (status === 429 || status === 500 || status === 0 || status >= 500)) {
+          await sleep(700 * (attempt + 1) + Math.random() * 400);
+          continue;
+        }
+        failures++;
+        console.warn("segmento sem transcrição", raw);
+        return;
+      }
     }
-    done++;
-    opts.onProgress?.({ done, total: segments.length });
-  }
+  };
+
+  const worker = async () => {
+    while (!fatal) {
+      const index = next++;
+      if (index >= segments.length) return;
+      await runOne(index);
+      done++;
+      opts.onProgress?.({ done, total: segments.length });
+    }
+  };
+
+  const lanes = Math.min(3, Math.max(1, segments.length));
+  await Promise.all(Array.from({ length: lanes }, () => worker()));
+
+  const cues = results.filter((c): c is CaptionCue => Boolean(c));
 
   if (!cues.length) {
     throw new Error(
-      failures
-        ? `A transcrição falhou em todos os ${failures} trechos. ${lastErr ?? ""}`.trim()
-        : "A transcrição voltou vazia — o áudio tem fala, mas nada foi reconhecido. Tente trocar o idioma para 'auto'.",
+      fatal ??
+        (failures
+          ? `A transcrição falhou em todos os ${failures} trechos. ${lastErr ?? ""}`.trim()
+          : "A transcrição voltou vazia — o áudio tem fala, mas nada foi reconhecido. Tente trocar o idioma para 'auto'."),
     );
   }
   return cues;
 }
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/** Lê o status HTTP que o servidor anexa na mensagem: "[401] ...". */
+function statusOf(msg: string): number {
+  const m = /^\[(\d{3})\]/.exec(msg);
+  if (m) return Number(m[1]);
+  if (/unauthorized|não autenticado|no authorization/i.test(msg)) return 401;
+  return 0;
+}
+
+function friendly(msg: string, status: number): string {
+  const clean = msg.replace(/^\[\d{3}\]\s*/, "");
+  if (status === 401) return "Sua sessão expirou. Entre de novo na conta para gerar legendas.";
+  return clean;
+}
+
+async function refreshSession(): Promise<boolean> {
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data } = await supabase.auth.refreshSession();
+    if (data.session?.access_token) return true;
+    const cur = await supabase.auth.getSession();
+    return Boolean(cur.data.session?.access_token);
+  } catch {
+    return false;
+  }
+}
+
 
 
 export function cuesToText(cues: CaptionCue[]) {

@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react";
+import { useInView } from "@/hooks/use-in-view";
 import { drawFrame } from "@/lib/draw";
 import { createTemplate, type Template } from "@/lib/template";
 import type { PreEdit } from "@/lib/preedit";
 import type { CaptionCue } from "@/lib/captions";
+
 
 /** Palco de saída 9:16 desenhado com o MESMO pipeline da exportação (draw.ts):
  *  o que aparece aqui é exatamente o que sai no MP4. */

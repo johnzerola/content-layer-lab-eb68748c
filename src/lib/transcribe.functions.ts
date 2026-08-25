@@ -48,8 +48,10 @@ export const transcribeChunk = createServerFn({ method: "POST" })
               : res.status === 400
                 ? "O áudio enviado foi recusado pela IA (formato ou idioma inválido). Tente o idioma 'auto'."
                 : `Falha na transcrição (${res.status}). ${body.slice(0, 160)}`;
-      throw new Error(msg);
+      // o prefixo com o status deixa o cliente classificar (repetir, pedir login, parar)
+      throw new Error(`[${res.status}] ${msg}`);
     }
+
 
 
     const json = (await res.json()) as { text?: string };
