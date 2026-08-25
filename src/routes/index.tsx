@@ -1425,7 +1425,7 @@ function Home() {
                 : []
             ).map((o) => ({
               mode: runMode,
-              fileName: `${i.file.name.replace(/\.[^.]+$/, "")}${o.label ? `-${o.label}` : ""}.${o.ext}`,
+              fileName: `${i.outName?.trim() ? sanitizeName(i.outName) : stripExt(i.file.name)}${o.label ? `-${o.label}` : ""}.${o.ext}`,
               sourceName: i.file.name,
               platform: platforms.join(","),
               ...(o.label ? { variant: o.label } : {}),
