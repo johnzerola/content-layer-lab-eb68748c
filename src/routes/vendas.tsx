@@ -277,7 +277,8 @@ function Hero() {
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link
-              to="/"
+              to="/checkout"
+              search={{ plano: "creator" }}
               className="group inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-transform hover:-translate-y-0.5"
             >
               Processar meu primeiro lote
@@ -554,7 +555,8 @@ function Plans() {
                 ))}
               </ul>
               <Link
-                to="/"
+                to="/checkout"
+                search={{ plano: p.name.toLowerCase() }}
                 className={`mt-8 inline-flex h-11 items-center justify-center rounded-xl text-sm font-semibold transition-transform hover:-translate-y-px ${
                   p.featured
                     ? "bg-primary text-primary-foreground"
@@ -643,7 +645,8 @@ function FinalCta() {
             pronto para a fila de postagem das suas páginas.
           </p>
           <Link
-            to="/"
+            to="/checkout"
+            search={{ plano: "creator" }}
             className="mt-9 inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-7 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-transform hover:-translate-y-0.5"
           >
             Abrir o estúdio agora <ArrowRight className="size-4" />

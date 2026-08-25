@@ -1,4 +1,4 @@
-﻿import { createFileRoute, redirect } from "@tanstack/react-router";
+﻿import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Upload,
@@ -3196,6 +3196,12 @@ function Home() {
             <AuthGate>
               <div className="hidden">Logado!</div>
             </AuthGate>
+            <p className="mt-4 text-center text-xs text-muted-foreground">
+              Ainda não conhece o VaiViral?{" "}
+              <Link to="/vendas" className="text-primary underline-offset-4 hover:underline">
+                Ver planos e o que a plataforma faz
+              </Link>
+            </p>
           </div>
         </div>
       )}

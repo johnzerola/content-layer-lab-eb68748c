@@ -19,6 +19,9 @@ import {
   BarChart3,
   Shield,
 } from "lucide-react";
+import { PlanGate } from "@/components/PlanGate";
+import { useAccess } from "@/lib/subscription";
+import { planFromId } from "@/lib/plan";
 
 
 export type AppMode = "lote" | "clip" | "limpar" | "limpar-ia" | "external";
@@ -125,6 +128,8 @@ interface Props {
 export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, children }: Props) {
   const [open, setOpen] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const { signedIn, sub, isAdmin } = useAccess();
+  const plan = planFromId(sub?.plan);
 
   useEffect(() => {
     import("@/lib/cloud").then(({ currentUser, onAuth }) => {
@@ -271,14 +276,16 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             <BarChart3 className="size-[18px] shrink-0" />
             {open && "Métricas"}
           </Link>
-          <Link
-            to="/admin"
-            title="Painel Administrativo"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <Shield className="size-[18px] shrink-0" />
-            {open && "Admin"}
-          </Link>
+          {isAdmin && (
+            <Link
+              to="/admin"
+              title="Painel Administrativo"
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+            >
+              <Shield className="size-[18px] shrink-0" />
+              {open && "Admin"}
+            </Link>
+          )}
           <button
             onClick={onCloud}
             title="Nuvem"
@@ -329,6 +336,17 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
                   </button>
                 ))}
               </div>
+              {signedIn && sub && (
+                <Link
+                  to="/checkout"
+                  search={{ plano: plan.id }}
+                  title="Plano e créditos"
+                  className="hidden rounded-full border border-border bg-surface-2 px-3 py-1.5 font-mono text-[11px] text-muted-foreground transition hover:text-foreground sm:inline-flex"
+                >
+                  {plan.name}
+                  {plan.credits === null ? " · ilimitado" : ` · ${sub.credits} créditos`}
+                </Link>
+              )}
               <span className="rounded-full border border-primary/35 bg-accent px-3 py-1.5 font-mono text-[11px] text-accent-foreground">
                 ● {count} vídeo{count === 1 ? "" : "s"}
               </span>
@@ -372,7 +390,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             </section>
           )}
 
-          {children}
+          {isAdmin ? children : <PlanGate>{children}</PlanGate>}
         </div>
       </div>
     </div>
