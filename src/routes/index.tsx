@@ -1240,10 +1240,17 @@ function Home() {
             }
           }
 
+          // headline personalizada deste vídeo (própria, banco em rodízio ou variação)
+          const itemIndex = Math.max(
+            0,
+            listNow().findIndex((x) => x.id === id),
+          );
+          const head = headlineForRef.current(item, itemIndex);
+
           for (const plat of outs) {
             // cada plataforma recebe a resolução/fps/bitrate recomendados
             // no modo "limpar" o quadro segue a orientação real do vídeo (sem recorte)
-            const tpl =
+            const baseTplForPlat =
               runMode === "limpar"
                 ? {
                     ...cleanOnly(active, { w: item.w, h: item.h }),
