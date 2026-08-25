@@ -3018,12 +3018,7 @@ function Home() {
           .filter((i) => i.status === "pronto" && i.blob)
           .map((i) => ({
             blob: i.blob!,
-            fileName: outputName(mode, {
-              index: items.indexOf(i),
-              sourceName: i.file.name,
-              templateName: active.name,
-              ext: i.ext || "mp4",
-            }),
+            fileName: finalName(i, items.indexOf(i), { ext: i.ext || "mp4" }),
             headline: i.headline,
             ...(i.clipTags?.length ? { clipTags: i.clipTags } : {}),
             ...(typeof i.score === "number" ? { score: i.score } : {}),
