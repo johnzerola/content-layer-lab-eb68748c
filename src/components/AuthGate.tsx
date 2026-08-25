@@ -83,11 +83,10 @@ export function AuthGate({
     <div className="mx-auto max-w-md rounded-2xl border border-border/60 bg-surface/40 p-6">
       <div className="mb-4 flex items-center gap-2">
         <LogIn className="size-4 text-primary" />
-        <h2 className="font-display text-lg font-bold">Entre para usar o CleanerIA</h2>
+        <h2 className="font-display text-lg font-bold">{title}</h2>
       </div>
-      <p className="mb-4 text-sm text-muted-foreground">
-        Os jobs de limpeza ficam salvos na sua conta com histórico e link de download.
-      </p>
+      <p className="mb-4 text-sm text-muted-foreground">{description}</p>
+
       <div className="space-y-3">
         <Input
           type="email"
