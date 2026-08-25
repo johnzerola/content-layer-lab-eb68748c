@@ -433,6 +433,39 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          created_at: string
+          credits: number
+          period_end: string
+          plan: string
+          simulated: boolean
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits?: number
+          period_end?: string
+          plan?: string
+          simulated?: boolean
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits?: number
+          period_end?: string
+          plan?: string
+          simulated?: boolean
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       template_versions: {
         Row: {
           created_at: string
