@@ -1262,6 +1262,20 @@ function Home() {
                     { ...cleanOnly(active, { w: item.w, h: item.h }), cleanup: [] }
                   : applyRatio(baseTpl, plat.w, plat.h);
 
+            // pequenas mudanças de posição/tamanho para nenhum vídeo sair idêntico
+            const tpl =
+              runMode === "lote" && head.text && (head.dy || head.scale !== 1)
+                ? {
+                    ...baseTplForPlat,
+                    headline: {
+                      ...baseTplForPlat.headline,
+                      y: baseTplForPlat.headline.y + head.dy,
+                      size: Math.round(baseTplForPlat.headline.size * head.scale),
+                    },
+                  }
+                : baseTplForPlat;
+
+
             for (let k = 0; k < n; k++) {
               const at = step;
               const stageLabel = `render ${at + 1}/${total}${outs.length > 1 ? ` · ${plat.short}` : ""}${n > 1 ? ` · v${k + 1}` : ""}`;
