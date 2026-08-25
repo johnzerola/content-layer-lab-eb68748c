@@ -1057,7 +1057,7 @@ function Home() {
     const pending = listNow()
       .filter((i) => (onlyIds ? onlyIds.includes(i.id) : i.status !== "pronto"))
       .map((i) => i.id);
-    startBatchProgress(pending.length, FLOWS[runMode]?.title ?? "Processando");
+    startBatchProgress(pending.length, FLOWS[runMode]?.brand ?? "Processando");
 
     const queue = [...pending];
     setItems((p) =>
@@ -1276,6 +1276,8 @@ function Home() {
           }
 
           doneCount.current++;
+          updateBatchProgress({ done: doneCount.current });
+
           const firstOut = outputs[0]!;
           await finishJob(id, `${outputs.length} arquivo(s) prontos`, { blob: firstOut.blob, fileName: item.file.name });
           setItems((p) =>
