@@ -18,6 +18,7 @@ import { CloudPanel } from "@/components/CloudPanel";
 import { listJobs } from "@/lib/jobs";
 
 export const Route = createFileRoute("/armazenamento")({
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Armazenamento e versões de templates — VaiViral" },
@@ -132,7 +133,7 @@ function StoragePage() {
               Selecione e apague versões antigas para não estourar o limite do navegador.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={refresh}>
               <RotateCcw className="size-4" /> Atualizar
             </Button>

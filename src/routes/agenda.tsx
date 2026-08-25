@@ -1,4 +1,5 @@
-import { createFileRoute, redirect, Link } from "@tanstack/react-router";
+import { RequireAuth } from "@/components/RequireAuth";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -27,26 +28,9 @@ import {
 
 import { beginInstagramOAuth } from "@/lib/meta-oauth.functions";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
-import { AuthGate } from "@/components/AuthGate";
 
 export const Route = createFileRoute("/agenda")({
-  beforeLoad: async () => {
-    const user = await currentUser();
-    if (!user) throw redirect({ to: "/" });
-  },
-  errorComponent: ({ error }) => {
-    if (error.message === "Unauthorized") {
-      return (
-        <div className="flex min-h-dvh flex-col items-center justify-center p-4">
-          <AuthGate>
-            <div className="hidden">Autenticado com sucesso!</div>
-          </AuthGate>
-        </div>
-      );
-    }
-    return <div>Erro ao carregar agenda: {error.message}</div>;
-  },
-  component: AgendaPage,
+  component: GuardedAgendaPage,
   head: () => ({
     meta: [
       { title: "Agenda de postagens — VaiViral" },
@@ -523,5 +507,16 @@ function AgendaPage() {
         />
       )}
     </AppShell>
+  );
+}
+
+function GuardedAgendaPage() {
+  return (
+    <RequireAuth
+      title={"Agenda requer login"}
+      description={"Entre para conectar suas contas e agendar publicações automáticas."}
+    >
+      <AgendaPage />
+    </RequireAuth>
   );
 }

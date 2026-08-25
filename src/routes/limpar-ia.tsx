@@ -1,9 +1,9 @@
+import { RequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Eraser, Sparkles, Upload, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
-import { AuthGate } from "@/components/AuthGate";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { listCleanerJobs } from "@/lib/cleaner.functions";
@@ -13,22 +13,6 @@ import { toast } from "sonner";
 import { cloudAuthHeaders, currentUser } from "@/lib/cloud";
 
 export const Route = createFileRoute("/limpar-ia")({
-  beforeLoad: async () => {
-    const user = await currentUser();
-    if (!user) throw new Error("Unauthorized");
-  },
-  errorComponent: ({ error }) => {
-    if (error.message === "Unauthorized") {
-      return (
-        <div className="flex min-h-dvh flex-col items-center justify-center p-4">
-          <AuthGate>
-            <div className="hidden">Autenticado com sucesso!</div>
-          </AuthGate>
-        </div>
-      );
-    }
-    return <div>Erro ao carregar ferramenta: {error.message}</div>;
-  },
   head: () => ({
     meta: [
       { title: "CleanerIA — Remoção profissional de textos e marcas" },
@@ -50,7 +34,7 @@ export const Route = createFileRoute("/limpar-ia")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: LimparIAPage,
+  component: GuardedLimparIAPage,
 });
 
 interface UploadItem {
@@ -256,5 +240,16 @@ function LimparIAPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function GuardedLimparIAPage() {
+  return (
+    <RequireAuth
+      title={"Entre para usar o CleanerIA"}
+      description={"Os jobs de limpeza ficam salvos na sua conta com histórico e link de download."}
+    >
+      <LimparIAPage />
+    </RequireAuth>
   );
 }
