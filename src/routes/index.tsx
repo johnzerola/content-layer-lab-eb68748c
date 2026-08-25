@@ -1309,6 +1309,11 @@ function Home() {
                 signal: ac.signal,
                 onProgress: (p) => {
                   const value = (at + p) / total;
+                  // atualiza a interface no máximo a cada 150 ms: a fila e as
+                  // prévias param de re-renderizar durante o render
+                  const now = performance.now();
+                  if (p < 1 && now - lastTick < 150) return;
+                  lastTick = now;
                   setItems((prev) =>
                     prev.map((x) => (x.id === id ? { ...x, progress: value } : x)),
                   );
