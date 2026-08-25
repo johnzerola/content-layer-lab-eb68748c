@@ -88,6 +88,14 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { ImportPanel } from "@/components/ImportPanel";
 import { FLOWS, outputName, zipName, type Mode } from "@/lib/flows";
+import { externalState, useExternalState } from "@/lib/external-state";
+import {
+  endBatchProgress,
+  registerBatchControls,
+  startBatchProgress,
+  updateBatchProgress,
+} from "@/lib/batch-runtime";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
