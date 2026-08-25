@@ -348,6 +348,11 @@ function Home() {
   /** variação automática de headline por vídeo */
   const [headlineAuto, setHeadlineAuto] = useState(true);
   const [headlinePanel, setHeadlinePanel] = useState(false);
+  const turboRef = useRef(turbo);
+  turboRef.current = turbo;
+  const headlineForRef = useRef<(i: Item, idx: number) => ReturnType<typeof headlineTweak>>(
+    () => headlineTweak("", "", false),
+  );
   const [bitrate, setBitrate] = useState(10);
   const [autoBitrate, setAutoBitrate] = useState(true);
   const [platforms, setPlatforms] = useState<string[]>(["reels"]);
@@ -1240,10 +1245,18 @@ function Home() {
             }
           }
 
+          let lastTick = 0;
+          // headline personalizada deste vídeo (própria, banco em rodízio ou variação)
+          const itemIndex = Math.max(
+            0,
+            listNow().findIndex((x) => x.id === id),
+          );
+          const head = headlineForRef.current(item, itemIndex);
+
           for (const plat of outs) {
             // cada plataforma recebe a resolução/fps/bitrate recomendados
             // no modo "limpar" o quadro segue a orientação real do vídeo (sem recorte)
-            const tpl =
+            const baseTplForPlat =
               runMode === "limpar"
                 ? {
                     ...cleanOnly(active, { w: item.w, h: item.h }),
@@ -1254,6 +1267,20 @@ function Home() {
                   ? // a limpeza já foi feita na GPU: só reembala mantendo proporção original
                     { ...cleanOnly(active, { w: item.w, h: item.h }), cleanup: [] }
                   : applyRatio(baseTpl, plat.w, plat.h);
+
+            // pequenas mudanças de posição/tamanho para nenhum vídeo sair idêntico
+            const tpl =
+              runMode === "lote" && head.text && (head.dy || head.scale !== 1)
+                ? {
+                    ...baseTplForPlat,
+                    headline: {
+                      ...baseTplForPlat.headline,
+                      y: baseTplForPlat.headline.y + head.dy,
+                      size: Math.round(baseTplForPlat.headline.size * head.scale),
+                    },
+                  }
+                : baseTplForPlat;
+
 
             for (let k = 0; k < n; k++) {
               const at = step;
@@ -1273,10 +1300,14 @@ function Home() {
                 variation: variationOf(item, k),
                 offsetX: item.offsetX,
                 offsetY: item.offsetY,
-                headline: item.headline || undefined,
+                headline: head.text || undefined,
                 // modo seguro: menos quadros e bitrate menor para destravar o render
-                fps: safe ? 24 : plat.fps,
-                bitrate: safe ? 4_000_000 : (autoBitrate ? plat.bitrate : bitrate) * 1_000_000,
+                fps: safe ? 24 : turboRef.current ? Math.min(plat.fps, 24) : plat.fps,
+                bitrate: safe
+                  ? 4_000_000
+                  : turboRef.current
+                    ? 5_000_000
+                    : (autoBitrate ? plat.bitrate : bitrate) * 1_000_000,
                 clip: item.clip,
                 pre: item.preEdit,
                 captions: cues,
@@ -1284,6 +1315,11 @@ function Home() {
                 signal: ac.signal,
                 onProgress: (p) => {
                   const value = (at + p) / total;
+                  // atualiza a interface no máximo a cada 150 ms: a fila e as
+                  // prévias param de re-renderizar durante o render
+                  const now = performance.now();
+                  if (p < 1 && now - lastTick < 150) return;
+                  lastTick = now;
                   setItems((prev) =>
                     prev.map((x) => (x.id === id ? { ...x, progress: value } : x)),
                   );
@@ -1389,7 +1425,7 @@ function Home() {
                 : []
             ).map((o) => ({
               mode: runMode,
-              fileName: `${i.file.name.replace(/\.[^.]+$/, "")}${o.label ? `-${o.label}` : ""}.${o.ext}`,
+              fileName: `${i.outName?.trim() ? sanitizeName(i.outName) : stripExt(i.file.name)}${o.label ? `-${o.label}` : ""}.${o.ext}`,
               sourceName: i.file.name,
               platform: platforms.join(","),
               ...(o.label ? { variant: o.label } : {}),
@@ -1562,6 +1598,7 @@ function Home() {
     },
     [headlineBank, headlineAuto],
   );
+  headlineForRef.current = headlineFor;
 
   /** aplica o padrão de renomeação a todos os itens */
   const applyNamePattern = () => {
@@ -1897,6 +1934,18 @@ function Home() {
                       </div>
                     )}
                     <div className="space-y-2 pt-1">
+                      <input
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                        placeholder="Nome do arquivo de saída (opcional)"
+                        value={selected.outName ?? ""}
+                        onChange={(e) =>
+                          setItems((p) =>
+                            p.map((x) =>
+                              x.id === selected.id ? { ...x, outName: e.target.value } : x,
+                            ),
+                          )
+                        }
+                      />
                       {mode === "lote" && (
                         <input
                           className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
@@ -2347,6 +2396,16 @@ function Home() {
                     />
                     {concurrency}x
                   </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={turbo}
+                      disabled={running}
+                      onChange={(e) => setTurbo(e.target.checked)}
+                      className="accent-[var(--primary)]"
+                    />
+                    turbo (24 fps · 5 Mbps — lotes grandes)
+                  </label>
                   <label className={`flex items-center gap-2 ${autoBitrate ? "opacity-50" : ""}`}>
                     bitrate
                     <input
@@ -2715,6 +2774,93 @@ function Home() {
                   limpar todos
                 </button>
               </div>
+
+              {items.length > 0 && (
+                <div className="mb-3 space-y-2 rounded-xl border border-border bg-surface-2 p-3">
+                  <p className="mono-label">Nome dos arquivos</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      className="min-w-0 flex-1 rounded-lg border border-input bg-background px-2.5 py-1.5 font-mono text-xs"
+                      value={namePattern}
+                      onChange={(e) => setNamePattern(e.target.value)}
+                      placeholder="{nome}-{indice}"
+                    />
+                    <button className="btn-ghost text-xs" onClick={applyNamePattern}>
+                      aplicar a todos
+                    </button>
+                    <button
+                      className="btn-ghost text-xs"
+                      onClick={() => setItems((p) => p.map((i) => ({ ...i, outName: undefined })))}
+                    >
+                      limpar
+                    </button>
+                  </div>
+                  <p className="font-mono text-[10px] text-muted-foreground">
+                    tokens: {"{nome}"} {"{indice}"} {"{data}"} {"{template}"} · exemplo:{" "}
+                    {items[0]
+                      ? expandPattern(namePattern, {
+                          index: 0,
+                          sourceName: items[0].file.name,
+                          templateName: active.name,
+                        })
+                      : "—"}
+                  </p>
+                  {mode === "lote" && (
+                    <button
+                      className="btn-ghost w-full text-xs"
+                      onClick={() => setHeadlinePanel((v) => !v)}
+                    >
+                      {headlinePanel ? "fechar" : "editar"} headlines do lote
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {mode === "lote" && headlinePanel && (
+                <div className="mb-3 space-y-3 rounded-xl border border-primary/40 bg-surface-2 p-3">
+                  <p className="mono-label">Headlines do lote</p>
+                  <textarea
+                    className="h-20 w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs"
+                    placeholder={"Banco de variações — uma headline por linha"}
+                    value={headlineBank}
+                    onChange={(e) => setHeadlineBank(e.target.value)}
+                  />
+                  <label className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={headlineAuto}
+                      onChange={(e) => setHeadlineAuto(e.target.checked)}
+                      className="accent-[var(--primary)]"
+                    />
+                    variar automaticamente (caixa, posição e tamanho)
+                  </label>
+                  <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                    {items.map((it, idx) => {
+                      const h = headlineFor(it, idx);
+                      return (
+                        <div key={it.id} className="space-y-1">
+                          <input
+                            className="w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs"
+                            placeholder={`${String(idx + 1).padStart(2, "0")} · headline deste vídeo`}
+                            value={it.headline}
+                            onChange={(e) =>
+                              setItems((p) =>
+                                p.map((x) =>
+                                  x.id === it.id ? { ...x, headline: e.target.value } : x,
+                                ),
+                              )
+                            }
+                          />
+                          <p className="truncate font-mono text-[10px] text-muted-foreground">
+                            {h.text || "usa o texto do template"} · {h.label}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2 overflow-y-auto pr-1">
                 {items.map((it, i) => (
                   <button
@@ -2748,6 +2894,8 @@ function Home() {
                         {it.clip ? ` · corte ${formatTime(it.clip.start)}` : ""}
                         {it.score ? ` · ${it.score}` : ""}
                         {hasPreEdit(it.preEdit) ? " · editado" : ""}
+                        {it.outName?.trim() ? ` · ${sanitizeName(it.outName)}` : ""}
+                        {mode === "lote" && it.headline?.trim() ? " · headline própria" : ""}
                       </p>
                       <p
                         className={`font-mono text-[11px] ${
@@ -2803,17 +2951,12 @@ function Home() {
                         }
                         onClick={(e) => {
                           e.stopPropagation();
-                          const base = it.file.name.replace(/\.\w+$/, "");
                           const outs = it.outputs ?? [
                             { blob: it.blob!, ext: it.ext ?? "mp4", label: "" },
                           ];
                           outs.forEach((o, k) =>
                             setTimeout(
-                              () =>
-                                downloadBlob(
-                                  o.blob,
-                                  `${base}-vv${o.label ? `-${o.label}` : ""}.${o.ext}`,
-                                ),
+                              () => downloadBlob(o.blob, finalName(it, i, o)),
                               k * 250,
                             ),
                           );
@@ -2981,12 +3124,7 @@ function Home() {
           .filter((i) => i.status === "pronto" && i.blob)
           .map((i) => ({
             blob: i.blob!,
-            fileName: outputName(mode, {
-              index: items.indexOf(i),
-              sourceName: i.file.name,
-              templateName: active.name,
-              ext: i.ext || "mp4",
-            }),
+            fileName: finalName(i, items.indexOf(i), { ext: i.ext || "mp4" }),
             headline: i.headline,
             ...(i.clipTags?.length ? { clipTags: i.clipTags } : {}),
             ...(typeof i.score === "number" ? { score: i.score } : {}),
