@@ -9,7 +9,17 @@ import { toast } from "sonner";
  * Ferramentas que gravam no banco (CleanerIA) exigem sessão — sem ela o
  * servidor responde "Unauthorized: No authorization header provided".
  */
-export function AuthGate({ children }: { children: ReactNode }) {
+export function AuthGate({
+  children,
+  title = "Entre para usar o CleanerIA",
+  description = "Os jobs de limpeza ficam salvos na sua conta com histórico e link de download.",
+  fallbackExtra,
+}: {
+  children: ReactNode;
+  title?: string;
+  description?: string;
+  fallbackExtra?: ReactNode;
+}) {
   const [user, setUser] = useState<CloudUser | null>(null);
   const [ready, setReady] = useState(false);
   const [email, setEmail] = useState("");
