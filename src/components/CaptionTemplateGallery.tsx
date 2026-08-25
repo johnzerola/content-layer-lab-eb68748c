@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Sparkles } from "lucide-react";
+import { useInView } from "@/hooks/use-in-view";
 import { drawCaptions } from "@/lib/draw";
+
 import {
   CAPTION_TEMPLATES,
   CATEGORY_LABEL,
