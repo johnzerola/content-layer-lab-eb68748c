@@ -88,6 +88,8 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { ImportPanel } from "@/components/ImportPanel";
 import { FLOWS, outputName, zipName, type Mode } from "@/lib/flows";
+import { dedupeNames, expandPattern, sanitizeName, stripExt } from "@/lib/naming";
+import { bankPick, headlineTweak, parseBank } from "@/lib/headlines";
 import { externalState, useExternalState } from "@/lib/external-state";
 import {
   endBatchProgress,
@@ -131,6 +133,8 @@ interface Item {
   h: number;
   duration: number;
   headline: string;
+  /** nome de saída escolhido pelo usuário (sem extensão) */
+  outName?: string | undefined;
   offsetX: number;
   offsetY: number;
   autoFrameSource?: string | undefined;
@@ -327,7 +331,23 @@ function Home() {
   const [zipping, setZipping] = useState(false);
   // Canvas, decoder e encoder disputam a mesma thread/GPU. Dois vídeos em
   // paralelo frequentemente deixam ambos presos em 0% em máquinas comuns.
-  const [concurrency, setConcurrency] = useState(1);
+  // padrão automático pelo hardware (metade dos núcleos, teto 4)
+  const [concurrency, setConcurrency] = useState(() => {
+    const cores =
+      typeof navigator !== "undefined" && navigator.hardwareConcurrency
+        ? navigator.hardwareConcurrency
+        : 2;
+    return Math.max(1, Math.min(4, Math.floor(cores / 2)));
+  });
+  /** modo turbo: fps/bitrate menores para lotes grandes */
+  const [turbo, setTurbo] = useState(false);
+  /** padrão de renomeação em massa */
+  const [namePattern, setNamePattern] = useState("{nome}-{indice}");
+  /** banco de headlines (uma por linha) distribuído em rodízio */
+  const [headlineBank, setHeadlineBank] = useState("");
+  /** variação automática de headline por vídeo */
+  const [headlineAuto, setHeadlineAuto] = useState(true);
+  const [headlinePanel, setHeadlinePanel] = useState(false);
   const [bitrate, setBitrate] = useState(10);
   const [autoBitrate, setAutoBitrate] = useState(true);
   const [platforms, setPlatforms] = useState<string[]>(["reels"]);
@@ -1503,24 +1523,59 @@ function Home() {
 
   const flow = FLOWS[mode];
 
+  /** nome final de um arquivo: usa o nome escolhido pelo usuário quando existir */
+  const finalName = useCallback(
+    (i: Item, idx: number, o: { label?: string; ext: string }) => {
+      if (i.outName?.trim()) {
+        const suffix = o.label ? `-${o.label}` : "";
+        return `${sanitizeName(i.outName)}${suffix}.${o.ext}`;
+      }
+      return outputName(mode, {
+        index: idx,
+        sourceName: i.file.name,
+        templateName: active.name,
+        ...(o.label ? { label: o.label } : {}),
+        ext: o.ext,
+      });
+    },
+    [mode, active.name],
+  );
+
   const outFiles = () => {
     const files: { name: string; blob: Blob }[] = [];
     items.forEach((i, idx) => {
       const outs = i.outputs ?? (i.blob ? [{ blob: i.blob, ext: i.ext ?? "mp4", label: "" }] : []);
       outs.forEach((o) => {
-        files.push({
-          name: outputName(mode, {
-            index: idx,
-            sourceName: i.file.name,
-            templateName: active.name,
-            label: o.label,
-            ext: o.ext,
-          }),
-          blob: o.blob,
-        });
+        files.push({ name: finalName(i, idx, o), blob: o.blob });
       });
     });
-    return files;
+    const names = dedupeNames(files.map((f) => f.name));
+    return files.map((f, k) => ({ ...f, name: names[k]! }));
+  };
+
+  /** headline efetiva de um vídeo (própria → banco em rodízio → template) */
+  const headlineFor = useCallback(
+    (i: Item, idx: number) => {
+      const bank = parseBank(headlineBank);
+      const base = i.headline?.trim() || bankPick(bank, idx) || "";
+      return headlineTweak(base, `${i.file.name}:${i.id}`, headlineAuto);
+    },
+    [headlineBank, headlineAuto],
+  );
+
+  /** aplica o padrão de renomeação a todos os itens */
+  const applyNamePattern = () => {
+    setItems((p) =>
+      p.map((i, idx) => ({
+        ...i,
+        outName: expandPattern(namePattern, {
+          index: idx,
+          sourceName: i.file.name,
+          templateName: active.name,
+        }),
+      })),
+    );
+    toast.success("Nomes atualizados para o lote.");
   };
 
   const downloadZipAll = async () => {
