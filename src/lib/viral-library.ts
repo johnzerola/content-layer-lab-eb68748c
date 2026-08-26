@@ -440,7 +440,7 @@ export function detectNiche(
         : dur >= 600
           ? "filme"
           : density > 0.6
-            ? "aula"
+            ? "educativo"
             : "humor";
   const n = NICHES.find((x) => x.id === pick) ?? NICHES[0]!;
   return { nicheId: n.id, label: n.label, confidence: 0.35, how: "duração e ritmo" };
