@@ -361,15 +361,63 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     await seekTo(trimStart);
     await awaitPresented(300);
 
+    // Caminho rápido: em vez de buscar quadro a quadro (lento, ~1 seek por
+    // frame), o vídeo é reproduzido acelerado e cada quadro de saída é
+    // capturado quando o tempo da fonte alcança o instante correspondente.
+    // Vários vezes mais rápido em vídeos longos e sem os saltos do modo antigo,
+    // porque o carimbo de tempo vem do próprio relógio do vídeo.
+    const canFast = segments.length === 1 && typeof video.play === "function";
+    if (canFast && frameIndex < totalFrames) {
+      try {
+        video.playbackRate = Math.max(1, Math.min(4, opts.turbo ?? 3));
+        video.muted = true;
+        await video.play();
+        let lastIdx = -1;
+        let lastMoveAt = performance.now();
+        while (frameIndex < totalFrames) {
+          if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
+          const cur = video.currentTime;
+          let guard = 0;
+          while (
+            frameIndex < totalFrames &&
+            guard++ < 12 &&
+            srcTimeAt(segments, (frameIndex / fps) * v.speed) <= cur + 1e-3
+          ) {
+            await emit();
+            if (frameIndex % 3 === 0) opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
+          }
+          if (frameIndex !== lastIdx) {
+            lastIdx = frameIndex;
+            lastMoveAt = performance.now();
+          } else if (performance.now() - lastMoveAt > 12_000) {
+            // fonte travou: cai para o caminho preciso a partir daqui
+            break;
+          }
+          if (frameIndex >= totalFrames) break;
+          if (video.ended || video.paused) break;
+          await bgSleep(3);
+        }
+      } catch (err) {
+        if ((err as Error)?.name === "AbortError") throw err;
+        // qualquer problema na leitura contínua: segue no caminho preciso
+      } finally {
+        try {
+          video.pause();
+        } catch {
+          /* ignora */
+        }
+      }
+    }
+
     // Exportação determinística: cada quadro de saída vem do instante exato do
-    // vídeo fonte. É mais lento que a leitura contínua, mas elimina os saltos e
-    // repetições que faziam o MP4 baixado parecer travando.
+    // vídeo fonte. Usada como fallback e para cortes multi-segmento.
     while (frameIndex < totalFrames) {
       if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
       await seekTo(srcTimeAt(segments, (frameIndex / fps) * v.speed));
       await emit();
       if (frameIndex % 3 === 0) opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
     }
+
 
 
 
