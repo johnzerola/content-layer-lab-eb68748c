@@ -97,10 +97,13 @@ import { bankPick, headlineTweak, parseBank } from "@/lib/headlines";
 import { externalState, useExternalState } from "@/lib/external-state";
 import {
   endBatchProgress,
+  notifyBatchDone,
   registerBatchControls,
   startBatchProgress,
   updateBatchProgress,
 } from "@/lib/batch-runtime";
+import { askNotifyPermission, holdBackground } from "@/lib/keepalive";
+
 
 
 export const Route = createFileRoute("/")({
@@ -1137,6 +1140,10 @@ function Home() {
       .filter((i) => (onlyIds ? onlyIds.includes(i.id) : i.status !== "pronto"))
       .map((i) => i.id);
     startBatchProgress(pending.length, FLOWS[runMode]?.brand ?? "Processando");
+    // mantém o render em velocidade cheia com a aba minimizada / em segundo plano
+    const releaseBackground = holdBackground();
+    void askNotifyPermission();
+
 
     const queue = [...pending];
     setItems((p) =>
@@ -1380,7 +1387,9 @@ function Home() {
                     prev.map((x) => (x.id === id ? { ...x, progress: value } : x)),
                   );
                   updateJob(id, { progress: value });
+                  updateBatchProgress({ itemProgress: value, itemLabel: item.file.name });
                 },
+
               });
               const label = [outs.length > 1 ? plat.short : "", n > 1 ? `v${k + 1}` : ""]
                 .filter(Boolean)
@@ -1391,7 +1400,8 @@ function Home() {
           }
 
           doneCount.current++;
-          updateBatchProgress({ done: doneCount.current });
+          updateBatchProgress({ done: doneCount.current, itemProgress: 0, itemLabel: null });
+
 
           const firstOut = outputs[0]!;
           await finishJob(id, `${outputs.length} arquivo(s) prontos`, { blob: firstOut.blob, fileName: item.file.name });
@@ -1438,11 +1448,14 @@ function Home() {
         } catch (err) {
           const aborted = (err as Error)?.name === "AbortError";
           const msg = String((err as Error)?.message ?? err);
-          if (!aborted)
+          if (!aborted) {
             failures.current.push({
               name: listNow().find((x) => x.id === id)?.file.name ?? id,
               error: msg,
             });
+            updateBatchProgress({ errors: failures.current.length });
+          }
+
           setItems((p) =>
             p.map((x) =>
               x.id === id
@@ -1461,8 +1474,11 @@ function Home() {
     await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
     setRunning(false);
     endBatchProgress();
+    releaseBackground();
 
     if (!ctrl.cancelled) {
+      notifyBatchDone(doneCount.current, failures.current.length);
+
       const seconds = Math.max(1, Math.round((performance.now() - startedAt.current) / 1000));
       setReport({
         ok: doneCount.current,
