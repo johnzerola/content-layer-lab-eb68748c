@@ -97,10 +97,13 @@ import { bankPick, headlineTweak, parseBank } from "@/lib/headlines";
 import { externalState, useExternalState } from "@/lib/external-state";
 import {
   endBatchProgress,
+  notifyBatchDone,
   registerBatchControls,
   startBatchProgress,
   updateBatchProgress,
 } from "@/lib/batch-runtime";
+import { askNotifyPermission, holdBackground } from "@/lib/keepalive";
+
 
 
 export const Route = createFileRoute("/")({
