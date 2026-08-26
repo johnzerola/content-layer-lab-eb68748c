@@ -1318,7 +1318,7 @@ function Home() {
                   : applyRatio(baseTpl, plat.w, plat.h);
 
             // pequenas mudanças de posição/tamanho para nenhum vídeo sair idêntico
-            const tpl =
+            const tplHead =
               runMode === "lote" && head.text && (head.dy || head.scale !== 1)
                 ? {
                     ...baseTplForPlat,
@@ -1329,6 +1329,11 @@ function Home() {
                     },
                   }
                 : baseTplForPlat;
+            // CTA próprio deste vídeo (definido na prévia rápida)
+            const tpl = item.cta?.trim()
+              ? { ...tplHead, cta: { ...tplHead.cta, text: item.cta.trim() } }
+              : tplHead;
+
 
 
             for (let k = 0; k < n; k++) {
