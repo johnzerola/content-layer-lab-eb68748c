@@ -136,6 +136,9 @@ export function TemplateCanvas({
   poster?: string | null;
   previewFile?: File | null;
   drawOpts?: DrawOpts | undefined;
+  /** variação anti-duplicidade: anima o zoom/movimento na prévia */
+  motionVar?: Variation | null | undefined;
+
   snap?: boolean;
   /** velocidade anti-duplicidade aplicada na prévia */
   speed?: number;
