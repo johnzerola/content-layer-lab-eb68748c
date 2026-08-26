@@ -74,6 +74,7 @@ import { webCodecsSupported } from "@/lib/encode";
 import { defaultAntiDup, describeVariation, makeVariation } from "@/lib/variation";
 import { autoFrame } from "@/lib/autoframe";
 import { findClips, formatTime, type ClipMetrics } from "@/lib/clips";
+import { mergeTagWeights, nicheContext } from "@/lib/viral-library";
 import { getClipFeedback } from "@/lib/clip-feedback";
 import { cuesToSentences, speechKeepSegments, zoomKeys, type Sentence } from "@/lib/transcript-clips";
 import { resolveVideoLink } from "@/lib/import.functions";
@@ -379,6 +380,8 @@ function Home() {
   const [clipTrimSilence, setClipTrimSilence] = useState(true);
   /** zoom dinâmico ritmado pela fala */
   const [clipDynamicZoom, setClipDynamicZoom] = useState(true);
+  /** nicho da Biblioteca Viral (contexto do que viraliza em cada formato) */
+  const [clipNiche, setClipNiche] = useState<string | null>(null);
   const [clipStage, setClipStage] = useState<string | null>(null);
   /** pesos por etiqueta aprendidos com o desempenho real dos posts */
   const [tagWeights, setTagWeights] = useState<Record<string, number>>({});
@@ -802,12 +805,14 @@ function Home() {
         }
 
         setClipStage(sentences.length ? "escolhendo os melhores trechos falados…" : "analisando áudio e movimento…");
+        const ctx = nicheContext(clipNiche);
         const clips = await findClips(item.file, {
           minLen: Math.min(clipMinLen, clipMaxLen),
           maxLen: Math.max(clipMinLen, clipMaxLen),
           max: clipMax,
           minScore: clipMinScore,
-          tagWeights,
+          tagWeights: mergeTagWeights(tagWeights, ctx),
+          ...(ctx ? { contextKeywords: ctx.keywords, contextLabel: ctx.label } : {}),
           ...(sentences.length ? { transcript: sentences } : {}),
         });
         if (!clips.length) {
@@ -886,6 +891,7 @@ function Home() {
       clipUseTranscript,
       clipTrimSilence,
       clipDynamicZoom,
+      clipNiche,
       tagWeights,
       setItems,
       setSelectedId,
@@ -1851,6 +1857,7 @@ function Home() {
               useTranscript: clipUseTranscript,
               trimSilence: clipTrimSilence,
               dynamicZoom: clipDynamicZoom,
+              nicheId: clipNiche,
             }}
             onSettings={(p) => {
               if (p.minLen !== undefined) setClipMinLen(p.minLen);
@@ -1860,6 +1867,7 @@ function Home() {
               if (p.useTranscript !== undefined) setClipUseTranscript(p.useTranscript);
               if (p.trimSilence !== undefined) setClipTrimSilence(p.trimSilence);
               if (p.dynamicZoom !== undefined) setClipDynamicZoom(p.dynamicZoom);
+              if (p.nicheId !== undefined) setClipNiche(p.nicheId);
             }}
             clipStage={clipStage}
             clipBusy={clipBusy}

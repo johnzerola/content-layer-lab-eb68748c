@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { formatTime, type ClipMetrics } from "@/lib/clips";
 import { analyzeAudio, unlockAudioOnGesture, type AudioHealth } from "@/lib/audio-health";
+import { ViralLibrary } from "@/components/ViralLibrary";
 import { toast } from "sonner";
 
 
@@ -58,6 +59,8 @@ export interface ClipSettings {
   trimSilence: boolean;
   /** zoom dinâmico ritmado pela fala */
   dynamicZoom: boolean;
+  /** nicho da Biblioteca Viral que dá contexto ao score */
+  nicheId: string | null;
 }
 
 interface Props {
@@ -1059,6 +1062,19 @@ export function ClipStudio(props: Props) {
         )}
 
       </section>
+
+      <ViralLibrary
+        nicheId={settings.nicheId}
+        onNiche={(id) => onSettings({ nicheId: id })}
+        onUsePattern={(p) => {
+          const min = Math.max(5, Math.round(p.seconds * 0.7));
+          const max = Math.max(min + 5, Math.round(p.seconds * 1.25));
+          onSettings({ minLen: min, maxLen: max });
+          toast.success(`Padrão aplicado · ${p.nicheLabel} (~${p.seconds}s)`);
+        }}
+      />
+
+
 
       {clips.length > 0 && (
         <section className="panel space-y-4 p-5">
