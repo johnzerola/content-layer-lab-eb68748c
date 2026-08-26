@@ -74,6 +74,7 @@ import { webCodecsSupported } from "@/lib/encode";
 import { defaultAntiDup, describeVariation, makeVariation } from "@/lib/variation";
 import { autoFrame } from "@/lib/autoframe";
 import { findClips, formatTime, type ClipMetrics } from "@/lib/clips";
+import { mergeTagWeights, nicheContext } from "@/lib/viral-library";
 import { getClipFeedback } from "@/lib/clip-feedback";
 import { cuesToSentences, speechKeepSegments, zoomKeys, type Sentence } from "@/lib/transcript-clips";
 import { resolveVideoLink } from "@/lib/import.functions";
@@ -890,6 +891,7 @@ function Home() {
       clipUseTranscript,
       clipTrimSilence,
       clipDynamicZoom,
+      clipNiche,
       tagWeights,
       setItems,
       setSelectedId,
@@ -1855,6 +1857,7 @@ function Home() {
               useTranscript: clipUseTranscript,
               trimSilence: clipTrimSilence,
               dynamicZoom: clipDynamicZoom,
+              nicheId: clipNiche,
             }}
             onSettings={(p) => {
               if (p.minLen !== undefined) setClipMinLen(p.minLen);
@@ -1864,6 +1867,7 @@ function Home() {
               if (p.useTranscript !== undefined) setClipUseTranscript(p.useTranscript);
               if (p.trimSilence !== undefined) setClipTrimSilence(p.trimSilence);
               if (p.dynamicZoom !== undefined) setClipDynamicZoom(p.dynamicZoom);
+              if (p.nicheId !== undefined) setClipNiche(p.nicheId);
             }}
             clipStage={clipStage}
             clipBusy={clipBusy}
