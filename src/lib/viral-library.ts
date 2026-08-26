@@ -383,3 +383,112 @@ export function mergeTagWeights(
   }
   return out;
 }
+
+export interface NicheGuess {
+  nicheId: string;
+  label: string;
+  confidence: number;
+  /** como o nicho foi decidido */
+  how: "transcrição" | "duração e ritmo";
+}
+
+/**
+ * Descobre em qual formato da biblioteca o vídeo se encaixa.
+ * Com transcrição, conta as palavras-chave de cada nicho; sem ela,
+ * usa duração e densidade de fala como heurística.
+ */
+export function detectNiche(
+  text: string,
+  meta?: { duration?: number; speechDensity?: number },
+): NicheGuess {
+  const t = norm(text ?? "");
+  if (t.length > 40) {
+    let best: { n: ViralNiche; hits: number } | null = null;
+    for (const n of NICHES) {
+      let hits = 0;
+      for (const k of n.keywords) {
+        const kk = norm(k);
+        if (!kk) continue;
+        let from = 0;
+        // conta ocorrências (cada palavra vale no máximo 3 pontos)
+        for (let c = 0; c < 3; c++) {
+          const i = t.indexOf(kk, from);
+          if (i < 0) break;
+          hits++;
+          from = i + kk.length;
+        }
+      }
+      if (!best || hits > best.hits) best = { n, hits };
+    }
+    if (best && best.hits >= 3) {
+      return {
+        nicheId: best.n.id,
+        label: best.n.label,
+        confidence: Math.min(1, best.hits / 18),
+        how: "transcrição",
+      };
+    }
+  }
+
+  const dur = meta?.duration ?? 0;
+  const density = meta?.speechDensity ?? 0.5;
+  const pick =
+    dur >= 1800 && density > 0.5
+      ? "podcast"
+      : dur >= 900 && density > 0.45
+        ? "live"
+        : dur >= 600
+          ? "filme"
+          : density > 0.6
+            ? "aula"
+            : "humor";
+  const n = NICHES.find((x) => x.id === pick) ?? NICHES[0]!;
+  return { nicheId: n.id, label: n.label, confidence: 0.35, how: "duração e ritmo" };
+}
+
+export interface PatternMatch {
+  hook: string;
+  topic: string;
+  payoff: string;
+  hashtags: string[];
+  nicheLabel: string;
+  reason: string;
+}
+
+/**
+ * Casa um corte com o padrão mais próximo do nicho (determinístico pelo
+ * tempo de início + texto, para o mesmo corte devolver sempre o mesmo padrão).
+ */
+export function matchPattern(
+  nicheId: string | null | undefined,
+  clip: { start: number; text?: string | undefined },
+): PatternMatch | null {
+  const n = NICHES.find((x) => x.id === nicheId);
+  if (!n) return null;
+  const seedText = `${n.id}|${clip.start.toFixed(2)}|${(clip.text ?? "").slice(0, 120)}`;
+  const t = norm(clip.text ?? "");
+
+  // se o texto cita um tema do nicho, esse tema ganha; senão, escolha estável por hash
+  let ti = Math.floor(hash(`${seedText}#t`) * n.topics.length);
+  for (let i = 0; i < n.topics.length; i++) {
+    const parts = norm(n.topics[i]!).split(/\s+/).filter((w) => w.length > 4);
+    if (parts.length && parts.some((w) => t.includes(w))) {
+      ti = i;
+      break;
+    }
+  }
+  const hi = Math.floor(hash(`${seedText}#h`) * n.hooks.length);
+  const pi = Math.floor(hash(`${seedText}#p`) * n.payoffs.length);
+  const hook = n.hooks[hi % n.hooks.length]!;
+  const topic = n.topics[ti % n.topics.length]!;
+  const payoff = n.payoffs[pi % n.payoffs.length]!;
+  return {
+    hook,
+    topic,
+    payoff,
+    hashtags: n.hashtags,
+    nicheLabel: n.label,
+    reason: `casou com padrão de ${n.label.toLowerCase()}: ${topic} ${payoff}`,
+  };
+}
+
