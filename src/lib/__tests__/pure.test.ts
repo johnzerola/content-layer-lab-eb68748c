@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { defaultAntiDup, makeVariation, describeVariation } from "../variation";
+import {
+  defaultAntiDup,
+  makeVariation,
+  describeVariation,
+  motionAt,
+  variationFingerprint,
+} from "../variation";
+
 import { formatTime, scoreClipSignals, speechSegments } from "../clips";
 import { analyzeLiveRms } from "../live";
 import {
