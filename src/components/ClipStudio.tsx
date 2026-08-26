@@ -59,6 +59,8 @@ export interface ClipSettings {
   trimSilence: boolean;
   /** zoom dinâmico ritmado pela fala */
   dynamicZoom: boolean;
+  /** nicho da Biblioteca Viral que dá contexto ao score */
+  nicheId: string | null;
 }
 
 interface Props {
