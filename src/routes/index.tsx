@@ -1398,7 +1398,8 @@ function Home() {
           }
 
           doneCount.current++;
-          updateBatchProgress({ done: doneCount.current });
+          updateBatchProgress({ done: doneCount.current, itemProgress: 0, itemLabel: null });
+
 
           const firstOut = outputs[0]!;
           await finishJob(id, `${outputs.length} arquivo(s) prontos`, { blob: firstOut.blob, fileName: item.file.name });
