@@ -14,11 +14,13 @@ interface Props {
   onNiche: (id: string | null) => void;
   /** aplica a duração recomendada do padrão escolhido */
   onUsePattern: (p: ViralPattern) => void;
+  /** nicho descoberto pela IA na última geração (modo automático) */
+  detectedId?: string | null | undefined;
 }
 
 const PAGE = 12;
 
-export function ViralLibrary({ nicheId, onNiche, onUsePattern }: Props) {
+export function ViralLibrary({ nicheId, onNiche, onUsePattern, detectedId }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
@@ -29,7 +31,8 @@ export function ViralLibrary({ nicheId, onNiche, onUsePattern }: Props) {
     [nicheId, search, page],
   );
 
-  const active = NICHES.find((n) => n.id === nicheId) ?? null;
+  const detected = NICHES.find((n) => n.id === detectedId) ?? null;
+  const active = NICHES.find((n) => n.id === nicheId) ?? detected;
 
   return (
     <section className="panel p-5">
@@ -60,7 +63,7 @@ export function ViralLibrary({ nicheId, onNiche, onUsePattern }: Props) {
               : "border-border bg-surface-2 text-muted-foreground hover:text-foreground"
           }`}
         >
-          automático
+          {detected ? `automático · ${detected.label}` : "automático"}
         </button>
         {NICHES.map((n) => (
           <button
@@ -83,6 +86,7 @@ export function ViralLibrary({ nicheId, onNiche, onUsePattern }: Props) {
       {active && (
         <p className="mt-3 rounded-lg border border-border bg-surface-2 p-3 font-mono text-[11px] text-muted-foreground">
           <Sparkles className="mr-1 inline size-3 text-primary" />
+          {!nicheId && detected ? "detectado pela IA · " : ""}
           {active.blurb} · duração ideal {active.minLen}–{active.maxLen}s ·{" "}
           {active.hashtags.join(" ")}
         </p>
