@@ -137,6 +137,9 @@ interface Item {
   h: number;
   duration: number;
   headline: string;
+  /** CTA só deste vídeo (sobrepõe o do template) */
+  cta?: string | undefined;
+
   /** nome de saída escolhido pelo usuário (sem extensão) */
   outName?: string | undefined;
   offsetX: number;
