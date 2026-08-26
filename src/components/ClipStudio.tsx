@@ -41,6 +41,8 @@ export interface ClipItem {
   clipMetrics?: ClipMetrics | undefined;
   /** hashtags sugeridas pela IA */
   clipHashtags?: string[] | undefined;
+  /** padrão da Biblioteca Viral que combinou com o corte */
+  clipPattern?: { label: string; hook: string; reason: string } | undefined;
   status: "pendente" | "na fila" | "processando" | "pronto" | "erro";
   progress: number;
   blob?: Blob | undefined;
