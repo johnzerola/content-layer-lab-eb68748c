@@ -1474,8 +1474,11 @@ function Home() {
     await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
     setRunning(false);
     endBatchProgress();
+    releaseBackground();
 
     if (!ctrl.cancelled) {
+      notifyBatchDone(doneCount.current, failures.current.length);
+
       const seconds = Math.max(1, Math.round((performance.now() - startedAt.current) / 1000));
       setReport({
         ok: doneCount.current,
