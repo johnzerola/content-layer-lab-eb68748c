@@ -22,9 +22,12 @@ import {
   Columns2,
   Wand2,
   Crop,
+  Eye,
   CalendarClock,
 } from "lucide-react";
+import { QuickPreviewModal } from "@/components/QuickPreviewModal";
 import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
+
 import { Button } from "@/components/ui/button";
 import { TemplateCanvas } from "@/components/TemplateCanvas";
 import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
