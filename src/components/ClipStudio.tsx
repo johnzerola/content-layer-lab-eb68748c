@@ -18,6 +18,7 @@ import {
   Copy,
   AudioLines,
   Gauge,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatTime, type ClipMetrics } from "@/lib/clips";
@@ -90,6 +91,8 @@ interface Props {
   onDownload: (item: ClipItem) => void;
   onZip: () => void;
   onSaveFolder: () => void;
+  /** nicho descoberto pela IA na última geração */
+  detectedNiche?: string | null | undefined;
 }
 
 const LENGTH_PRESETS = [
