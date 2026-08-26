@@ -280,13 +280,25 @@ export function makeVariation(cfg: AntiDupConfig, seed: string): Variation {
 }
 
 
+const MOTION_LABEL: Record<MotionPreset, string> = {
+  none: "",
+  breathe: "respiração",
+  kenburns: "ken burns",
+  pulse: "pulso",
+  pushin: "push-in",
+};
+
 export function describeVariation(v: Variation) {
+  const m = v.motion;
   return [
     v.mirror ? "espelho" : null,
     `${v.speed.toFixed(3)}x`,
     `brilho ${(v.brightness * 100).toFixed(0)}%`,
     `sat ${(v.saturation * 100).toFixed(0)}%`,
     `zoom ${((v.zoom - 1) * 100).toFixed(1)}%`,
+    m && m.preset !== "none"
+      ? `mov ${MOTION_LABEL[m.preset]} +${(m.amount * 100).toFixed(1)}%/${m.period.toFixed(1)}s`
+      : null,
     v.rotate ? `giro ${v.rotate}°` : null,
     v.border ? `moldura ${v.border}px` : null,
     v.pitch ? `tom ${v.pitch > 0 ? "+" : ""}${v.pitch}c` : null,
@@ -296,3 +308,15 @@ export function describeVariation(v: Variation) {
     .filter(Boolean)
     .join(" · ");
 }
+
+/** Assinatura curta da variação — serve pra conferir que dois exports diferem. */
+export function variationFingerprint(v: Variation) {
+  const s = JSON.stringify(v);
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+
