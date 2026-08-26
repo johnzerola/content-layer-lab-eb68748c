@@ -1448,11 +1448,14 @@ function Home() {
         } catch (err) {
           const aborted = (err as Error)?.name === "AbortError";
           const msg = String((err as Error)?.message ?? err);
-          if (!aborted)
+          if (!aborted) {
             failures.current.push({
               name: listNow().find((x) => x.id === id)?.file.name ?? id,
               error: msg,
             });
+            updateBatchProgress({ errors: failures.current.length });
+          }
+
           setItems((p) =>
             p.map((x) =>
               x.id === id
