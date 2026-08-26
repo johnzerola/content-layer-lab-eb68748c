@@ -1140,6 +1140,10 @@ function Home() {
       .filter((i) => (onlyIds ? onlyIds.includes(i.id) : i.status !== "pronto"))
       .map((i) => i.id);
     startBatchProgress(pending.length, FLOWS[runMode]?.brand ?? "Processando");
+    // mantém o render em velocidade cheia com a aba minimizada / em segundo plano
+    const releaseBackground = holdBackground();
+    void askNotifyPermission();
+
 
     const queue = [...pending];
     setItems((p) =>
