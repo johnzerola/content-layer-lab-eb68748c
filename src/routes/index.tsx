@@ -74,7 +74,14 @@ import { detectOverlays, safeZones } from "@/lib/detect";
 import { buildBackgroundPlate } from "@/lib/plate";
 import { downloadBlob, grabPoster, outputIsWebm, renderVideo } from "@/lib/render";
 import { webCodecsSupported } from "@/lib/encode";
-import { defaultAntiDup, describeVariation, makeVariation } from "@/lib/variation";
+import {
+  MOTION_PRESETS,
+  defaultAntiDup,
+  describeVariation,
+  makeVariation,
+  variationFingerprint,
+} from "@/lib/variation";
+
 import { autoFrame } from "@/lib/autoframe";
 import { findClips, formatTime, type ClipMetrics } from "@/lib/clips";
 import { detectNiche, mergeTagWeights, nicheContext } from "@/lib/viral-library";
