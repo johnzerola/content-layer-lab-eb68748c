@@ -379,6 +379,8 @@ function Home() {
   const [clipTrimSilence, setClipTrimSilence] = useState(true);
   /** zoom dinâmico ritmado pela fala */
   const [clipDynamicZoom, setClipDynamicZoom] = useState(true);
+  /** nicho da Biblioteca Viral (contexto do que viraliza em cada formato) */
+  const [clipNiche, setClipNiche] = useState<string | null>(null);
   const [clipStage, setClipStage] = useState<string | null>(null);
   /** pesos por etiqueta aprendidos com o desempenho real dos posts */
   const [tagWeights, setTagWeights] = useState<Record<string, number>>({});
