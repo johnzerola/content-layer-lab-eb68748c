@@ -804,12 +804,14 @@ function Home() {
         }
 
         setClipStage(sentences.length ? "escolhendo os melhores trechos falados…" : "analisando áudio e movimento…");
+        const ctx = nicheContext(clipNiche);
         const clips = await findClips(item.file, {
           minLen: Math.min(clipMinLen, clipMaxLen),
           maxLen: Math.max(clipMinLen, clipMaxLen),
           max: clipMax,
           minScore: clipMinScore,
-          tagWeights,
+          tagWeights: mergeTagWeights(tagWeights, ctx),
+          ...(ctx ? { contextKeywords: ctx.keywords, contextLabel: ctx.label } : {}),
           ...(sentences.length ? { transcript: sentences } : {}),
         });
         if (!clips.length) {
