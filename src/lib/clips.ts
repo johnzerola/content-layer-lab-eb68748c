@@ -60,6 +60,10 @@ export interface ClipOptions {
   transcript?: Sentence[];
   /** pesos aprendidos por etiqueta (desempenho real dos posts) */
   tagWeights?: Record<string, number>;
+  /** palavras-chave do nicho escolhido na Biblioteca Viral */
+  contextKeywords?: string[];
+  /** rótulo do nicho, usado nas etiquetas do corte */
+  contextLabel?: string;
   onProgress?: (p: number) => void;
   signal?: AbortSignal;
 }
