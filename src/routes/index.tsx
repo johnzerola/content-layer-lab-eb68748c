@@ -74,7 +74,7 @@ import { webCodecsSupported } from "@/lib/encode";
 import { defaultAntiDup, describeVariation, makeVariation } from "@/lib/variation";
 import { autoFrame } from "@/lib/autoframe";
 import { findClips, formatTime, type ClipMetrics } from "@/lib/clips";
-import { mergeTagWeights, nicheContext } from "@/lib/viral-library";
+import { detectNiche, mergeTagWeights, nicheContext } from "@/lib/viral-library";
 import { getClipFeedback } from "@/lib/clip-feedback";
 import { cuesToSentences, speechKeepSegments, zoomKeys, type Sentence } from "@/lib/transcript-clips";
 import { resolveVideoLink } from "@/lib/import.functions";
@@ -153,6 +153,8 @@ interface Item {
   clipMetrics?: ClipMetrics | undefined;
   /** hashtags sugeridas pela IA */
   clipHashtags?: string[] | undefined;
+  /** padrão da Biblioteca Viral que combinou com o corte */
+  clipPattern?: { label: string; hook: string; reason: string } | undefined;
 
   status: Status;
   progress: number;
@@ -382,6 +384,8 @@ function Home() {
   const [clipDynamicZoom, setClipDynamicZoom] = useState(true);
   /** nicho da Biblioteca Viral (contexto do que viraliza em cada formato) */
   const [clipNiche, setClipNiche] = useState<string | null>(null);
+  /** nicho detectado automaticamente na última geração */
+  const [clipDetected, setClipDetected] = useState<string | null>(null);
   const [clipStage, setClipStage] = useState<string | null>(null);
   /** pesos por etiqueta aprendidos com o desempenho real dos posts */
   const [tagWeights, setTagWeights] = useState<Record<string, number>>({});
@@ -804,15 +808,43 @@ function Home() {
           }
         }
 
+        // 1b) Biblioteca Viral: no modo automático o formato é descoberto pelo conteúdo
+        let nicheId = clipNiche;
+        if (!nicheId) {
+          const spoken = sentences.map((x) => x.text).join(" ");
+          const spokenSecs = sentences.reduce((a, x) => a + (x.end - x.start), 0);
+          const guess = detectNiche(spoken, {
+            duration: item.duration || 0,
+            speechDensity: item.duration ? Math.min(1, spokenSecs / item.duration) : 0.5,
+          });
+          nicheId = guess.nicheId;
+          setClipDetected(guess.nicheId);
+          setClipStage(`biblioteca viral · ${guess.label} (${guess.how})`);
+        } else {
+          setClipDetected(null);
+        }
+
         setClipStage(sentences.length ? "escolhendo os melhores trechos falados…" : "analisando áudio e movimento…");
-        const ctx = nicheContext(clipNiche);
+        const ctx = nicheContext(nicheId);
+        // no preset "Automático" a duração ideal vem do formato detectado
+        const autoLen = clipMinLen === 15 && clipMaxLen === 75;
+        const minLen = ctx && autoLen ? ctx.minLen : Math.min(clipMinLen, clipMaxLen);
+        const maxLen = ctx && autoLen ? ctx.maxLen : Math.max(clipMinLen, clipMaxLen);
         const clips = await findClips(item.file, {
-          minLen: Math.min(clipMinLen, clipMaxLen),
-          maxLen: Math.max(clipMinLen, clipMaxLen),
+          minLen,
+          maxLen,
           max: clipMax,
           minScore: clipMinScore,
           tagWeights: mergeTagWeights(tagWeights, ctx),
-          ...(ctx ? { contextKeywords: ctx.keywords, contextLabel: ctx.label } : {}),
+          ...(ctx
+            ? {
+                contextKeywords: ctx.keywords,
+                contextLabel: ctx.label,
+                contextNicheId: ctx.nicheId,
+                contextTagWeights: ctx.tagWeights,
+                contextHashtags: ctx.hashtags,
+              }
+            : {}),
           ...(sentences.length ? { transcript: sentences } : {}),
         });
         if (!clips.length) {
@@ -850,6 +882,7 @@ function Home() {
           clipTitle: c.title,
           clipReason: c.reason,
           clipTags: c.tags,
+          ...(c.pattern ? { clipPattern: c.pattern } : {}),
           ...(c.metrics ? { clipMetrics: c.metrics } : {}),
           ...(c.hashtags?.length ? { clipHashtags: c.hashtags } : {}),
 
@@ -1871,6 +1904,7 @@ function Home() {
             }}
             clipStage={clipStage}
             clipBusy={clipBusy}
+            detectedNiche={clipDetected}
             onGenerate={(it) => void autoClip(items.find((x) => x.id === it.id)!)}
             running={running}
             paused={paused}

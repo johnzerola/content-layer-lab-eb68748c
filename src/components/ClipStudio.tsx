@@ -18,6 +18,7 @@ import {
   Copy,
   AudioLines,
   Gauge,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatTime, type ClipMetrics } from "@/lib/clips";
@@ -41,6 +42,8 @@ export interface ClipItem {
   clipMetrics?: ClipMetrics | undefined;
   /** hashtags sugeridas pela IA */
   clipHashtags?: string[] | undefined;
+  /** padrão da Biblioteca Viral que combinou com o corte */
+  clipPattern?: { label: string; hook: string; reason: string } | undefined;
   status: "pendente" | "na fila" | "processando" | "pronto" | "erro";
   progress: number;
   blob?: Blob | undefined;
@@ -88,6 +91,8 @@ interface Props {
   onDownload: (item: ClipItem) => void;
   onZip: () => void;
   onSaveFolder: () => void;
+  /** nicho descoberto pela IA na última geração */
+  detectedNiche?: string | null | undefined;
 }
 
 const LENGTH_PRESETS = [
@@ -573,6 +578,14 @@ function ClipCard({
           </div>
         )}
 
+        {item.clipPattern && (
+          <p className="rounded-lg border border-primary/30 bg-primary/5 p-2 font-mono text-[10px] leading-snug text-muted-foreground">
+            <Sparkles className="mr-1 inline size-3 text-primary" />
+            biblioteca viral · {item.clipPattern.reason}
+            <span className="mt-1 block text-foreground/80">gancho: {item.clipPattern.hook}</span>
+          </p>
+        )}
+
         {(item.clipMetrics || item.clipHashtags?.length) && (
           <div className="rounded-lg border border-border/40 bg-surface-3/40">
             <button
@@ -868,6 +881,7 @@ export function ClipStudio(props: Props) {
     onDownload,
     onZip,
     onSaveFolder,
+    detectedNiche,
   } = props;
 
   const [advanced, setAdvanced] = useState(false);
@@ -1065,6 +1079,7 @@ export function ClipStudio(props: Props) {
 
       <ViralLibrary
         nicheId={settings.nicheId}
+        detectedId={detectedNiche}
         onNiche={(id) => onSettings({ nicheId: id })}
         onUsePattern={(p) => {
           const min = Math.max(5, Math.round(p.seconds * 0.7));
