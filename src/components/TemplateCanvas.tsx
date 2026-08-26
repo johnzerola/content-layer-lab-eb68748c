@@ -8,6 +8,8 @@ import {
   type Template,
 } from "@/lib/template";
 import { drawFrame, preloadImage, type DrawOpts } from "@/lib/draw";
+import { motionAt, type Variation } from "@/lib/variation";
+
 
 type Rect = { x: number; y: number; w: number; h: number };
 
