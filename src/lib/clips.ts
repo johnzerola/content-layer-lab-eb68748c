@@ -531,6 +531,24 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
       for (const t of text.tags) if (!tags.includes(t)) tags.push(t);
     }
 
+    // contexto da Biblioteca Viral: palavras típicas do nicho valem pontos
+    let ctxBoost = 1;
+    const ctxWords = opts.contextKeywords;
+    if (ctxWords?.length && text?.text) {
+      const t = text.text
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+      const hits = ctxWords.filter((k) =>
+        t.includes(k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")),
+      ).length;
+      if (hits) {
+        ctxBoost = 1 + Math.min(0.2, hits * 0.05);
+        const label = opts.contextLabel ? `padrão ${opts.contextLabel.toLowerCase()}` : "padrão da biblioteca";
+        if (!tags.includes(label)) tags.push(label);
+      }
+    }
+
     // realimentação: o desempenho real dos posts ajusta o peso de cada etiqueta
     const learned = opts.tagWeights;
     let tagBoost = 1;
@@ -542,7 +560,7 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
     return {
       start: s,
       end: e,
-      raw: raw * tagBoost,
+      raw: raw * tagBoost * ctxBoost,
       hook,
       energy,
       dynamics,
