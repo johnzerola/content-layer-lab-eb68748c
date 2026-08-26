@@ -5,6 +5,8 @@ import type { Variation } from "./variation";
 import type { CaptionCue } from "./captions";
 import { keptSegments, segmentsDuration, srcTimeAt, type PreEdit } from "./preedit";
 import { cleanMp4Metadata } from "./mp4meta";
+import { bgSleep } from "./keepalive";
+
 
 export interface EncodeOptions {
   file: File;
@@ -302,12 +304,13 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
         if (performance.now() - queueWaitStarted > 15_000) {
           throw new RenderStalledError("O codificador de vídeo parou de responder");
         }
-        await new Promise((r) => setTimeout(r, 2));
+        await bgSleep(2);
       }
       // Libera a thread principal regularmente para a barra de progresso e o
       // botão de cancelar continuarem respondendo durante renders pesados.
-      if (frameIndex % 4 === 0) await new Promise((r) => setTimeout(r, 0));
+      if (frameIndex % 8 === 0) await bgSleep(0);
       const elapsed = Math.max(0.1, performance.now() - startedAt);
+
       averageFrameMs = averageFrameMs * 0.85 + elapsed * 0.15;
     };
 
