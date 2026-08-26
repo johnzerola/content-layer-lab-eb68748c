@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { defaultAntiDup, makeVariation, describeVariation } from "../variation";
+import {
+  defaultAntiDup,
+  makeVariation,
+  describeVariation,
+  motionAt,
+  variationFingerprint,
+} from "../variation";
+
 import { formatTime, scoreClipSignals, speechSegments } from "../clips";
 import { analyzeLiveRms } from "../live";
 import {
@@ -46,6 +53,48 @@ describe("variation", () => {
     expect(d).toContain("corte");
   });
 });
+
+describe("movimento anti-duplicidade", () => {
+  const cfg = defaultAntiDup();
+
+  it("gera curvas de movimento diferentes para seeds diferentes", () => {
+    const a = makeVariation(cfg, "video-a").motion;
+    const b = makeVariation(cfg, "video-b").motion;
+    expect(a).not.toEqual(b);
+  });
+
+  it("o zoom varia ao longo do clipe (não fica travado)", () => {
+    const v = makeVariation({ ...cfg, motion: "breathe", motionAmount: 0.08, motionPeriod: 6 }, "s");
+    const samples = [0, 1.5, 3, 4.5, 6, 7.5].map((t) => motionAt(v, t, 20).zoom);
+    const min = Math.min(...samples);
+    const max = Math.max(...samples);
+    expect(max - min).toBeGreaterThan(0.02);
+  });
+
+  it("push-in começa fechado e termina no quadro normal", () => {
+    const v = makeVariation({ ...cfg, motion: "pushin", motionAmount: 0.1 }, "s");
+    expect(motionAt(v, 0, 20).zoom).toBeGreaterThan(motionAt(v, 15, 20).zoom);
+    expect(motionAt(v, 19, 20).zoom).toBeCloseTo(v.zoom, 3);
+  });
+
+  it("pulso acompanha a energia do áudio", () => {
+    const v = makeVariation({ ...cfg, motion: "pulse", motionAmount: 0.1 }, "s");
+    expect(motionAt(v, 5, 20, 1).zoom).toBeGreaterThan(motionAt(v, 5, 20, 0).zoom);
+  });
+
+  it("preset nenhum mantém o zoom fixo", () => {
+    const v = makeVariation({ ...cfg, motion: "none" }, "s");
+    expect(motionAt(v, 0, 20).zoom).toBeCloseTo(v.zoom, 6);
+    expect(motionAt(v, 12, 20).zoom).toBeCloseTo(v.zoom, 6);
+  });
+
+  it("duas cópias do mesmo vídeo têm impressões digitais diferentes", () => {
+    expect(variationFingerprint(makeVariation(cfg, "clip#0"))).not.toBe(
+      variationFingerprint(makeVariation(cfg, "clip#1")),
+    );
+  });
+});
+
 
 describe("clips", () => {
   it("formata tempo em m:ss", () => {

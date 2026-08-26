@@ -2182,6 +2182,7 @@ function Home() {
                             poster={selected.poster}
                             previewFile={selected.file}
                             drawOpts={previewDrawOpts}
+                            motionVar={previewVariation}
                             speed={previewVariation?.speed ?? 1}
                             loopStart={previewLoop.start}
                             loopEnd={previewLoop.end}
@@ -2194,6 +2195,7 @@ function Home() {
                             poster={selected.poster}
                             previewFile={selected.file}
                             drawOpts={previewDrawOpts}
+                            motionVar={previewVariation}
                             speed={previewVariation?.speed ?? 1}
                             loopStart={previewLoop.start}
                             loopEnd={previewLoop.end}
@@ -2208,6 +2210,7 @@ function Home() {
                           poster={selected.poster}
                           previewFile={selected.file}
                           drawOpts={previewDrawOpts}
+                            motionVar={previewVariation}
                           speed={previewVariation?.speed ?? 1}
                           loopStart={previewLoop.start}
                           loopEnd={previewLoop.end}

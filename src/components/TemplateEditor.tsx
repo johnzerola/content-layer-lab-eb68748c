@@ -442,7 +442,9 @@ export function TemplateEditor({
               debugSafeArea={debugSafe}
               debugBoxes={debugBoxes}
               drawOpts={adOpts}
+              motionVar={adPreview ? adVariation : null}
               speed={adPreview ? adVariation.speed : 1}
+
             />
 
             {debug ? <DebugPanel

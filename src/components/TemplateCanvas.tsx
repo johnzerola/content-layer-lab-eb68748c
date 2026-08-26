@@ -8,6 +8,8 @@ import {
   type Template,
 } from "@/lib/template";
 import { drawFrame, preloadImage, type DrawOpts } from "@/lib/draw";
+import { motionAt, type Variation } from "@/lib/variation";
+
 
 type Rect = { x: number; y: number; w: number; h: number };
 
@@ -114,6 +116,8 @@ export function TemplateCanvas({
   poster,
   previewFile,
   drawOpts,
+  motionVar,
+
   snap = true,
   speed = 1,
   loopStart = 0,
@@ -132,6 +136,9 @@ export function TemplateCanvas({
   poster?: string | null;
   previewFile?: File | null;
   drawOpts?: DrawOpts | undefined;
+  /** variação anti-duplicidade: anima o zoom/movimento na prévia */
+  motionVar?: Variation | null | undefined;
+
   snap?: boolean;
   /** velocidade anti-duplicidade aplicada na prévia */
   speed?: number;
