@@ -171,6 +171,31 @@ async function decodeAudio(
   }
 }
 
+/** Envoltória de energia do áudio a 20Hz (0..1), usada pelo movimento rítmico. */
+function audioEnvelope(buf: AudioBuffer, rate = 20) {
+  const ch = buf.getChannelData(0);
+  const step = Math.max(1, Math.floor(buf.sampleRate / rate));
+  const out = new Float32Array(Math.max(1, Math.ceil(ch.length / step)));
+  let peak = 1e-6;
+  for (let i = 0, k = 0; i < ch.length; i += step, k++) {
+    let sum = 0;
+    const end = Math.min(ch.length, i + step);
+    for (let j = i; j < end; j++) sum += ch[j]! * ch[j]!;
+    const rms = Math.sqrt(sum / Math.max(1, end - i));
+    out[k] = rms;
+    if (rms > peak) peak = rms;
+  }
+  for (let i = 0; i < out.length; i++) out[i] = Math.min(1, out[i]! / peak);
+  return { data: out, rate };
+}
+
+function envelopeAt(env: { data: Float32Array; rate: number }, t: number) {
+  const i = Math.min(env.data.length - 1, Math.max(0, Math.round(t * env.rate)));
+  return env.data[i] ?? 0;
+}
+
+const clampOffset = (n: number) => Math.max(-1, Math.min(1, n));
+
 
 /** Renderiza para MP4 (H.264 + AAC) usando WebCodecs — mais rápido que tempo real. */
 export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
