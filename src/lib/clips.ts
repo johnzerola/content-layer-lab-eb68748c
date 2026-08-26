@@ -12,6 +12,7 @@
  *  5. Extração de Highlights: Identifica momentos de "ouro" com base em picos de engajamento preditivo e estrutura de storytelling.
  */
 
+import { matchPattern } from "./viral-library";
 import { titleFromText, transcriptWindows, type Sentence, type TranscriptWindow } from "./transcript-clips";
 
 export interface Clip {
@@ -31,6 +32,8 @@ export interface Clip {
   metrics?: ClipMetrics;
   /** hashtags sugeridas para a publicação */
   hashtags?: string[];
+  /** padrão da Biblioteca Viral que combinou com o corte */
+  pattern?: { label: string; hook: string; reason: string };
 }
 
 export interface ClipMetrics {
@@ -64,6 +67,12 @@ export interface ClipOptions {
   contextKeywords?: string[];
   /** rótulo do nicho, usado nas etiquetas do corte */
   contextLabel?: string;
+  /** id do nicho — usado para casar cada corte com um padrão da biblioteca */
+  contextNicheId?: string;
+  /** pesos de etiqueta do nicho (valem com ou sem transcrição) */
+  contextTagWeights?: Record<string, number>;
+  /** hashtags do nicho, mescladas às sugeridas pelo corte */
+  contextHashtags?: string[];
   onProgress?: (p: number) => void;
   signal?: AbortSignal;
 }
@@ -549,6 +558,17 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
       }
     }
 
+    // pesos do nicho valem sempre — mesmo sem transcrição
+    const nicheW = opts.contextTagWeights;
+    if (nicheW) {
+      const ws = tags.map((t) => nicheW[t]).filter((w): w is number => typeof w === "number");
+      if (ws.length) {
+        const avg = ws.reduce((a, b) => a + b, 0) / ws.length;
+        // efeito contido: metade do peso do nicho
+        ctxBoost *= 1 + (avg - 1) * 0.5;
+      }
+    }
+
     // realimentação: o desempenho real dos posts ajusta o peso de cada etiqueta
     const learned = opts.tagWeights;
     let tagBoost = 1;
@@ -630,6 +650,7 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
     .sort((a, b) => a.start - b.start)
     .map((c, i) => {
       const meta = describe(c, i, duration);
+      const pattern = matchPattern(opts.contextNicheId, { start: c.start, ...(c.text ? { text: c.text } : {}) });
       const retention = Math.max(
         0,
         Math.min(1, c.hook * 0.4 + c.density * 0.3 + c.cadence * 0.2 + c.edgeQuality * 0.1),
@@ -650,14 +671,29 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
           edgeQuality: c.edgeQuality,
           retention,
         },
-        hashtags: suggestHashtags(c.tags, c.text),
+        hashtags: mergeHashtags(suggestHashtags(c.tags, c.text), opts.contextHashtags),
         ...(c.text ? { text: c.text } : {}),
+        ...(pattern
+          ? {
+              pattern: {
+                label: pattern.nicheLabel,
+                hook: pattern.hook,
+                reason: pattern.reason,
+              },
+            }
+          : {}),
       };
     });
 
 
   opts.onProgress?.(1);
   return clips;
+}
+
+function mergeHashtags(base: string[], extra?: string[]): string[] {
+  const out = [...base];
+  for (const h of extra ?? []) if (!out.includes(h)) out.push(h);
+  return out.slice(0, 8);
 }
 
 export function formatTime(t: number) {
