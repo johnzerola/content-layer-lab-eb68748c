@@ -196,6 +196,27 @@ function rng(seed: string) {
   };
 }
 
+/** Movimento determinístico: preset, fase e amplitude sorteados pela seed. */
+function makeMotion(cfg: AntiDupConfig, r: () => number, random: boolean): Motion {
+  const preset: MotionPreset =
+    cfg.motion === "auto"
+      ? (["breathe", "kenburns", "pulse", "pushin"] as const)[Math.floor(r() * 4)] ?? "breathe"
+      : cfg.motion;
+  if (preset === "none") return { ...NO_MOTION, period: cfg.motionPeriod ?? 7 };
+  const amp = cfg.motionAmount ?? 0;
+  const dir = () => (r() < 0.5 ? -1 : 1);
+  return {
+    preset,
+    amount: random ? amp * (0.6 + r() * 0.6) : amp,
+    period: Math.max(1, (cfg.motionPeriod ?? 7) * (random ? 0.75 + r() * 0.5 : 1)),
+    phase: random ? r() : 0,
+    panX: cfg.microPan ? (random ? dir() * (0.02 + r() * 0.05) : 0.04) : 0,
+    panY: cfg.microPan ? (random ? dir() * (0.02 + r() * 0.05) : 0.03) : 0,
+    colorDrift: cfg.colorDrift ? (random ? 0.006 + r() * 0.014 : 0.01) : 0,
+    sway: cfg.sway ? (random ? dir() * (0.05 + r() * 0.2) : 0.1) : 0,
+  };
+}
+
 export function makeVariation(cfg: AntiDupConfig, seed: string): Variation {
   const base: Variation = {
     mirror: cfg.mirror,
@@ -211,7 +232,9 @@ export function makeVariation(cfg: AntiDupConfig, seed: string): Variation {
     borderColor: "#000000",
     pitch: 0,
     eq: 0,
+    motion: NO_MOTION,
   };
+  const r = rng(seed);
   // modo manual: os valores dos sliders são aplicados exatamente como estão
   if (!cfg.auto) {
     const tintM = 16;
@@ -228,11 +251,11 @@ export function makeVariation(cfg: AntiDupConfig, seed: string): Variation {
       borderColor: `rgb(${tintM},${tintM},${tintM})`,
       pitch: Math.round(cfg.pitch ?? 0),
       eq: Number((cfg.eq ?? 0).toFixed(2)),
+      motion: makeMotion(cfg, r, false),
     };
   }
 
 
-  const r = rng(seed);
   const spread = (amp: number) => (r() * 2 - 1) * amp;
 
   const border = Math.round(r() * (cfg.border ?? 0));
@@ -252,8 +275,10 @@ export function makeVariation(cfg: AntiDupConfig, seed: string): Variation {
     borderColor: `rgb(${tint},${tint},${tint})`,
     pitch: Math.round(spread(cfg.pitch ?? 0)),
     eq: Number(spread(cfg.eq ?? 0).toFixed(2)),
+    motion: makeMotion(cfg, r, true),
   };
 }
+
 
 export function describeVariation(v: Variation) {
   return [
