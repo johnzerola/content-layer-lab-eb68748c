@@ -1,7 +1,10 @@
 import { CANVAS_H, CANVAS_W, type Template } from "./template";
 import { drawFrame } from "./draw";
 import { encodeMp4, webCodecsSupported } from "./encode";
-import type { Variation } from "./variation";
+import { motionAt, type Variation } from "./variation";
+
+const clamp1 = (n: number) => Math.max(-1, Math.min(1, n));
+
 import type { CaptionCue } from "./captions";
 import type { PreEdit } from "./preedit";
 
