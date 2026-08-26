@@ -3081,6 +3081,24 @@ function Home() {
                     <span
                       role="button"
                       tabIndex={0}
+                      title="Ver como vai ficar (headline/CTA só deste vídeo)"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedId(it.id);
+                        setQuickId(it.id);
+                      }}
+                      className={`rounded-md border p-1.5 hover:border-primary ${
+                        it.headline?.trim() || it.cta?.trim()
+                          ? "border-primary text-primary"
+                          : "border-border text-muted-foreground"
+                      }`}
+                    >
+                      <Eye className="size-3.5" />
+                    </span>
+
+                    <span
+                      role="button"
+                      tabIndex={0}
                       title="Editar vídeo (cortar, enquadrar, cor)"
                       onClick={(e) => {
                         e.stopPropagation();
