@@ -22,9 +22,12 @@ import {
   Columns2,
   Wand2,
   Crop,
+  Eye,
   CalendarClock,
 } from "lucide-react";
+import { QuickPreviewModal } from "@/components/QuickPreviewModal";
 import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
+
 import { Button } from "@/components/ui/button";
 import { TemplateCanvas } from "@/components/TemplateCanvas";
 import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
@@ -134,6 +137,9 @@ interface Item {
   h: number;
   duration: number;
   headline: string;
+  /** CTA só deste vídeo (sobrepõe o do template) */
+  cta?: string | undefined;
+
   /** nome de saída escolhido pelo usuário (sem extensão) */
   outName?: string | undefined;
   offsetX: number;
@@ -277,6 +283,8 @@ function Home() {
   }, []);
   const [editing, setEditing] = useState(false);
   const [studioId, setStudioId] = useState<string | null>(null);
+  const [quickId, setQuickId] = useState<string | null>(null);
+
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [cloudOpen, setCloudOpen] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
@@ -1310,7 +1318,7 @@ function Home() {
                   : applyRatio(baseTpl, plat.w, plat.h);
 
             // pequenas mudanças de posição/tamanho para nenhum vídeo sair idêntico
-            const tpl =
+            const tplHead =
               runMode === "lote" && head.text && (head.dy || head.scale !== 1)
                 ? {
                     ...baseTplForPlat,
@@ -1321,6 +1329,11 @@ function Home() {
                     },
                   }
                 : baseTplForPlat;
+            // CTA próprio deste vídeo (definido na prévia rápida)
+            const tpl = item.cta?.trim()
+              ? { ...tplHead, cta: { ...tplHead.cta, text: item.cta.trim() } }
+              : tplHead;
+
 
 
             for (let k = 0; k < n; k++) {
