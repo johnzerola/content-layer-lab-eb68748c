@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { formatTime, type ClipMetrics } from "@/lib/clips";
 import { analyzeAudio, unlockAudioOnGesture, type AudioHealth } from "@/lib/audio-health";
+import { ViralLibrary } from "@/components/ViralLibrary";
 import { toast } from "sonner";
 
 
