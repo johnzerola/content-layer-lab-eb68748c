@@ -1063,6 +1063,19 @@ export function ClipStudio(props: Props) {
 
       </section>
 
+      <ViralLibrary
+        nicheId={settings.nicheId}
+        onNiche={(id) => onSettings({ nicheId: id })}
+        onUsePattern={(p) => {
+          const min = Math.max(5, Math.round(p.seconds * 0.7));
+          const max = Math.max(min + 5, Math.round(p.seconds * 1.25));
+          onSettings({ minLen: min, maxLen: max });
+          toast.success(`Padrão aplicado · ${p.nicheLabel} (~${p.seconds}s)`);
+        }}
+      />
+
+
+
       {clips.length > 0 && (
         <section className="panel space-y-4 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
