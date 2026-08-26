@@ -228,6 +228,7 @@ export function TemplateCanvas({
   useEffect(() => {
     let raf = 0;
     const t0 = performance.now();
+    const hasMotion = Boolean(motionVar && motionVar.motion && motionVar.motion.preset !== "none");
     const tick = () => {
       const ctx = canvasRef.current?.getContext("2d");
       if (ctx) {
@@ -239,13 +240,31 @@ export function TemplateCanvas({
             ? { el: p, width: p.naturalWidth, height: p.naturalHeight }
             : null;
         const time = vid?.currentTime ?? (performance.now() - t0) / 1000;
-        drawFrame(ctx, template, source, { ...drawOpts, time });
+        let extra: DrawOpts | undefined;
+        if (hasMotion && motionVar) {
+          const rate = Math.max(0.25, speed || 1);
+          const dur = Math.max(1, ((loopEnd ?? vid?.duration ?? 10) - loopStart) / rate);
+          const outTime = Math.max(0, (time - loopStart) / rate);
+          // sem análise de áudio na prévia: energia simulada para o preset "pulso"
+          const energy = 0.5 + 0.5 * Math.sin(outTime * 3.1);
+          const mo = motionAt(motionVar, outTime, dur, energy);
+          extra = {
+            zoom: mo.zoom,
+            brightness: mo.brightness,
+            saturation: mo.saturation,
+            rotate: mo.rotate,
+            offsetX: Math.max(-1, Math.min(1, (drawOpts?.offsetX ?? template.video.offsetX) + mo.panX)),
+            offsetY: Math.max(-1, Math.min(1, (drawOpts?.offsetY ?? template.video.offsetY) + mo.panY)),
+          };
+        }
+        drawFrame(ctx, template, source, { ...drawOpts, ...extra, time });
       }
       raf = requestAnimationFrame(tick);
     };
     tick();
     return () => cancelAnimationFrame(raf);
-  }, [template, drawOpts]);
+  }, [template, drawOpts, motionVar, speed, loopStart, loopEnd]);
+
 
   const drag = (id: SelId, mode: "move" | "resize") => (e: React.PointerEvent) => {
     if (!interactive || !onChange) return;

@@ -74,7 +74,14 @@ import { detectOverlays, safeZones } from "@/lib/detect";
 import { buildBackgroundPlate } from "@/lib/plate";
 import { downloadBlob, grabPoster, outputIsWebm, renderVideo } from "@/lib/render";
 import { webCodecsSupported } from "@/lib/encode";
-import { defaultAntiDup, describeVariation, makeVariation } from "@/lib/variation";
+import {
+  MOTION_PRESETS,
+  defaultAntiDup,
+  describeVariation,
+  makeVariation,
+  variationFingerprint,
+} from "@/lib/variation";
+
 import { autoFrame } from "@/lib/autoframe";
 import { findClips, formatTime, type ClipMetrics } from "@/lib/clips";
 import { detectNiche, mergeTagWeights, nicheContext } from "@/lib/viral-library";
@@ -2818,6 +2825,70 @@ function Home() {
                       </label>
                     ))}
                   </div>
+                  <div className="mt-3 rounded-lg border border-border/70 bg-surface-1 p-2">
+                    <p className="mono-label mb-1">Movimento (zoom animado)</p>
+                    <div className="flex flex-wrap gap-1">
+                      {MOTION_PRESETS.map((p) => (
+                        <button
+                          key={p.id}
+                          title={p.hint}
+                          onClick={() => setAntiDup({ motion: p.id })}
+                          className={`rounded-md border px-2 py-1 font-mono text-[11px] transition ${
+                            (antiDup.motion ?? "auto") === p.id
+                              ? "border-primary text-primary"
+                              : "border-border text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <label className="font-mono text-[11px] text-muted-foreground">
+                        intensidade · {((antiDup.motionAmount ?? 0) * 100).toFixed(0)}%
+                        <input
+                          type="range"
+                          min={0}
+                          max={0.25}
+                          step={0.005}
+                          value={antiDup.motionAmount ?? 0}
+                          onChange={(e) => setAntiDup({ motionAmount: Number(e.target.value) })}
+                          className="w-full accent-[var(--primary)]"
+                        />
+                      </label>
+                      <label className="font-mono text-[11px] text-muted-foreground">
+                        ciclo · {(antiDup.motionPeriod ?? 7).toFixed(1)}s
+                        <input
+                          type="range"
+                          min={2}
+                          max={20}
+                          step={0.5}
+                          value={antiDup.motionPeriod ?? 7}
+                          onChange={(e) => setAntiDup({ motionPeriod: Number(e.target.value) })}
+                          className="w-full accent-[var(--primary)]"
+                        />
+                      </label>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-3">
+                      {(
+                        [
+                          ["microPan", "micro-pan"],
+                          ["colorDrift", "deriva de cor"],
+                          ["sway", "balanço"],
+                        ] as const
+                      ).map(([key, label]) => (
+                        <label key={key} className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                          <input
+                            type="checkbox"
+                            checked={antiDup[key] ?? false}
+                            onChange={(e) => setAntiDup({ [key]: e.target.checked })}
+                            className="accent-[var(--primary)]"
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                   <label className="mt-2 flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
                     <input
                       type="checkbox"
@@ -2829,9 +2900,11 @@ function Home() {
                   </label>
                   {selected && (
                     <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                      este vídeo: {describeVariation(variationOf(selected))}
+                      este vídeo: {describeVariation(variationOf(selected))} · impressão{" "}
+                      {variationFingerprint(variationOf(selected))}
                     </p>
                   )}
+
                 </div>
               </div>
             </section>
