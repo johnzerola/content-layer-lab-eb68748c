@@ -5,6 +5,8 @@ import type { Variation } from "./variation";
 import type { CaptionCue } from "./captions";
 import { keptSegments, segmentsDuration, srcTimeAt, type PreEdit } from "./preedit";
 import { cleanMp4Metadata } from "./mp4meta";
+import { bgSleep } from "./keepalive";
+
 
 export interface EncodeOptions {
   file: File;
