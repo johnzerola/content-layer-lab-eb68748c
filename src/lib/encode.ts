@@ -272,6 +272,9 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       ...(opts.plate ? { plate: opts.plate } : {}),
     };
 
+    // envoltória de energia do áudio (20Hz) — usada pelo movimento "pulso no ritmo"
+    const envelope = audio ? audioEnvelope(audio.rendered) : null;
+    const hasMotion = v.motion && v.motion.preset !== "none";
 
     let frameIndex = 0;
     const frameDur = Math.round(1_000_000 / fps);
@@ -280,13 +283,32 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     const emit = async () => {
       const startedAt = performance.now();
       // tempo do vídeo fonte correspondente a este frame (legendas sincronizadas)
-      const srcTime = srcTimeAt(segments, (frameIndex / fps) * v.speed);
+      const outTime = frameIndex / fps;
+      const srcTime = srcTimeAt(segments, outTime * v.speed);
+      const mo = hasMotion
+        ? motionAt(v, outTime, outDur, envelope ? envelopeAt(envelope, outTime) : 0)
+        : null;
       drawFrame(
         ctx,
         tpl,
         { el: video, width: video.videoWidth, height: video.videoHeight },
-        { ...drawOpts, time: srcTime, quality: "hq" as const },
+        {
+          ...drawOpts,
+          ...(mo
+            ? {
+                zoom: mo.zoom,
+                brightness: mo.brightness,
+                saturation: mo.saturation,
+                rotate: mo.rotate,
+                offsetX: clampOffset(opts.offsetX + mo.panX),
+                offsetY: clampOffset(opts.offsetY + mo.panY),
+              }
+            : {}),
+          time: srcTime,
+          quality: "hq" as const,
+        },
       );
+
       const frame = new VideoFrame(canvas, {
         timestamp: frameIndex * frameDur,
         duration: frameDur,
