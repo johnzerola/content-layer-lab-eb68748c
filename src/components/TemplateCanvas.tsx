@@ -116,6 +116,8 @@ export function TemplateCanvas({
   poster,
   previewFile,
   drawOpts,
+  motionVar,
+
   snap = true,
   speed = 1,
   loopStart = 0,
