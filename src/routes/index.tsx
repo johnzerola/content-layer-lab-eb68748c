@@ -1387,7 +1387,9 @@ function Home() {
                     prev.map((x) => (x.id === id ? { ...x, progress: value } : x)),
                   );
                   updateJob(id, { progress: value });
+                  updateBatchProgress({ itemProgress: value, itemLabel: item.file.name });
                 },
+
               });
               const label = [outs.length > 1 ? plat.short : "", n > 1 ? `v${k + 1}` : ""]
                 .filter(Boolean)
