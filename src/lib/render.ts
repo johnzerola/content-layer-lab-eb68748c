@@ -95,16 +95,20 @@ async function recordVideo(
   const clipEnd = Math.min(video.duration, opts.clip?.end ?? video.duration);
   const endAt = Math.max(clipStart + 0.2, clipEnd - v.trimEnd);
   let raf = 0;
+  const outDur = Math.max(0.5, (endAt - (clipStart + v.trimStart)) / (v.speed || 1));
+  const hasMotion = v.motion && v.motion.preset !== "none";
   const loop = () => {
+    const outTime = Math.max(0, (video.currentTime - (clipStart + v.trimStart)) / (v.speed || 1));
+    const mo = hasMotion ? motionAt(v, outTime, outDur, 0.5) : null;
     drawFrame(ctx, tpl, { el: video, width: video.videoWidth, height: video.videoHeight }, {
       mirror: v.mirror,
-      offsetX: opts.offsetX,
-      offsetY: opts.offsetY,
-      brightness: v.brightness,
-      saturation: v.saturation,
-      zoom: v.zoom,
+      offsetX: clamp1(opts.offsetX + (mo?.panX ?? 0)),
+      offsetY: clamp1(opts.offsetY + (mo?.panY ?? 0)),
+      brightness: mo?.brightness ?? v.brightness,
+      saturation: mo?.saturation ?? v.saturation,
+      zoom: mo?.zoom ?? v.zoom,
       noise: v.noise,
-      rotate: v.rotate,
+      rotate: mo?.rotate ?? v.rotate,
       border: v.border,
       borderColor: v.borderColor,
       time: video.currentTime,
@@ -117,6 +121,7 @@ async function recordVideo(
     if (video.currentTime >= endAt) video.pause();
     raf = requestAnimationFrame(loop);
   };
+
 
   video.currentTime = clipStart + v.trimStart;
   recorder.start(1000);
