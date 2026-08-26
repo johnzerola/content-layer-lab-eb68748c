@@ -1904,6 +1904,7 @@ function Home() {
             }}
             clipStage={clipStage}
             clipBusy={clipBusy}
+            detectedNiche={clipDetected}
             onGenerate={(it) => void autoClip(items.find((x) => x.id === it.id)!)}
             running={running}
             paused={paused}

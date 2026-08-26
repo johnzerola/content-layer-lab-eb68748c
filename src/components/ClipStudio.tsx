@@ -881,6 +881,7 @@ export function ClipStudio(props: Props) {
     onDownload,
     onZip,
     onSaveFolder,
+    detectedNiche,
   } = props;
 
   const [advanced, setAdvanced] = useState(false);
