@@ -1,5 +1,17 @@
 /** Anti-duplicidade: variações sutis aplicadas por vídeo. */
 
+/** Curvas de movimento aplicadas ao longo do clipe (não só um valor fixo). */
+export type MotionPreset = "none" | "breathe" | "kenburns" | "pulse" | "pushin";
+
+export const MOTION_PRESETS: { id: MotionPreset | "auto"; label: string; hint: string }[] = [
+  { id: "auto", label: "Automático", hint: "Sorteia um movimento diferente para cada vídeo" },
+  { id: "breathe", label: "Respiração", hint: "Amplia devagar e volta ao tamanho normal, em ciclo" },
+  { id: "kenburns", label: "Ken Burns", hint: "Deriva lenta de zoom com leve panorâmica" },
+  { id: "pulse", label: "Pulso no ritmo", hint: "Pequenos avanços de zoom nos acentos do áudio" },
+  { id: "pushin", label: "Push-in", hint: "Entra fechado e abre para o quadro normal" },
+  { id: "none", label: "Nenhum", hint: "Zoom fixo do começo ao fim" },
+];
+
 export interface AntiDupConfig {
   auto: boolean;
   mirror: boolean;
@@ -15,6 +27,18 @@ export interface AntiDupConfig {
   pitch: number; // cents de variação de tom do áudio (ex 25)
   eq: number; // dB máximos de realce/corte sutil de agudos
   cleanMetadata: boolean;
+  /** preset de movimento; "auto" sorteia por vídeo */
+  motion: MotionPreset | "auto";
+  /** amplitude extra de zoom do movimento (ex 0.08 => até +8%) */
+  motionAmount: number;
+  /** duração do ciclo de movimento em segundos */
+  motionPeriod: number;
+  /** micro deslocamento lento do enquadramento */
+  microPan: boolean;
+  /** brilho/saturação oscilando de forma quase imperceptível */
+  colorDrift: boolean;
+  /** balanço lento da rotação em vez de giro travado */
+  sway: boolean;
 }
 
 export const defaultAntiDup = (): AntiDupConfig => ({
@@ -31,7 +55,30 @@ export const defaultAntiDup = (): AntiDupConfig => ({
   pitch: 25,
   eq: 1.5,
   cleanMetadata: true,
+  motion: "auto",
+  motionAmount: 0.06,
+  motionPeriod: 7,
+  microPan: true,
+  colorDrift: true,
+  sway: true,
 });
+
+export interface Motion {
+  preset: MotionPreset;
+  /** amplitude extra de zoom (0..0.3) */
+  amount: number;
+  /** segundos por ciclo */
+  period: number;
+  /** deslocamento inicial do ciclo (0..1) */
+  phase: number;
+  /** deriva do enquadramento ao longo do clipe (-1..1, unidades de offset) */
+  panX: number;
+  panY: number;
+  /** oscilação de brilho/saturação (0..0.05) */
+  colorDrift: number;
+  /** oscilação de rotação em graus */
+  sway: number;
+}
 
 export interface Variation {
   mirror: boolean;
@@ -47,7 +94,86 @@ export interface Variation {
   borderColor: string;
   pitch: number; // cents
   eq: number; // dB
+  motion: Motion;
 }
+
+/** Valores do movimento em um instante do clipe de saída. */
+export interface MotionState {
+  zoom: number;
+  panX: number;
+  panY: number;
+  brightness: number;
+  saturation: number;
+  rotate: number;
+}
+
+const NO_MOTION: Motion = {
+  preset: "none",
+  amount: 0,
+  period: 7,
+  phase: 0,
+  panX: 0,
+  panY: 0,
+  colorDrift: 0,
+  sway: 0,
+};
+
+const easeInOut = (x: number) => (x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2);
+
+/**
+ * Estado do movimento no instante `t` (segundos do clipe de saída).
+ * `energy` (0..1) é a intensidade do áudio naquele ponto, usada pelo preset "pulse".
+ */
+export function motionAt(v: Variation, t: number, duration: number, energy = 0): MotionState {
+  const m = v.motion ?? NO_MOTION;
+  const dur = Math.max(0.2, duration);
+  const p = Math.min(1, Math.max(0, t / dur));
+  const period = Math.max(1, m.period || 7);
+  const wave = Math.sin(2 * Math.PI * (t / period + (m.phase ?? 0)));
+
+  let zoomExtra = 0;
+  let px = 0;
+  let py = 0;
+  switch (m.preset) {
+    case "breathe":
+      zoomExtra = m.amount * (0.5 + 0.5 * wave);
+      break;
+    case "kenburns":
+      zoomExtra = m.amount * easeInOut(p);
+      px = m.panX * easeInOut(p);
+      py = m.panY * easeInOut(p);
+      break;
+    case "pulse":
+      zoomExtra = m.amount * (0.15 + 0.85 * Math.min(1, Math.max(0, energy)));
+      break;
+    case "pushin": {
+      // entra fechado nos primeiros ~15% e abre até o quadro normal
+      const k = Math.min(1, p / 0.18);
+      zoomExtra = m.amount * (1 - easeInOut(k));
+      break;
+    }
+    default:
+      zoomExtra = 0;
+  }
+
+  if (m.preset !== "kenburns") {
+    px = m.panX * Math.sin(2 * Math.PI * (t / (period * 1.7) + (m.phase ?? 0)));
+    py = m.panY * Math.sin(2 * Math.PI * (t / (period * 2.3) + (m.phase ?? 0) * 0.5));
+  }
+
+  const drift = (m.colorDrift ?? 0) * Math.sin(2 * Math.PI * (t / (period * 1.3) + (m.phase ?? 0)));
+  const driftSat = (m.colorDrift ?? 0) * Math.sin(2 * Math.PI * (t / (period * 2.1) + 0.25));
+
+  return {
+    zoom: v.zoom * (1 + zoomExtra),
+    panX: px,
+    panY: py,
+    brightness: v.brightness * (1 + drift),
+    saturation: v.saturation * (1 + driftSat),
+    rotate: v.rotate + (m.sway ?? 0) * Math.sin(2 * Math.PI * (t / (period * 1.9) + (m.phase ?? 0))),
+  };
+}
+
 
 function hash(seed: string) {
   let h = 2166136261;
