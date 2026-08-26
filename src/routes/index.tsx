@@ -3222,6 +3222,36 @@ function Home() {
         />
       )}
 
+      {quickItem && (
+        <QuickPreviewModal
+          fileName={quickItem.file.name}
+          poster={quickItem.poster}
+          file={quickItem.file}
+          template={{
+            ...baseTpl,
+            headline: {
+              ...baseTpl.headline,
+              text: quickItem.headline || baseTpl.headline.text,
+            },
+            cta: { ...baseTpl.cta, text: quickItem.cta?.trim() || baseTpl.cta.text },
+            video: {
+              ...baseTpl.video,
+              offsetX: quickItem.offsetX,
+              offsetY: quickItem.offsetY,
+            },
+          }}
+          headline={quickItem.headline ?? ""}
+          cta={quickItem.cta ?? ""}
+          onHeadline={(v) =>
+            setItems((p) => p.map((x) => (x.id === quickItem.id ? { ...x, headline: v } : x)))
+          }
+          onCta={(v) =>
+            setItems((p) => p.map((x) => (x.id === quickItem.id ? { ...x, cta: v } : x)))
+          }
+          onClose={() => setQuickId(null)}
+        />
+      )}
+
       {cloudOpen && (
         <CloudPanel
           templates={templates}
