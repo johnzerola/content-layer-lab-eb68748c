@@ -8,7 +8,18 @@ import {
   type TextLayer,
 } from "./template";
 import type { CaptionCue } from "./captions";
-import { cropRect, cropAt, isFullCrop, preEditFilter, rectForCrop, transitionAt, type PreEdit } from "./preedit";
+import {
+  composeTransitions,
+  cropRect,
+  cropAt,
+  isFullCrop,
+  preEditFilter,
+  rectForCrop,
+  segmentTransitionAt,
+  transitionAt,
+  type PreEdit,
+} from "./preedit";
+
 import { resolveFraming } from "./framing";
 
 
