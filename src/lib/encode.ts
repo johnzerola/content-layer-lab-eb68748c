@@ -409,6 +409,52 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     await seekTo(trimStart);
     await awaitPresented(300);
 
+    // ---- Caminho turbo: decodificação direta do arquivo (WebCodecs) ----
+    // Sem reprodução em tempo real: cada quadro sai do decodificador com o
+    // carimbo de tempo exato, na velocidade máxima da máquina.
+    if (frameIndex < totalFrames && videoDecoderSupported()) {
+      const reader = await FrameReader.open(opts.file).catch(() => null);
+      if (reader) {
+        let cur: DecodedFrame | null = null;
+        try {
+          await reader.seek(srcTimeAt(segments, 0));
+          cur = await reader.read();
+          while (cur && frameIndex < totalFrames) {
+            if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
+            const target = srcTimeAt(segments, (frameIndex / fps) * v.speed);
+            // salto grande (corte multi-segmento): reposiciona no keyframe
+            if (target < cur.time - 0.25 || target > cur.time + 2) {
+              await reader.seek(target);
+              cur.frame.close();
+              cur = await reader.read();
+              continue;
+            }
+            while (cur && cur.time + cur.duration <= target - 1e-4) {
+              const nxt = await reader.read();
+              if (!nxt) break;
+              cur.frame.close();
+              cur = nxt;
+            }
+            if (!cur) break;
+            await emit({
+              el: cur.frame,
+              width: cur.frame.displayWidth,
+              height: cur.frame.displayHeight,
+            });
+            if (frameIndex % 3 === 0) opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
+          }
+        } catch (err) {
+          if ((err as Error)?.name === "AbortError") throw err;
+          // qualquer falha na decodificação direta: segue pelos caminhos antigos
+        } finally {
+          cur?.frame.close();
+          reader.close();
+        }
+      }
+    }
+
+
+
     // Caminho rápido: em vez de buscar quadro a quadro (lento, ~1 seek por
     // frame), o vídeo é reproduzido e cada quadro de saída é capturado quando o
     // tempo da fonte alcança o instante correspondente. A reprodução é pausada
