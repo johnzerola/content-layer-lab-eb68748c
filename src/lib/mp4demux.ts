@@ -271,6 +271,9 @@ function parseVideoTrack(view: DataView, moov: Box): Mp4Track | null {
     }
     if (samples.length < 2) continue;
     samples.sort((a, b) => a.cts - b.cts || a.offset - b.offset);
+    // alinha ao mesmo referencial do <video> (primeiro quadro em t=0)
+    const base = samples[0]!.cts;
+    if (base > 0) for (const s of samples) s.cts -= base;
 
     return {
       codec,
