@@ -103,10 +103,14 @@ function pickWorker() {
 /** Imagens do template decodificadas uma vez por template (reusadas por variação). */
 function templateImages(t: Template) {
   const srcs = new Set<string>();
-  for (const l of t.layers ?? []) {
-    if ("src" in l && typeof l.src === "string" && l.src) srcs.add(l.src);
+  const push = (s?: string | null) => {
+    if (s) srcs.add(s);
+  };
+  push(t.watermark?.src);
+  push(t.avatar?.src);
+  for (const l of t.extras ?? []) {
+    if ("src" in l && typeof l.src === "string") push(l.src);
   }
-  if (t.logo?.src) srcs.add(t.logo.src);
   return [...srcs];
 }
 
