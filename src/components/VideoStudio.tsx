@@ -1311,43 +1311,48 @@ export function VideoStudio({
             {tab === "trans" && (
               <div className="space-y-5">
                 {(["transIn", "transOut"] as const).map((key) => (
-                  <div key={key} className="space-y-2">
-                    <span className="font-mono text-[11px] text-muted-foreground">
-                      {key === "transIn" ? "Transição de abertura" : "Transição de saída"}
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {TRANSITIONS.map((tr) => (
-                        <button
-                          key={tr.id}
-                          onClick={() =>
-                            set({ [key]: { ...pre[key], kind: tr.id as TransitionKind } } as Partial<PreEdit>, "transição")
-                          }
-                          className={`rounded-md border px-2.5 py-1 font-mono text-[11px] transition ${
-                            pre[key].kind === tr.id
-                              ? "border-primary text-primary"
-                              : "border-border text-muted-foreground hover:border-primary/50"
-                          }`}
-                        >
-                          {tr.label}
-                        </button>
-                      ))}
-                    </div>
-                    <Field label={`Duração · ${pre[key].dur.toFixed(2)}s`}>
-                      <Slider
-                        value={[pre[key].dur]}
-                        min={0.1}
-                        max={2}
-                        step={0.05}
-                        onValueChange={([v]) => set({ [key]: { ...pre[key], dur: v ?? 0.5 } } as Partial<PreEdit>, "transição")}
-                      />
-                    </Field>
-                  </div>
+                  <TransitionPicker
+                    key={key}
+                    label={key === "transIn" ? "Transição de abertura" : "Transição de saída"}
+                    value={pre[key]}
+                    onChange={(t) => set({ [key]: t } as Partial<PreEdit>, "transição")}
+                  />
                 ))}
+
+                <div className="space-y-3 border-t border-border pt-4">
+                  <span className="font-mono text-[11px] text-muted-foreground">
+                    Emendas entre cortes ({Math.max(0, segs.length - 1)})
+                  </span>
+                  {segs.length < 2 ? (
+                    <p className="font-mono text-[11px] text-muted-foreground">
+                      Divida o vídeo com a tesoura (tecla S) para liberar transições entre cortes.
+                    </p>
+                  ) : (
+                    segs.slice(1).map((_, i) => (
+                      <div
+                        key={`join-${i}`}
+                        ref={i === focusJoin ? focusJoinRef : undefined}
+                        className={`rounded-lg border p-2 transition ${
+                          i === focusJoin ? "border-primary/70 bg-primary/5" : "border-border"
+                        }`}
+                      >
+                        <TransitionPicker
+                          label={`Corte ${i + 1} → ${i + 2}`}
+                          value={transitionList[i] ?? { kind: "none", dur: 0.4 }}
+                          onChange={(t) => setJunction(i, t)}
+                          onApplyAll={() => applyJunctionToAll(t2 => t2, i)}
+                        />
+                      </div>
+                    ))
+                  )}
+                </div>
+
                 <p className="font-mono text-[11px] text-muted-foreground">
                   As transições aparecem no palco e na exportação.
                 </p>
               </div>
             )}
+
 
             {tab === "caps" && (
               <div className="space-y-3">
