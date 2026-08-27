@@ -305,7 +305,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     const frameDur = Math.round(1_000_000 / fps);
 
     let averageFrameMs = 1000 / fps;
-    const emit = async () => {
+    const emit = async (src?: { el: CanvasImageSource; width: number; height: number }) => {
       const startedAt = performance.now();
       // tempo do vídeo fonte correspondente a este frame (legendas sincronizadas)
       const outTime = frameIndex / fps;
@@ -316,7 +316,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       drawFrame(
         ctx,
         tpl,
-        { el: video, width: video.videoWidth, height: video.videoHeight },
+        src ?? { el: video, width: video.videoWidth, height: video.videoHeight },
         {
           ...drawOpts,
           ...(mo
@@ -333,6 +333,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
           quality: "hq" as const,
         },
       );
+
 
       const frame = new VideoFrame(canvas, {
         timestamp: frameIndex * frameDur,
