@@ -63,6 +63,9 @@ export interface PreEdit {
   transIn: Transition;
   /** transição de saída */
   transOut: Transition;
+  /** transição de cada emenda entre trechos (índice i = corte entre o trecho i e i+1) */
+  transitions?: Transition[];
+
   /** giro em passos de 90° */
   rotate: 0 | 90 | 180 | 270;
   flipH: boolean;
