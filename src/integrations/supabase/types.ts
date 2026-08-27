@@ -242,6 +242,7 @@ export type Database = {
           kind: string
           lock_id: string | null
           locked_at: string | null
+          media_type: string
           next_attempt_at: string | null
           permalink: string | null
           provider_post_id: string | null
@@ -265,6 +266,7 @@ export type Database = {
           kind?: string
           lock_id?: string | null
           locked_at?: string | null
+          media_type?: string
           next_attempt_at?: string | null
           permalink?: string | null
           provider_post_id?: string | null
@@ -288,6 +290,7 @@ export type Database = {
           kind?: string
           lock_id?: string | null
           locked_at?: string | null
+          media_type?: string
           next_attempt_at?: string | null
           permalink?: string | null
           provider_post_id?: string | null
@@ -567,6 +570,7 @@ export type Database = {
           caption: string
           id: string
           kind: string
+          media_type: string
           user_id: string
           video_path: string
           video_url: string
