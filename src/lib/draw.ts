@@ -857,7 +857,11 @@ export function drawFrame(
   ctx.fillRect(0, 0, W, H);
 
   // transição de abertura/saída: afeta o quadro montado inteiro
-  const tr = transitionAt(opts?.pre, opts?.time, opts?.clip ?? null);
+  const tr = composeTransitions(
+    transitionAt(opts?.pre, opts?.time, opts?.clip ?? null),
+    segmentTransitionAt(opts?.pre, opts?.time, opts?.clip ?? null),
+  );
+
   const animating = tr.alpha < 1 || tr.scale !== 1 || tr.dx !== 0 || tr.dy !== 0;
   if (animating) {
     ctx.save();
