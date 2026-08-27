@@ -24,6 +24,8 @@ export type SocialAccount = {
   created_at: string;
 };
 
+export type MediaType = "video" | "image";
+
 export type ScheduledPost = {
   id: string;
   account_id: string | null;
@@ -31,6 +33,7 @@ export type ScheduledPost = {
   caption: string;
   video_url: string | null;
   video_path: string | null;
+  media_type: MediaType;
   file_name: string | null;
   scheduled_at: string;
   status: string;
