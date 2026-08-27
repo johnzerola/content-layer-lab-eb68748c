@@ -83,22 +83,26 @@ export async function removeAccount(id: string) {
   if (error) throw error;
 }
 
-/* ---------------------------- vídeo no storage --------------------------- */
+/* ---------------------------- mídia no storage --------------------------- */
 
-/** Sobe o MP4 para o bucket privado e devolve caminho + link assinado (7 dias). */
-export async function uploadPostVideo(file: File | Blob, fileName: string) {
+/** Sobe o arquivo (vídeo ou foto) para o bucket privado e devolve caminho + link assinado. */
+export async function uploadPostMedia(file: File | Blob, fileName: string) {
   const user = await currentUser();
-  if (!user) throw new Error("Faça login para enviar o vídeo.");
+  if (!user) throw new Error("Faça login para enviar o arquivo.");
   const safe = fileName.replace(/[^\w.-]+/g, "_");
-  const path = `${user.id}/${Date.now()}-${safe}`;
+  const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`;
+  const isImage = (file as File).type?.startsWith("image/") || /\.(jpe?g|png|webp)$/i.test(fileName);
   const { error } = await supabase.storage.from("posts").upload(path, file, {
-    contentType: (file as File).type || "video/mp4",
+    contentType: (file as File).type || (isImage ? "image/jpeg" : "video/mp4"),
     upsert: false,
   });
   if (error) throw error;
   const { data } = await supabase.storage.from("posts").createSignedUrl(path, 60 * 60 * 24 * 7);
   return { path, url: data?.signedUrl ?? null };
 }
+
+/** Alias legado. */
+export const uploadPostVideo = uploadPostMedia;
 
 /* ----------------------------- agendamentos ------------------------------ */
 
@@ -110,6 +114,7 @@ export type NewPost = {
   videoPath?: string | null;
   videoUrl?: string | null;
   fileName?: string | null;
+  mediaType?: MediaType;
   consent?: boolean;
 };
 
@@ -142,6 +147,7 @@ export async function schedulePost(p: NewPost) {
       video_path: p.videoPath ?? null,
       video_url: p.videoUrl ?? null,
       file_name: p.fileName ?? null,
+      media_type: p.mediaType ?? "video",
       status: "agendado",
     })
     .select("id")
@@ -154,7 +160,7 @@ export async function listPosts(limit = 200): Promise<ScheduledPost[]> {
   const { data, error } = await supabase
     .from("scheduled_posts")
     .select(
-      "id,account_id,kind,caption,video_url,video_path,file_name,scheduled_at,status,attempts,error,published_at,permalink",
+      "id,account_id,kind,caption,video_url,video_path,media_type,file_name,scheduled_at,status,attempts,error,published_at,permalink",
     )
     .order("scheduled_at", { ascending: true })
     .limit(limit);
