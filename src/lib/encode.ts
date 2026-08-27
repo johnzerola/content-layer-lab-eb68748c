@@ -457,12 +457,11 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
             break;
           }
           if (frameIndex >= totalFrames) break;
-          if (video.ended || (!playing && lead <= 0)) break;
-          if (playing || lead > 0) await bgSleep(2);
+          if (video.ended) break;
+          await bgSleep(2);
         }
-        if (drifted) {
-          // recomeça este quadro pelo caminho preciso
-        }
+        void drifted;
+
       } catch (err) {
         if ((err as Error)?.name === "AbortError") throw err;
         // qualquer problema na leitura contínua: segue no caminho preciso
