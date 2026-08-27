@@ -618,6 +618,33 @@ export function EditorTimeline({
                   )}
                 </span>
               ))}
+              {/* emendas: escolher a transição entre dois trechos */}
+              {onPickTransition &&
+                segments.slice(1).map((s, i) => {
+                  const tr = transitions?.[i];
+                  const on = Boolean(tr && tr.kind !== "none" && tr.dur > 0);
+                  return (
+                    <button
+                      key={`join-${i}-${s.start}`}
+                      type="button"
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        onPickTransition(i);
+                      }}
+                      style={{ left: s.start * pps }}
+                      title={on ? `transição: ${tr!.kind}` : "adicionar transição"}
+                      aria-label={`transição do corte ${i + 1}`}
+                      className={`absolute top-2 z-10 -ml-2.5 grid size-5 place-items-center rounded-full border text-[11px] leading-none transition ${
+                        on
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-surface text-muted-foreground hover:border-primary hover:text-primary"
+                      }`}
+                    >
+                      {on ? "◆" : "+"}
+                    </button>
+                  );
+                })}
+
             </div>
           )}
 
