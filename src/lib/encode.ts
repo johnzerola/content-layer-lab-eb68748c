@@ -115,6 +115,7 @@ async function pickAudioCodec(channels: number, sampleRate: number): Promise<"aa
   return null;
 }
 
+/** Faixa de áudio da variação — o arquivo é decodificado uma vez só (cache). */
 async function decodeAudio(
   file: File,
   segments: { start: number; end: number }[],
@@ -122,79 +123,9 @@ async function decodeAudio(
   pitchCents = 0,
   eqDb = 0,
 ) {
-  try {
-    const buf = await file.arrayBuffer();
-    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const ac = new Ctx();
-    const decoded = await ac.decodeAudioData(buf);
-    void ac.close();
-    if (!decoded.length) return null;
-
-    const sampleRate = 48000;
-    const channels = Math.min(2, decoded.numberOfChannels);
-    const dur = segments.reduce((a, s) => a + Math.max(0, s.end - s.start), 0);
-    const outLen = Math.max(1, Math.floor((dur / speed) * sampleRate));
-    const off = new OfflineAudioContext(channels, outLen, sampleRate);
-
-    let cursor = 0;
-    for (const seg of segments) {
-      const len = Math.max(0, seg.end - seg.start);
-      if (len <= 0.01) continue;
-      const src = off.createBufferSource();
-      src.buffer = decoded;
-      src.playbackRate.value = speed;
-      // anti-duplicidade: leve alteração de tom (cents) sem mudar a duração de saída
-      if (pitchCents) {
-        try {
-          src.detune.value = pitchCents;
-        } catch {
-          /* navegador sem detune */
-        }
-      }
-      let node: AudioNode = src;
-      if (eqDb) {
-        // realce/corte sutil de agudos: muda o fingerprint do áudio sem soar diferente
-        const shelf = off.createBiquadFilter();
-        shelf.type = "highshelf";
-        shelf.frequency.value = 5200;
-        shelf.gain.value = eqDb;
-        node.connect(shelf);
-        node = shelf;
-      }
-      node.connect(off.destination);
-      src.start(cursor, seg.start, len);
-      cursor += len / speed;
-    }
-
-    const rendered = await off.startRendering();
-    return { rendered, channels, sampleRate };
-  } catch {
-    return null;
-  }
+  return renderAudioTrack(file, segments, speed, pitchCents, eqDb);
 }
 
-/** Envoltória de energia do áudio a 20Hz (0..1), usada pelo movimento rítmico. */
-function audioEnvelope(buf: AudioBuffer, rate = 20) {
-  const ch = buf.getChannelData(0);
-  const step = Math.max(1, Math.floor(buf.sampleRate / rate));
-  const out = new Float32Array(Math.max(1, Math.ceil(ch.length / step)));
-  let peak = 1e-6;
-  for (let i = 0, k = 0; i < ch.length; i += step, k++) {
-    let sum = 0;
-    const end = Math.min(ch.length, i + step);
-    for (let j = i; j < end; j++) sum += ch[j]! * ch[j]!;
-    const rms = Math.sqrt(sum / Math.max(1, end - i));
-    out[k] = rms;
-    if (rms > peak) peak = rms;
-  }
-  for (let i = 0; i < out.length; i++) out[i] = Math.min(1, out[i]! / peak);
-  return { data: out, rate };
-}
-
-function envelopeAt(env: { data: Float32Array; rate: number }, t: number) {
-  const i = Math.min(env.data.length - 1, Math.max(0, Math.round(t * env.rate)));
-  return env.data[i] ?? 0;
-}
 
 const clampOffset = (n: number) => Math.max(-1, Math.min(1, n));
 
