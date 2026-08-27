@@ -6,6 +6,8 @@ import type { CaptionCue } from "./captions";
 import { keptSegments, segmentsDuration, srcTimeAt, type PreEdit } from "./preedit";
 import { cleanMp4Metadata } from "./mp4meta";
 import { bgSleep } from "./keepalive";
+import { FrameReader, videoDecoderSupported, type DecodedFrame } from "./decode";
+
 
 
 export interface EncodeOptions {
