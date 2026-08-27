@@ -101,6 +101,8 @@ export function defaultPreEdit(): PreEdit {
     bgColor: "#000000",
     transIn: { kind: "none", dur: 0.5 },
     transOut: { kind: "none", dur: 0.5 },
+    transitions: [],
+
     rotate: 0,
     flipH: false,
     flipV: false,
