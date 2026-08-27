@@ -54,6 +54,7 @@ import {
   isFullCrop,
   keptSegments,
   LAYOUTS,
+  normalizeTransitions,
   preEditFilter,
   segmentsDuration,
   splitAt,
@@ -61,8 +62,10 @@ import {
   type FrameKey,
   type LayoutKind,
   type PreEdit,
+  type Transition,
   type TransitionKind,
 } from "@/lib/preedit";
+
 import { translateWords } from "@/lib/translate.functions";
 import { detectSpeechSegments } from "@/lib/silence";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
