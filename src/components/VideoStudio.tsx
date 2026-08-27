@@ -480,6 +480,42 @@ export function VideoStudio({
   const segs = keptSegments(pre, { start, end }, duration);
   const outDur = segmentsDuration(segs);
 
+  /** transições das emendas, sempre com o tamanho certo */
+  const transitionList = normalizeTransitions(pre.transitions, Math.max(0, segs.length - 1));
+
+  const setJunction = useCallback(
+    (index: number, tr: Transition) =>
+      setPre((v) => {
+        const base = normalizeTransitions(v.transitions, Math.max(index + 1, (v.transitions ?? []).length));
+        const next = base.slice();
+        next[index] = tr;
+        return { ...v, transitions: next };
+      }, "transição"),
+    [setPre],
+  );
+
+  const applyJunctionToAll = useCallback(
+    (index: number) =>
+      setPre((v) => {
+        const base = normalizeTransitions(v.transitions, Math.max(index + 1, (v.transitions ?? []).length));
+        const tr = base[index] ?? { kind: "none" as const, dur: 0.4 };
+        return { ...v, transitions: base.map(() => ({ ...tr })) };
+      }, "transição"),
+    [setPre],
+  );
+
+  const [focusJoin, setFocusJoin] = useState<number | null>(null);
+  const focusJoinRef = useRef<HTMLDivElement | null>(null);
+  const pickTransition = useCallback((index: number) => {
+    setTab("trans");
+    setFocusJoin(index);
+  }, []);
+  useEffect(() => {
+    if (focusJoin === null) return;
+    focusJoinRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [focusJoin, tab]);
+
+
   /** divide o trecho no playhead (tesoura) */
   const split = useCallback(
     () =>
