@@ -714,7 +714,7 @@ function drawVideoLayer(
 
 let scratch: HTMLCanvasElement | null = null;
 function getScratch(w: number, h: number) {
-  if (!scratch) scratch = document.createElement("canvas");
+  if (!scratch) scratch = makeCanvas(w, h);
   if (scratch.width !== w || scratch.height !== h) {
     scratch.width = w;
     scratch.height = h;
