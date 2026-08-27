@@ -41,9 +41,7 @@ function inpaintArea(
   const sh = Math.min(canvas.height - sy, h + pad * 2);
   if (sw < 4 || sh < 4) return;
   const work = makeCanvas(sw, sh);
-  work.width = sw;
-  work.height = sh;
-  const wc = work.getContext("2d", { willReadFrequently: true });
+  const wc = work.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D | null;
   if (!wc) return;
   wc.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
   const data = wc.getImageData(0, 0, sw, sh).data;
@@ -58,15 +56,35 @@ function inpaintArea(
   ctx.fillRect(x, y, w, h);
 }
 
-
-
-
+/**
+ * Canvas de trabalho compatível com a thread principal e com Web Workers.
+ * No worker não existe `document`: usamos `OffscreenCanvas`.
+ */
+export function makeCanvas(w = 1, h = 1): HTMLCanvasElement {
+  if (typeof document !== "undefined") {
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    return c;
+  }
+  return new OffscreenCanvas(w, h) as unknown as HTMLCanvasElement;
+}
 
 const imgCache = new Map<string, HTMLImageElement>();
 
+/** Registra uma imagem já decodificada (usado pelos workers, que não têm `Image`). */
+export function setImageSource(src: string, img: CanvasImageSource) {
+  imgCache.set(src, img as unknown as HTMLImageElement);
+}
+
 export function getImage(src: string): HTMLImageElement | null {
   const cached = imgCache.get(src);
-  if (cached) return cached.complete && cached.naturalWidth ? cached : null;
+  if (cached) {
+    // ImageBitmap (worker) não tem `complete`; nesse caso já está pronto
+    if (!("complete" in cached)) return cached;
+    return cached.complete && cached.naturalWidth ? cached : null;
+  }
+  if (typeof Image === "undefined") return null;
   const img = new Image();
   img.crossOrigin = "anonymous";
   img.src = src;
@@ -76,6 +94,7 @@ export function getImage(src: string): HTMLImageElement | null {
 
 export function preloadImage(src: string) {
   return new Promise<void>((resolve) => {
+    if (typeof Image === "undefined") return resolve();
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
