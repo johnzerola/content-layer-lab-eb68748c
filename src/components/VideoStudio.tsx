@@ -58,12 +58,10 @@ import {
   preEditFilter,
   segmentsDuration,
   splitAt,
-  TRANSITIONS,
   type FrameKey,
   type LayoutKind,
   type PreEdit,
   type Transition,
-  type TransitionKind,
 } from "@/lib/preedit";
 
 import { translateWords } from "@/lib/translate.functions";
