@@ -1,6 +1,7 @@
 import { CANVAS_H, CANVAS_W, type Template } from "./template";
 import { drawFrame } from "./draw";
 import { encodeMp4, webCodecsSupported } from "./encode";
+import { poolSupported, renderInPool } from "./render-pool";
 import { motionAt, type Variation } from "./variation";
 
 const clamp1 = (n: number) => Math.max(-1, Math.min(1, n));
