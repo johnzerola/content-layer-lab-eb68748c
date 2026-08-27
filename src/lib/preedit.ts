@@ -203,6 +203,8 @@ export function hasPreEdit(p?: PreEdit | null) {
     (p.transIn?.kind ?? "none") !== "none" ||
 
     (p.transOut?.kind ?? "none") !== "none" ||
+    (p.transitions ?? []).some((t) => t.kind !== "none" && t.dur > 0) ||
+
     p.rotate !== 0 ||
     p.flipH ||
     p.flipV ||
