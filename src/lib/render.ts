@@ -1,6 +1,7 @@
 import { CANVAS_H, CANVAS_W, type Template } from "./template";
 import { drawFrame } from "./draw";
 import { encodeMp4, webCodecsSupported } from "./encode";
+import { poolSupported, renderInPool } from "./render-pool";
 import { motionAt, type Variation } from "./variation";
 
 const clamp1 = (n: number) => Math.max(-1, Math.min(1, n));
@@ -153,6 +154,22 @@ export async function renderVideo(
   template: Template,
   opts: RenderOptions,
 ): Promise<{ blob: Blob; ext: string }> {
+  // 1ª opção: pool de workers (OffscreenCanvas) — vários vídeos em paralelo
+  // sem travar a interface. Cai para os caminhos antigos se algo não rolar.
+  if (poolSupported()) {
+    try {
+      const blob = await renderInPool(file, template, opts);
+      if (opts.jobId) {
+        const { finishJob } = await import("./jobs");
+        void finishJob(opts.jobId, "pronto", { blob, fileName: file.name });
+      }
+      return { blob, ext: "mp4" };
+    } catch (err) {
+      if ((err as Error)?.name === "AbortError") throw err;
+      console.warn("Pool de workers falhou, usando exportação na tela:", err);
+    }
+  }
+
   if (webCodecsSupported()) {
 
     try {
