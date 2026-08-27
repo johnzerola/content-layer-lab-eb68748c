@@ -1340,7 +1340,7 @@ export function VideoStudio({
                           label={`Corte ${i + 1} → ${i + 2}`}
                           value={transitionList[i] ?? { kind: "none", dur: 0.4 }}
                           onChange={(t) => setJunction(i, t)}
-                          onApplyAll={() => applyJunctionToAll(t2 => t2, i)}
+                          onApplyAll={() => applyJunctionToAll(i)}
                         />
                       </div>
                     ))
