@@ -40,7 +40,7 @@ function inpaintArea(
   const sw = Math.min(canvas.width - sx, w + pad * 2);
   const sh = Math.min(canvas.height - sy, h + pad * 2);
   if (sw < 4 || sh < 4) return;
-  const work = document.createElement("canvas");
+  const work = makeCanvas(sw, sh);
   work.width = sw;
   work.height = sh;
   const wc = work.getContext("2d", { willReadFrequently: true });
