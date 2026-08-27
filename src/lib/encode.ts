@@ -7,6 +7,7 @@ import { keptSegments, segmentsDuration, srcTimeAt, type PreEdit } from "./preed
 import { cleanMp4Metadata } from "./mp4meta";
 import { bgSleep } from "./keepalive";
 import { FrameReader, videoDecoderSupported, type DecodedFrame } from "./decode";
+import { audioEnvelope, envelopeAt, renderAudioTrack } from "./audio-track";
 
 
 
