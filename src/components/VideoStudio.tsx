@@ -54,20 +54,23 @@ import {
   isFullCrop,
   keptSegments,
   LAYOUTS,
+  normalizeTransitions,
   preEditFilter,
   segmentsDuration,
   splitAt,
-  TRANSITIONS,
   type FrameKey,
   type LayoutKind,
   type PreEdit,
-  type TransitionKind,
+  type Transition,
 } from "@/lib/preedit";
+
 import { translateWords } from "@/lib/translate.functions";
 import { detectSpeechSegments } from "@/lib/silence";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
 import { FramingStudio } from "@/components/FramingStudio";
 import { EditorTimeline } from "@/components/EditorTimeline";
+import { TransitionPicker } from "@/components/editor/TransitionPicker";
+
 import { StagePreview } from "@/components/editor/StagePreview";
 import { useEditorHistory } from "@/components/editor/useEditorHistory";
 import type { CaptionCue } from "@/lib/captions";
@@ -479,6 +482,42 @@ export function VideoStudio({
   /** trechos mantidos na sequência final */
   const segs = keptSegments(pre, { start, end }, duration);
   const outDur = segmentsDuration(segs);
+
+  /** transições das emendas, sempre com o tamanho certo */
+  const transitionList = normalizeTransitions(pre.transitions, Math.max(0, segs.length - 1));
+
+  const setJunction = useCallback(
+    (index: number, tr: Transition) =>
+      setPre((v) => {
+        const base = normalizeTransitions(v.transitions, Math.max(index + 1, (v.transitions ?? []).length));
+        const next = base.slice();
+        next[index] = tr;
+        return { ...v, transitions: next };
+      }, "transição"),
+    [setPre],
+  );
+
+  const applyJunctionToAll = useCallback(
+    (index: number) =>
+      setPre((v) => {
+        const base = normalizeTransitions(v.transitions, Math.max(index + 1, (v.transitions ?? []).length));
+        const tr = base[index] ?? { kind: "none" as const, dur: 0.4 };
+        return { ...v, transitions: base.map(() => ({ ...tr })) };
+      }, "transição"),
+    [setPre],
+  );
+
+  const [focusJoin, setFocusJoin] = useState<number | null>(null);
+  const focusJoinRef = useRef<HTMLDivElement | null>(null);
+  const pickTransition = useCallback((index: number) => {
+    setTab("trans");
+    setFocusJoin(index);
+  }, []);
+  useEffect(() => {
+    if (focusJoin === null) return;
+    focusJoinRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [focusJoin, tab]);
+
 
   /** divide o trecho no playhead (tesoura) */
   const split = useCallback(
@@ -941,6 +980,9 @@ export function VideoStudio({
               segments={segs}
               onSplit={split}
               onDeleteSegment={deleteSegment}
+              transitions={transitionList}
+              onPickTransition={pickTransition}
+
             />
           </section>
 
@@ -1311,43 +1353,48 @@ export function VideoStudio({
             {tab === "trans" && (
               <div className="space-y-5">
                 {(["transIn", "transOut"] as const).map((key) => (
-                  <div key={key} className="space-y-2">
-                    <span className="font-mono text-[11px] text-muted-foreground">
-                      {key === "transIn" ? "Transição de abertura" : "Transição de saída"}
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {TRANSITIONS.map((tr) => (
-                        <button
-                          key={tr.id}
-                          onClick={() =>
-                            set({ [key]: { ...pre[key], kind: tr.id as TransitionKind } } as Partial<PreEdit>, "transição")
-                          }
-                          className={`rounded-md border px-2.5 py-1 font-mono text-[11px] transition ${
-                            pre[key].kind === tr.id
-                              ? "border-primary text-primary"
-                              : "border-border text-muted-foreground hover:border-primary/50"
-                          }`}
-                        >
-                          {tr.label}
-                        </button>
-                      ))}
-                    </div>
-                    <Field label={`Duração · ${pre[key].dur.toFixed(2)}s`}>
-                      <Slider
-                        value={[pre[key].dur]}
-                        min={0.1}
-                        max={2}
-                        step={0.05}
-                        onValueChange={([v]) => set({ [key]: { ...pre[key], dur: v ?? 0.5 } } as Partial<PreEdit>, "transição")}
-                      />
-                    </Field>
-                  </div>
+                  <TransitionPicker
+                    key={key}
+                    label={key === "transIn" ? "Transição de abertura" : "Transição de saída"}
+                    value={pre[key]}
+                    onChange={(t) => set({ [key]: t } as Partial<PreEdit>, "transição")}
+                  />
                 ))}
+
+                <div className="space-y-3 border-t border-border pt-4">
+                  <span className="font-mono text-[11px] text-muted-foreground">
+                    Emendas entre cortes ({Math.max(0, segs.length - 1)})
+                  </span>
+                  {segs.length < 2 ? (
+                    <p className="font-mono text-[11px] text-muted-foreground">
+                      Divida o vídeo com a tesoura (tecla S) para liberar transições entre cortes.
+                    </p>
+                  ) : (
+                    segs.slice(1).map((_, i) => (
+                      <div
+                        key={`join-${i}`}
+                        ref={i === focusJoin ? focusJoinRef : undefined}
+                        className={`rounded-lg border p-2 transition ${
+                          i === focusJoin ? "border-primary/70 bg-primary/5" : "border-border"
+                        }`}
+                      >
+                        <TransitionPicker
+                          label={`Corte ${i + 1} → ${i + 2}`}
+                          value={transitionList[i] ?? { kind: "none", dur: 0.4 }}
+                          onChange={(t) => setJunction(i, t)}
+                          onApplyAll={() => applyJunctionToAll(i)}
+                        />
+                      </div>
+                    ))
+                  )}
+                </div>
+
                 <p className="font-mono text-[11px] text-muted-foreground">
                   As transições aparecem no palco e na exportação.
                 </p>
               </div>
             )}
+
 
             {tab === "caps" && (
               <div className="space-y-3">

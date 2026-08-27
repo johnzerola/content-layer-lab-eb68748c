@@ -63,6 +63,9 @@ export interface PreEdit {
   transIn: Transition;
   /** transição de saída */
   transOut: Transition;
+  /** transição de cada emenda entre trechos (índice i = corte entre o trecho i e i+1) */
+  transitions?: Transition[];
+
   /** giro em passos de 90° */
   rotate: 0 | 90 | 180 | 270;
   flipH: boolean;
@@ -98,6 +101,8 @@ export function defaultPreEdit(): PreEdit {
     bgColor: "#000000",
     transIn: { kind: "none", dur: 0.5 },
     transOut: { kind: "none", dur: 0.5 },
+    transitions: [],
+
     rotate: 0,
     flipH: false,
     flipV: false,
@@ -198,6 +203,8 @@ export function hasPreEdit(p?: PreEdit | null) {
     (p.transIn?.kind ?? "none") !== "none" ||
 
     (p.transOut?.kind ?? "none") !== "none" ||
+    (p.transitions ?? []).some((t) => t.kind !== "none" && t.dur > 0) ||
+
     p.rotate !== 0 ||
     p.flipH ||
     p.flipV ||
@@ -251,49 +258,95 @@ export function cropAt(p: PreEdit | null | undefined, t?: number): PreCrop | nul
   };
 }
 
+export type TransitionState = { alpha: number; scale: number; dx: number; dy: number };
+
+const NO_TRANSITION: TransitionState = { alpha: 1, scale: 1, dx: 0, dy: 0 };
+
+const easeOutCubic = (k: number) => 1 - Math.pow(1 - k, 3);
+
+/** Curva de uma transição: `k` de 0 (início do efeito) a 1 (quadro normal). */
+export function applyTransition(kind: TransitionKind, k: number, outward = false): TransitionState {
+  const e = easeOutCubic(Math.min(1, Math.max(0, k)));
+  const dir = outward ? -1 : 1;
+  switch (kind) {
+    case "fade":
+      return { alpha: e, scale: 1, dx: 0, dy: 0 };
+    case "zoom":
+      return { alpha: e, scale: 1 + (1 - e) * 0.18, dx: 0, dy: 0 };
+    case "slide-up":
+      return { alpha: e, scale: 1, dx: 0, dy: dir * (1 - e) * 0.25 };
+    case "slide-left":
+      return { alpha: e, scale: 1, dx: dir * (1 - e) * 0.25, dy: 0 };
+    case "whip":
+      return { alpha: e, scale: 1 + (1 - e) * 0.06, dx: dir * (1 - e) * 0.4, dy: 0 };
+    default:
+      return NO_TRANSITION;
+  }
+}
+
+/** Combina duas transições (abertura/saída + emenda entre cortes). */
+export function composeTransitions(a: TransitionState, b: TransitionState): TransitionState {
+  return {
+    alpha: a.alpha * b.alpha,
+    scale: a.scale * b.scale,
+    dx: a.dx + b.dx,
+    dy: a.dy + b.dy,
+  };
+}
+
 /** Estado da transição de abertura/saída no instante `t` do trecho exportado. */
 export function transitionAt(
   p: PreEdit | null | undefined,
   t?: number,
   clip?: { start: number; end: number } | null,
-): { alpha: number; scale: number; dx: number; dy: number } {
-  const none = { alpha: 1, scale: 1, dx: 0, dy: 0 };
-  if (!p || t === undefined) return none;
+): TransitionState {
+  if (!p || t === undefined) return NO_TRANSITION;
   const start = clip?.start ?? 0;
   const end = clip?.end;
   const local = t - start;
-  const easeOut = (k: number) => 1 - Math.pow(1 - k, 3);
-
-  const apply = (kind: TransitionKind, k: number, outward: boolean) => {
-    const e = easeOut(Math.min(1, Math.max(0, k)));
-    const dir = outward ? -1 : 1;
-    switch (kind) {
-      case "fade":
-        return { alpha: e, scale: 1, dx: 0, dy: 0 };
-      case "zoom":
-        return { alpha: e, scale: 1 + (1 - e) * 0.18, dx: 0, dy: 0 };
-      case "slide-up":
-        return { alpha: e, scale: 1, dx: 0, dy: dir * (1 - e) * 0.25 };
-      case "slide-left":
-        return { alpha: e, scale: 1, dx: dir * (1 - e) * 0.25, dy: 0 };
-      case "whip":
-        return { alpha: e, scale: 1 + (1 - e) * 0.06, dx: dir * (1 - e) * 0.4, dy: 0 };
-      default:
-        return none;
-    }
-  };
 
   const tin = p.transIn;
   if (tin && tin.kind !== "none" && tin.dur > 0 && local < tin.dur) {
-    return apply(tin.kind, local / tin.dur, false);
+    return applyTransition(tin.kind, local / tin.dur, false);
   }
   const tout = p.transOut;
   if (tout && tout.kind !== "none" && tout.dur > 0 && end !== undefined) {
     const left = end - t;
-    if (left < tout.dur) return apply(tout.kind, Math.max(0, left) / tout.dur, true);
+    if (left < tout.dur) return applyTransition(tout.kind, Math.max(0, left) / tout.dur, true);
   }
-  return none;
+  return NO_TRANSITION;
 }
+
+/** Transição da emenda entre dois trechos, no instante `t` do vídeo original. */
+export function segmentTransitionAt(
+  p: PreEdit | null | undefined,
+  t?: number,
+  clip?: { start: number; end: number } | null,
+  duration?: number,
+): TransitionState {
+  const list = p?.transitions;
+  if (!p || t === undefined || !list || list.length === 0) return NO_TRANSITION;
+  const segs = keptSegments(p, clip, duration);
+  if (segs.length < 2) return NO_TRANSITION;
+  for (let i = 1; i < segs.length; i++) {
+    const tr = list[i - 1];
+    if (!tr || tr.kind === "none" || tr.dur <= 0) continue;
+    const seg = segs[i]!;
+    const local = t - seg.start;
+    if (local >= 0 && local < tr.dur) return applyTransition(tr.kind, local / tr.dur, false);
+  }
+  return NO_TRANSITION;
+}
+
+/** Lista de transições ajustada para `count` emendas. */
+export function normalizeTransitions(list: Transition[] | undefined, count: number): Transition[] {
+  const out: Transition[] = [];
+  for (let i = 0; i < Math.max(0, count); i++) {
+    out.push(list?.[i] ?? { kind: "none", dur: 0.4 });
+  }
+  return out;
+}
+
 
 /** Retângulo em pixels de um recorte normalizado + dimensões após o giro. */
 export function rectForCrop(c: PreCrop, w: number, h: number, rotate = 0) {
