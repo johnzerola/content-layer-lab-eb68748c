@@ -71,6 +71,8 @@ import { detectSpeechSegments } from "@/lib/silence";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
 import { FramingStudio } from "@/components/FramingStudio";
 import { EditorTimeline } from "@/components/EditorTimeline";
+import { TransitionPicker } from "@/components/editor/TransitionPicker";
+
 import { StagePreview } from "@/components/editor/StagePreview";
 import { useEditorHistory } from "@/components/editor/useEditorHistory";
 import type { CaptionCue } from "@/lib/captions";
