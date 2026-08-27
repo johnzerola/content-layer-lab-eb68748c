@@ -77,6 +77,9 @@ export function EditorTimeline({
   transOut,
   cues,
   segments,
+  transitions,
+  onPickTransition,
+
   onSeek,
   onTogglePlay,
   onTrim,
