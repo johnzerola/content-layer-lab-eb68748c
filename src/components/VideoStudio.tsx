@@ -980,6 +980,9 @@ export function VideoStudio({
               segments={segs}
               onSplit={split}
               onDeleteSegment={deleteSegment}
+              transitions={transitionList}
+              onPickTransition={pickTransition}
+
             />
           </section>
 
