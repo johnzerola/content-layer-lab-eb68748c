@@ -58,8 +58,8 @@ export class FrameReader {
     try {
       const cfg: VideoDecoderConfig = {
         codec: track.codec,
-        codedWidth: track.width || undefined,
-        codedHeight: track.height || undefined,
+        ...(track.width ? { codedWidth: track.width } : {}),
+        ...(track.height ? { codedHeight: track.height } : {}),
         ...(track.description ? { description: track.description } : {}),
         optimizeForLatency: false,
       };
@@ -109,8 +109,8 @@ export class FrameReader {
       this.decoder?.reset();
       this.decoder?.configure({
         codec: this.track.codec,
-        codedWidth: this.track.width || undefined,
-        codedHeight: this.track.height || undefined,
+        ...(this.track.width ? { codedWidth: this.track.width } : {}),
+        ...(this.track.height ? { codedHeight: this.track.height } : {}),
         ...(this.track.description ? { description: this.track.description } : {}),
       });
     } catch {
