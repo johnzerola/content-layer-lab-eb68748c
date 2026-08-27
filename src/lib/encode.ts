@@ -347,15 +347,24 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       // Não deixe o encoder acumular uma fila grande. Uma fila sem limite faz
       // o desenho continuar enquanto o vídeo fonte avança, provocando saltos
       // que aparecem como congelamentos no MP4 final.
-      const queueWaitStarted = performance.now();
+      let queueWaitStarted = performance.now();
+      let recovered = false;
       while (encoder.encodeQueueSize > 6) {
         if (encoderError) throw encoderError;
         if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
-        if (performance.now() - queueWaitStarted > 15_000) {
-          throw new RenderStalledError("O codificador de vídeo parou de responder");
+        // Codificadores por hardware costumam engasgar quando a aba fica em
+        // segundo plano. Antes de desistir, forçamos um flush: quase sempre
+        // isso libera a fila e o lote continua normalmente.
+        if (performance.now() - queueWaitStarted > 20_000) {
+          if (recovered) throw new RenderStalledError("O codificador de vídeo parou de responder");
+          recovered = true;
+          await encoder.flush().catch(() => {});
+          queueWaitStarted = performance.now();
+          continue;
         }
         await bgSleep(2);
       }
+
       // Libera a thread principal regularmente para a barra de progresso e o
       // botão de cancelar continuarem respondendo durante renders pesados.
       if (frameIndex % 8 === 0) await bgSleep(0);
