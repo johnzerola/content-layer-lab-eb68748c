@@ -445,9 +445,7 @@ export interface FrameSource {
 let noiseTile: HTMLCanvasElement | null = null;
 function getNoiseTile() {
   if (noiseTile) return noiseTile;
-  const c = document.createElement("canvas");
-  c.width = 128;
-  c.height = 128;
+  const c = makeCanvas(128, 128);
   const cx = c.getContext("2d")!;
   const img = cx.createImageData(128, 128);
   for (let i = 0; i < img.data.length; i += 4) {
