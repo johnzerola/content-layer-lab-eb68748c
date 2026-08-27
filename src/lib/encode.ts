@@ -409,29 +409,45 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     await awaitPresented(300);
 
     // Caminho rápido: em vez de buscar quadro a quadro (lento, ~1 seek por
-    // frame), o vídeo é reproduzido acelerado e cada quadro de saída é
-    // capturado quando o tempo da fonte alcança o instante correspondente.
-    // Vários vezes mais rápido em vídeos longos e sem os saltos do modo antigo,
-    // porque o carimbo de tempo vem do próprio relógio do vídeo.
+    // frame), o vídeo é reproduzido e cada quadro de saída é capturado quando o
+    // tempo da fonte alcança o instante correspondente. A reprodução é pausada
+    // sempre que a fonte fica à frente do quadro que estamos codificando, para
+    // que imagem, áudio e legendas continuem alinhados mesmo em máquinas lentas.
     const canFast = segments.length === 1 && typeof video.play === "function";
     if (canFast && frameIndex < totalFrames) {
+      // tolerância: a fonte pode adiantar no máximo ~1 quadro
+      const LEAD_TOLERANCE = Math.max(1 / fps, 0.04);
+      // acima disto o quadro capturado já não corresponde ao carimbo de tempo;
+      // abandonamos o caminho rápido e usamos a busca precisa
+      const MAX_DRIFT = 0.25;
       try {
         video.playbackRate = Math.max(1, Math.min(4, opts.turbo ?? 3));
         video.muted = true;
         await video.play();
+        let playing = true;
         let lastIdx = -1;
         let lastMoveAt = performance.now();
+        let drifted = false;
         while (frameIndex < totalFrames) {
           if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
           const cur = video.currentTime;
-          let guard = 0;
-          while (
-            frameIndex < totalFrames &&
-            guard++ < 12 &&
-            srcTimeAt(segments, (frameIndex / fps) * v.speed) <= cur + 1e-3
-          ) {
+          const target = srcTimeAt(segments, (frameIndex / fps) * v.speed);
+          if (cur - target > MAX_DRIFT) {
+            drifted = true;
+            break;
+          }
+          if (target <= cur + 1e-3) {
             await emit();
             if (frameIndex % 3 === 0) opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
+          }
+          const nextTarget = srcTimeAt(segments, (frameIndex / fps) * v.speed);
+          const lead = video.currentTime - nextTarget;
+          if (lead > LEAD_TOLERANCE && playing) {
+            video.pause();
+            playing = false;
+          } else if (lead <= 0 && !playing) {
+            await video.play();
+            playing = true;
           }
           if (frameIndex !== lastIdx) {
             lastIdx = frameIndex;
@@ -441,8 +457,11 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
             break;
           }
           if (frameIndex >= totalFrames) break;
-          if (video.ended || video.paused) break;
-          await bgSleep(3);
+          if (video.ended || (!playing && lead <= 0)) break;
+          if (playing || lead > 0) await bgSleep(2);
+        }
+        if (drifted) {
+          // recomeça este quadro pelo caminho preciso
         }
       } catch (err) {
         if ((err as Error)?.name === "AbortError") throw err;
@@ -455,6 +474,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
         }
       }
     }
+
 
     // Exportação determinística: cada quadro de saída vem do instante exato do
     // vídeo fonte. Usada como fallback e para cortes multi-segmento.
