@@ -30,6 +30,11 @@ interface Props {
   cues?: CaptionCue[] | undefined;
   /** trechos mantidos (corte multi-segmento) */
   segments?: Segment[] | undefined;
+  /** transição de cada emenda entre trechos */
+  transitions?: Transition[] | undefined;
+  /** abre o seletor de transição da emenda `index` */
+  onPickTransition?: ((index: number) => void) | undefined;
+
   onSeek: (t: number) => void;
   onTogglePlay: () => void;
   onTrim: (start: number, end: number) => void;
