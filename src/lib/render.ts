@@ -29,7 +29,12 @@ export interface RenderOptions {
   onProgress?: ((p: number) => void) | undefined;
   onPhase?: ((phase: string, prepProgress?: number) => void) | undefined;
   /** telemetria de velocidade/caminho de leitura (só no caminho WebCodecs) */
-  onStats?: ((s: { path: "turbo" | "reprodução" | "busca precisa"; fps: number }) => void) | undefined;
+  onStats?:
+    | ((s: {
+        path: "worker" | "turbo" | "reprodução" | "busca precisa" | "gravação em tempo real";
+        fps: number;
+      }) => void)
+    | undefined;
 
   signal?: AbortSignal | undefined;
   jobId?: string | undefined;
@@ -98,6 +103,8 @@ async function recordVideo(
         tier: opts.tier ?? "balanced",
       }),
   });
+  // este caminho grava em tempo real: nunca passa de 1x, então avisamos a UI
+  opts.onStats?.({ path: "gravação em tempo real", fps });
   const chunks: BlobPart[] = [];
   recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
 
@@ -244,11 +251,13 @@ async function runRender(
   // sem travar a interface. Cai para os caminhos antigos se algo não rolar.
   if (poolSupported()) {
     try {
+      opts.onStats?.({ path: "worker", fps: 0 });
       const blob = await renderInPool(file, template, opts);
       return { blob, ext: "mp4" };
     } catch (err) {
       if ((err as Error)?.name === "AbortError") throw err;
       console.warn("Pool de workers falhou, usando exportação na tela:", err);
+      opts.onPhase?.(`worker indisponível (${(err as Error)?.message ?? "erro"}) — exportando na tela`);
     }
   }
 

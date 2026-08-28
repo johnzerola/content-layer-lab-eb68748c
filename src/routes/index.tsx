@@ -122,8 +122,15 @@ import {
   prepScale,
   registerBatchControls,
   renderScale,
+  PHASE_WEIGHTS,
+  batchStats,
+  formatEta,
+  formatSpeed,
+  markRenderStart,
+  setBatchPath,
   setBatchPhase,
   startBatchItem,
+  useBatchProgress,
   startBatchProgress,
   updateBatchProgress,
 } from "@/lib/batch-runtime";
@@ -222,6 +229,48 @@ interface QueueCtrl {
 }
 
 /** Modo "só cortes": remove toda a marca e usa o vídeo cheio no quadro. */
+/** Card de progresso do lote — usa exatamente o mesmo estado do dock global. */
+function BatchProgressCard() {
+  const p = useBatchProgress();
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!p.running) return;
+    const id = window.setInterval(() => tick((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [p.running]);
+
+  const progressed = p.done + Math.min(0.999, p.itemProgress);
+  const pct = p.total ? Math.round((progressed / p.total) * 100) : 0;
+  const { eta, perItemSec, measuring } = batchStats(p);
+  const starting = p.running && p.itemProgress <= PHASE_WEIGHTS.prep;
+
+  return (
+    <div className="space-y-1.5 rounded-xl border border-border bg-surface-2 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="mono-label">Progresso do lote</p>
+        <p className="font-mono text-[11px] text-muted-foreground">
+          {p.done}/{p.total} arquivos · {pct}%
+        </p>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-muted">
+        <div
+          className={`h-full rounded-full bg-primary transition-all ${starting ? "animate-pulse" : ""}`}
+          style={{ width: `${Math.max(pct, starting ? 3 : 0)}%` }}
+        />
+      </div>
+      <p className="truncate font-mono text-[11px] text-muted-foreground">
+        {p.itemLabel ? `${p.itemLabel} · ` : ""}
+        {p.phase ?? "preparando"}
+        {p.path ? ` · ${p.path}` : ""}
+        {p.itemFps > 0 ? ` · ${p.itemFps.toFixed(0)} fps` : ""}
+      </p>
+      <p className="font-mono text-[11px] text-muted-foreground">
+        {measuring ? "medindo velocidade…" : `restam ~${formatEta(eta)} · ${formatSpeed(perItemSec)}`}
+      </p>
+    </div>
+  );
+}
+
 function stripBranding(t: Template): Template {
   const off = <T extends { visible: boolean }>(l: T): T => ({ ...l, visible: false });
   return {
@@ -1513,8 +1562,8 @@ function Home() {
               plate,
               signal: ac.signal,
               onStats: ({ path, fps }) => {
-                updateBatchProgress({ itemFps: fps });
-                setBatchPhase(`${stageLabel} · ${path}`);
+                setBatchPath(path);
+                if (fps > 0) updateBatchProgress({ itemFps: fps });
               },
               onPhase: (phase, prepProgress) => {
                 if (ac.signal.aborted) return;
@@ -1523,6 +1572,7 @@ function Home() {
                 setItems((prev) => prev.map((x) => (x.id === id ? { ...x, stage: phase } : x)));
               },
               onProgress: (p) => {
+                if (p > 0) markRenderStart();
                 taskProgress.set(at, p);
                 pushProgress();
               },
@@ -2585,41 +2635,8 @@ function Home() {
                 {user ? <CloudRenderPanel tool={mode} /> : null}
 
 
-                {/* progresso detalhado do lote */}
-                {(running || batchItems.length > 0) && (
-                  <div className="space-y-1.5 rounded-xl border border-border bg-surface-2 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="mono-label">Progresso do lote</p>
-                      <p className="font-mono text-[11px] text-muted-foreground">
-                        {batchDone}/{batchItems.length} arquivos · {Math.round(batchProgress * 100)}
-                        %
-                      </p>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-primary transition-all"
-                        style={{ width: `${Math.round(batchProgress * 100)}%` }}
-                      />
-                    </div>
-                    {activeItem && (
-                      <>
-                        <p className="truncate font-mono text-[11px] text-muted-foreground">
-                          {activeItem.file.name} · {activeItem.stage ?? "processando"}
-                          {activeItem.stepTotal
-                            ? ` (etapa ${activeItem.stepIndex}/${activeItem.stepTotal})`
-                            : ""}
-                          {` · ${Math.round(activeItem.progress * 100)}%`}
-                        </p>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-warn transition-all"
-                            style={{ width: `${Math.round(activeItem.progress * 100)}%` }}
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
+                {/* progresso do lote: fonte única (mesmo estado do dock global) */}
+                {(running || batchItems.length > 0) && <BatchProgressCard />}
 
                 {/* relatório do lote */}
                 {report && !running && (

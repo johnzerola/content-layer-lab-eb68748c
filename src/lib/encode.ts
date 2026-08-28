@@ -40,7 +40,12 @@ export interface EncodeOptions {
   plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null | undefined;
   onProgress?: ((p: number) => void) | undefined;
   /** telemetria: qual caminho de leitura está sendo usado e a taxa real */
-  onStats?: ((s: { path: "turbo" | "reprodução" | "busca precisa"; fps: number }) => void) | undefined;
+  onStats?:
+    | ((s: {
+        path: "worker" | "turbo" | "reprodução" | "busca precisa" | "gravação em tempo real";
+        fps: number;
+      }) => void)
+    | undefined;
 
   signal?: AbortSignal | undefined;
   jobId?: string | undefined;

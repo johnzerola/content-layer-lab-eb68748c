@@ -81,8 +81,9 @@ export function BatchProgressDock() {
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] text-muted-foreground">
         <span>restam {p.paused ? "—" : measuring ? "calculando…" : `~${formatEta(eta)}`}</span>
-        <span>{formatSpeed(perItemSec)}</span>
+        {!measuring && <span>{formatSpeed(perItemSec)}</span>}
         {p.itemFps > 0 && <span>{p.itemFps.toFixed(0)} fps</span>}
+        {p.path && <span className="text-foreground/70">{p.path}</span>}
         {p.phase && <span className="text-foreground/80">{p.phase}</span>}
         {p.itemLabel && <span className="truncate max-w-[45%]">{p.itemLabel}</span>}
 

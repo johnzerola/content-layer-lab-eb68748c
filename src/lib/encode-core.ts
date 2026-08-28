@@ -248,7 +248,10 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
         width: cur.frame.displayWidth,
         height: cur.frame.displayHeight,
       });
-      if (frameIndex % 3 === 0) opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
+      // o primeiro quadro já reporta progresso: a UI para de parecer travada
+      // em "iniciando codificador"
+      if (frameIndex <= 2 || frameIndex % 3 === 0)
+        opts.onProgress?.(Math.min(0.97, Math.max(0.001, frameIndex / totalFrames)));
     }
 
     // último quadro repetido quando a fonte acaba antes do previsto
