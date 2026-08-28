@@ -2589,41 +2589,8 @@ function Home() {
                 {user ? <CloudRenderPanel tool={mode} /> : null}
 
 
-                {/* progresso detalhado do lote */}
-                {(running || batchItems.length > 0) && (
-                  <div className="space-y-1.5 rounded-xl border border-border bg-surface-2 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="mono-label">Progresso do lote</p>
-                      <p className="font-mono text-[11px] text-muted-foreground">
-                        {batchDone}/{batchItems.length} arquivos · {Math.round(batchProgress * 100)}
-                        %
-                      </p>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-primary transition-all"
-                        style={{ width: `${Math.round(batchProgress * 100)}%` }}
-                      />
-                    </div>
-                    {activeItem && (
-                      <>
-                        <p className="truncate font-mono text-[11px] text-muted-foreground">
-                          {activeItem.file.name} · {activeItem.stage ?? "processando"}
-                          {activeItem.stepTotal
-                            ? ` (etapa ${activeItem.stepIndex}/${activeItem.stepTotal})`
-                            : ""}
-                          {` · ${Math.round(activeItem.progress * 100)}%`}
-                        </p>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-warn transition-all"
-                            style={{ width: `${Math.round(activeItem.progress * 100)}%` }}
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
+                {/* progresso do lote: fonte única (mesmo estado do dock global) */}
+                {(running || batchItems.length > 0) && <BatchProgressCard />}
 
                 {/* relatório do lote */}
                 {report && !running && (
