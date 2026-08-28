@@ -47,14 +47,16 @@ export function facebookOAuthConfiguration(
   const appId = environment["META_APP_ID"]?.trim();
   const appSecret = environment["META_APP_SECRET"]?.trim();
   const redirectUri = callbackFromEnvironment(environment);
-  const configId = environment["META_LOGIN_CONFIG_ID"]?.trim();
-  if (!appId || !appSecret || !redirectUri || !configId) {
+  const classicMode = environment["META_LOGIN_MODE"]?.trim().toLowerCase() === "classic";
+  const rawConfigId = environment["META_LOGIN_CONFIG_ID"]?.trim();
+  const configId = classicMode || !rawConfigId ? null : rawConfigId;
+  if (!appId || !appSecret || !redirectUri) {
     throw new MetaLinkError(
       "SERVER_CONFIG_MISSING",
-      "O Login do Facebook para Empresas ainda não está configurado no servidor.",
+      "O Login do Facebook ainda não está configurado no servidor.",
     );
   }
-  if (!/^\d+$/.test(appId) || !/^\d+$/.test(configId)) {
+  if (!/^\d+$/.test(appId) || (configId !== null && !/^\d+$/.test(configId))) {
     throw new MetaLinkError(
       "SERVER_CONFIG_MISSING",
       "O App ID ou o ID da configuração empresarial da Meta é inválido.",
