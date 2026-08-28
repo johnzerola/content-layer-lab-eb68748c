@@ -165,6 +165,8 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
     return lit / (32 * 32);
   };
   let checked = false;
+  /** reposicionamentos do decodificador (cortes multi-trecho) — diagnóstico */
+  let seeks = 0;
 
   // medição do custo de desenho: se cair muito, o fundo desfocado é degradado
   // automaticamente em vez de deixar a exportação levar horas
@@ -253,7 +255,10 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
     while (cur && frameIndex < totalFrames) {
       if (abort()) throw cancelled();
       const target = srcTimeAt(segments, (frameIndex / fps) * v.speed);
-      if (target < cur.time - 0.25 || target > cur.time + 2) {
+      // reposicionar o decodificador é caro: só vale a pena quando o salto é
+      // maior que o custo de simplesmente decodificar os quadros do caminho
+      if (target < cur.time - 0.25 || target > cur.time + 3) {
+        seeks++;
         await reader.seek(target);
         cur.frame.close();
         cur = await reader.read();
