@@ -236,9 +236,33 @@ function IntegrationsPage() {
                               {account.username}
                             </p>
                             <p className="truncate text-xs text-muted-foreground">
-                              {connected ? "Pronta para publicar" : "Precisa reautorizar"}
+                              {account.is_primary
+                                ? "Conta ativa desta rede"
+                                : connected
+                                  ? "Pronta para publicar"
+                                  : "Precisa reautorizar"}
                             </p>
                           </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={!connected || account.is_primary}
+                            onClick={() => void choosePrimary(account)}
+                            aria-label={`Definir ${account.username} como conta ativa`}
+                            title={
+                              account.is_primary
+                                ? "Conta ativa"
+                                : "Usar esta Página/conta por padrão nas publicações"
+                            }
+                            className={`border border-border ${
+                              account.is_primary ? "text-amber-400" : "text-muted-foreground"
+                            }`}
+                          >
+                            <Star
+                              className={`size-4 ${account.is_primary ? "fill-current" : ""}`}
+                            />
+                          </Button>
                           <Button
                             type="button"
                             variant="ghost"
