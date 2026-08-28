@@ -69,11 +69,24 @@ function todayInput() {
 }
 
 /** Agendamento em massa: pasta inteira dividida em X posts por dia. */
-export function BulkScheduleModal({ open, onClose, accounts, onDone, initialFiles }: Props) {
+export function BulkScheduleModal({
+  open,
+  onClose,
+  accounts,
+  onDone,
+  initialFiles,
+  items,
+  onItemScheduled,
+  hideFilePicker,
+  secondaryAction,
+  subtitle,
+}: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
 
-  const [files, setFiles] = useState<File[]>(initialFiles ?? []);
+  const [entries, setEntries] = useState<BulkScheduleItem[]>(
+    items ?? (initialFiles ?? []).map((file) => ({ file })),
+  );
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const [kind, setKind] = useState<PostKind>("reels");
   const [caption, setCaption] = useState("");
@@ -88,7 +101,19 @@ export function BulkScheduleModal({ open, onClose, accounts, onDone, initialFile
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
 
-  const ordered = useMemo(() => sortByName(files), [files]);
+  // Itens vindos de outra ferramenta: sincroniza ao abrir.
+  useEffect(() => {
+    if (open && items) setEntries(items);
+  }, [open, items]);
+
+  useEffect(() => {
+    if (!accountId && accounts[0]) setAccountId(accounts[0].id);
+  }, [accounts, accountId]);
+
+  const ordered = useMemo(
+    () => sortByName(entries.map((e) => ({ ...e, name: e.file.name }))),
+    [entries],
+  );
 
   const config = useMemo(() => {
     const [y, m, d] = startDate.split("-").map(Number);
@@ -117,7 +142,7 @@ export function BulkScheduleModal({ open, onClose, accounts, onDone, initialFile
       toast.error("Selecione fotos ou vídeos.");
       return;
     }
-    setFiles((prev) => [...prev, ...incoming]);
+    setEntries((prev) => [...prev, ...incoming.map((file) => ({ file }))]);
   };
 
   const run = async () => {
@@ -140,16 +165,17 @@ export function BulkScheduleModal({ open, onClose, accounts, onDone, initialFile
     const failed: string[] = [];
 
     for (let i = 0; i < ordered.length; i++) {
-      const file = ordered[i] as File;
+      const entry = ordered[i] as BulkScheduleItem & { name: string };
+      const file = entry.file;
       const when = plan[i];
       if (!when) break;
       try {
         const media = mediaTypeOf(file);
         const uploaded = await uploadPostMedia(file, file.name);
-        await schedulePost({
+        const postId = await schedulePost({
           accountId,
           kind: media === "image" && kind === "reels" ? "feed" : kind,
-          caption,
+          caption: entry.caption?.trim() ? entry.caption : caption,
           scheduledAt: when,
           videoPath: uploaded.path,
           videoUrl: uploaded.url,
@@ -157,6 +183,7 @@ export function BulkScheduleModal({ open, onClose, accounts, onDone, initialFile
           mediaType: media,
           consent: true,
         });
+        await onItemScheduled?.(entry, (postId as string | null) ?? null);
         ok++;
       } catch (e) {
         failed.push(`${file.name}: ${e instanceof Error ? e.message : "erro"}`);
@@ -168,11 +195,12 @@ export function BulkScheduleModal({ open, onClose, accounts, onDone, initialFile
     if (ok > 0) toast.success(`${ok} publicação(ões) agendada(s) em ${days.length} dia(s).`);
     if (failed.length > 0) toast.error(`${failed.length} falharam. ${failed[0] ?? ""}`);
     if (ok > 0) {
-      setFiles([]);
+      setEntries([]);
       onDone();
       onClose();
     }
   };
+
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-3 sm:p-6">
