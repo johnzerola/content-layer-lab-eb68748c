@@ -41,6 +41,8 @@ export interface CoreEncodeOptions {
   audio?: AudioPcm | null | undefined;
   envelope?: Envelope | null | undefined;
   onProgress?: ((p: number) => void) | undefined;
+  /** etapa atual (abrindo vídeo, preparando decodificador, codificando) */
+  onPhase?: ((phase: string) => void) | undefined;
   isCancelled?: (() => boolean) | undefined;
 }
 
@@ -73,9 +75,11 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
   const v = opts.variation;
   const abort = () => opts.isCancelled?.() === true;
 
+  opts.onPhase?.("preparando codificador");
   const picked = await pickVideoCodec(W, H, bitrate, fps, tier);
   if (!picked) throw new Error("Codificação de vídeo não suportada neste navegador");
 
+  opts.onPhase?.("abrindo o vídeo");
   const reader = await FrameReader.open(opts.file);
   if (!reader) throw new Error("Não foi possível decodificar este vídeo diretamente");
 
@@ -250,8 +254,10 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
 
   let cur: DecodedFrame | null = null;
   try {
+    opts.onPhase?.("decodificando o primeiro quadro");
     await reader.seek(srcTimeAt(segments, 0));
     cur = await reader.read();
+    opts.onPhase?.("codificando");
     while (cur && frameIndex < totalFrames) {
       if (abort()) throw cancelled();
       const target = srcTimeAt(segments, (frameIndex / fps) * v.speed);

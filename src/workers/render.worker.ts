@@ -40,6 +40,9 @@ export type WorkerRequest = RenderRequest | { type: "cancel"; id: number };
 
 export type WorkerResponse =
   | { type: "progress"; id: number; p: number }
+  | { type: "phase"; id: number; phase: string }
+  /** sinal de vida: o trabalho segue, mesmo que um quadro demore */
+  | { type: "alive"; id: number }
   | { type: "done"; id: number; buffer: ArrayBuffer }
   | { type: "error"; id: number; message: string; name: string };
 
@@ -72,6 +75,8 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     return;
   }
   const { id } = msg;
+  // pulso a cada 3s: o vigia distingue "quadro lento" de "travou de vez"
+  const beat = setInterval(() => post({ type: "alive", id }), 3_000);
   try {
     await registerFonts(msg.fonts);
     for (const img of msg.images ?? []) setImageSource(img.src, img.bitmap);
@@ -94,12 +99,15 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       audio: msg.audio,
       envelope: msg.envelope,
       onProgress: (p) => post({ type: "progress", id, p }),
+      onPhase: (phase) => post({ type: "phase", id, phase }),
       isCancelled: () => cancelled.has(id),
     });
 
+    clearInterval(beat);
     cancelled.delete(id);
     post({ type: "done", id, buffer }, [buffer]);
   } catch (err) {
+    clearInterval(beat);
     cancelled.delete(id);
     const error = err as Error;
     post({

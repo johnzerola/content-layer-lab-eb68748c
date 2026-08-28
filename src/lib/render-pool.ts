@@ -18,6 +18,7 @@ interface Pending {
   resolve: (buf: ArrayBuffer) => void;
   reject: (err: Error) => void;
   onProgress?: ((p: number) => void) | undefined;
+  onPhase?: ((phase: string, prep?: number) => void) | undefined;
   worker: Worker;
   watchdog: ReturnType<typeof setTimeout>;
 }
@@ -64,18 +65,34 @@ function raceStep<T>(task: Promise<T>, signal: AbortSignal | undefined, timeoutM
   });
 }
 
+/** Reinicia o vigia: houve sinal de vida deste job. */
+function keepAlive(id: number, job: Pending) {
+  clearTimeout(job.watchdog);
+  job.watchdog = setTimeout(() => {
+    pending.delete(id);
+    job.worker.terminate();
+    workers = workers.filter((candidate) => candidate !== job.worker);
+    job.reject(
+      Object.assign(new Error("A renderização parou de responder"), { name: "RenderStalledError" }),
+    );
+  }, STALL_MS);
+}
+
 function handle(e: MessageEvent<WorkerResponse>) {
   const msg = e.data;
   const job = pending.get(msg.id);
   if (!job) return;
+  if (msg.type === "alive") {
+    keepAlive(msg.id, job);
+    return;
+  }
+  if (msg.type === "phase") {
+    keepAlive(msg.id, job);
+    job.onPhase?.(msg.phase);
+    return;
+  }
   if (msg.type === "progress") {
-    clearTimeout(job.watchdog);
-    job.watchdog = setTimeout(() => {
-      pending.delete(msg.id);
-      job.worker.terminate();
-      workers = workers.filter((candidate) => candidate !== job.worker);
-      job.reject(Object.assign(new Error("A renderização parou de responder"), { name: "RenderStalledError" }));
-    }, STALL_MS);
+    keepAlive(msg.id, job);
     job.onProgress?.(msg.p);
     return;
   }
@@ -248,7 +265,16 @@ export async function renderInPool(
     const watchdog = setTimeout(() => {
       rejectWorkerJobs(worker, Object.assign(new Error("O codificador não iniciou"), { name: "RenderStalledError" }));
     }, STALL_MS);
-    pending.set(id, { resolve, reject, onProgress: opts.onProgress, worker, watchdog });
+    pending.set(id, {
+      resolve,
+      reject,
+      onProgress: opts.onProgress,
+      // o worker informa a etapa real: a UI nunca mais fica presa em
+      // "iniciando codificador" enquanto os quadros já estão saindo
+      onPhase: (phase) => opts.onPhase?.(phase, 0.95),
+      worker,
+      watchdog,
+    });
   });
 
   const onAbort = () => {

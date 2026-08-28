@@ -184,72 +184,91 @@ export async function renderVideo(
   opts: RenderOptions,
 ): Promise<{ blob: Blob; ext: string }> {
   // Vigia global: qualquer caminho de render (pool, WebCodecs ou gravação em
-  // tela) precisa dar sinal de vida. Sem sinal, o job é abortado e devolve erro
-  // em vez de ficar "preparando" para sempre.
-  const inner = new AbortController();
-  let last = performance.now();
-  const alive = () => {
-    last = performance.now();
-  };
-  const onOuterAbort = () => inner.abort();
-  opts.signal?.addEventListener("abort", onOuterAbort, { once: true });
-  if (opts.signal?.aborted) inner.abort();
-
-  let stalled = false;
-  const watchdog = setInterval(() => {
-    if (performance.now() - last < RENDER_STALL_MS) return;
-    stalled = true;
-    inner.abort();
-  }, 5_000);
-
-  const guarded: RenderOptions = {
-    ...opts,
-    signal: inner.signal,
-    onProgress: (p) => {
-      alive();
-      opts.onProgress?.(p);
-    },
-    onPhase: (phase, prep) => {
-      alive();
-      opts.onPhase?.(phase, prep);
-    },
-    onStats: (s) => {
-      alive();
-      opts.onStats?.(s);
-    },
-  };
-
+  // tela) precisa dar sinal de vida. Sem sinal, o job é abortado — mas em vez
+  // de virar erro, ele é refeito uma vez em "modo seguro" (sem worker), para o
+  // usuário terminar o lote com o arquivo na mão.
   const stallError = () =>
     Object.assign(
-      new Error("O render travou e foi interrompido. Tente novamente em modo seguro."),
+      new Error("O render travou e foi interrompido mesmo no modo seguro."),
       { name: "RenderStalledError" },
     );
 
-  try {
-    const result = await runRender(file, template, guarded);
-    if (opts.jobId) {
-      const { finishJob } = await import("./jobs");
-      void finishJob(opts.jobId, "pronto", { blob: result.blob, fileName: file.name });
+  const attempt = async (skipPool: boolean) => {
+    const inner = new AbortController();
+    let last = performance.now();
+    const alive = () => {
+      last = performance.now();
+    };
+    const onOuterAbort = () => inner.abort();
+    opts.signal?.addEventListener("abort", onOuterAbort, { once: true });
+    if (opts.signal?.aborted) inner.abort();
+
+    let stalled = false;
+    const watchdog = setInterval(() => {
+      if (performance.now() - last < RENDER_STALL_MS) return;
+      stalled = true;
+      inner.abort();
+    }, 5_000);
+
+    const guarded: RenderOptions = {
+      ...opts,
+      signal: inner.signal,
+      onProgress: (p) => {
+        alive();
+        opts.onProgress?.(p);
+      },
+      onPhase: (phase, prep) => {
+        alive();
+        opts.onPhase?.(phase, prep);
+      },
+      onStats: (s) => {
+        alive();
+        opts.onStats?.(s);
+      },
+    };
+
+    try {
+      return await runRender(file, template, guarded, skipPool);
+    } catch (err) {
+      // cancelamento pedido pelo usuário: propaga como está
+      if (opts.signal?.aborted) throw err;
+      if (stalled) throw stallError();
+      throw err;
+    } finally {
+      clearInterval(watchdog);
+      opts.signal?.removeEventListener("abort", onOuterAbort);
     }
-    return result;
+  };
+
+  let result: { blob: Blob; ext: string };
+  try {
+    result = await attempt(false);
   } catch (err) {
-    if (stalled) throw stallError();
-    throw err;
-  } finally {
-    clearInterval(watchdog);
-    opts.signal?.removeEventListener("abort", onOuterAbort);
+    const name = (err as Error)?.name;
+    if (opts.signal?.aborted || name === "AbortError") throw err;
+    if (name !== "RenderStalledError") throw err;
+    console.warn("Render travou; refazendo em modo seguro (sem worker)");
+    opts.onPhase?.("refazendo em modo seguro", 0.05);
+    result = await attempt(true);
   }
+
+  if (opts.jobId) {
+    const { finishJob } = await import("./jobs");
+    void finishJob(opts.jobId, "pronto", { blob: result.blob, fileName: file.name });
+  }
+  return result;
 }
 
 async function runRender(
   file: File,
   template: Template,
   opts: RenderOptions,
+  skipPool = false,
 ): Promise<{ blob: Blob; ext: string }> {
   opts.onPhase?.("iniciando processamento", 0.02);
   // 1ª opção: pool de workers (OffscreenCanvas) — vários vídeos em paralelo
   // sem travar a interface. Cai para os caminhos antigos se algo não rolar.
-  if (poolSupported()) {
+  if (!skipPool && poolSupported()) {
     try {
       opts.onStats?.({ path: "worker", fps: 0 });
       const blob = await renderInPool(file, template, opts);
