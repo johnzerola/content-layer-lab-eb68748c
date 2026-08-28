@@ -513,6 +513,13 @@ function AgendaPage() {
           onRestore={() => {}}
         />
       )}
+
+      <BulkScheduleModal
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        accounts={accounts}
+        onDone={() => void refresh()}
+      />
     </AppShell>
   );
 }
