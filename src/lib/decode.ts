@@ -80,11 +80,15 @@ export class FrameReader {
   private configure(cfg: VideoDecoderConfig) {
     this.decoder = new VideoDecoder({
       output: (frame) => {
-        this.queue.push({
+        const item: DecodedFrame = {
           frame,
           time: (frame.timestamp ?? 0) / 1e6,
           duration: (frame.duration ?? 0) / 1e6 || 1 / 30,
-        });
+        };
+        // insere já ordenado por tempo de exibição (quadros B podem sair fora)
+        let i = this.queue.length;
+        while (i > 0 && this.queue[i - 1]!.time > item.time) i--;
+        this.queue.splice(i, 0, item);
         this.wake?.();
       },
       error: (e) => {
@@ -98,10 +102,14 @@ export class FrameReader {
   /** Posiciona a leitura no keyframe imediatamente anterior a `time`. */
   async seek(time: number) {
     const samples = this.track.samples;
+    // a tabela está em ordem de decodificação: escolhe o último keyframe cujo
+    // tempo (dts e cts) já passou, para não pular quadros de referência.
     let idx = 0;
     for (let i = 0; i < samples.length; i++) {
-      if (samples[i]!.cts > time) break;
-      if (samples[i]!.sync) idx = i;
+      const s = samples[i]!;
+      if (!s.sync) continue;
+      if (Math.min(s.cts, s.dts) <= time + 1e-6) idx = i;
+      else break;
     }
     if (idx === this.next && this.queue.length) return;
     this.drain();
@@ -147,8 +155,13 @@ export class FrameReader {
   async read(): Promise<DecodedFrame | null> {
     for (;;) {
       if (this.failed) throw this.failed;
-      if (this.queue.length) return this.queue.shift()!;
-      if (this.next >= this.track.samples.length) {
+      // janela de reordenação: espera alguns quadros para garantir ordem de
+      // exibição correta em vídeos com quadros B.
+      const done = this.next >= this.track.samples.length;
+      if (this.queue.length >= 4 || (this.queue.length && (done || this.flushed))) {
+        return this.queue.shift()!;
+      }
+      if (done) {
         if (this.flushed) return null;
         this.flushed = true;
         try {
