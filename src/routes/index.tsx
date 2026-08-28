@@ -1228,6 +1228,8 @@ function Home() {
               p.map((x) => (x.id === id ? { ...x, stage: "baixando vídeo limpo" } : x)),
             );
             updateJob(id, { stage: "baixando vídeo limpo" });
+            setBatchPhase("baixando vídeo limpo", prepScale(0.2));
+
             const res = await fetch(item.result_url, { signal: ac.signal });
             if (!res.ok) throw new Error("Não consegui baixar o vídeo limpo da GPU.");
             const cleaned = await res.blob();
