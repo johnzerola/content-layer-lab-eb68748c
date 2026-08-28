@@ -8,14 +8,34 @@ export interface BatchProgress {
   done: number;
   total: number;
   label: string | null;
-  /** progresso (0-1) do vídeo em render agora */
+  /** progresso (0-1) do vídeo em render agora (inclui preparo e finalização) */
   itemProgress: number;
   /** nome do vídeo em render agora */
   itemLabel: string | null;
+  /** fase atual em linguagem simples (ex.: "lendo áudio") */
+  phase: string | null;
+  /** quadros por segundo medidos no item atual (0 = ainda medindo) */
+  itemFps: number;
   /** quantos falharam até agora */
   errors: number;
   /** performance.now() de quando o lote começou */
   startedAt: number;
+  /** performance.now() de quando o item atual começou */
+  itemStartedAt: number;
+  /** durações (ms) dos itens já concluídos — base honesta para o ETA */
+  itemDurations: number[];
+}
+
+/** Pesos das fases de cada vídeo: preparo, render e finalização. */
+export const PHASE_WEIGHTS = { prep: 0.15, render: 0.8, finish: 0.05 } as const;
+
+/** Converte o progresso do render (0-1) para a escala do item inteiro. */
+export function renderScale(p: number) {
+  return PHASE_WEIGHTS.prep + Math.max(0, Math.min(1, p)) * PHASE_WEIGHTS.render;
+}
+/** Converte o progresso do preparo (0-1) para a escala do item inteiro. */
+export function prepScale(p: number) {
+  return Math.max(0, Math.min(1, p)) * PHASE_WEIGHTS.prep;
 }
 
 const EMPTY: BatchProgress = {
@@ -26,8 +46,12 @@ const EMPTY: BatchProgress = {
   label: null,
   itemProgress: 0,
   itemLabel: null,
+  phase: null,
+  itemFps: 0,
   errors: 0,
   startedAt: 0,
+  itemStartedAt: 0,
+  itemDurations: [],
 };
 
 export const batchProgress = externalState<BatchProgress>(EMPTY);
@@ -51,41 +75,114 @@ export function cancelBatch() {
   controls.cancel?.();
 }
 
+const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+
 export function startBatchProgress(total: number, label?: string) {
   batchProgress.set({
     ...EMPTY,
+    itemDurations: [],
     running: true,
     total,
     label: label ?? null,
-    startedAt: typeof performance !== "undefined" ? performance.now() : Date.now(),
+    startedAt: now(),
   });
 }
 export function updateBatchProgress(patch: Partial<BatchProgress>) {
   batchProgress.set((p) => ({ ...p, ...patch }));
 }
+
+/** Marca o início do trabalho de um vídeo (reinicia fase, fps e cronômetro). */
+export function startBatchItem(label: string, phase = "preparando") {
+  batchProgress.set((p) => ({
+    ...p,
+    itemLabel: label,
+    itemProgress: 0,
+    itemFps: 0,
+    phase,
+    itemStartedAt: now(),
+  }));
+}
+
+/** Atualiza somente a fase textual do item atual. */
+export function setBatchPhase(phase: string, itemProgress?: number) {
+  batchProgress.set((p) => ({
+    ...p,
+    phase,
+    ...(typeof itemProgress === "number" ? { itemProgress } : {}),
+  }));
+}
+
+/** Item concluído: guarda a duração real para o ETA das próximas iterações. */
+export function finishBatchItem(done: number) {
+  batchProgress.set((p) => {
+    const spent = p.itemStartedAt ? now() - p.itemStartedAt : 0;
+    return {
+      ...p,
+      done,
+      itemProgress: 0,
+      itemLabel: null,
+      phase: null,
+      itemFps: 0,
+      itemStartedAt: 0,
+      itemDurations: spent > 500 ? [...p.itemDurations, spent].slice(-20) : p.itemDurations,
+    };
+  });
+}
+
 export function endBatchProgress() {
   batchProgress.set(EMPTY);
 }
 
-/** Estatísticas derivadas: velocidade e tempo restante estimado. */
+/**
+ * Estatísticas derivadas. O ETA vem da duração real dos vídeos já concluídos;
+ * enquanto não houver amostra suficiente, devolvemos `measuring` para a
+ * interface dizer "calculando…" em vez de exibir um número inventado.
+ */
 export function batchStats(p: BatchProgress) {
-  const now = typeof performance !== "undefined" ? performance.now() : Date.now();
-  const elapsed = p.startedAt ? Math.max(0.001, (now - p.startedAt) / 1000) : 0;
+  const t = now();
+  const elapsed = p.startedAt ? Math.max(0.001, (t - p.startedAt) / 1000) : 0;
   const progressed = p.done + Math.min(0.999, p.itemProgress);
-  const perMin = elapsed > 3 && progressed > 0 ? (progressed / elapsed) * 60 : 0;
   const remaining = Math.max(0, p.total - progressed);
-  const eta = perMin > 0 ? Math.round((remaining / perMin) * 60) : null;
-  return { elapsed, perMin, eta };
+
+  // média das durações reais (peso maior nas mais recentes)
+  let perItemSec = 0;
+  if (p.itemDurations.length) {
+    let weight = 0;
+    let acc = 0;
+    p.itemDurations.forEach((d, i) => {
+      const w = i + 1;
+      acc += d * w;
+      weight += w;
+    });
+    perItemSec = acc / weight / 1000;
+  } else if (p.itemStartedAt && p.itemProgress >= 0.08) {
+    // extrapola o item atual só depois de 8% — antes disso a conta é ruído
+    perItemSec = (t - p.itemStartedAt) / 1000 / p.itemProgress;
+  }
+
+  const measuring = perItemSec <= 0;
+  const eta = measuring ? null : Math.round(remaining * perItemSec);
+  const perMin = perItemSec > 0 ? 60 / perItemSec : 0;
+  return { elapsed, perMin, eta, perItemSec, measuring };
+}
+
+/** Velocidade legível: vídeos/min quando rápido, min/vídeo quando lento. */
+export function formatSpeed(perItemSec: number) {
+  if (!perItemSec || !Number.isFinite(perItemSec)) return "medindo…";
+  if (perItemSec <= 60) return `${(60 / perItemSec).toFixed(1)} vídeos/min`;
+  const min = perItemSec / 60;
+  return `${min < 10 ? min.toFixed(1) : Math.round(min)} min/vídeo`;
 }
 
 export function formatEta(seconds: number | null) {
-  if (seconds == null || !Number.isFinite(seconds)) return "—";
+  if (seconds == null || !Number.isFinite(seconds)) return "calculando…";
   if (seconds < 60) return `${Math.max(1, Math.round(seconds))}s`;
   const m = Math.floor(seconds / 60);
   const s = Math.round(seconds % 60);
   if (m < 60) return `${m}m${s ? ` ${s}s` : ""}`;
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
+
 
 /** Aviso de conclusão mesmo com a aba em segundo plano. */
 export function notifyBatchDone(ok: number, fail: number) {

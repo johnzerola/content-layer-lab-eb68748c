@@ -31,6 +31,9 @@ export interface EncodeOptions {
   /** placa de fundo (mediana temporal) para remover overlays com pixels reais */
   plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null | undefined;
   onProgress?: ((p: number) => void) | undefined;
+  /** telemetria: qual caminho de leitura está sendo usado e a taxa real */
+  onStats?: ((s: { path: "turbo" | "reprodução" | "busca precisa"; fps: number }) => void) | undefined;
+
   signal?: AbortSignal | undefined;
   jobId?: string | undefined;
 }
@@ -239,8 +242,11 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     const frameDur = Math.round(1_000_000 / fps);
 
     let averageFrameMs = 1000 / fps;
+    /** caminho de leitura em uso — reportado para o painel de diagnóstico */
+    let path: "turbo" | "reprodução" | "busca precisa" = "turbo";
     const emit = async (src?: { el: CanvasImageSource; width: number; height: number }) => {
       const startedAt = performance.now();
+
       // tempo do vídeo fonte correspondente a este frame (legendas sincronizadas)
       const outTime = frameIndex / fps;
       const srcTime = srcTimeAt(segments, outTime * v.speed);
@@ -297,13 +303,17 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
         await bgSleep(2);
       }
 
-      // Libera a thread principal regularmente para a barra de progresso e o
-      // botão de cancelar continuarem respondendo durante renders pesados.
-      if (frameIndex % 8 === 0) await bgSleep(0);
+      // Libera a thread principal periodicamente para a barra de progresso e o
+      // botão de cancelar continuarem respondendo. Com a fila do codificador
+      // vazia dá para espaçar mais essas pausas e ganhar velocidade.
+      const breathe = encoder.encodeQueueSize > 2 ? 8 : 24;
+      if (frameIndex % breathe === 0) await bgSleep(0);
       const elapsed = Math.max(0.1, performance.now() - startedAt);
 
       averageFrameMs = averageFrameMs * 0.85 + elapsed * 0.15;
+      if (frameIndex % 15 === 0) opts.onStats?.({ path, fps: 1000 / averageFrameMs });
     };
+
 
     /** Espera o navegador realmente apresentar um quadro novo após a busca. */
     const awaitPresented = (ms: number) =>
@@ -356,7 +366,11 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     // Sem reprodução em tempo real: cada quadro sai do decodificador com o
     // carimbo de tempo exato, na velocidade máxima da máquina.
     if (frameIndex < totalFrames && videoDecoderSupported()) {
-      const reader = await FrameReader.open(opts.file).catch(() => null);
+      path = "turbo";
+      const reader = await FrameReader.open(opts.file).catch((err) => {
+        console.warn("Turbo indisponível (leitor de quadros):", err);
+        return null;
+      });
       if (reader) {
         let cur: DecodedFrame | null = null;
         try {
@@ -389,12 +403,14 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
         } catch (err) {
           if ((err as Error)?.name === "AbortError") throw err;
           // qualquer falha na decodificação direta: segue pelos caminhos antigos
+          console.warn("Turbo interrompido, caindo para reprodução:", err);
         } finally {
           cur?.frame.close();
           reader.close();
         }
       }
     }
+
 
 
 
@@ -405,6 +421,8 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     // que imagem, áudio e legendas continuem alinhados mesmo em máquinas lentas.
     const canFast = segments.length === 1 && typeof video.play === "function";
     if (canFast && frameIndex < totalFrames) {
+      path = "reprodução";
+
       // tolerância: a fonte pode adiantar no máximo ~1 quadro
       const LEAD_TOLERANCE = Math.max(1 / fps, 0.04);
       // acima disto o quadro capturado já não corresponde ao carimbo de tempo;
@@ -467,8 +485,10 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
 
     // Exportação determinística: cada quadro de saída vem do instante exato do
     // vídeo fonte. Usada como fallback e para cortes multi-segmento.
+    if (frameIndex < totalFrames) path = "busca precisa";
     while (frameIndex < totalFrames) {
       if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
+
       await seekTo(srcTimeAt(segments, (frameIndex / fps) * v.speed));
       await emit();
       if (frameIndex % 3 === 0) opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));

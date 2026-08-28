@@ -5,9 +5,11 @@ import {
   batchStats,
   cancelBatch,
   formatEta,
+  formatSpeed,
   pauseBatch,
   useBatchProgress,
 } from "@/lib/batch-runtime";
+
 
 /** Indicador global do lote: continua visível em qualquer tela enquanto processa. */
 export function BatchProgressDock() {
@@ -36,7 +38,8 @@ export function BatchProgressDock() {
 
   const progressed = p.done + Math.min(0.999, p.itemProgress);
   const pct = p.total ? Math.round((progressed / p.total) * 100) : 0;
-  const { perMin, eta } = batchStats(p);
+  const { eta, perItemSec, measuring } = batchStats(p);
+
 
   return (
     <div className="fixed bottom-4 left-1/2 z-50 w-[min(92vw,460px)] -translate-x-1/2 rounded-xl border border-border bg-surface-2/95 p-3 shadow-lg backdrop-blur">
@@ -77,9 +80,12 @@ export function BatchProgressDock() {
         <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] text-muted-foreground">
-        <span>restam ~{p.paused ? "—" : formatEta(eta)}</span>
-        <span>{perMin > 0 ? `${perMin.toFixed(1)} vídeos/min` : "medindo…"}</span>
+        <span>restam {p.paused ? "—" : measuring ? "calculando…" : `~${formatEta(eta)}`}</span>
+        <span>{formatSpeed(perItemSec)}</span>
+        {p.itemFps > 0 && <span>{p.itemFps.toFixed(0)} fps</span>}
+        {p.phase && <span className="text-foreground/80">{p.phase}</span>}
         {p.itemLabel && <span className="truncate max-w-[45%]">{p.itemLabel}</span>}
+
         {p.errors > 0 && (
           <span className="flex items-center gap-1 text-destructive">
             <AlertTriangle className="size-3" /> {p.errors} com erro
