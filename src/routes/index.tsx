@@ -1202,7 +1202,10 @@ function Home() {
               : x,
           ),
         );
+        // cronômetro e fases deste vídeo (base honesta do ETA no dock)
+        startBatchItem(item.file.name, "preparando");
         const runItem = async () => {
+
           const n = runFlow.variants ? Math.max(1, variants) : 1;
           const targets = runFlow.platforms
             ? PLATFORM_PRESETS.filter((p) => platforms.includes(p.id))
