@@ -8,6 +8,8 @@ import { CalendarClock, Facebook, Instagram, Loader2, Plus, Trash2, UploadCloud,
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
+import { BulkScheduleModal } from "@/components/BulkScheduleModal";
+import { Button } from "@/components/ui/button";
 import { listJobs } from "@/lib/jobs";
 import type { Template } from "@/lib/template";
 import {
@@ -68,6 +70,7 @@ function AgendaPage() {
   const [mode, setMode] = useState<AppMode>("external");
   const [libOpen, setLibOpen] = useState(false);
   const [cloudOpen, setCloudOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const jobs = listJobs();
 
