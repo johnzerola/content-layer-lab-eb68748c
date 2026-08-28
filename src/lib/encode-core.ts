@@ -63,14 +63,15 @@ const cancelled = () => new DOMException("cancelado", "AbortError");
 /** Renderiza o MP4 completo e devolve os bytes (transferíveis). */
 export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffer> {
   const fps = opts.fps ?? 30;
-  const bitrate = opts.bitrate ?? 10_000_000;
   const t = opts.template;
   const W = t.canvasW ?? CANVAS_W;
   const H = t.canvasH ?? CANVAS_H;
+  const tier = opts.tier ?? "balanced";
+  const bitrate = opts.bitrate ?? pickBitrate({ width: W, height: H, fps, tier });
   const v = opts.variation;
   const abort = () => opts.isCancelled?.() === true;
 
-  const picked = await pickVideoCodec(W, H, bitrate, fps);
+  const picked = await pickVideoCodec(W, H, bitrate, fps, tier);
   if (!picked) throw new Error("Codificação de vídeo não suportada neste navegador");
 
   const reader = await FrameReader.open(opts.file);
