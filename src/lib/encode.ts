@@ -1,5 +1,5 @@
 import { ArrayBufferTarget, Muxer } from "mp4-muxer";
-import { drawFrame } from "./draw";
+import { setBackdropQuality, drawFrame } from "./draw";
 import { CANVAS_H, CANVAS_W, type Template } from "./template";
 import { motionAt, type Variation } from "./variation";
 import type { CaptionCue } from "./captions";
@@ -216,6 +216,8 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     const frameDur = Math.round(1_000_000 / fps);
 
     let averageFrameMs = 1000 / fps;
+    let bgQuality: "alta" | "media" | "baixa" = "alta";
+    setBackdropQuality("alta");
     /** caminho de leitura em uso — reportado para o painel de diagnóstico */
     let path: "turbo" | "reprodução" | "busca precisa" = "turbo";
     const emit = async (src?: { el: CanvasImageSource; width: number; height: number }) => {
@@ -285,6 +287,15 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       const elapsed = Math.max(0.1, performance.now() - startedAt);
 
       averageFrameMs = averageFrameMs * 0.85 + elapsed * 0.15;
+      // desenho muito caro (fundo desfocado em resolução cheia): degrada o
+      // fundo em vez de deixar a exportação levar horas
+      if (frameIndex % 12 === 0) {
+        const next = averageFrameMs > 120 ? "baixa" : averageFrameMs > 45 ? "media" : null;
+        if (next && next !== bgQuality) {
+          bgQuality = next;
+          setBackdropQuality(next);
+        }
+      }
       if (frameIndex % 15 === 0) opts.onStats?.({ path, fps: 1000 / averageFrameMs });
     };
 

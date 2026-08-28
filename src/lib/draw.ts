@@ -70,6 +70,37 @@ export function makeCanvas(w = 1, h = 1): HTMLCanvasElement {
   return new OffscreenCanvas(w, h) as unknown as HTMLCanvasElement;
 }
 
+/**
+ * Cache do fundo desfocado dos layouts (blur/spotlight/centered/split).
+ *
+ * Desfocar o quadro inteiro em resolução final custa centenas de ms por frame
+ * — era isto que fazia uma exportação de 1 minuto levar horas. O fundo é
+ * gerado uma vez em baixa resolução e reaproveitado por uma fração de segundo
+ * de vídeo; visualmente é idêntico, porque já está borrado.
+ */
+const backdropCache = new WeakMap<
+  object,
+  { canvas: HTMLCanvasElement; key: string; time: number; uses: number }
+>();
+/** Largura máxima do fundo auxiliar (reduzida automaticamente se estiver lento). */
+let backdropMaxWidth = 320;
+/** Quantos segundos de vídeo o mesmo fundo pode ser reaproveitado. */
+let backdropHold = 0.15;
+
+/** Degrada (ou restaura) a qualidade do fundo quando a renderização está lenta. */
+export function setBackdropQuality(level: "alta" | "media" | "baixa") {
+  if (level === "alta") {
+    backdropMaxWidth = 320;
+    backdropHold = 0.15;
+  } else if (level === "media") {
+    backdropMaxWidth = 240;
+    backdropHold = 0.25;
+  } else {
+    backdropMaxWidth = 160;
+    backdropHold = 0.4;
+  }
+}
+
 const imgCache = new Map<string, HTMLImageElement>();
 
 /** Registra uma imagem já decodificada (usado pelos workers, que não têm `Image`). */
@@ -617,15 +648,88 @@ function drawVideoLayer(
         ctx.restore();
         return;
       }
-      paint(target, "cover", full, {
-        blur: Math.max(0, baseBlur * bgIntensity),
-        dim: dim * Math.min(1, bgIntensity),
-        useOffset: false,
-      });
+      const blurPx = Math.max(0, baseBlur * bgIntensity);
+      const dimPx = dim * Math.min(1, bgIntensity);
+      if (!blurPx) {
+        paint(target, "cover", full, { dim: dimPx, useOffset: false });
+        return;
+      }
+
+      // fundo desfocado em baixa resolução, reaproveitado entre quadros
+      const scale = Math.min(1, backdropMaxWidth / Math.max(1, target.w));
+      const bw = Math.max(16, Math.round(target.w * scale));
+      const bh = Math.max(16, Math.round(target.h * scale));
+      const key = [
+        bw,
+        bh,
+        blurPx.toFixed(1),
+        baseFilter,
+        zoom.toFixed(3),
+        full.quarter,
+        pre?.flipH ? 1 : 0,
+        pre?.flipV ? 1 : 0,
+        source.width,
+        source.height,
+      ].join("|");
+      const time = opts?.time ?? 0;
+      const cached = backdropCache.get(ctx.canvas as object);
+      const reusable =
+        cached &&
+        cached.key === key &&
+        cached.uses < 60 &&
+        Math.abs(time - cached.time) < backdropHold;
+
+      let bc = cached?.canvas;
+      if (reusable && bc) {
+        cached.uses++;
+      } else {
+        bc = bc && bc.width === bw && bc.height === bh ? bc : makeCanvas(bw, bh);
+        const bctx = bc.getContext("2d") as CanvasRenderingContext2D | null;
+        if (!bctx) {
+          paint(target, "cover", full, { blur: blurPx, dim: dimPx, useOffset: false });
+          return;
+        }
+        bctx.clearRect(0, 0, bw, bh);
+        bctx.filter =
+          ((baseFilter === "none" ? "" : baseFilter) +
+            ` blur(${Math.max(1, blurPx * scale).toFixed(2)}px)`).trim();
+        const fit = Math.max(bw / full.ew, bh / full.eh) * zoom;
+        const dw = full.ew * fit;
+        const dh = full.eh * fit;
+        bctx.save();
+        bctx.translate(bw / 2, bh / 2);
+        if (full.quarter) bctx.rotate((full.quarter * Math.PI) / 2);
+        if (pre?.flipH) bctx.scale(-1, 1);
+        if (pre?.flipV) bctx.scale(1, -1);
+        const rw = full.quarter % 2 ? dh : dw;
+        const rh = full.quarter % 2 ? dw : dh;
+        bctx.drawImage(source.el, full.sx, full.sy, full.sw, full.sh, -rw / 2, -rh / 2, rw, rh);
+        bctx.restore();
+        bctx.filter = "none";
+        backdropCache.set(ctx.canvas as object, { canvas: bc, key, time, uses: 0 });
+      }
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(target.x, target.y, target.w, target.h);
+      ctx.clip();
+      ctx.filter = "none";
+      ctx.drawImage(bc, target.x, target.y, target.w, target.h);
+      if (dimPx) {
+        ctx.fillStyle = `rgba(0,0,0,${dimPx})`;
+        ctx.fillRect(target.x, target.y, target.w, target.h);
+      }
+      ctx.restore();
+    };
+
+    /** O primeiro plano já cobre a caixa inteira? Então nem desenha o fundo. */
+    const coversBox = (target: { w: number; h: number }, rect: typeof cr) => {
+      const fit = Math.min(target.w / rect.ew, target.h / rect.eh) * zoom;
+      return rect.ew * fit >= target.w - 1 && rect.eh * fit >= target.h - 1;
     };
 
     if (layout === "blur") {
-      paintBackdrop(box, 34, 0.35);
+      if (!coversBox(box, cr)) paintBackdrop(box, 34, 0.35);
       dest = paint(box, "contain");
     } else if (layout === "fit") {
       ctx.save();
@@ -670,7 +774,7 @@ function drawVideoLayer(
       ctx.fillRect(v.x, v.y + topH - 1, v.w, 2);
       ctx.restore();
     } else if (layout === "centered") {
-      paintBackdrop(box, 60, 0.55);
+      if (!coversBox(box, full)) paintBackdrop(box, 60, 0.55);
       dest = paint(box, "contain", full, { useOffset: false });
     } else if (layout === "horizontal") {
       ctx.save();

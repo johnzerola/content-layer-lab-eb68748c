@@ -7,7 +7,7 @@
  * ser renderizados em paralelo sem travar a interface.
  */
 import { ArrayBufferTarget, Muxer } from "mp4-muxer";
-import { drawFrame } from "./draw";
+import { drawFrame, setBackdropQuality } from "./draw";
 import { CANVAS_H, CANVAS_W, type Template } from "./template";
 import { motionAt, type Variation } from "./variation";
 import type { CaptionCue } from "./captions";
@@ -165,8 +165,31 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
     return lit / (32 * 32);
   };
   let checked = false;
+  /** reposicionamentos do decodificador (cortes multi-trecho) — diagnóstico */
+  let seeks = 0;
+
+  // medição do custo de desenho: se cair muito, o fundo desfocado é degradado
+  // automaticamente em vez de deixar a exportação levar horas
+  let drawMs = 0;
+  let drawCount = 0;
+  let quality: "alta" | "media" | "baixa" = "alta";
+  setBackdropQuality("alta");
+  const watchDrawCost = (ms: number) => {
+    drawMs += ms;
+    drawCount++;
+    if (drawCount < 12) return;
+    const avg = drawMs / drawCount;
+    drawMs = 0;
+    drawCount = 0;
+    const next: typeof quality = avg > 120 ? "baixa" : avg > 45 ? "media" : quality;
+    if (next !== quality) {
+      quality = next;
+      setBackdropQuality(next);
+    }
+  };
 
   const emit = async (src: { el: CanvasImageSource; width: number; height: number }) => {
+    const drawStart = performance.now();
     const outTime = frameIndex / fps;
     const srcTime = srcTimeAt(segments, outTime * v.speed);
     const mo = hasMotion
@@ -199,6 +222,8 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
 
 
 
+    watchDrawCost(performance.now() - drawStart);
+
     const frame = new VideoFrame(canvas, {
       timestamp: frameIndex * frameDur,
       duration: frameDur,
@@ -230,7 +255,10 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
     while (cur && frameIndex < totalFrames) {
       if (abort()) throw cancelled();
       const target = srcTimeAt(segments, (frameIndex / fps) * v.speed);
-      if (target < cur.time - 0.25 || target > cur.time + 2) {
+      // reposicionar o decodificador é caro: só vale a pena quando o salto é
+      // maior que o custo de simplesmente decodificar os quadros do caminho
+      if (target < cur.time - 0.25 || target > cur.time + 3) {
+        seeks++;
         await reader.seek(target);
         cur.frame.close();
         cur = await reader.read();
@@ -318,6 +346,7 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
   }
 
   muxer.finalize();
+  if (seeks > 0) console.info(`[render] ${seeks} reposicionamentos do decodificador`);
   opts.onProgress?.(1);
   const raw = muxer.target.buffer as ArrayBuffer;
   return t.antiDup?.cleanMetadata === false ? raw : cleanMp4Metadata(raw);
