@@ -5,14 +5,29 @@ import { MetaLinkError } from "@/lib/social-linking.server";
 
 const OAUTH_TTL_MS = 10 * 60 * 1000;
 
+/**
+ * Permissões mínimas para publicar em Páginas do Facebook e contas IG Business.
+ * `pages_read_engagement` fica de fora por padrão: em apps sem o caso de uso
+ * liberado a Meta rejeita o diálogo com "Invalid Scopes". Pode ser reativada
+ * (ou ajustada) com META_LOGIN_SCOPES, separando por vírgula.
+ */
 export const FACEBOOK_SCOPES = [
   "pages_show_list",
-  "pages_read_engagement",
   "pages_manage_posts",
-  "business_management",
   "instagram_basic",
   "instagram_content_publish",
 ];
+
+export function facebookScopes(environment: NodeJS.ProcessEnv = process.env): string[] {
+  const raw = environment["META_LOGIN_SCOPES"]?.trim();
+  if (!raw) return FACEBOOK_SCOPES;
+  const parsed = raw
+    .split(",")
+    .map((scope) => scope.trim())
+    .filter(Boolean);
+  return parsed.length > 0 ? parsed : FACEBOOK_SCOPES;
+}
+
 
 type OAuthConfiguration = {
   appId: string;
