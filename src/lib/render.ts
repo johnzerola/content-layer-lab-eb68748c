@@ -257,6 +257,7 @@ async function runRender(
     } catch (err) {
       if ((err as Error)?.name === "AbortError") throw err;
       console.warn("Pool de workers falhou, usando exportação na tela:", err);
+      opts.onPhase?.(`worker indisponível (${(err as Error)?.message ?? "erro"}) — exportando na tela`);
     }
   }
 
