@@ -2542,6 +2542,8 @@ function Home() {
                   <p className="font-mono text-[11px] text-muted-foreground">{saveMsg}</p>
                 )}
 
+                <CloudRenderPanel tool={mode} />
+
 
                 {/* progresso detalhado do lote */}
                 {(running || batchItems.length > 0) && (
