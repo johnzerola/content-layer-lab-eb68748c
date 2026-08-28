@@ -264,6 +264,7 @@ function parseVideoTrack(view: DataView, moov: Box): Mp4Track | null {
           offset: off,
           size: sizes[sample]!,
           cts: (dts[sample]! + cOff[sample]!) / timescale,
+          dts: dts[sample]! / timescale,
           duration: delta[sample]! / timescale,
           sync: syncSet ? syncSet.has(sample) : true,
         });
@@ -272,10 +273,12 @@ function parseVideoTrack(view: DataView, moov: Box): Mp4Track | null {
       }
     }
     if (samples.length < 2) continue;
-    samples.sort((a, b) => a.cts - b.cts || a.offset - b.offset);
+    // IMPORTANTE: a tabela fica em ordem de DECODIFICAÇÃO. Reordenar por tempo
+    // de exibição embaralha os quadros B e destrói a imagem no decodificador.
     // alinha ao mesmo referencial do <video> (primeiro quadro em t=0)
-    const base = samples[0]!.cts;
-    if (base > 0) for (const s of samples) s.cts -= base;
+    let base = Infinity;
+    for (const s of samples) if (s.cts < base) base = s.cts;
+    if (base > 0 && Number.isFinite(base)) for (const s of samples) s.cts -= base;
 
     return {
       codec,
