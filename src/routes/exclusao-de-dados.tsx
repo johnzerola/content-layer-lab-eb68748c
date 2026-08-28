@@ -14,9 +14,6 @@ import {
 } from "@/lib/data-deletion.functions";
 
 export const Route = createFileRoute("/exclusao-de-dados")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    code: typeof search.code === "string" ? search.code.slice(0, 100) : undefined,
-  }),
   component: DataDeletionPage,
   head: () => ({
     meta: [
@@ -49,7 +46,7 @@ const statusLabels: Record<string, string> = {
 };
 
 function DataDeletionPage() {
-  const { code } = Route.useSearch();
+  const [confirmationCode, setConfirmationCode] = useState<string | null>(null);
   const submitRequest = useServerFn(createDataDeletionRequest);
   const fetchRequests = useServerFn(listMyDataDeletionRequests);
   const [user, setUser] = useState<CloudUser | null>(null);
@@ -61,6 +58,7 @@ function DataDeletionPage() {
   const [requests, setRequests] = useState<DeletionRequest[]>([]);
 
   useEffect(() => {
+    setConfirmationCode(new URLSearchParams(window.location.search).get("code")?.slice(0, 100) ?? null);
     const off = onAuth((nextUser) => {
       setUser(nextUser);
       setAuthReady(true);
@@ -114,11 +112,11 @@ function DataDeletionPage() {
         Voltar
       </Link>
       <h1 className="mt-6 font-display text-3xl font-bold">Exclusão de dados</h1>
-      {code && (
+      {confirmationCode && (
         <div className="mt-5 border-l-2 border-primary bg-primary/5 px-4 py-3" role="status">
           <p className="font-medium">Solicitação confirmada pela Meta</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Guarde seu protocolo: <strong className="font-mono text-foreground">{code}</strong>
+            Guarde seu protocolo: <strong className="font-mono text-foreground">{confirmationCode}</strong>
           </p>
         </div>
       )}
