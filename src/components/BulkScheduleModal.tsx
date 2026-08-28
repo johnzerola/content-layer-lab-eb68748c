@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, FolderOpen, Image as ImageIcon, Loader2, Video, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -13,6 +13,26 @@ import {
 } from "@/lib/schedule-plan";
 import { KIND_LABEL, schedulePost, uploadPostMedia, type PostKind, type SocialAccount } from "@/lib/social";
 
+/** Item pronto vindo de outra ferramenta (ViralBatch / CorteIA). */
+export type BulkScheduleItem = {
+  file: File;
+  /** Legenda específica (headline). Se vazia, usa a legenda padrão do lote. */
+  caption?: string;
+  meta?: Record<string, unknown>;
+};
+
+export type BulkScheduleConfig = {
+  accountId: string;
+  kind: PostKind;
+  caption: string;
+  perDay: number;
+  mode: SlotMode;
+  times: string[];
+  windowStart: string;
+  windowEnd: string;
+  weekdays: number[];
+};
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -20,7 +40,17 @@ type Props = {
   onDone: () => void;
   /** Arquivos já prontos (ex.: saída do ViralBatch / CorteIA). */
   initialFiles?: File[];
+  /** Itens prontos com legenda/metadados (ViralBatch / CorteIA). */
+  items?: BulkScheduleItem[];
+  /** Chamado após cada item agendado com sucesso. */
+  onItemScheduled?: (item: BulkScheduleItem, postId: string | null) => void | Promise<void>;
+  /** Esconde os seletores de arquivo (quando os itens vêm prontos). */
+  hideFilePicker?: boolean;
+  /** Ação extra no rodapé (ex.: "Agendar no lote" do ViralBatch). */
+  secondaryAction?: { label: string; run: (config: BulkScheduleConfig) => void };
+  subtitle?: string;
 };
+
 
 const WEEKDAYS = [
   { value: 0, label: "D" },
