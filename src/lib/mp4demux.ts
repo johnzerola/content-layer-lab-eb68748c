@@ -217,6 +217,10 @@ function parseVideoTrack(view: DataView, moov: Box): Mp4Track | null {
     const sizes = new Uint32Array(total);
     {
       const uniform = view.getUint32(stsz.body + 4);
+      const declared = view.getUint32(stsz.body + 8);
+      // tabelas inconsistentes geram offsets errados (imagem embaralhada):
+      // melhor recusar o caminho turbo do que exportar vídeo corrompido.
+      if (!uniform && declared !== total) continue;
       if (uniform) sizes.fill(uniform);
       else for (let i = 0; i < total; i++) sizes[i] = view.getUint32(stsz.body + 12 + i * 4);
     }
@@ -227,7 +231,13 @@ function parseVideoTrack(view: DataView, moov: Box): Mp4Track | null {
       syncSet = new Set<number>();
       const n = view.getUint32(stss.body + 4);
       for (let i = 0; i < n; i++) syncSet.add(view.getUint32(stss.body + 8 + i * 4) - 1);
+      if (!syncSet.size) continue;
+    } else {
+      // sem tabela de sync não dá para saber onde estão os quadros-chave:
+      // só o primeiro quadro é seguro para iniciar a decodificação.
+      syncSet = new Set<number>([0]);
     }
+
 
     // chunks
     const is64 = stco.type === "co64";
@@ -266,13 +276,16 @@ function parseVideoTrack(view: DataView, moov: Box): Mp4Track | null {
           cts: (dts[sample]! + cOff[sample]!) / timescale,
           dts: dts[sample]! / timescale,
           duration: delta[sample]! / timescale,
-          sync: syncSet ? syncSet.has(sample) : true,
+          sync: syncSet.has(sample),
         });
         off += sizes[sample]!;
         sample++;
       }
     }
-    if (samples.length < 2) continue;
+    // cobertura incompleta = tabela stsc/stco fora do padrão: recusa o turbo
+    if (samples.length !== total || samples.length < 2) continue;
+    if (!samples[0]!.sync) continue;
+
     // IMPORTANTE: a tabela fica em ordem de DECODIFICAÇÃO. Reordenar por tempo
     // de exibição embaralha os quadros B e destrói a imagem no decodificador.
     // alinha ao mesmo referencial do <video> (primeiro quadro em t=0)
