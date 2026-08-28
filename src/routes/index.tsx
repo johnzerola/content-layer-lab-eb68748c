@@ -1318,6 +1318,8 @@ function Home() {
               p.map((x) => (x.id === id ? { ...x, stage: "recuperando fundo original" } : x)),
             );
             updateJob(id, { stage: "recuperando fundo original" });
+            setBatchPhase("recuperando fundo original", prepScale(0.9));
+
             try {
               plate = await buildBackgroundPlate(item.file, itemRegions, {
                 ...(item.clip ? { clip: item.clip } : {}),
