@@ -303,13 +303,17 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
         await bgSleep(2);
       }
 
-      // Libera a thread principal regularmente para a barra de progresso e o
-      // botão de cancelar continuarem respondendo durante renders pesados.
-      if (frameIndex % 8 === 0) await bgSleep(0);
+      // Libera a thread principal periodicamente para a barra de progresso e o
+      // botão de cancelar continuarem respondendo. Com a fila do codificador
+      // vazia dá para espaçar mais essas pausas e ganhar velocidade.
+      const breathe = encoder.encodeQueueSize > 2 ? 8 : 24;
+      if (frameIndex % breathe === 0) await bgSleep(0);
       const elapsed = Math.max(0.1, performance.now() - startedAt);
 
       averageFrameMs = averageFrameMs * 0.85 + elapsed * 0.15;
+      if (frameIndex % 15 === 0) opts.onStats?.({ path, fps: 1000 / averageFrameMs });
     };
+
 
     /** Espera o navegador realmente apresentar um quadro novo após a busca. */
     const awaitPresented = (ms: number) =>
