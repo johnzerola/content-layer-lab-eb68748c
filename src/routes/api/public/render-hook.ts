@@ -47,11 +47,36 @@ export const Route = createFileRoute("/api/public/render-hook")({
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+        const TERMINAL = ["completed", "failed", "cancelled"] as const;
+        const isTerminal = (s?: string) => !!s && (TERMINAL as readonly string[]).includes(s);
+
         if (payload.item_id) {
+          // Callbacks podem chegar fora de ordem (retentativas do worker).
+          // Lemos o estado atual e ignoramos atualizações atrasadas.
+          const { data: current } = await supabaseAdmin
+            .from("render_items")
+            .select("status, progress")
+            .eq("id", payload.item_id)
+            .eq("batch_id", payload.job_id)
+            .maybeSingle();
+
+          if (!current) return new Response("unknown item", { status: 404 });
+
+          const currentRow = current as { status: string | null; progress: number | null };
+          if (isTerminal(currentRow.status ?? undefined)) {
+            return new Response("ok"); // já finalizado: nada a fazer
+          }
+
           const patch: Record<string, unknown> = {};
           if (payload.status) patch["status"] = payload.status;
           if (payload.stage !== undefined) patch["stage"] = payload.stage;
-          if (payload.progress !== undefined) patch["progress"] = payload.progress;
+          if (payload.progress !== undefined) {
+            // progresso nunca regride, exceto quando o item vira terminal
+            const next = isTerminal(payload.status)
+              ? payload.progress
+              : Math.max(payload.progress, currentRow.progress ?? 0);
+            patch["progress"] = next;
+          }
           if (payload.result_path) patch["result_path"] = payload.result_path;
           if (payload.error) patch["error"] = payload.error;
           if (Object.keys(patch).length) {
@@ -59,7 +84,8 @@ export const Route = createFileRoute("/api/public/render-hook")({
               .from("render_items")
               .update(patch as never)
               .eq("id", payload.item_id)
-              .eq("batch_id", payload.job_id);
+              .eq("batch_id", payload.job_id)
+              .not("status", "in", `(${TERMINAL.join(",")})`);
             if (error) return new Response(error.message, { status: 500 });
           }
         }
