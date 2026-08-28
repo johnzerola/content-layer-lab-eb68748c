@@ -15,6 +15,7 @@ export type ClaimedPost = {
   caption: string;
   video_url: string | null;
   video_path: string | null;
+  media_type?: string | null;
   attempts: number;
 };
 
@@ -117,6 +118,7 @@ async function publishClaimedPost(post: ClaimedPost, deps: QueueDependencies): P
     kind: post.kind as PostKind,
     caption: post.caption,
     videoUrl,
+    mediaType: post.media_type === "image" ? "image" : "video",
     username: account.username,
     platform: account.platform,
     provider: selectedProvider,
