@@ -16,6 +16,7 @@ import { Route as ArmazenamentoRouteImport } from './routes/armazenamento'
 import { Route as BibliotecaRouteImport } from './routes/biblioteca'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as ContaRouteImport } from './routes/conta'
+import { Route as ExclusaoDeDadosRouteImport } from './routes/exclusao-de-dados'
 import { Route as IntegracoesRouteImport } from './routes/integracoes'
 import { Route as LimparIaRouteImport } from './routes/limpar-ia'
 import { Route as LiveRouteImport } from './routes/live'
@@ -38,6 +39,8 @@ import { Route as IntegracoesFacebookCallbackRouteImport } from './routes/integr
 import { Route as IntegracoesInstagramCallbackRouteImport } from './routes/integracoes_.instagram.callback'
 import { Route as IntegracoesTiktokCallbackRouteImport } from './routes/integracoes_.tiktok.callback'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
+import { Route as ApiPublicMetaDataDeletionRouteImport } from './routes/api/public/meta.data-deletion'
+import { Route as ApiPublicMetaDeauthorizeRouteImport } from './routes/api/public/meta.deauthorize'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -72,6 +75,11 @@ const CheckoutRoute = CheckoutRouteImport.update({
 const ContaRoute = ContaRouteImport.update({
   id: '/conta',
   path: '/conta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExclusaoDeDadosRoute = ExclusaoDeDadosRouteImport.update({
+  id: '/exclusao-de-dados',
+  path: '/exclusao-de-dados',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IntegracoesRoute = IntegracoesRouteImport.update({
@@ -192,6 +200,18 @@ const ApiPublicHooksPublishDueRoute =
     path: '/api/public/hooks/publish-due',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicMetaDataDeletionRoute =
+  ApiPublicMetaDataDeletionRouteImport.update({
+    id: '/api/public/meta/data-deletion',
+    path: '/api/public/meta/data-deletion',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicMetaDeauthorizeRoute =
+  ApiPublicMetaDeauthorizeRouteImport.update({
+    id: '/api/public/meta/deauthorize',
+    path: '/api/public/meta/deauthorize',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -201,6 +221,7 @@ export interface FileRoutesByFullPath {
   '/biblioteca': typeof BibliotecaRoute
   '/checkout': typeof CheckoutRoute
   '/conta': typeof ContaRoute
+  '/exclusao-de-dados': typeof ExclusaoDeDadosRoute
   '/integracoes': typeof IntegracoesRoute
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
@@ -223,6 +244,8 @@ export interface FileRoutesByFullPath {
   '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
+  '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
+  '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -232,6 +255,7 @@ export interface FileRoutesByTo {
   '/biblioteca': typeof BibliotecaRoute
   '/checkout': typeof CheckoutRoute
   '/conta': typeof ContaRoute
+  '/exclusao-de-dados': typeof ExclusaoDeDadosRoute
   '/integracoes': typeof IntegracoesRoute
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
@@ -254,6 +278,8 @@ export interface FileRoutesByTo {
   '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
+  '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
+  '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -264,6 +290,7 @@ export interface FileRoutesById {
   '/biblioteca': typeof BibliotecaRoute
   '/checkout': typeof CheckoutRoute
   '/conta': typeof ContaRoute
+  '/exclusao-de-dados': typeof ExclusaoDeDadosRoute
   '/integracoes': typeof IntegracoesRoute
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
@@ -286,6 +313,8 @@ export interface FileRoutesById {
   '/integracoes_/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes_/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
+  '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
+  '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -297,6 +326,7 @@ export interface FileRouteTypes {
     | '/biblioteca'
     | '/checkout'
     | '/conta'
+    | '/exclusao-de-dados'
     | '/integracoes'
     | '/limpar-ia'
     | '/live'
@@ -319,6 +349,8 @@ export interface FileRouteTypes {
     | '/integracoes/instagram/callback'
     | '/integracoes/tiktok/callback'
     | '/api/public/hooks/publish-due'
+    | '/api/public/meta/data-deletion'
+    | '/api/public/meta/deauthorize'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -328,6 +360,7 @@ export interface FileRouteTypes {
     | '/biblioteca'
     | '/checkout'
     | '/conta'
+    | '/exclusao-de-dados'
     | '/integracoes'
     | '/limpar-ia'
     | '/live'
@@ -350,6 +383,8 @@ export interface FileRouteTypes {
     | '/integracoes/instagram/callback'
     | '/integracoes/tiktok/callback'
     | '/api/public/hooks/publish-due'
+    | '/api/public/meta/data-deletion'
+    | '/api/public/meta/deauthorize'
   id:
     | '__root__'
     | '/'
@@ -359,6 +394,7 @@ export interface FileRouteTypes {
     | '/biblioteca'
     | '/checkout'
     | '/conta'
+    | '/exclusao-de-dados'
     | '/integracoes'
     | '/limpar-ia'
     | '/live'
@@ -381,6 +417,8 @@ export interface FileRouteTypes {
     | '/integracoes_/instagram/callback'
     | '/integracoes_/tiktok/callback'
     | '/api/public/hooks/publish-due'
+    | '/api/public/meta/data-deletion'
+    | '/api/public/meta/deauthorize'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -391,6 +429,7 @@ export interface RootRouteChildren {
   BibliotecaRoute: typeof BibliotecaRoute
   CheckoutRoute: typeof CheckoutRoute
   ContaRoute: typeof ContaRoute
+  ExclusaoDeDadosRoute: typeof ExclusaoDeDadosRoute
   IntegracoesRoute: typeof IntegracoesRoute
   LimparIaRoute: typeof LimparIaRoute
   LiveRoute: typeof LiveRoute
@@ -413,6 +452,8 @@ export interface RootRouteChildren {
   IntegracoesInstagramCallbackRoute: typeof IntegracoesInstagramCallbackRoute
   IntegracoesTiktokCallbackRoute: typeof IntegracoesTiktokCallbackRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
+  ApiPublicMetaDataDeletionRoute: typeof ApiPublicMetaDataDeletionRoute
+  ApiPublicMetaDeauthorizeRoute: typeof ApiPublicMetaDeauthorizeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -464,6 +505,13 @@ declare module '@tanstack/react-router' {
       path: '/conta'
       fullPath: '/conta'
       preLoaderRoute: typeof ContaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/exclusao-de-dados': {
+      id: '/exclusao-de-dados'
+      path: '/exclusao-de-dados'
+      fullPath: '/exclusao-de-dados'
+      preLoaderRoute: typeof ExclusaoDeDadosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/integracoes': {
@@ -620,6 +668,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksPublishDueRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/meta/data-deletion': {
+      id: '/api/public/meta/data-deletion'
+      path: '/api/public/meta/data-deletion'
+      fullPath: '/api/public/meta/data-deletion'
+      preLoaderRoute: typeof ApiPublicMetaDataDeletionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/meta/deauthorize': {
+      id: '/api/public/meta/deauthorize'
+      path: '/api/public/meta/deauthorize'
+      fullPath: '/api/public/meta/deauthorize'
+      preLoaderRoute: typeof ApiPublicMetaDeauthorizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -631,6 +693,7 @@ const rootRouteChildren: RootRouteChildren = {
   BibliotecaRoute: BibliotecaRoute,
   CheckoutRoute: CheckoutRoute,
   ContaRoute: ContaRoute,
+  ExclusaoDeDadosRoute: ExclusaoDeDadosRoute,
   IntegracoesRoute: IntegracoesRoute,
   LimparIaRoute: LimparIaRoute,
   LiveRoute: LiveRoute,
@@ -654,6 +717,8 @@ const rootRouteChildren: RootRouteChildren = {
   IntegracoesInstagramCallbackRoute: IntegracoesInstagramCallbackRoute,
   IntegracoesTiktokCallbackRoute: IntegracoesTiktokCallbackRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
+  ApiPublicMetaDataDeletionRoute: ApiPublicMetaDataDeletionRoute,
+  ApiPublicMetaDeauthorizeRoute: ApiPublicMetaDeauthorizeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

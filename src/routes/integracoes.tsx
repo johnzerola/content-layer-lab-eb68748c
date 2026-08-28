@@ -252,7 +252,31 @@ function IntegrationsPage() {
             })}
           </div>
         )}
+
+        <section className="mt-6 rounded-2xl border border-border/70 bg-surface/60 p-5 text-xs leading-relaxed text-muted-foreground">
+          <p className="font-medium text-foreground">
+            Apareceu “Recurso indisponível” ou “estamos atualizando detalhes” na tela do Facebook?
+          </p>
+          <p className="mt-2">
+            Esse aviso vem da Meta, não do VaiViral: o app precisa estar ativo, com a configuração do Login for
+            Business publicada e com política de privacidade, exclusão de dados, ícone, categoria e e-mail de contato
+            preenchidos. Se você é o administrador do app, revise essas informações no painel da Meta e tente de novo.
+          </p>
+          <p className="mt-2">
+            Não guardamos senhas: só o token que a Meta emite, criptografado. Remova a conta aqui a qualquer momento —
+            veja a{" "}
+            <a href="/privacidade" className="underline hover:text-foreground">
+              política de privacidade
+            </a>{" "}
+            e a{" "}
+            <a href="/exclusao-de-dados" className="underline hover:text-foreground">
+              exclusão de dados
+            </a>
+            .
+          </p>
+        </section>
       </main>
+
     </AppShell>
   );
 }

@@ -3428,11 +3428,13 @@ function Home() {
         )}
 
         <footer className="py-8 text-center font-mono text-xs text-muted-foreground">
-          lote comum roda no navegador; CleanerIA, links e Agenda usam VPS/Supabase quando acionados.{" "}
+          lote comum roda no navegador; CleanerIA, links e Agenda usam VPS/nuvem quando acionados.{" "}
           <a href="/privacidade" className="hover:text-foreground">privacidade</a> ·{" "}
           <a href="/termos" className="hover:text-foreground">termos</a> ·{" "}
+          <a href="/exclusao-de-dados" className="hover:text-foreground">exclusão de dados</a> ·{" "}
           <a href="/conta" className="hover:text-foreground">conta</a>
         </footer>
+
       </div>
 
       {editing && (
