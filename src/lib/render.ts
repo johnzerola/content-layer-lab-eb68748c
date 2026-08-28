@@ -245,11 +245,12 @@ async function runRender(
   file: File,
   template: Template,
   opts: RenderOptions,
+  skipPool = false,
 ): Promise<{ blob: Blob; ext: string }> {
   opts.onPhase?.("iniciando processamento", 0.02);
   // 1ª opção: pool de workers (OffscreenCanvas) — vários vídeos em paralelo
   // sem travar a interface. Cai para os caminhos antigos se algo não rolar.
-  if (poolSupported()) {
+  if (!skipPool && poolSupported()) {
     try {
       opts.onStats?.({ path: "worker", fps: 0 });
       const blob = await renderInPool(file, template, opts);
