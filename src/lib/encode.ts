@@ -1,5 +1,5 @@
 import { ArrayBufferTarget, Muxer } from "mp4-muxer";
-import { drawFrame } from "./draw";
+import { setBackdropQuality, drawFrame } from "./draw";
 import { CANVAS_H, CANVAS_W, type Template } from "./template";
 import { motionAt, type Variation } from "./variation";
 import type { CaptionCue } from "./captions";
