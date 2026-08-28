@@ -274,7 +274,9 @@ export async function renderInPool(
     offsetY: opts.offsetY,
     headline: opts.headline,
     fps: opts.fps ?? 30,
-    bitrate: opts.bitrate ?? 10_000_000,
+    // sem bitrate explícito o worker aplica o preset da resolução
+    ...(opts.bitrate ? { bitrate: opts.bitrate } : {}),
+    tier: opts.tier ?? "balanced",
     clip: opts.clip,
     pre: opts.pre,
     captions: opts.captions,
