@@ -136,14 +136,19 @@ async function recordVideo(
   await video.play();
   loop();
 
+  // limite de segurança: mesmo que o vídeo nunca avance, a gravação termina
+  const maxWait = Math.max(30_000, outDur * 2000 + 30_000);
+  const startedAt = performance.now();
   await new Promise<void>((res) => {
     const check = setInterval(() => {
-      if (video.ended || video.paused || video.currentTime >= endAt) {
+      const timedOut = performance.now() - startedAt > maxWait;
+      if (video.ended || video.paused || video.currentTime >= endAt || timedOut) {
         clearInterval(check);
         res();
       }
     }, 120);
   });
+
 
   cancelAnimationFrame(raf);
   recorder.stop();
@@ -153,7 +158,68 @@ async function recordVideo(
   return { blob, ext: mimeType.startsWith("video/mp4") ? "mp4" : "webm" };
 }
 
+/** tempo máximo sem qualquer sinal de vida antes de considerar o render travado */
+const RENDER_STALL_MS = 120_000;
+
 export async function renderVideo(
+  file: File,
+  template: Template,
+  opts: RenderOptions,
+): Promise<{ blob: Blob; ext: string }> {
+  // Vigia global: qualquer caminho de render (pool, WebCodecs ou gravação em
+  // tela) precisa dar sinal de vida. Sem sinal, o job é abortado e devolve erro
+  // em vez de ficar "preparando" para sempre.
+  const inner = new AbortController();
+  let last = performance.now();
+  const alive = () => {
+    last = performance.now();
+  };
+  const onOuterAbort = () => inner.abort();
+  opts.signal?.addEventListener("abort", onOuterAbort, { once: true });
+  if (opts.signal?.aborted) inner.abort();
+
+  let stalled = false;
+  const watchdog = setInterval(() => {
+    if (performance.now() - last < RENDER_STALL_MS) return;
+    stalled = true;
+    inner.abort();
+  }, 5_000);
+
+  const guarded: RenderOptions = {
+    ...opts,
+    signal: inner.signal,
+    onProgress: (p) => {
+      alive();
+      opts.onProgress?.(p);
+    },
+    onPhase: (phase, prep) => {
+      alive();
+      opts.onPhase?.(phase, prep);
+    },
+    onStats: (s) => {
+      alive();
+      opts.onStats?.(s);
+    },
+  };
+
+  const stallError = () =>
+    Object.assign(
+      new Error("O render travou e foi interrompido. Tente novamente em modo seguro."),
+      { name: "RenderStalledError" },
+    );
+
+  try {
+    return await runRender(file, template, guarded);
+  } catch (err) {
+    if (stalled) throw stallError();
+    throw err;
+  } finally {
+    clearInterval(watchdog);
+    opts.signal?.removeEventListener("abort", onOuterAbort);
+  }
+}
+
+async function runRender(
   file: File,
   template: Template,
   opts: RenderOptions,
@@ -174,6 +240,8 @@ export async function renderVideo(
       console.warn("Pool de workers falhou, usando exportação na tela:", err);
     }
   }
+
+  if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
 
   if (webCodecsSupported()) {
 
@@ -204,8 +272,11 @@ export async function renderVideo(
       console.warn("WebCodecs falhou, usando fallback:", err);
     }
   }
+
+  if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
   return recordVideo(file, template, opts);
 }
+
 
 export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
