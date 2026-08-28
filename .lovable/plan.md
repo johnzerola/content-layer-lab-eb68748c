@@ -25,6 +25,7 @@ Transformar o sistema atual em um fluxo confiável de ponta a ponta: importar, e
 2. **Implantar a fila de render no worker existente**
    - Fazer deploy atômico do `backend/` atual na mesma VPS, preservando segredo, domínio e armazenamento.
    - Confirmar `features.batch_render=true` e testar criar, enviar, iniciar, acompanhar, cancelar e baixar um lote real.
+   - Antes do deploy público, fechar a possibilidade de DNS rebinding/SSRF nos downloads por URL e aceitar somente origens autorizadas ou um IP validado e fixado na conexão.
    - Não criar outra VPS.
    - Expor na interface um diagnóstico claro quando a versão do worker não oferece fila de render.
 
@@ -37,16 +38,22 @@ Transformar o sistema atual em um fluxo confiável de ponta a ponta: importar, e
    - Garantir que provedores ainda não ativos retornem “não disponível”, nunca “publicado”.
    - Manter TikTok/YouTube desabilitados até OAuth, permissões e publicação real terem sido validados.
 
+5. **Corrigir consistência imediata do processamento local**
+   - Marcar o job como concluído em todos os caminhos de exportação bem-sucedidos, não apenas quando o pool de workers é usado.
+   - Corrigir o pool local para usar o paralelismo suportado pela máquina sem ultrapassar limites seguros de memória.
+   - Representar cancelamento como `cancelled`, e não como falha, em toda a cadeia do CleanerIA.
+
 ## Fase 2 — Pipeline persistente, retomável e observável (P0/P1)
 
 1. Tornar a fila em nuvem a opção recomendada para lotes; o processamento local fica como modo rápido/compatibilidade.
 2. Implementar upload retomável por partes, com retry exponencial, checksum e idempotência por item; um arquivo falho não reinicia todo o lote.
 3. Persistir estados e eventos de job: `uploading`, `queued`, `processing`, `completed`, `failed`, `cancelled`, fase, progresso, heartbeat, tentativa e erro estruturado.
 4. Adicionar lease/heartbeat e watchdog no worker para recuperar jobs abandonados após reinício.
-5. Atualizar a interface por evento/callback e usar polling apenas como contingência; permitir retomar lote ao reabrir o app.
+5. Atualizar a interface por evento/callback com sequência monotônica para impedir que um callback atrasado faça um item pronto voltar a “processando”; usar polling apenas como contingência e permitir retomar lote ao reabrir o app.
 6. Separar falhas de rede, arquivo inválido, capacidade ocupada, worker incompatível e falha do encoder, cada uma com ação apropriada.
 7. Unificar ActivityDock, BatchProgressDock e fila da nuvem em uma central de atividades responsiva, sem sobreposição.
 8. Registrar métricas operacionais: tempo de upload/fila/render, FPS, tamanho, encoder, retries, erros por etapa e versão do worker.
+9. Substituir o consumidor único global da VPS por concorrência limitada e justa por usuário/lote, dimensionada pela CPU/GPU e memória disponíveis.
 
 ## Fase 3 — Render consistente entre preview, local e VPS (P1)
 
@@ -64,6 +71,7 @@ Transformar o sistema atual em um fluxo confiável de ponta a ponta: importar, e
 3. Unificar resultados locais e de nuvem na Biblioteca, com filtros, preview, download individual/ZIP, reagendar, duplicar edição e excluir.
 4. Definir retenção e quota por plano, com avisos antes da expiração e limpeza segura.
 5. Ligar autosave de projeto ao lote e permitir “Continuar editando” sem depender de `blob:` URLs ou somente do navegador anterior.
+6. Ao excluir conta ou atender uma solicitação de exclusão, remover também todos os objetos do storage do usuário, não apenas as linhas do banco e o login.
 
 ## Fase 5 — Contas sociais, Meta e agendamento real (P1)
 
@@ -100,6 +108,7 @@ Transformar o sistema atual em um fluxo confiável de ponta a ponta: importar, e
 
 - Testes unitários para manifesto de render, transições, áudio, retries, estados da fila e erros por provedor.
 - Testes de integração para upload interrompido/retomado, callback perdido, reinício do worker, cancelamento e expiração de download.
+- Testes específicos de segurança para URL remota/DNS rebinding, callbacks fora de ordem, RBAC administrativo e exclusão integral de dados/storage.
 - Testes E2E autenticados para: conectar conta, selecionar Página, importar pasta, gerar legendas, gerar cortes, editar, renderizar na VPS, fechar/reabrir, baixar e agendar.
 - Matriz visual em 375×812, tablet e 1280×1800, sem sobreposição e sem texto cortado.
 - Lote mínimo real com vídeo que contém áudio e B-frames: progresso deve sair de 0%, sobreviver ao fechamento do navegador e terminar com A/V sync validado.
