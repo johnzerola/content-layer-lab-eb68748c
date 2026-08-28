@@ -1264,10 +1264,15 @@ function Home() {
                 ),
               );
               updateJob(id, { stage: "transcrevendo áudio" });
+              setBatchPhase("transcrevendo áudio", prepScale(0.35));
               return generateCaptions(item.file, {
                 clip: item.clip,
                 language: capLang || undefined,
-                onProgress: ({ done, total: t }) =>
+                onProgress: ({ done, total: t }) => {
+                  setBatchPhase(
+                    `transcrevendo ${done}/${t}`,
+                    prepScale(0.35 + 0.5 * (t ? done / t : 0)),
+                  );
                   setItems((p) =>
                     p.map((x) =>
                       x.id === id
@@ -1278,8 +1283,10 @@ function Home() {
                           }
                         : x,
                     ),
-                  ),
+                  );
+                },
               });
+
             });
             capChain.current = run.catch(() => undefined);
             try {
