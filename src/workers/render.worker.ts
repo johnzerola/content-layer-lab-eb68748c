@@ -24,6 +24,7 @@ export interface RenderRequest {
   headline?: string | undefined;
   fps?: number | undefined;
   bitrate?: number | undefined;
+  tier?: QualityTier | undefined;
   clip?: { start: number; end: number } | undefined;
   pre?: PreEdit | null | undefined;
   captions?: CaptionCue[] | undefined;
