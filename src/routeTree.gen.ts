@@ -39,6 +39,7 @@ import { Route as IntegracoesFacebookCallbackRouteImport } from './routes/integr
 import { Route as IntegracoesInstagramCallbackRouteImport } from './routes/integracoes_.instagram.callback'
 import { Route as IntegracoesTiktokCallbackRouteImport } from './routes/integracoes_.tiktok.callback'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
+import { Route as ApiPublicMetaDataDeletionRouteImport } from './routes/api/public/meta.data-deletion'
 import { Route as ApiPublicMetaDeauthorizeRouteImport } from './routes/api/public/meta.deauthorize'
 
 const IndexRoute = IndexRouteImport.update({
@@ -199,6 +200,12 @@ const ApiPublicHooksPublishDueRoute =
     path: '/api/public/hooks/publish-due',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicMetaDataDeletionRoute =
+  ApiPublicMetaDataDeletionRouteImport.update({
+    id: '/api/public/meta/data-deletion',
+    path: '/api/public/meta/data-deletion',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicMetaDeauthorizeRoute =
   ApiPublicMetaDeauthorizeRouteImport.update({
     id: '/api/public/meta/deauthorize',
@@ -237,6 +244,7 @@ export interface FileRoutesByFullPath {
   '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
+  '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
   '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
 }
 export interface FileRoutesByTo {
@@ -270,6 +278,7 @@ export interface FileRoutesByTo {
   '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
+  '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
   '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
 }
 export interface FileRoutesById {
@@ -304,6 +313,7 @@ export interface FileRoutesById {
   '/integracoes_/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes_/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
+  '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
   '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
 }
 export interface FileRouteTypes {
@@ -339,6 +349,7 @@ export interface FileRouteTypes {
     | '/integracoes/instagram/callback'
     | '/integracoes/tiktok/callback'
     | '/api/public/hooks/publish-due'
+    | '/api/public/meta/data-deletion'
     | '/api/public/meta/deauthorize'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -372,6 +383,7 @@ export interface FileRouteTypes {
     | '/integracoes/instagram/callback'
     | '/integracoes/tiktok/callback'
     | '/api/public/hooks/publish-due'
+    | '/api/public/meta/data-deletion'
     | '/api/public/meta/deauthorize'
   id:
     | '__root__'
@@ -405,6 +417,7 @@ export interface FileRouteTypes {
     | '/integracoes_/instagram/callback'
     | '/integracoes_/tiktok/callback'
     | '/api/public/hooks/publish-due'
+    | '/api/public/meta/data-deletion'
     | '/api/public/meta/deauthorize'
   fileRoutesById: FileRoutesById
 }
@@ -439,6 +452,7 @@ export interface RootRouteChildren {
   IntegracoesInstagramCallbackRoute: typeof IntegracoesInstagramCallbackRoute
   IntegracoesTiktokCallbackRoute: typeof IntegracoesTiktokCallbackRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
+  ApiPublicMetaDataDeletionRoute: typeof ApiPublicMetaDataDeletionRoute
   ApiPublicMetaDeauthorizeRoute: typeof ApiPublicMetaDeauthorizeRoute
 }
 
@@ -654,6 +668,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksPublishDueRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/meta/data-deletion': {
+      id: '/api/public/meta/data-deletion'
+      path: '/api/public/meta/data-deletion'
+      fullPath: '/api/public/meta/data-deletion'
+      preLoaderRoute: typeof ApiPublicMetaDataDeletionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/meta/deauthorize': {
       id: '/api/public/meta/deauthorize'
       path: '/api/public/meta/deauthorize'
@@ -696,6 +717,7 @@ const rootRouteChildren: RootRouteChildren = {
   IntegracoesInstagramCallbackRoute: IntegracoesInstagramCallbackRoute,
   IntegracoesTiktokCallbackRoute: IntegracoesTiktokCallbackRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
+  ApiPublicMetaDataDeletionRoute: ApiPublicMetaDataDeletionRoute,
   ApiPublicMetaDeauthorizeRoute: ApiPublicMetaDeauthorizeRoute,
 }
 export const routeTree = rootRouteImport
