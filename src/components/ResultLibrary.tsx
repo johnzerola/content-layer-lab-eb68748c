@@ -131,8 +131,14 @@ export function ResultLibrary() {
                   </div>
 
                   <div className="flex items-center gap-2 sm:ml-4">
-                    <Button variant="outline" size="sm" className="h-9 gap-2" disabled>
-                      <Download className="size-4" /> Baixar
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-2"
+                      disabled
+                      title="Este é o histórico das exportações. O arquivo foi salvo no seu computador no momento do download. Para arquivos guardados no servidor, use a fila de renderização na nuvem."
+                    >
+                      <Download className="size-4" /> Salvo localmente
                     </Button>
                   </div>
                 </div>

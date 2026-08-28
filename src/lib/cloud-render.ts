@@ -99,14 +99,11 @@ export function useCloudBatches(enabled = true) {
       const list = await refresh();
       if (!alive) return;
       const active = list.filter((b) => batchIsActive(b.status));
-      // rede de segurança: se algum webhook se perder, puxamos o estado do worker
-      for (const b of active) {
-        try {
-          await syncCloudBatch({ data: { batchId: b.id } });
-        } catch {
-          /* worker pode estar reiniciando */
-        }
-      }
+      // rede de segurança: se algum webhook se perder, puxamos o estado do worker.
+      // Em paralelo para a fila não travar quando há vários lotes ativos.
+      await Promise.allSettled(
+        active.map((b) => syncCloudBatch({ data: { batchId: b.id } })),
+      );
       if (active.length) await refresh();
       if (!alive) return;
       timer.current = setTimeout(tick, active.length ? 5000 : 30000);
