@@ -172,7 +172,6 @@ export class FrameReader {
         continue;
       }
       await this.feed();
-      if (this.queue.length) continue;
       await new Promise<void>((res) => {
         const t = setTimeout(res, 40);
         this.wake = () => {
