@@ -126,8 +126,9 @@ export function facebookConfigChecklist(
   if (!appId) issues.push("META_APP_ID não está definido.");
   else if (!/^\d+$/.test(appId)) issues.push("META_APP_ID deve conter apenas números.");
   if (!environment["META_APP_SECRET"]?.trim()) issues.push("META_APP_SECRET não está definido.");
-  if (!configId) issues.push("META_LOGIN_CONFIG_ID não está definido.");
-  else if (!/^\d+$/.test(configId)) issues.push("META_LOGIN_CONFIG_ID deve conter apenas números.");
+  if (configId && !/^\d+$/.test(configId)) {
+    issues.push("META_LOGIN_CONFIG_ID deve conter apenas números.");
+  }
 
   if (!redirectUri) {
     issues.push("Nenhuma URL de retorno pôde ser calculada (defina FACEBOOK_REDIRECT_URI ou PUBLIC_SITE_URL).");
