@@ -7,11 +7,10 @@
  * ser renderizados em paralelo sem travar a interface.
  */
 import { ArrayBufferTarget, Muxer } from "mp4-muxer";
-import { drawFrame } from "./draw";
+import { drawFrame, setBackdropQuality } from "./draw";
 import { CANVAS_H, CANVAS_W, type Template } from "./template";
 import { motionAt, type Variation } from "./variation";
 import type { CaptionCue } from "./captions";
-import { setBackdropQuality } from "./draw";
 import { keptSegments, segmentsDuration, srcTimeAt, type PreEdit } from "./preedit";
 import { cleanMp4Metadata } from "./mp4meta";
 import { FrameReader, videoDecoderSupported, type DecodedFrame } from "./decode";
