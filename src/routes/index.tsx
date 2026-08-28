@@ -1468,7 +1468,7 @@ function Home() {
             for (const [k, o] of outputs.entries()) {
               try {
                 await writeToFolder(dir, {
-                  name: finalNameRef.current(item, at, { ...o, ext: o.ext }),
+                  name: finalNameRef.current(item, itemIndex, { ...o, ext: o.ext }),
                   blob: o.blob,
                 });
               } catch (err) {
