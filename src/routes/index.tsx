@@ -356,6 +356,12 @@ function Home() {
   const [paused, setPaused] = useExternalState(pausedState);
 
   const [zipping, setZipping] = useState(false);
+  /** texto do progresso de download/salvamento (ex.: "1,2 GB de 3,4 GB") */
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  /** pasta escolhida para salvar cada vídeo assim que ele fica pronto */
+  const autoFolder = useRef<FileSystemDirectoryHandle | null>(null);
+  const [autoFolderName, setAutoFolderName] = useState<string | null>(null);
+
   // Canvas, decoder e encoder disputam a mesma thread/GPU. Dois vídeos em
   // paralelo frequentemente deixam ambos presos em 0% em máquinas comuns.
   // padrão automático pelo hardware (metade dos núcleos, teto 4)
