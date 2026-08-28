@@ -16,6 +16,10 @@ export interface BatchProgress {
   phase: string | null;
   /** quadros por segundo medidos no item atual (0 = ainda medindo) */
   itemFps: number;
+  /** caminho de exportação em uso (worker, turbo, gravação em tempo real…) */
+  path: string | null;
+  /** performance.now() de quando a codificação do item começou */
+  renderStartedAt: number;
   /** quantos falharam até agora */
   errors: number;
   /** performance.now() de quando o lote começou */
@@ -48,6 +52,8 @@ const EMPTY: BatchProgress = {
   itemLabel: null,
   phase: null,
   itemFps: 0,
+  path: null,
+  renderStartedAt: 0,
   errors: 0,
   startedAt: 0,
   itemStartedAt: 0,
@@ -98,12 +104,24 @@ export function startBatchItem(label: string, phase = "preparando") {
     itemLabel: label,
     itemProgress: 0,
     itemFps: 0,
+    path: null,
+    renderStartedAt: 0,
     phase,
     itemStartedAt: now(),
   }));
 }
 
 /** Atualiza somente a fase textual do item atual. */
+/** Marca o caminho de exportação escolhido (worker/turbo/gravação). */
+export function setBatchPath(path: string) {
+  batchProgress.set((p) => (p.path === path ? p : { ...p, path }));
+}
+
+/** Marca o instante em que a codificação começou (base do ETA). */
+export function markRenderStart() {
+  batchProgress.set((p) => (p.renderStartedAt ? p : { ...p, renderStartedAt: now() }));
+}
+
 export function setBatchPhase(phase: string, itemProgress?: number) {
   batchProgress.set((p) => ({
     ...p,
@@ -123,6 +141,8 @@ export function finishBatchItem(done: number) {
       itemLabel: null,
       phase: null,
       itemFps: 0,
+      path: null,
+      renderStartedAt: 0,
       itemStartedAt: 0,
       itemDurations: spent > 500 ? [...p.itemDurations, spent].slice(-20) : p.itemDurations,
     };
@@ -155,9 +175,13 @@ export function batchStats(p: BatchProgress) {
       weight += w;
     });
     perItemSec = acc / weight / 1000;
-  } else if (p.itemStartedAt && p.itemProgress >= 0.08) {
-    // extrapola o item atual só depois de 8% — antes disso a conta é ruído
-    perItemSec = (t - p.itemStartedAt) / 1000 / p.itemProgress;
+  } else if (p.renderStartedAt && p.itemProgress > PHASE_WEIGHTS.prep + 0.05) {
+    // só extrapola depois que a codificação de fato começou: usar o tempo de
+    // preparo (abrir worker, áudio, template) inflava o ETA em vários minutos
+    const renderPart = (p.itemProgress - PHASE_WEIGHTS.prep) / PHASE_WEIGHTS.render;
+    const renderSec = (t - p.renderStartedAt) / 1000 / Math.max(0.02, renderPart);
+    const prepSec = Math.max(0, (p.renderStartedAt - p.itemStartedAt) / 1000);
+    perItemSec = prepSec + renderSec;
   }
 
   const measuring = perItemSec <= 0;
