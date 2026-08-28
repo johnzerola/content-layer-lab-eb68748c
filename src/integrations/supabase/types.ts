@@ -479,6 +479,7 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
+          is_primary: boolean
           platform: string
           provider: string
           provider_account_id: string | null
@@ -492,6 +493,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          is_primary?: boolean
           platform?: string
           provider?: string
           provider_account_id?: string | null
@@ -505,6 +507,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          is_primary?: boolean
           platform?: string
           provider?: string
           provider_account_id?: string | null
