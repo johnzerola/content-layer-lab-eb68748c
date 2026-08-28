@@ -122,6 +122,7 @@ import {
   prepScale,
   registerBatchControls,
   renderScale,
+  PHASE_WEIGHTS,
   batchStats,
   formatEta,
   formatSpeed,
@@ -241,7 +242,7 @@ function BatchProgressCard() {
   const progressed = p.done + Math.min(0.999, p.itemProgress);
   const pct = p.total ? Math.round((progressed / p.total) * 100) : 0;
   const { eta, perItemSec, measuring } = batchStats(p);
-  const starting = p.running && p.itemProgress <= prepScale;
+  const starting = p.running && p.itemProgress <= PHASE_WEIGHTS.prep;
 
   return (
     <div className="space-y-1.5 rounded-xl border border-border bg-surface-2 p-3">
