@@ -104,11 +104,17 @@ import { bankPick, headlineTweak, parseBank } from "@/lib/headlines";
 import { externalState, useExternalState } from "@/lib/external-state";
 import {
   endBatchProgress,
+  finishBatchItem,
   notifyBatchDone,
+  prepScale,
   registerBatchControls,
+  renderScale,
+  setBatchPhase,
+  startBatchItem,
   startBatchProgress,
   updateBatchProgress,
 } from "@/lib/batch-runtime";
+
 import { askNotifyPermission, holdBackground } from "@/lib/keepalive";
 
 
@@ -1196,7 +1202,10 @@ function Home() {
               : x,
           ),
         );
+        // cronômetro e fases deste vídeo (base honesta do ETA no dock)
+        startBatchItem(item.file.name, "preparando");
         const runItem = async () => {
+
           const n = runFlow.variants ? Math.max(1, variants) : 1;
           const targets = runFlow.platforms
             ? PLATFORM_PRESETS.filter((p) => platforms.includes(p.id))
@@ -1219,6 +1228,8 @@ function Home() {
               p.map((x) => (x.id === id ? { ...x, stage: "baixando vídeo limpo" } : x)),
             );
             updateJob(id, { stage: "baixando vídeo limpo" });
+            setBatchPhase("baixando vídeo limpo", prepScale(0.2));
+
             const res = await fetch(item.result_url, { signal: ac.signal });
             if (!res.ok) throw new Error("Não consegui baixar o vídeo limpo da GPU.");
             const cleaned = await res.blob();
@@ -1253,10 +1264,15 @@ function Home() {
                 ),
               );
               updateJob(id, { stage: "transcrevendo áudio" });
+              setBatchPhase("transcrevendo áudio", prepScale(0.35));
               return generateCaptions(item.file, {
                 clip: item.clip,
                 language: capLang || undefined,
-                onProgress: ({ done, total: t }) =>
+                onProgress: ({ done, total: t }) => {
+                  setBatchPhase(
+                    `transcrevendo ${done}/${t}`,
+                    prepScale(0.35 + 0.5 * (t ? done / t : 0)),
+                  );
                   setItems((p) =>
                     p.map((x) =>
                       x.id === id
@@ -1267,8 +1283,10 @@ function Home() {
                           }
                         : x,
                     ),
-                  ),
+                  );
+                },
               });
+
             });
             capChain.current = run.catch(() => undefined);
             try {
@@ -1300,6 +1318,8 @@ function Home() {
               p.map((x) => (x.id === id ? { ...x, stage: "recuperando fundo original" } : x)),
             );
             updateJob(id, { stage: "recuperando fundo original" });
+            setBatchPhase("recuperando fundo original", prepScale(0.9));
+
             try {
               plate = await buildBackgroundPlate(item.file, itemRegions, {
                 ...(item.clip ? { clip: item.clip } : {}),
@@ -1383,6 +1403,10 @@ function Home() {
                 captions: cues,
                 plate,
                 signal: ac.signal,
+                onStats: ({ path, fps }) => {
+                  updateBatchProgress({ itemFps: fps });
+                  setBatchPhase(`${stageLabel} · ${path}`);
+                },
                 onProgress: (p) => {
                   const value = (at + p) / total;
                   // atualiza a interface no máximo a cada 150 ms: a fila e as
@@ -1394,8 +1418,15 @@ function Home() {
                     prev.map((x) => (x.id === id ? { ...x, progress: value } : x)),
                   );
                   updateJob(id, { progress: value });
-                  updateBatchProgress({ itemProgress: value, itemLabel: item.file.name });
+                  // o render ocupa a faixa 15%–95% do item; preparo e
+                  // finalização já contam antes e depois
+                  updateBatchProgress({
+                    itemProgress: renderScale(value),
+                    itemLabel: item.file.name,
+                  });
                 },
+
+
 
               });
               const label = [outs.length > 1 ? plat.short : "", n > 1 ? `v${k + 1}` : ""]
@@ -1406,8 +1437,10 @@ function Home() {
             }
           }
 
+          setBatchPhase("finalizando", renderScale(1));
           doneCount.current++;
-          updateBatchProgress({ done: doneCount.current, itemProgress: 0, itemLabel: null });
+          finishBatchItem(doneCount.current);
+
 
 
           const firstOut = outputs[0]!;
