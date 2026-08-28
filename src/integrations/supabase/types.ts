@@ -229,6 +229,104 @@ export type Database = {
         }
         Relationships: []
       }
+      render_batches: {
+        Row: {
+          created_at: string
+          done: number
+          errors: number
+          id: string
+          label: string | null
+          preset: Json
+          status: string
+          tool: string
+          total: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          done?: number
+          errors?: number
+          id?: string
+          label?: string | null
+          preset?: Json
+          status?: string
+          tool?: string
+          total?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          done?: number
+          errors?: number
+          id?: string
+          label?: string | null
+          preset?: Json
+          status?: string
+          tool?: string
+          total?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      render_items: {
+        Row: {
+          batch_id: string
+          created_at: string
+          error: string | null
+          id: string
+          name: string
+          overrides: Json
+          progress: number
+          result_path: string | null
+          source_url: string | null
+          stage: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          name: string
+          overrides?: Json
+          progress?: number
+          result_path?: string | null
+          source_url?: string | null
+          stage?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          name?: string
+          overrides?: Json
+          progress?: number
+          result_path?: string | null
+          source_url?: string | null
+          stage?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "render_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "render_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scheduled_posts: {
         Row: {
           account_id: string | null
