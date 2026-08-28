@@ -2453,15 +2453,30 @@ function Home() {
                     </Button>
                   )}
                   {fsAccessSupported() && (
-                    <Button
-                      variant="outline"
-                      onClick={() => void saveFolder()}
-                      disabled={readyCount === 0}
-                    >
-                      <FolderDown className="size-4" /> Salvar na pasta
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => void saveFolder()}
+                        disabled={readyCount === 0 || zipping}
+                      >
+                        <FolderDown className="size-4" /> Salvar na pasta
+                      </Button>
+                      <Button
+                        variant={autoFolderName ? "default" : "outline"}
+                        onClick={() => void toggleAutoFolder()}
+                        title="Cada vídeo é gravado na pasta assim que fica pronto — nada se perde se o lote parar"
+                      >
+                        <FolderDown className="size-4" />{" "}
+                        {autoFolderName ? `Auto: ${autoFolderName}` : "Salvar automático"}
+                      </Button>
+                    </>
                   )}
                 </div>
+
+                {saveMsg && (
+                  <p className="font-mono text-[11px] text-muted-foreground">{saveMsg}</p>
+                )}
+
 
                 {/* progresso detalhado do lote */}
                 {(running || batchItems.length > 0) && (
