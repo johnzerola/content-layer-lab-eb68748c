@@ -28,8 +28,19 @@ async function call<T>(path: string, init: RequestInit & { jobId?: string } = {}
   const headers = new Headers(init.headers);
   headers.set("content-type", "application/json");
   if (init.jobId) headers.set("x-job-token", jobToken(init.jobId, "control"));
-  const response = await fetch(`${base}${path}`, { ...init, headers });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20_000);
+  let response: Response;
+  try {
+    response = await fetch(`${base}${path}`, { ...init, headers, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error("A VPS não respondeu em 20 segundos.");
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
   const body = await response.text();
+  if (response.status === 404) throw new Error("O motor de render ainda não está instalado na VPS.");
   if (!response.ok) throw new Error(compact(body, response.status));
   try {
     return (body ? JSON.parse(body) : {}) as T;

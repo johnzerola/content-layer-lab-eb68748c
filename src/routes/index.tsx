@@ -382,7 +382,7 @@ function Home() {
       typeof navigator !== "undefined" && navigator.hardwareConcurrency
         ? navigator.hardwareConcurrency
         : 2;
-    return Math.max(1, Math.min(4, Math.floor(cores / 2)));
+    return Math.max(1, Math.min(2, Math.floor(cores / 4) || 1));
   });
   /** modo turbo: fps/bitrate menores para lotes grandes */
   const [turbo, setTurbo] = useState(false);
@@ -1482,7 +1482,14 @@ function Home() {
                   updateBatchProgress({ itemFps: fps });
                   setBatchPhase(`${stageLabel} · ${path}`);
                 },
+                onPhase: (phase, prepProgress) => {
+                  if (ac.signal.aborted) return;
+                  setBatchPhase(phase, prepScale(prepProgress ?? 0));
+                  updateJob(id, { stage: phase });
+                  setItems((prev) => prev.map((x) => x.id === id ? { ...x, stage: phase } : x));
+                },
                 onProgress: (p) => {
+                  if (ac.signal.aborted) return;
                   const value = (at + p) / total;
                   // atualiza a interface no máximo a cada 150 ms: a fila e as
                   // prévias param de re-renderizar durante o render

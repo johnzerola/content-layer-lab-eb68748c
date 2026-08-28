@@ -97,6 +97,10 @@ export const createCloudBatch = createServerFn({ method: "POST" })
         .from("render_batches")
         .update({ status: "failed" })
         .eq("id", batch.id);
+      await supabase
+        .from("render_items")
+        .update({ status: "failed", error: message.slice(0, 1000), stage: "falha ao conectar à VPS" })
+        .eq("batch_id", batch.id);
       throw new Error(
         message === "worker-offline"
           ? "O motor de render da VPS não está configurado (CLEANER_WORKER_URL)."
@@ -107,7 +111,7 @@ export const createCloudBatch = createServerFn({ method: "POST" })
     return {
       batchId: batch.id,
       uploadToken: renderUploadToken(batch.id),
-      items: items.map((row) => ({ id: row.id, name: row.name, needsUpload: !row.source_url })),
+      items: items.map((row, index) => ({ id: row.id, name: row.name, index, needsUpload: !row.source_url })),
     };
   });
 

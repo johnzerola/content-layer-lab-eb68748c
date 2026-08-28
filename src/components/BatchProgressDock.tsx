@@ -38,7 +38,7 @@ export function BatchProgressDock() {
 
   const progressed = p.done + Math.min(0.999, p.itemProgress);
   const pct = p.total ? Math.round((progressed / p.total) * 100) : 0;
-  const { eta, perItemSec, measuring } = batchStats(p);
+  const { eta, perItemSec, measuring, elapsed } = batchStats(p);
 
 
   return (
@@ -91,7 +91,7 @@ export function BatchProgressDock() {
             <AlertTriangle className="size-3" /> {p.errors} com erro
           </span>
         )}
-        <span className="ml-auto">pode minimizar — continua rodando</span>
+        <span className="ml-auto">{Math.floor(elapsed / 60)}:{String(Math.floor(elapsed % 60)).padStart(2, "0")} · mantenha esta aba aberta</span>
       </div>
     </div>
   );

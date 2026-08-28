@@ -24,6 +24,7 @@ export interface RenderOptions {
   /** placa de fundo (mediana temporal) para reconstruir áreas limpas */
   plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null | undefined;
   onProgress?: ((p: number) => void) | undefined;
+  onPhase?: ((phase: string, prepProgress?: number) => void) | undefined;
   /** telemetria de velocidade/caminho de leitura (só no caminho WebCodecs) */
   onStats?: ((s: { path: "turbo" | "reprodução" | "busca precisa"; fps: number }) => void) | undefined;
 
@@ -157,6 +158,7 @@ export async function renderVideo(
   template: Template,
   opts: RenderOptions,
 ): Promise<{ blob: Blob; ext: string }> {
+  opts.onPhase?.("iniciando processamento", 0.02);
   // 1ª opção: pool de workers (OffscreenCanvas) — vários vídeos em paralelo
   // sem travar a interface. Cai para os caminhos antigos se algo não rolar.
   if (poolSupported()) {
