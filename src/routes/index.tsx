@@ -2476,6 +2476,15 @@ function Home() {
                   <Button onClick={() => void processAll()} disabled={running}>
                     <Play className="size-4" /> {running ? "Processando…" : "Processar em lote"}
                   </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => void processInCloud()}
+                    disabled={sendingCloud || running}
+                    title="Renderiza no servidor: pode fechar o navegador e baixar depois"
+                  >
+                    <CloudCog className="size-4" />
+                    {sendingCloud ? "Enviando…" : "Renderizar na nuvem"}
+                  </Button>
                   {running && (
                     <>
                       <Button variant="outline" onClick={togglePause}>
