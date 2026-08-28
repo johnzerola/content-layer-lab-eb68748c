@@ -15,6 +15,12 @@ import { keptSegments, segmentsDuration, srcTimeAt, type PreEdit } from "./preed
 import { cleanMp4Metadata } from "./mp4meta";
 import { FrameReader, videoDecoderSupported, type DecodedFrame } from "./decode";
 import { envelopeAt, type AudioPcm, type Envelope } from "./audio-track";
+import {
+  pickAudioCodec,
+  pickBitrate,
+  pickVideoCodec,
+  type QualityTier,
+} from "./encode-presets";
 
 export interface CoreEncodeOptions {
   file: File;
