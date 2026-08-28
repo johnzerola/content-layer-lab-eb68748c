@@ -76,48 +76,8 @@ export function webCodecsSupported() {
   );
 }
 
-async function pickVideoCodec(width: number, height: number, bitrate: number, framerate: number) {
-  const candidates: { codec: string; mux: "avc" | "vp9" }[] = [
-    { codec: "avc1.640028", mux: "avc" },
-    { codec: "avc1.4d0032", mux: "avc" },
-    { codec: "avc1.42003c", mux: "avc" },
-    { codec: "avc1.42001f", mux: "avc" },
-    // último recurso: VP9 dentro do MP4 (quando o navegador não tem H.264)
-    { codec: "vp09.00.10.08", mux: "vp9" },
-  ];
-  for (const { codec, mux } of candidates) {
-    try {
-      const cfg: VideoEncoderConfig = {
-        codec,
-        width,
-        height,
-        bitrate,
-        framerate,
-        latencyMode: "quality",
-        ...(mux === "avc" ? { avc: { format: "avc" as const } } : {}),
-      };
-      const sup = await VideoEncoder.isConfigSupported(cfg);
-      if (sup.supported) return { cfg, mux };
-    } catch {
-      /* tenta o próximo */
-    }
-  }
-  return null;
-}
+// escolha de codec/bitrate vive em ./encode-presets (compartilhado com o worker)
 
-async function pickAudioCodec(channels: number, sampleRate: number): Promise<"aac" | "opus" | null> {
-  const Enc = window.AudioEncoder;
-  if (!Enc) return null;
-  for (const [mux, codec] of [["aac", "mp4a.40.2"], ["opus", "opus"]] as const) {
-    try {
-      const sup = await Enc.isConfigSupported({ codec, sampleRate, numberOfChannels: channels, bitrate: 128_000 });
-      if (sup.supported) return mux;
-    } catch {
-      /* próximo */
-    }
-  }
-  return null;
-}
 
 /** Faixa de áudio da variação — o arquivo é decodificado uma vez só (cache). */
 async function decodeAudio(
