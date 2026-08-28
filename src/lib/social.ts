@@ -21,6 +21,7 @@ export type SocialAccount = {
   provider: string;
   provider_account_id: string | null;
   status: string;
+  is_primary?: boolean;
   created_at: string;
 };
 
