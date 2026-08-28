@@ -1437,8 +1437,10 @@ function Home() {
             }
           }
 
+          setBatchPhase("finalizando", renderScale(1));
           doneCount.current++;
-          updateBatchProgress({ done: doneCount.current, itemProgress: 0, itemLabel: null });
+          finishBatchItem(doneCount.current);
+
 
 
           const firstOut = outputs[0]!;
