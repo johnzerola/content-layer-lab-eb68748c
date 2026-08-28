@@ -122,6 +122,9 @@ import {
   prepScale,
   registerBatchControls,
   renderScale,
+  batchStats,
+  formatEta,
+  formatSpeed,
   markRenderStart,
   setBatchPath,
   setBatchPhase,
@@ -225,6 +228,48 @@ interface QueueCtrl {
 }
 
 /** Modo "só cortes": remove toda a marca e usa o vídeo cheio no quadro. */
+/** Card de progresso do lote — usa exatamente o mesmo estado do dock global. */
+function BatchProgressCard() {
+  const p = useBatchProgress();
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!p.running) return;
+    const id = window.setInterval(() => tick((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [p.running]);
+
+  const progressed = p.done + Math.min(0.999, p.itemProgress);
+  const pct = p.total ? Math.round((progressed / p.total) * 100) : 0;
+  const { eta, perItemSec, measuring } = batchStats(p);
+  const starting = p.running && p.itemProgress <= prepScale;
+
+  return (
+    <div className="space-y-1.5 rounded-xl border border-border bg-surface-2 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="mono-label">Progresso do lote</p>
+        <p className="font-mono text-[11px] text-muted-foreground">
+          {p.done}/{p.total} arquivos · {pct}%
+        </p>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-muted">
+        <div
+          className={`h-full rounded-full bg-primary transition-all ${starting ? "animate-pulse" : ""}`}
+          style={{ width: `${Math.max(pct, starting ? 3 : 0)}%` }}
+        />
+      </div>
+      <p className="truncate font-mono text-[11px] text-muted-foreground">
+        {p.itemLabel ? `${p.itemLabel} · ` : ""}
+        {p.phase ?? "preparando"}
+        {p.path ? ` · ${p.path}` : ""}
+        {p.itemFps > 0 ? ` · ${p.itemFps.toFixed(0)} fps` : ""}
+      </p>
+      <p className="font-mono text-[11px] text-muted-foreground">
+        {measuring ? "medindo velocidade…" : `restam ~${formatEta(eta)} · ${formatSpeed(perItemSec)}`}
+      </p>
+    </div>
+  );
+}
+
 function stripBranding(t: Template): Template {
   const off = <T extends { visible: boolean }>(l: T): T => ({ ...l, visible: false });
   return {
