@@ -843,14 +843,21 @@ export function VideoStudio({
                   </button>
                 </div>
 
-                <div className="relative flex min-h-0 flex-1 items-center justify-center">
+                <div ref={stageRef} className="relative flex min-h-0 flex-1 items-center justify-center">
                   {/* fonte (sempre montada: alimenta o canvas de saída) */}
                   <div
                     ref={boxRef}
                     className={`relative overflow-hidden rounded-xl border border-border bg-black ${
-                      view === "out" ? "pointer-events-none invisible absolute size-px opacity-0" : "h-full max-h-full"
+                      view === "out" ? "pointer-events-none invisible absolute size-px opacity-0" : ""
                     }`}
-                    style={view === "out" ? undefined : { aspectRatio: String(srcAR), maxWidth: "100%" }}
+                    style={
+                      view === "out"
+                        ? undefined
+                        : stageBox
+                          ? { width: `${stageBox.w}px`, height: `${stageBox.h}px` }
+                          : { aspectRatio: String(srcAR), maxWidth: "100%", maxHeight: "100%" }
+                    }
+
                     onPointerMove={onPointerMove}
                     onPointerUp={() => (dragRef.current = null)}
                     onPointerCancel={() => (dragRef.current = null)}
