@@ -729,7 +729,7 @@ function drawVideoLayer(
     };
 
     if (layout === "blur") {
-      paintBackdrop(box, 34, 0.35);
+      if (!coversBox(box, cr)) paintBackdrop(box, 34, 0.35);
       dest = paint(box, "contain");
     } else if (layout === "fit") {
       ctx.save();
@@ -774,7 +774,7 @@ function drawVideoLayer(
       ctx.fillRect(v.x, v.y + topH - 1, v.w, 2);
       ctx.restore();
     } else if (layout === "centered") {
-      paintBackdrop(box, 60, 0.55);
+      if (!coversBox(box, full)) paintBackdrop(box, 60, 0.55);
       dest = paint(box, "contain", full, { useOffset: false });
     } else if (layout === "horizontal") {
       ctx.save();
