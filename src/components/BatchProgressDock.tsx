@@ -5,9 +5,11 @@ import {
   batchStats,
   cancelBatch,
   formatEta,
+  formatSpeed,
   pauseBatch,
   useBatchProgress,
 } from "@/lib/batch-runtime";
+
 
 /** Indicador global do lote: continua visível em qualquer tela enquanto processa. */
 export function BatchProgressDock() {
