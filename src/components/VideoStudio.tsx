@@ -687,6 +687,27 @@ export function VideoStudio({
   const srcAR = width && height ? width / height : 9 / 16;
   const quarter = ((pre.rotate / 90) | 0) % 4;
 
+  // O retângulo de recorte é posicionado em % da caixa. Se a caixa não tiver
+  // exatamente a proporção do vídeo, o vídeo fica com barras (object-contain)
+  // e o recorte deixa de bater com a imagem. Por isso a caixa é medida em px.
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const [stageBox, setStageBox] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const fit = () => {
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      const w = Math.min(r.width, r.height * srcAR);
+      setStageBox({ w, h: w / srcAR });
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [srcAR, view]);
+
+
   const clipWindow = useMemo(() => ({ start, end }), [start, end]);
 
   const save = () =>
