@@ -24,6 +24,7 @@ import {
   Crop,
   Eye,
   CalendarClock,
+  CloudCog,
 } from "lucide-react";
 import { QuickPreviewModal } from "@/components/QuickPreviewModal";
 import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
@@ -1176,7 +1177,7 @@ function Home() {
           template: active,
           variants: FLOWS[runMode].export.variants ? Math.max(1, variants) : 1,
           platforms: FLOWS[runMode].export.platforms ? platforms : ["reels"],
-          captions: Boolean(active.captions?.enabled),
+          captions: Boolean(active.captions?.visible),
         },
         items: list.map((item) => ({
           name: item.outName ? `${item.outName}.mp4` : item.file.name,
@@ -2540,6 +2541,8 @@ function Home() {
                 {saveMsg && (
                   <p className="font-mono text-[11px] text-muted-foreground">{saveMsg}</p>
                 )}
+
+                {user ? <CloudRenderPanel tool={mode} /> : null}
 
 
                 {/* progresso detalhado do lote */}
