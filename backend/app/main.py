@@ -26,6 +26,7 @@ from .security import TokenError, validate_callback_url, validate_job_token, val
 from .services.media_resolver import MediaResolveError, resolve_public_media
 from .services.text_detect import detector_status
 from .storage import cleanup_expired, directory_size, job_dir, read_state, write_state
+from .render_queue import RenderManager
 from .utils.video import probe
 
 
@@ -35,6 +36,12 @@ JOBS: Dict[str, dict] = {}
 ACTIVE_JOBS: set[str] = set()
 ACTIVE_LOCK = threading.Lock()
 RATE_BUCKETS: Dict[str, Deque[float]] = defaultdict(deque)
+RENDER = RenderManager(
+    SETTINGS.storage_dir,
+    SETTINGS.worker_secret,
+    SETTINGS.callback_origins,
+    SETTINGS.max_upload_bytes,
+)
 MAX_RATE_BUCKETS = 10_000
 VIDEO_TYPES = {
     "application/octet-stream",
@@ -56,11 +63,13 @@ async def _cleanup_loop() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     cleanup_expired(SETTINGS.storage_dir, SETTINGS.retention_seconds)
+    RENDER.start()
     task = asyncio.create_task(_cleanup_loop())
     try:
         yield
     finally:
         task.cancel()
+        RENDER.shutdown()
 
 
 app = FastAPI(
@@ -178,6 +187,20 @@ class MediaResolveRequest(BaseModel):
     url: str = Field(min_length=10, max_length=2048)
 
 
+class RenderItemRequest(BaseModel):
+    id: str
+    name: str = Field(min_length=1, max_length=300)
+    source_url: Optional[str] = Field(default=None, max_length=2048)
+    overrides: dict = Field(default_factory=dict)
+
+
+class RenderCreateRequest(BaseModel):
+    job_id: str
+    preset: dict = Field(default_factory=dict)
+    callback_url: Optional[str] = Field(default=None, max_length=2048)
+    items: List[RenderItemRequest] = Field(min_length=1, max_length=500)
+
+
 @app.get("/v1/health")
 async def health():
     propainter = propainter_status()
@@ -195,6 +218,7 @@ async def health():
             "temporal_fill": {"ready": True, "quality": "fallback"},
         },
         "detectors": {"text": detector_status()},
+        "features": {"batch_render": True},
         "limits": {
             "max_upload_bytes": SETTINGS.max_upload_bytes,
             "max_duration_seconds": SETTINGS.max_duration_seconds,
@@ -205,6 +229,98 @@ async def health():
         },
         "version": app.version,
     }
+
+
+@app.post("/v1/render/jobs")
+async def create_render_job(req: RenderCreateRequest, x_job_token: Optional[str] = Header(None)):
+    verify_token(req.job_id, x_job_token, "control")
+    try:
+        return RENDER.create(req.job_id, req.preset, req.callback_url, [item.model_dump() for item in req.items])
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
+
+
+@app.post("/v1/render/items/{item_id}/upload")
+async def upload_render_item(
+    request: Request,
+    item_id: str,
+    x_job_token: Optional[str] = Header(None),
+    x_file_name: Optional[str] = Header(None),
+):
+    try:
+        batch_id, state, item = RENDER.find_item(item_id)
+    except (KeyError, ValueError):
+        raise HTTPException(404, "render item not found") from None
+    verify_token(batch_id, x_job_token, "upload")
+    if item.get("status") not in {"uploading", "failed"}:
+        return {"ok": True, "existing": True}
+    directory = RENDER.directory(batch_id)
+    destination = directory / f"{item_id}.input.mp4"
+    temporary = directory / f".{item_id}.upload"
+    size = 0
+    try:
+        with temporary.open("wb") as output:
+            async for chunk in request.stream():
+                size += len(chunk)
+                if size > SETTINGS.max_upload_bytes:
+                    raise HTTPException(413, "arquivo excede o limite configurado")
+                output.write(chunk)
+        if size == 0:
+            raise HTTPException(400, "arquivo vazio")
+        metadata = _validate_video(temporary)
+        os.replace(temporary, destination)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
+    item.update(status="queued", progress=0, stage="enviado", size=size, probe=metadata)
+    RENDER.write(batch_id, state)
+    return {"ok": True, "size": size, "probe": metadata, "name": unquote(x_file_name or item["name"])}
+
+
+@app.post("/v1/render/jobs/{batch_id}/start")
+async def start_render_job(batch_id: str, x_job_token: Optional[str] = Header(None)):
+    verify_token(batch_id, x_job_token, "control")
+    state = RENDER.read(batch_id)
+    if not state:
+        raise HTTPException(404, "render batch not found")
+    missing = [item["id"] for item in state.get("items", []) if not item.get("source_url") and not (RENDER.directory(batch_id) / f"{item['id']}.input.mp4").is_file()]
+    if missing:
+        raise HTTPException(409, f"{len(missing)} arquivo(s) ainda não enviado(s)")
+    state["status"] = "queued"
+    RENDER.write(batch_id, state)
+    RENDER.enqueue(batch_id)
+    return {"ok": True}
+
+
+@app.get("/v1/render/jobs/{batch_id}")
+async def render_job_status(batch_id: str, x_job_token: Optional[str] = Header(None)):
+    verify_token(batch_id, x_job_token, "control")
+    state = RENDER.read(batch_id)
+    if not state:
+        raise HTTPException(404, "render batch not found")
+    return state
+
+
+@app.post("/v1/render/jobs/{batch_id}/cancel")
+async def cancel_render_job(batch_id: str, x_job_token: Optional[str] = Header(None)):
+    verify_token(batch_id, x_job_token, "control")
+    try:
+        return RENDER.cancel(batch_id)
+    except KeyError:
+        raise HTTPException(404, "render batch not found") from None
+
+
+@app.get("/v1/render/items/{item_id}/result")
+async def render_item_result(item_id: str, token: Optional[str] = Query(None)):
+    try:
+        batch_id, _, item = RENDER.find_item(item_id)
+    except (KeyError, ValueError):
+        raise HTTPException(404, "render item not found") from None
+    verify_token(batch_id, token, "result")
+    path = RENDER.directory(batch_id) / f"{item_id}.output.mp4"
+    if item.get("status") != "completed" or not path.is_file():
+        raise HTTPException(404, "resultado ainda não disponível")
+    return FileResponse(path, media_type="video/mp4", filename=item.get("name") or f"{item_id}.mp4")
 
 
 @app.post("/v1/media/resolve")

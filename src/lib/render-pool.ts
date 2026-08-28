@@ -19,6 +19,7 @@ interface Pending {
   reject: (err: Error) => void;
   onProgress?: ((p: number) => void) | undefined;
   worker: Worker;
+  watchdog: ReturnType<typeof setTimeout>;
 }
 
 let workers: Worker[] = [];
@@ -41,7 +42,26 @@ export function poolSupported() {
 /** Concorrência: metade dos núcleos, entre 2 e 4. */
 export function poolSize() {
   const cores = typeof navigator !== "undefined" ? (navigator.hardwareConcurrency ?? 4) : 4;
-  return Math.max(2, Math.min(4, Math.floor(cores / 2) || 2));
+  return Math.max(1, Math.min(2, Math.floor(cores / 4) || 1));
+}
+
+const STALL_MS = 90_000;
+
+function abortError() {
+  return new DOMException("cancelado", "AbortError");
+}
+
+function raceStep<T>(task: Promise<T>, signal: AbortSignal | undefined, timeoutMs: number, label: string) {
+  return new Promise<T>((resolve, reject) => {
+    if (signal?.aborted) return reject(abortError());
+    const timer = setTimeout(() => reject(Object.assign(new Error(`${label} demorou demais`), { name: "RenderStalledError" })), timeoutMs);
+    const abort = () => reject(abortError());
+    signal?.addEventListener("abort", abort, { once: true });
+    task.then(resolve, reject).finally(() => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+    });
+  });
 }
 
 function handle(e: MessageEvent<WorkerResponse>) {
@@ -49,10 +69,18 @@ function handle(e: MessageEvent<WorkerResponse>) {
   const job = pending.get(msg.id);
   if (!job) return;
   if (msg.type === "progress") {
+    clearTimeout(job.watchdog);
+    job.watchdog = setTimeout(() => {
+      pending.delete(msg.id);
+      job.worker.terminate();
+      workers = workers.filter((candidate) => candidate !== job.worker);
+      job.reject(Object.assign(new Error("A renderização parou de responder"), { name: "RenderStalledError" }));
+    }, STALL_MS);
     job.onProgress?.(msg.p);
     return;
   }
   pending.delete(msg.id);
+  clearTimeout(job.watchdog);
   load.set(job.worker, Math.max(0, (load.get(job.worker) ?? 1) - 1));
   if (msg.type === "done") job.resolve(msg.buffer);
   else {
@@ -60,6 +88,17 @@ function handle(e: MessageEvent<WorkerResponse>) {
     err.name = msg.name;
     job.reject(err);
   }
+}
+
+function rejectWorkerJobs(worker: Worker, error: Error) {
+  for (const [id, job] of pending) {
+    if (job.worker !== worker) continue;
+    clearTimeout(job.watchdog);
+    pending.delete(id);
+    job.reject(error);
+  }
+  worker.terminate();
+  workers = workers.filter((candidate) => candidate !== worker);
 }
 
 function ensureWorkers() {
@@ -70,9 +109,7 @@ function ensureWorkers() {
       type: "module",
     });
     w.onmessage = handle;
-    w.onerror = () => {
-      /* erros de job chegam por mensagem */
-    };
+    w.onerror = () => rejectWorkerJobs(w, new Error("Worker de renderização falhou"));
     load.set(w, 0);
     workers.push(w);
   }
@@ -81,6 +118,10 @@ function ensureWorkers() {
 
 /** Encerra os workers (ex.: lote cancelado e ocioso). */
 export function shutdownPool() {
+  for (const job of pending.values()) {
+    clearTimeout(job.watchdog);
+    job.reject(abortError());
+  }
   for (const w of workers) w.terminate();
   workers = [];
   pending.clear();
@@ -163,8 +204,9 @@ export async function renderInPool(
   opts: RenderOptions,
 ): Promise<Blob> {
   if (!poolSupported()) throw new Error("pool indisponível");
-
-  const duration = await sourceDuration(file);
+  if (opts.signal?.aborted) throw abortError();
+  opts.onPhase?.("lendo informações do vídeo", 0.08);
+  const duration = await raceStep(sourceDuration(file), opts.signal, 15_000, "A leitura do vídeo");
   const v = opts.variation;
 
   // ---- análises reaproveitadas entre variações ----
@@ -177,11 +219,13 @@ export async function renderInPool(
 
   // o áudio-fonte é decodificado uma única vez por arquivo (cache);
   // aqui só remontamos com a velocidade/tom desta variação
-  const track = await renderAudioTrack(file, segments, v.speed, v.pitch, v.eq);
+  opts.onPhase?.("preparando áudio", 0.25);
+  const track = await raceStep(renderAudioTrack(file, segments, v.speed, v.pitch, v.eq), opts.signal, 60_000, "A preparação do áudio");
   const audio = track ? toPcm(track) : null;
   const envelope: Envelope | null = track ? audioEnvelope(track.rendered) : null;
 
-  const images = await loadBitmaps(templateImages(template));
+  opts.onPhase?.("carregando elementos do template", 0.68);
+  const images = await raceStep(loadBitmaps(templateImages(template)), opts.signal, 20_000, "O carregamento do template");
 
   let plate: { bitmap: ImageBitmap; ok: string[] } | null = null;
   if (opts.plate) {
@@ -199,12 +243,23 @@ export async function renderInPool(
   const id = ++seq;
   load.set(worker, (load.get(worker) ?? 0) + 1);
 
+  opts.onPhase?.("iniciando codificador", 0.92);
   const done = new Promise<ArrayBuffer>((resolve, reject) => {
-    pending.set(id, { resolve, reject, onProgress: opts.onProgress, worker });
+    const watchdog = setTimeout(() => {
+      rejectWorkerJobs(worker, Object.assign(new Error("O codificador não iniciou"), { name: "RenderStalledError" }));
+    }, STALL_MS);
+    pending.set(id, { resolve, reject, onProgress: opts.onProgress, worker, watchdog });
   });
 
   const onAbort = () => {
     worker.postMessage({ type: "cancel", id });
+    const job = pending.get(id);
+    if (job) {
+      clearTimeout(job.watchdog);
+      pending.delete(id);
+      load.set(worker, Math.max(0, (load.get(worker) ?? 1) - 1));
+      job.reject(abortError());
+    }
   };
   opts.signal?.addEventListener("abort", onAbort, { once: true });
 

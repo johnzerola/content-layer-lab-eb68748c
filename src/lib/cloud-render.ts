@@ -47,8 +47,8 @@ export async function sendBatchToCloud(input: {
 
   for (const row of created.items) {
     if (!row.needsUpload) continue;
-    const source = input.items.find((item) => item.name === row.name && item.file);
-    if (!source?.file) continue;
+    const source = input.items[row.index];
+    if (!source?.file) throw new Error(`Arquivo obrigatório ausente: "${row.name}".`);
     const response = await fetch(`/api/public/render-upload?item=${row.id}`, {
       method: "POST",
       headers: {
@@ -59,7 +59,8 @@ export async function sendBatchToCloud(input: {
       body: source.file,
     });
     if (!response.ok) {
-      throw new Error(`Falha ao enviar "${source.file.name}" para a VPS.`);
+      const detail = (await response.text()).slice(0, 300);
+      throw new Error(`Falha ao enviar "${source.file.name}" para a VPS${detail ? `: ${detail}` : "."}`);
     }
     uploaded += 1;
     input.onProgress?.(uploaded, uploads.length);
@@ -106,6 +107,7 @@ export function useCloudBatches(enabled = true) {
           /* worker pode estar reiniciando */
         }
       }
+      if (active.length) await refresh();
       if (!alive) return;
       timer.current = setTimeout(tick, active.length ? 5000 : 30000);
     };
