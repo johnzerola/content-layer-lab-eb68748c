@@ -24,6 +24,9 @@ export interface RenderOptions {
   /** placa de fundo (mediana temporal) para reconstruir áreas limpas */
   plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null | undefined;
   onProgress?: ((p: number) => void) | undefined;
+  /** telemetria de velocidade/caminho de leitura (só no caminho WebCodecs) */
+  onStats?: ((s: { path: "turbo" | "reprodução" | "busca precisa"; fps: number }) => void) | undefined;
+
   signal?: AbortSignal | undefined;
   jobId?: string | undefined;
 }
