@@ -104,11 +104,17 @@ import { bankPick, headlineTweak, parseBank } from "@/lib/headlines";
 import { externalState, useExternalState } from "@/lib/external-state";
 import {
   endBatchProgress,
+  finishBatchItem,
   notifyBatchDone,
+  prepScale,
   registerBatchControls,
+  renderScale,
+  setBatchPhase,
+  startBatchItem,
   startBatchProgress,
   updateBatchProgress,
 } from "@/lib/batch-runtime";
+
 import { askNotifyPermission, holdBackground } from "@/lib/keepalive";
 
 
