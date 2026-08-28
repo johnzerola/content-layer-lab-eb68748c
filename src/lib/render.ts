@@ -29,7 +29,12 @@ export interface RenderOptions {
   onProgress?: ((p: number) => void) | undefined;
   onPhase?: ((phase: string, prepProgress?: number) => void) | undefined;
   /** telemetria de velocidade/caminho de leitura (só no caminho WebCodecs) */
-  onStats?: ((s: { path: "turbo" | "reprodução" | "busca precisa"; fps: number }) => void) | undefined;
+  onStats?:
+    | ((s: {
+        path: "worker" | "turbo" | "reprodução" | "busca precisa" | "gravação em tempo real";
+        fps: number;
+      }) => void)
+    | undefined;
 
   signal?: AbortSignal | undefined;
   jobId?: string | undefined;
@@ -244,6 +249,7 @@ async function runRender(
   // sem travar a interface. Cai para os caminhos antigos se algo não rolar.
   if (poolSupported()) {
     try {
+      opts.onStats?.({ path: "worker", fps: 0 });
       const blob = await renderInPool(file, template, opts);
       return { blob, ext: "mp4" };
     } catch (err) {
