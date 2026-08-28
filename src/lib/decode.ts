@@ -155,8 +155,13 @@ export class FrameReader {
   async read(): Promise<DecodedFrame | null> {
     for (;;) {
       if (this.failed) throw this.failed;
-      if (this.queue.length) return this.queue.shift()!;
-      if (this.next >= this.track.samples.length) {
+      // janela de reordenação: espera alguns quadros para garantir ordem de
+      // exibição correta em vídeos com quadros B.
+      const done = this.next >= this.track.samples.length;
+      if (this.queue.length >= 4 || (this.queue.length && (done || this.flushed))) {
+        return this.queue.shift()!;
+      }
+      if (done) {
         if (this.flushed) return null;
         this.flushed = true;
         try {
