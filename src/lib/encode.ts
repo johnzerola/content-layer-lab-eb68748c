@@ -421,6 +421,8 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     // que imagem, áudio e legendas continuem alinhados mesmo em máquinas lentas.
     const canFast = segments.length === 1 && typeof video.play === "function";
     if (canFast && frameIndex < totalFrames) {
+      path = "reprodução";
+
       // tolerância: a fonte pode adiantar no máximo ~1 quadro
       const LEAD_TOLERANCE = Math.max(1 / fps, 0.04);
       // acima disto o quadro capturado já não corresponde ao carimbo de tempo;
