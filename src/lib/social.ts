@@ -66,7 +66,7 @@ export function resolveAccountLinkUi(
 /* ------------------------------- contas -------------------------------- */
 
 export const SOCIAL_ACCOUNT_SELECT =
-  "id,platform,username,display_name,avatar_url,provider,status,provider_account_id,created_at";
+  "id,platform,username,display_name,avatar_url,provider,status,provider_account_id,is_primary,created_at";
 
 export async function listAccounts(): Promise<SocialAccount[]> {
   const { data, error } = await supabase
