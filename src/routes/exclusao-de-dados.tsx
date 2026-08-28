@@ -1,4 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
+import {
+  createDataDeletionRequest,
+  listMyDataDeletionRequests,
+} from "@/lib/data-deletion.functions";
 
 export const Route = createFileRoute("/exclusao-de-dados")({
   component: DataDeletionPage,
@@ -23,7 +35,74 @@ export const Route = createFileRoute("/exclusao-de-dados")({
 
 const CONTACT = "privacidade@vaiviral.app";
 
+type DeletionRequest = Awaited<ReturnType<typeof listMyDataDeletionRequests>>[number];
+
+const statusLabels: Record<string, string> = {
+  pending: "Recebido",
+  processing: "Em processamento",
+  completed: "Concluído",
+  rejected: "Não aprovado",
+};
+
 function DataDeletionPage() {
+  const submitRequest = useServerFn(createDataDeletionRequest);
+  const fetchRequests = useServerFn(listMyDataDeletionRequests);
+  const [user, setUser] = useState<CloudUser | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [facebook, setFacebook] = useState(true);
+  const [instagram, setInstagram] = useState(true);
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [requests, setRequests] = useState<DeletionRequest[]>([]);
+
+  useEffect(() => {
+    const off = onAuth((nextUser) => {
+      setUser(nextUser);
+      setAuthReady(true);
+    });
+    currentUser()
+      .then(setUser)
+      .finally(() => setAuthReady(true));
+    return off;
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setRequests([]);
+      return;
+    }
+    fetchRequests()
+      .then(setRequests)
+      .catch(() => toast.error("Não foi possível carregar seus pedidos."));
+  }, [fetchRequests, user]);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const platforms = [facebook ? "facebook" : null, instagram ? "instagram" : null].filter(
+      (platform): platform is "facebook" | "instagram" => platform !== null,
+    );
+    if (!platforms.length) {
+      toast.error("Selecione Facebook ou Instagram.");
+      return;
+    }
+    if (reason.trim().length > 1000) {
+      toast.error("O motivo deve ter até 1.000 caracteres.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const result = await submitRequest({ data: { platforms, reason: reason.trim() || undefined } });
+      toast.success(result.created ? "Pedido de exclusão registrado." : "Você já possui um pedido em andamento.");
+      setReason("");
+      setRequests(await fetchRequests());
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível registrar o pedido.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <main className="mx-auto max-w-3xl px-5 py-10 text-sm leading-relaxed">
       <Link to="/" className="text-muted-foreground hover:text-foreground">
@@ -63,6 +142,86 @@ function DataDeletionPage() {
         com o e-mail do cadastro e o nome de usuário da rede social. Confirmamos o pedido e concluímos a exclusão em
         até 30 dias.
       </p>
+
+      <section className="mt-8 border-y border-border py-7" aria-labelledby="request-title">
+        <div className="flex items-start gap-3">
+          <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
+          <div>
+            <h2 id="request-title" className="font-display text-xl font-semibold">
+              Solicitar exclusão dos dados da Meta
+            </h2>
+            <p className="mt-1 text-muted-foreground">
+              Registre o pedido e acompanhe pelo código de confirmação. O prazo de conclusão é de até 30 dias.
+            </p>
+          </div>
+        </div>
+
+        {!authReady ? (
+          <Loader2 className="mt-6 size-5 animate-spin text-muted-foreground" aria-label="Carregando conta" />
+        ) : !user ? (
+          <div className="mt-5 border-l-2 border-primary pl-4">
+            <p className="text-muted-foreground">Entre na sua conta para enviar e acompanhar o pedido.</p>
+            <Link to="/auth" search={{ next: "/exclusao-de-dados" }} className="mt-3 inline-block font-medium text-primary underline">
+              Entrar para solicitar
+            </Link>
+          </div>
+        ) : (
+          <>
+            <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
+              <fieldset>
+                <legend className="font-medium">Quais dados deseja excluir?</legend>
+                <div className="mt-3 flex flex-wrap gap-x-7 gap-y-3">
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <Checkbox checked={facebook} onCheckedChange={(checked) => setFacebook(checked === true)} />
+                    Facebook
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <Checkbox checked={instagram} onCheckedChange={(checked) => setInstagram(checked === true)} />
+                    Instagram
+                  </label>
+                </div>
+              </fieldset>
+              <label className="block">
+                <span className="font-medium">Informações adicionais (opcional)</span>
+                <Textarea
+                  className="mt-2 min-h-28"
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                  maxLength={1000}
+                  placeholder="Descreva somente o necessário para identificarmos o pedido."
+                />
+                <span className="mt-1 block text-right text-xs text-muted-foreground">{reason.length}/1000</span>
+              </label>
+              <Button type="submit" disabled={submitting || (!facebook && !instagram)}>
+                {submitting && <Loader2 className="size-4 animate-spin" />}
+                Registrar pedido
+              </Button>
+            </form>
+
+            {requests.length > 0 && (
+              <div className="mt-8">
+                <h3 className="font-display text-base font-semibold">Seus pedidos</h3>
+                <ul className="mt-3 divide-y divide-border border-y border-border">
+                  {requests.map((request) => (
+                    <li key={request.id} className="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="font-mono text-xs font-semibold">{request.confirmation_code}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {request.platforms.join(" e ")} · {new Date(request.requested_at).toLocaleDateString("pt-BR")}
+                        </p>
+                      </div>
+                      <span className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium sm:mt-0">
+                        {request.status === "completed" && <CheckCircle2 className="size-4 text-primary" />}
+                        {statusLabels[request.status] ?? request.status}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+      </section>
 
       <h2 className="mt-8 font-display text-xl font-semibold">O que é apagado</h2>
       <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
