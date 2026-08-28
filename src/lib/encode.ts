@@ -8,6 +8,12 @@ import { cleanMp4Metadata } from "./mp4meta";
 import { bgSleep } from "./keepalive";
 import { FrameReader, videoDecoderSupported, type DecodedFrame } from "./decode";
 import { audioEnvelope, envelopeAt, renderAudioTrack } from "./audio-track";
+import {
+  pickAudioCodec,
+  pickBitrate,
+  pickVideoCodec,
+  type QualityTier,
+} from "./encode-presets";
 
 
 
