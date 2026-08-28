@@ -10,6 +10,8 @@ export interface Mp4Sample {
   size: number;
   /** tempo de apresentação em segundos */
   cts: number;
+  /** tempo de decodificação em segundos */
+  dts: number;
   /** duração em segundos */
   duration: number;
   sync: boolean;
