@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 import { listAccounts, removeAccount, type SocialAccount } from "@/lib/social";
 
-import { beginFacebookOAuth } from "@/lib/facebook-oauth.functions";
+import { beginFacebookOAuth, diagnoseFacebookIntegration } from "@/lib/facebook-oauth.functions";
 import { setPrimaryAccount } from "@/lib/social-primary.functions";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -333,5 +333,121 @@ function IntegrationsPage() {
       </main>
 
     </AppShell>
+  );
+}
+
+type MetaCheck = {
+  graphVersion: string;
+  appId: string | null;
+  configId: string | null;
+  redirectUri: string | null;
+  siteUrl: string | null;
+  authorizationUrl: string | null;
+  issues: string[];
+  loginConfiguration: { checked: boolean; ok: boolean; detail: string };
+};
+
+function MetaDiagnosticsPanel() {
+  const runDiagnosis = useServerFn(diagnoseFacebookIntegration);
+  const [state, setState] = useState<
+    { status: "idle" } | { status: "loading" } | { status: "denied" } | { status: "ready"; check: MetaCheck }
+  >({ status: "idle" });
+
+  const run = useCallback(async () => {
+    setState({ status: "loading" });
+    try {
+      const response = await runDiagnosis();
+      setState(response.ok ? { status: "ready", check: response.check as MetaCheck } : { status: "denied" });
+    } catch {
+      setState({ status: "denied" });
+    }
+  }, [runDiagnosis]);
+
+  return (
+    <section className="mb-6 rounded-2xl border border-border/70 bg-surface/60 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-display text-base font-semibold">Diagnóstico da integração Meta</h2>
+          <p className="text-xs text-muted-foreground">
+            Disponível para administradores. Nenhum segredo é exibido.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => void run()} disabled={state.status === "loading"}>
+          {state.status === "loading" ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+          Verificar configuração
+        </Button>
+      </div>
+
+      {state.status === "denied" && (
+        <p className="mt-3 text-sm text-muted-foreground">
+          Diagnóstico disponível apenas para administradores.
+        </p>
+      )}
+
+      {state.status === "ready" && (
+        <div className="mt-4 space-y-3 text-sm">
+          <dl className="grid gap-2 sm:grid-cols-2">
+            <Row label="Versão do Graph" value={state.check.graphVersion} />
+            <Row label="App ID" value={state.check.appId ?? "não definido"} />
+            <Row label="config_id" value={state.check.configId ?? "não definido"} />
+            <Row label="URL de retorno" value={state.check.redirectUri ?? "não definida"} />
+            <Row label="Site público" value={state.check.siteUrl ?? "não definido"} />
+          </dl>
+
+          <p
+            className={
+              state.check.loginConfiguration.ok
+                ? "flex items-start gap-2 text-emerald-400"
+                : "flex items-start gap-2 text-amber-400"
+            }
+          >
+            {state.check.loginConfiguration.ok ? (
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+            ) : (
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+            )}
+            <span>{state.check.loginConfiguration.detail}</span>
+          </p>
+
+          {state.check.issues.length > 0 ? (
+            <ul className="space-y-1 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-amber-300">
+              {state.check.issues.map((issue) => (
+                <li key={issue}>• {issue}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-emerald-400">Configuração do servidor completa.</p>
+          )}
+
+          {state.check.authorizationUrl && (
+            <p className="break-all rounded-xl border border-border bg-surface-2 p-3 text-xs text-muted-foreground">
+              {state.check.authorizationUrl}
+            </p>
+          )}
+
+          <div className="rounded-xl border border-border bg-surface-2 p-3 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">Checklist no painel da Meta</p>
+            <ul className="mt-1 space-y-1">
+              <li>• URIs de redirecionamento válidos: {state.check.redirectUri ?? "—"}</li>
+              <li>
+                • Adicione também {state.check.siteUrl ?? "https://seu-dominio"}/integracoes/instagram/callback
+              </li>
+              <li>• Domínio do SDK do JavaScript sem barra final</li>
+              <li>• Ícone quadrado do app e Página do app associada</li>
+              <li>• Configuração do Login para Empresas publicada e app em modo Ativo</li>
+            </ul>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-surface-2 p-3">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="break-all text-sm">{value}</dd>
+    </div>
   );
 }
