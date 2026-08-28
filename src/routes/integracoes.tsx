@@ -193,6 +193,10 @@ function IntegrationsPage() {
           </p>
         </section>
 
+        {user && <MetaDiagnosticsPanel />}
+
+
+
         {!user ? (
           <div className="rounded-2xl border border-border bg-surface/60 p-6 text-center text-sm text-muted-foreground">
             Faça login na Nuvem para conectar suas contas.
