@@ -276,13 +276,16 @@ function parseVideoTrack(view: DataView, moov: Box): Mp4Track | null {
           cts: (dts[sample]! + cOff[sample]!) / timescale,
           dts: dts[sample]! / timescale,
           duration: delta[sample]! / timescale,
-          sync: syncSet ? syncSet.has(sample) : true,
+          sync: syncSet.has(sample),
         });
         off += sizes[sample]!;
         sample++;
       }
     }
-    if (samples.length < 2) continue;
+    // cobertura incompleta = tabela stsc/stco fora do padrão: recusa o turbo
+    if (samples.length !== total || samples.length < 2) continue;
+    if (!samples[0]!.sync) continue;
+
     // IMPORTANTE: a tabela fica em ordem de DECODIFICAÇÃO. Reordenar por tempo
     // de exibição embaralha os quadros B e destrói a imagem no decodificador.
     // alinha ao mesmo referencial do <video> (primeiro quadro em t=0)
