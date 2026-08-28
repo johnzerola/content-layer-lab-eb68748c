@@ -212,8 +212,9 @@ export function BulkScheduleModal({
               Agendamento em massa
             </p>
             <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-              suba a pasta inteira e o sistema divide por dia automaticamente
+              {subtitle ?? "suba a pasta inteira e o sistema divide por dia automaticamente"}
             </p>
+
           </div>
           <button onClick={onClose} className="rounded-lg p-2 hover:bg-surface-2" aria-label="Fechar">
             <X className="size-4" />
