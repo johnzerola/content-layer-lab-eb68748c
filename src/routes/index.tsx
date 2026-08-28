@@ -1455,7 +1455,22 @@ function Home() {
           doneCount.current++;
           finishBatchItem(doneCount.current);
 
-
+          // Salvamento automático: o arquivo vai para a pasta escolhida assim
+          // que fica pronto, então nada se perde se o lote for interrompido.
+          const dir = autoFolder.current;
+          if (dir) {
+            setBatchPhase("salvando na pasta", 1);
+            for (const [k, o] of outputs.entries()) {
+              try {
+                await writeToFolder(dir, {
+                  name: finalNameRef.current(item, at, { ...o, ext: o.ext }),
+                  blob: o.blob,
+                });
+              } catch (err) {
+                console.warn("[download] falha ao salvar na pasta", k, err);
+              }
+            }
+          }
 
           const firstOut = outputs[0]!;
           await finishJob(id, `${outputs.length} arquivo(s) prontos`, { blob: firstOut.blob, fileName: item.file.name });
@@ -1469,11 +1484,14 @@ function Home() {
                     ext: firstOut.ext,
                     outputs,
                     progress: 1,
-                    stage: `${outputs.length} arquivo(s) prontos`,
+                    stage: dir
+                      ? `${outputs.length} arquivo(s) salvos na pasta`
+                      : `${outputs.length} arquivo(s) prontos`,
                   }
                 : x,
             ),
           );
+
         };
 
         // até 2 tentativas por vídeo: uma falha isolada não derruba o lote
