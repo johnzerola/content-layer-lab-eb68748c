@@ -485,8 +485,10 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
 
     // Exportação determinística: cada quadro de saída vem do instante exato do
     // vídeo fonte. Usada como fallback e para cortes multi-segmento.
+    if (frameIndex < totalFrames) path = "busca precisa";
     while (frameIndex < totalFrames) {
       if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
+
       await seekTo(srcTimeAt(segments, (frameIndex / fps) * v.speed));
       await emit();
       if (frameIndex % 3 === 0) opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
