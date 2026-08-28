@@ -300,7 +300,8 @@ export function facebookAuthorizationUrl(
   } else {
     // Login clássico: as permissões vão em `scope` (usado quando não há
     // configuração empresarial publicada, evitando o erro genérico da Meta).
-    url.searchParams.set("scope", FACEBOOK_SCOPES.join(","));
+    url.searchParams.set("scope", facebookScopes(environment).join(","));
+
   }
   return url.toString();
 }
