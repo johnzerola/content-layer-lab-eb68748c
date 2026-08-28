@@ -191,6 +191,8 @@ export async function renderVideo(
         captions: opts.captions,
         plate: opts.plate,
         onProgress: opts.onProgress,
+        onStats: opts.onStats,
+
         signal: opts.signal,
         jobId: opts.jobId,
       });
