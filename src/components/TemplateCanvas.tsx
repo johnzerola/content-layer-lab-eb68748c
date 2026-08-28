@@ -241,7 +241,9 @@ export function TemplateCanvas({
       if (ctx) {
         const vid = videoEl.current;
         const p = posterImg.current;
-        const source = vid && vid.videoWidth
+        // readyState < 2 = ainda não há quadro decodificado: desenhar o <video>
+        // agora pintaria preto. Nesse caso usamos o poster até o vídeo abrir.
+        const source = vid && vid.videoWidth && vid.readyState >= 2
           ? { el: vid, width: vid.videoWidth, height: vid.videoHeight }
           : p
             ? { el: p, width: p.naturalWidth, height: p.naturalHeight }
