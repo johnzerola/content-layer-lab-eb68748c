@@ -70,6 +70,37 @@ export function makeCanvas(w = 1, h = 1): HTMLCanvasElement {
   return new OffscreenCanvas(w, h) as unknown as HTMLCanvasElement;
 }
 
+/**
+ * Cache do fundo desfocado dos layouts (blur/spotlight/centered/split).
+ *
+ * Desfocar o quadro inteiro em resolução final custa centenas de ms por frame
+ * — era isto que fazia uma exportação de 1 minuto levar horas. O fundo é
+ * gerado uma vez em baixa resolução e reaproveitado por uma fração de segundo
+ * de vídeo; visualmente é idêntico, porque já está borrado.
+ */
+const backdropCache = new WeakMap<
+  object,
+  { canvas: HTMLCanvasElement; key: string; time: number; uses: number }
+>();
+/** Largura máxima do fundo auxiliar (reduzida automaticamente se estiver lento). */
+let backdropMaxWidth = 320;
+/** Quantos segundos de vídeo o mesmo fundo pode ser reaproveitado. */
+let backdropHold = 0.15;
+
+/** Degrada (ou restaura) a qualidade do fundo quando a renderização está lenta. */
+export function setBackdropQuality(level: "alta" | "media" | "baixa") {
+  if (level === "alta") {
+    backdropMaxWidth = 320;
+    backdropHold = 0.15;
+  } else if (level === "media") {
+    backdropMaxWidth = 240;
+    backdropHold = 0.25;
+  } else {
+    backdropMaxWidth = 160;
+    backdropHold = 0.4;
+  }
+}
+
 const imgCache = new Map<string, HTMLImageElement>();
 
 /** Registra uma imagem já decodificada (usado pelos workers, que não têm `Image`). */
