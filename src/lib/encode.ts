@@ -548,11 +548,6 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     const clean = t.antiDup?.cleanMetadata === false ? raw : cleanMp4Metadata(raw);
     const blob = new Blob([clean], { type: "video/mp4" });
 
-    if (opts.jobId) {
-      const { finishJob } = await import("./jobs");
-      void finishJob(opts.jobId, "pronto", { blob, fileName: opts.file.name });
-    }
-
     return blob;
   } finally {
     URL.revokeObjectURL(url);
