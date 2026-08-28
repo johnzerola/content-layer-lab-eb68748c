@@ -38,7 +38,8 @@ export function BatchProgressDock() {
 
   const progressed = p.done + Math.min(0.999, p.itemProgress);
   const pct = p.total ? Math.round((progressed / p.total) * 100) : 0;
-  const { perMin, eta } = batchStats(p);
+  const { eta, perItemSec, measuring } = batchStats(p);
+
 
   return (
     <div className="fixed bottom-4 left-1/2 z-50 w-[min(92vw,460px)] -translate-x-1/2 rounded-xl border border-border bg-surface-2/95 p-3 shadow-lg backdrop-blur">
