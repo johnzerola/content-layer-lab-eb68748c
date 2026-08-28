@@ -15,9 +15,21 @@ export type NextAction = {
   accountId: string;
   kind: "reels" | "feed" | "stories" | "shorts";
   caption?: string;
+  /** Modo antigo: intervalo fixo entre posts. */
   intervalHours?: number;
   intervalDays?: number;
+  /** Modo novo (mesmo motor da Agenda): X posts por dia. */
+  perDay?: number;
+  slotMode?: "auto" | "fixed";
+  times?: string[];
+  windowStart?: string;
+  windowEnd?: string;
+  weekdays?: number[];
 };
+
+/** Quantos itens já foram agendados automaticamente nesta sessão (por conta). */
+const autoScheduleCount = new Map<string, number>();
+
 
 export interface JobStep {
   label: string;
