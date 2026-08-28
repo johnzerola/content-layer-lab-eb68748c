@@ -5,6 +5,7 @@ export type PublishInput = {
   kind: PostKind;
   caption: string;
   videoUrl: string;
+  mediaType?: "video" | "image";
   username: string;
   accountId?: string;
   platform?: string;
@@ -202,13 +203,14 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
   const authorization = { authorization: `Bearer ${token}` };
 
   try {
-    const mediaType = input.kind === "stories" ? "STORIES" : "REELS";
+    const isImage = input.mediaType === "image";
+    const mediaType = isImage ? (input.kind === "stories" ? "STORIES" : undefined) : input.kind === "stories" ? "STORIES" : "REELS";
     const create = await fetch(`${accountBase}/media`, {
       method: "POST",
       headers: { "content-type": "application/json", ...authorization },
       body: JSON.stringify({
-        media_type: mediaType,
-        video_url: input.videoUrl,
+        ...(mediaType ? { media_type: mediaType } : {}),
+        ...(isImage ? { image_url: input.videoUrl } : { video_url: input.videoUrl }),
         caption: input.kind === "stories" ? undefined : input.caption,
       }),
     });
@@ -220,8 +222,8 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
     }
 
 
-    let finished = false;
-    for (let i = 0; i < 20; i++) {
+    let finished = isImage;
+    for (let i = 0; !finished && i < 20; i++) {
       await new Promise((resolve) => setTimeout(resolve, 3000));
       const statusResponse = await fetch(`${graphBase}/${creationId}?fields=status_code`, {
         headers: authorization,

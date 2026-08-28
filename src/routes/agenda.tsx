@@ -8,6 +8,8 @@ import { CalendarClock, Facebook, Instagram, Loader2, Plus, Trash2, UploadCloud,
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
+import { BulkScheduleModal } from "@/components/BulkScheduleModal";
+import { Button } from "@/components/ui/button";
 import { listJobs } from "@/lib/jobs";
 import type { Template } from "@/lib/template";
 import {
@@ -68,6 +70,7 @@ function AgendaPage() {
   const [mode, setMode] = useState<AppMode>("external");
   const [libOpen, setLibOpen] = useState(false);
   const [cloudOpen, setCloudOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const jobs = listJobs();
 
@@ -271,7 +274,14 @@ function AgendaPage() {
 
               {/* novo agendamento */}
               <section className="rounded-2xl border border-border/70 bg-surface/60 p-5">
-                <p className="mono-label pb-3">Nova publicação</p>
+                <div className="flex items-center justify-between gap-3 pb-3">
+                  <p className="mono-label">Nova publicação</p>
+                  <Button size="sm" variant="outline" onClick={() => setBulkOpen(true)}>
+                    <CalendarClock className="mr-1 size-4" />
+                    Agendar em massa
+                  </Button>
+                </div>
+
 
                 <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-border bg-surface-2 px-3 py-4 text-sm text-muted-foreground transition hover:text-foreground">
                   <UploadCloud className="size-5 shrink-0" />
@@ -506,6 +516,13 @@ function AgendaPage() {
           onRestore={() => {}}
         />
       )}
+
+      <BulkScheduleModal
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        accounts={accounts}
+        onDone={() => void refresh()}
+      />
     </AppShell>
   );
 }
