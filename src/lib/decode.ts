@@ -98,10 +98,14 @@ export class FrameReader {
   /** Posiciona a leitura no keyframe imediatamente anterior a `time`. */
   async seek(time: number) {
     const samples = this.track.samples;
+    // a tabela está em ordem de decodificação: escolhe o último keyframe cujo
+    // tempo (dts e cts) já passou, para não pular quadros de referência.
     let idx = 0;
     for (let i = 0; i < samples.length; i++) {
-      if (samples[i]!.cts > time) break;
-      if (samples[i]!.sync) idx = i;
+      const s = samples[i]!;
+      if (!s.sync) continue;
+      if (Math.min(s.cts, s.dts) <= time + 1e-6) idx = i;
+      else break;
     }
     if (idx === this.next && this.queue.length) return;
     this.drain();
