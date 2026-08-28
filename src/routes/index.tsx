@@ -34,6 +34,9 @@ import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
 import { TemplateEditor } from "@/components/TemplateEditor";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
+import { CloudRenderPanel } from "@/components/CloudRenderPanel";
+import { sendBatchToCloud } from "@/lib/cloud-render";
+import { PRESET_VERSION } from "@/lib/render-cloud";
 import {
   autoSyncTemplates,
   enableCloudQuotaFallback,
