@@ -466,11 +466,33 @@ export function BulkScheduleModal({
               <Button variant="outline" onClick={onClose} disabled={busy}>
                 Cancelar
               </Button>
+              {secondaryAction && (
+                <Button
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() =>
+                    secondaryAction.run({
+                      accountId,
+                      kind,
+                      caption,
+                      perDay,
+                      mode,
+                      times: times.split(",").map((t) => t.trim()).filter(Boolean),
+                      windowStart,
+                      windowEnd,
+                      weekdays,
+                    })
+                  }
+                >
+                  {secondaryAction.label}
+                </Button>
+              )}
               <Button onClick={run} disabled={busy || ordered.length === 0}>
                 {busy ? <Loader2 className="mr-1 size-4 animate-spin" /> : <CalendarClock className="mr-1 size-4" />}
                 Agendar tudo
               </Button>
             </div>
+
           </div>
         </footer>
       </div>
