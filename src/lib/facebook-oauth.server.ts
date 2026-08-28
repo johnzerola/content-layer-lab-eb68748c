@@ -266,8 +266,10 @@ export function verifyFacebookOAuthState(
 export function facebookAuthorizationUrl(
   userId: string,
   environment: NodeJS.ProcessEnv = process.env,
+  options: { forceClassic?: boolean } = {},
 ): string {
-  const configuration = facebookOAuthConfiguration(environment);
+  const base = facebookOAuthConfiguration(environment);
+  const configuration = options.forceClassic ? { ...base, configId: null } : base;
   // O Login for Business deve usar a mesma versão configurada para as chamadas Graph.
   // Isso evita a Meta resolver o diálogo com uma versão padrão diferente da configuração.
   const url = new URL(`https://www.facebook.com/${metaGraphVersion(environment)}/dialog/oauth`);
