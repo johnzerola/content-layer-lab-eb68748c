@@ -14,6 +14,9 @@ import {
 } from "@/lib/data-deletion.functions";
 
 export const Route = createFileRoute("/exclusao-de-dados")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    code: typeof search.code === "string" ? search.code.slice(0, 100) : undefined,
+  }),
   component: DataDeletionPage,
   head: () => ({
     meta: [
@@ -46,6 +49,7 @@ const statusLabels: Record<string, string> = {
 };
 
 function DataDeletionPage() {
+  const { code } = Route.useSearch();
   const submitRequest = useServerFn(createDataDeletionRequest);
   const fetchRequests = useServerFn(listMyDataDeletionRequests);
   const [user, setUser] = useState<CloudUser | null>(null);
@@ -110,6 +114,14 @@ function DataDeletionPage() {
         Voltar
       </Link>
       <h1 className="mt-6 font-display text-3xl font-bold">Exclusão de dados</h1>
+      {code && (
+        <div className="mt-5 border-l-2 border-primary bg-primary/5 px-4 py-3" role="status">
+          <p className="font-medium">Solicitação confirmada pela Meta</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Guarde seu protocolo: <strong className="font-mono text-foreground">{code}</strong>
+          </p>
+        </div>
+      )}
       <p className="mt-4 text-muted-foreground">
         Você pode remover, a qualquer momento, as contas sociais conectadas e todos os dados que o VaiViral guarda
         sobre você. Nenhuma senha de rede social é armazenada: guardamos apenas o token de acesso criptografado que a
