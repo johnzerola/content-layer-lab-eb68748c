@@ -226,37 +226,42 @@ export function BulkScheduleModal({
           <div className="space-y-4">
             <div>
               <p className="mono-label">1. arquivos ({ordered.length})</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-                  Selecionar arquivos
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => folderRef.current?.click()}>
-                  <FolderOpen className="mr-1 size-4" />
-                  Selecionar pasta
-                </Button>
-                {ordered.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={() => setFiles([])}>
-                    Limpar
-                  </Button>
-                )}
-              </div>
-              <input
-                ref={fileRef}
-                type="file"
-                multiple
-                accept="video/*,image/*"
-                hidden
-                onChange={(e) => addFiles(e.target.files)}
-              />
-              <input
-                ref={folderRef}
-                type="file"
-                multiple
-                hidden
-                // @ts-expect-error atributo não tipado
-                webkitdirectory=""
-                onChange={(e) => addFiles(e.target.files)}
-              />
+              {!hideFilePicker && (
+                <>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+                      Selecionar arquivos
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => folderRef.current?.click()}>
+                      <FolderOpen className="mr-1 size-4" />
+                      Selecionar pasta
+                    </Button>
+                    {ordered.length > 0 && (
+                      <Button variant="ghost" size="sm" onClick={() => setEntries([])}>
+                        Limpar
+                      </Button>
+                    )}
+                  </div>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    multiple
+                    accept="video/*,image/*"
+                    hidden
+                    onChange={(e) => addFiles(e.target.files)}
+                  />
+                  <input
+                    ref={folderRef}
+                    type="file"
+                    multiple
+                    hidden
+                    // @ts-expect-error atributo não tipado
+                    webkitdirectory=""
+                    onChange={(e) => addFiles(e.target.files)}
+                  />
+                </>
+              )}
+
               {ordered.length > 0 && (
                 <div className="mt-2 max-h-32 overflow-y-auto rounded-lg border border-border bg-surface-2 p-2">
                   {ordered.slice(0, 60).map((f, i) => (
