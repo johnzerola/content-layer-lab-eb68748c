@@ -91,9 +91,18 @@ export function BulkScheduleModal({ open, onClose, accounts, onDone, initialFile
   };
 
   const run = async () => {
-    if (!accountId) return toast.error("Selecione uma conta conectada.");
-    if (ordered.length === 0) return toast.error("Adicione arquivos para agendar.");
-    if (!consent) return toast.error("Confirme o consentimento de publicação.");
+    if (!accountId) {
+      toast.error("Selecione uma conta conectada.");
+      return;
+    }
+    if (ordered.length === 0) {
+      toast.error("Adicione arquivos para agendar.");
+      return;
+    }
+    if (!consent) {
+      toast.error("Confirme o consentimento de publicação.");
+      return;
+    }
 
     setBusy(true);
     setProgress({ done: 0, total: ordered.length });
