@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useState } from "react";
 import {
   CheckCircle2,
+  Star,
   Facebook,
   Instagram,
   Loader2,
@@ -17,6 +18,7 @@ import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 import { listAccounts, removeAccount, type SocialAccount } from "@/lib/social";
 
 import { beginFacebookOAuth } from "@/lib/facebook-oauth.functions";
+import { setPrimaryAccount } from "@/lib/social-primary.functions";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { listJobs } from "@/lib/jobs";
@@ -89,6 +91,7 @@ function IntegrationsPage() {
   const [busy, setBusy] = useState<PlatformKey | null>(null);
 
   const startFacebook = useServerFn(beginFacebookOAuth);
+  const makePrimary = useServerFn(setPrimaryAccount);
 
   useEffect(() => {
     void currentUser().then(setUser);
@@ -149,6 +152,23 @@ function IntegrationsPage() {
       }
     },
     [reload],
+  );
+
+  const choosePrimary = useCallback(
+    async (account: SocialAccount) => {
+      try {
+        const response = await makePrimary({ data: { accountId: account.id } });
+        if (!response.ok) {
+          toast.error(response.error);
+          return;
+        }
+        toast.success(`${account.username} agora é a conta ativa.`);
+        reload();
+      } catch {
+        toast.error("Não foi possível definir a conta ativa.");
+      }
+    },
+    [makePrimary, reload],
   );
 
   return (
@@ -216,9 +236,33 @@ function IntegrationsPage() {
                               {account.username}
                             </p>
                             <p className="truncate text-xs text-muted-foreground">
-                              {connected ? "Pronta para publicar" : "Precisa reautorizar"}
+                              {account.is_primary
+                                ? "Conta ativa desta rede"
+                                : connected
+                                  ? "Pronta para publicar"
+                                  : "Precisa reautorizar"}
                             </p>
                           </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={!connected || account.is_primary}
+                            onClick={() => void choosePrimary(account)}
+                            aria-label={`Definir ${account.username} como conta ativa`}
+                            title={
+                              account.is_primary
+                                ? "Conta ativa"
+                                : "Usar esta Página/conta por padrão nas publicações"
+                            }
+                            className={`border border-border ${
+                              account.is_primary ? "text-amber-400" : "text-muted-foreground"
+                            }`}
+                          >
+                            <Star
+                              className={`size-4 ${account.is_primary ? "fill-current" : ""}`}
+                            />
+                          </Button>
                           <Button
                             type="button"
                             variant="ghost"

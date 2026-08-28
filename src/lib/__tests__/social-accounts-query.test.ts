@@ -25,6 +25,7 @@ describe("Cloud social schema query contract", () => {
       "provider",
       "status",
       "provider_account_id",
+      "is_primary",
       "created_at",
     ]);
   });

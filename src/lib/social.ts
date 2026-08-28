@@ -2,6 +2,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import { currentUser } from "@/lib/cloud";
 import type { LinkAccountResult } from "@/lib/social-linking.server";
+import {
+  summarizeIssues,
+  validateMediaForPlatform,
+  type MediaPlatform,
+  type MediaSpec,
+} from "@/lib/platform-media";
 
 export type PostKind = "reels" | "feed" | "stories" | "shorts";
 
@@ -21,6 +27,7 @@ export type SocialAccount = {
   provider: string;
   provider_account_id: string | null;
   status: string;
+  is_primary?: boolean;
   created_at: string;
 };
 
@@ -65,7 +72,7 @@ export function resolveAccountLinkUi(
 /* ------------------------------- contas -------------------------------- */
 
 export const SOCIAL_ACCOUNT_SELECT =
-  "id,platform,username,display_name,avatar_url,provider,status,provider_account_id,created_at";
+  "id,platform,username,display_name,avatar_url,provider,status,provider_account_id,is_primary,created_at";
 
 export async function listAccounts(): Promise<SocialAccount[]> {
   const { data, error } = await supabase
@@ -116,6 +123,8 @@ export type NewPost = {
   fileName?: string | null;
   mediaType?: MediaType;
   consent?: boolean;
+  /** Medidas do arquivo, quando conhecidas, para validar limites da plataforma. */
+  media?: MediaSpec;
 };
 
 export async function schedulePost(p: NewPost) {
@@ -126,7 +135,7 @@ export async function schedulePost(p: NewPost) {
 
   const { data: account, error: accountError } = await supabase
     .from("social_accounts")
-    .select("id,status,provider,provider_account_id")
+    .select("id,status,provider,provider_account_id,platform")
     .eq("id", p.accountId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -134,6 +143,18 @@ export async function schedulePost(p: NewPost) {
   const connected = account?.status === "connected" || account?.status === "conectado";
   if (!account || !connected || !account.provider_account_id || account.provider === "pending") {
     throw new Error("Esta conta ainda nao tem conexao OAuth/API valida. Conecte pelo provedor oficial antes de agendar.");
+  }
+
+  // Validação por plataforma: evita agendar algo que o provedor recusaria.
+  const platform = account.platform as MediaPlatform;
+  if (["instagram", "facebook", "tiktok", "youtube"].includes(platform)) {
+    const check = validateMediaForPlatform(platform, p.kind, {
+      ...(p.media ?? {}),
+      mediaType: p.mediaType ?? p.media?.mediaType ?? "video",
+      format: p.media?.format ?? p.fileName?.split(".").pop() ?? null,
+      captionLength: p.caption.length,
+    });
+    if (!check.ok) throw new Error(summarizeIssues(check.issues));
   }
 
   const { data, error } = await supabase
