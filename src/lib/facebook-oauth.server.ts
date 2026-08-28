@@ -88,6 +88,129 @@ export function diagnoseFacebookOAuth(
   };
 }
 
+export type FacebookConfigCheck = {
+  graphVersion: string;
+  appId: string | null;
+  configId: string | null;
+  redirectUri: string | null;
+  siteUrl: string | null;
+  authorizationUrl: string | null;
+  issues: string[];
+  loginConfiguration: { checked: boolean; ok: boolean; detail: string };
+};
+
+function mask(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return value.length <= 6 ? value : `${value.slice(0, 4)}…${value.slice(-4)}`;
+}
+
+/** Checagem sem exceções: mostra exatamente o que falta configurar. */
+export function facebookConfigChecklist(
+  environment: NodeJS.ProcessEnv = process.env,
+): Omit<FacebookConfigCheck, "loginConfiguration"> {
+  const issues: string[] = [];
+  const appId = environment["META_APP_ID"]?.trim() ?? null;
+  const configId = environment["META_LOGIN_CONFIG_ID"]?.trim() ?? null;
+  const siteUrl = environment["PUBLIC_SITE_URL"]?.trim().replace(/\/$/, "") ?? null;
+  const redirectUri = callbackFromEnvironment(environment) || null;
+  const graphVersion = metaGraphVersion(environment);
+
+  if (!appId) issues.push("META_APP_ID não está definido.");
+  else if (!/^\d+$/.test(appId)) issues.push("META_APP_ID deve conter apenas números.");
+  if (!environment["META_APP_SECRET"]?.trim()) issues.push("META_APP_SECRET não está definido.");
+  if (!configId) issues.push("META_LOGIN_CONFIG_ID não está definido.");
+  else if (!/^\d+$/.test(configId)) issues.push("META_LOGIN_CONFIG_ID deve conter apenas números.");
+
+  if (!redirectUri) {
+    issues.push("Nenhuma URL de retorno pôde ser calculada (defina FACEBOOK_REDIRECT_URI ou PUBLIC_SITE_URL).");
+  } else {
+    try {
+      const callback = new URL(redirectUri);
+      if (callback.protocol !== "https:") issues.push("A URL de retorno precisa usar HTTPS.");
+      if (callback.pathname !== "/integracoes/facebook/callback") {
+        issues.push("A URL de retorno precisa terminar em /integracoes/facebook/callback.");
+      }
+      if (siteUrl && callback.origin !== siteUrl) {
+        issues.push(`A URL de retorno (${callback.origin}) não bate com PUBLIC_SITE_URL (${siteUrl}).`);
+      }
+    } catch {
+      issues.push("A URL de retorno é inválida.");
+    }
+  }
+
+  let authorizationUrl: string | null = null;
+  if (issues.length === 0) {
+    try {
+      const preview = new URL(facebookAuthorizationUrl("diagnostico", environment));
+      preview.searchParams.set("state", "<gerado por usuário>");
+      authorizationUrl = preview.toString();
+    } catch {
+      authorizationUrl = null;
+    }
+  }
+
+  return {
+    graphVersion,
+    appId,
+    configId: mask(configId),
+    redirectUri,
+    siteUrl,
+    authorizationUrl,
+    issues,
+  };
+}
+
+/** Confirma na Graph API se a configuração do Login para Empresas existe e pertence ao app. */
+export async function verifyFacebookLoginConfiguration(input: {
+  environment?: NodeJS.ProcessEnv;
+  fetch?: typeof fetch;
+} = {}): Promise<FacebookConfigCheck["loginConfiguration"]> {
+  const environment = input.environment ?? process.env;
+  const appId = environment["META_APP_ID"]?.trim();
+  const appSecret = environment["META_APP_SECRET"]?.trim();
+  const configId = environment["META_LOGIN_CONFIG_ID"]?.trim();
+  if (!appId || !appSecret || !configId) {
+    return { checked: false, ok: false, detail: "Credenciais incompletas no servidor." };
+  }
+  const url = new URL(`${facebookGraphBase(environment)}/${configId}`);
+  url.searchParams.set("fields", "id,name,status,is_published");
+  url.searchParams.set("access_token", `${appId}|${appSecret}`);
+  const response = await (input.fetch ?? fetch)(url).catch(() => null);
+  if (!response) {
+    return { checked: true, ok: false, detail: "Não foi possível falar com a Meta agora." };
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = readString(asObject(payload)?.["error"], "message");
+    return {
+      checked: true,
+      ok: false,
+      detail: message || "A Meta recusou a consulta da configuração de login.",
+    };
+  }
+  const id = readString(payload, "id");
+  if (id !== configId) {
+    return { checked: true, ok: false, detail: "A configuração retornada não corresponde ao config_id." };
+  }
+  const status = readString(payload, "status");
+  const published = asObject(payload)?.["is_published"];
+  if (published === false || (status && status.toUpperCase() !== "LIVE" && status.toUpperCase() !== "PUBLISHED")) {
+    return {
+      checked: true,
+      ok: false,
+      detail: `A configuração existe, mas não está publicada (status: ${status ?? "desconhecido"}).`,
+    };
+  }
+  const name = readString(payload, "name");
+  return {
+    checked: true,
+    ok: true,
+    detail: name ? `Configuração "${name}" publicada e válida.` : "Configuração publicada e válida.",
+  };
+}
+
+
+
 function signState(payload: string, secret: string): string {
   return createHmac("sha256", secret).update(payload).digest("base64url");
 }
