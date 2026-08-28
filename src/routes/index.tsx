@@ -1748,6 +1748,8 @@ function Home() {
     [headlineBank, headlineAuto],
   );
   headlineForRef.current = headlineFor;
+  finalNameRef.current = finalName;
+
 
   /** aplica o padrão de renomeação a todos os itens */
   const applyNamePattern = () => {
