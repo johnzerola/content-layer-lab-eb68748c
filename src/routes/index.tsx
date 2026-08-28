@@ -88,7 +88,15 @@ import { detectNiche, mergeTagWeights, nicheContext } from "@/lib/viral-library"
 import { getClipFeedback } from "@/lib/clip-feedback";
 import { cuesToSentences, speechKeepSegments, zoomKeys, type Sentence } from "@/lib/transcript-clips";
 import { resolveVideoLink } from "@/lib/import.functions";
-import { downloadAsZip, fsAccessSupported, saveToFolder } from "@/lib/zip";
+import {
+  downloadAsZip,
+  formatBytes,
+  fsAccessSupported,
+  pickFolder,
+  saveToFolder,
+  writeToFolder,
+} from "@/lib/zip";
+
 import { cuesToSrt, cuesToText, demoCues, generateCaptions, type CaptionCue } from "@/lib/captions";
 import { registerFonts } from "@/lib/fonts";
 import { CaptionStudio } from "@/components/CaptionStudio";
