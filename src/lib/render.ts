@@ -103,6 +103,8 @@ async function recordVideo(
         tier: opts.tier ?? "balanced",
       }),
   });
+  // este caminho grava em tempo real: nunca passa de 1x, então avisamos a UI
+  opts.onStats?.({ path: "gravação em tempo real", fps });
   const chunks: BlobPart[] = [];
   recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
 
