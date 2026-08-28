@@ -356,6 +356,12 @@ function Home() {
   const [paused, setPaused] = useExternalState(pausedState);
 
   const [zipping, setZipping] = useState(false);
+  /** texto do progresso de download/salvamento (ex.: "1,2 GB de 3,4 GB") */
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  /** pasta escolhida para salvar cada vídeo assim que ele fica pronto */
+  const autoFolder = useRef<FileSystemDirectoryHandle | null>(null);
+  const [autoFolderName, setAutoFolderName] = useState<string | null>(null);
+
   // Canvas, decoder e encoder disputam a mesma thread/GPU. Dois vídeos em
   // paralelo frequentemente deixam ambos presos em 0% em máquinas comuns.
   // padrão automático pelo hardware (metade dos núcleos, teto 4)
@@ -1730,19 +1736,59 @@ function Home() {
   const downloadZipAll = async () => {
     setZipping(true);
     try {
-      await downloadAsZip(outFiles(), zipName(mode, active.name));
+      await downloadAsZip(outFiles(), zipName(mode, active.name), (p) => {
+        const pct = p.total ? ` (${Math.round((p.bytes / p.total) * 100)}%)` : "";
+        setSaveMsg(
+          `${p.target === "disco" ? "Gravando no disco" : "Compactando"} ${formatBytes(p.bytes)}${pct}`,
+        );
+      });
+    } catch (err) {
+      toast.error(`Não consegui gerar o ZIP: ${String((err as Error)?.message ?? err)}`);
     } finally {
       setZipping(false);
+      setSaveMsg(null);
     }
   };
 
   const saveFolder = async () => {
+    const files = outFiles();
+    setZipping(true);
     try {
-      await saveToFolder(outFiles());
+      const dir = autoFolder.current ?? (await pickFolder());
+      await saveToFolder(
+        files,
+        (p) => setSaveMsg(`Salvando ${p.files}/${files.length} · ${formatBytes(p.bytes)}`),
+        dir,
+      );
+      toast.success(`${files.length} arquivo(s) salvos na pasta.`);
+    } catch (err) {
+      if ((err as Error)?.name !== "AbortError") {
+        toast.error(`Não consegui salvar na pasta: ${String((err as Error)?.message ?? err)}`);
+      }
+    } finally {
+      setZipping(false);
+      setSaveMsg(null);
+    }
+  };
+
+  /** Liga/desliga o salvamento automático: cada vídeo cai na pasta ao ficar pronto. */
+  const toggleAutoFolder = async () => {
+    if (autoFolder.current) {
+      autoFolder.current = null;
+      setAutoFolderName(null);
+      toast.info("Salvamento automático desligado.");
+      return;
+    }
+    try {
+      const dir = await pickFolder();
+      autoFolder.current = dir;
+      setAutoFolderName(dir.name);
+      toast.success(`Cada vídeo pronto será salvo em “${dir.name}” automaticamente.`);
     } catch {
       /* cancelado */
     }
   };
+
 
   const baseTpl: Template =
     mode === "clip"
