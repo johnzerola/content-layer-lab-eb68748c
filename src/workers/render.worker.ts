@@ -11,6 +11,7 @@ import type { Variation } from "@/lib/variation";
 import type { CaptionCue } from "@/lib/captions";
 import type { PreEdit } from "@/lib/preedit";
 import type { AudioPcm, Envelope } from "@/lib/audio-track";
+import type { QualityTier } from "@/lib/encode-presets";
 
 export interface RenderRequest {
   type: "render";
@@ -85,6 +86,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       headline: msg.headline,
       fps: msg.fps,
       bitrate: msg.bitrate,
+      tier: msg.tier,
       clip: msg.clip,
       pre: msg.pre,
       captions: msg.captions,
