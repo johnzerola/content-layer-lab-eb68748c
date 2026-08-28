@@ -74,3 +74,22 @@ export const completeFacebookOAuth = createServerFn({ method: "POST" })
       };
     }
   });
+
+/** Diagnóstico da integração Meta (somente admin). */
+export const diagnoseFacebookIntegration = createServerFn({ method: "POST" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) {
+      return { ok: false as const, error: "Apenas administradores podem ver o diagnóstico." };
+    }
+    const { facebookConfigChecklist, verifyFacebookLoginConfiguration } = await import(
+      "@/lib/facebook-oauth.server"
+    );
+    const checklist = facebookConfigChecklist();
+    const loginConfiguration = await verifyFacebookLoginConfiguration();
+    return { ok: true as const, check: { ...checklist, loginConfiguration } };
+  });
