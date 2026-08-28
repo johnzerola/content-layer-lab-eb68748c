@@ -265,7 +265,16 @@ export async function renderInPool(
     const watchdog = setTimeout(() => {
       rejectWorkerJobs(worker, Object.assign(new Error("O codificador não iniciou"), { name: "RenderStalledError" }));
     }, STALL_MS);
-    pending.set(id, { resolve, reject, onProgress: opts.onProgress, worker, watchdog });
+    pending.set(id, {
+      resolve,
+      reject,
+      onProgress: opts.onProgress,
+      // o worker informa a etapa real: a UI nunca mais fica presa em
+      // "iniciando codificador" enquanto os quadros já estão saindo
+      onPhase: (phase) => opts.onPhase?.(phase, 0.95),
+      worker,
+      watchdog,
+    });
   });
 
   const onAbort = () => {
