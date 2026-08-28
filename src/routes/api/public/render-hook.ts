@@ -98,7 +98,8 @@ export const Route = createFileRoute("/api/public/render-hook")({
           await supabaseAdmin
             .from("render_batches")
             .update(batchPatch as never)
-            .eq("id", payload.job_id);
+            .eq("id", payload.job_id)
+            .not("status", "in", `(${TERMINAL.join(",")})`);
         }
 
         return new Response("ok");
