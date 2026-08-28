@@ -270,52 +270,68 @@ export type Database = {
       }
       render_batches: {
         Row: {
+          callback_seq: number
           created_at: string
           done: number
           errors: number
+          heartbeat_at: string | null
           id: string
           label: string | null
+          metrics: Json
           preset: Json
           status: string
           tool: string
           total: number
           updated_at: string
           user_id: string
+          worker_version: string | null
         }
         Insert: {
+          callback_seq?: number
           created_at?: string
           done?: number
           errors?: number
+          heartbeat_at?: string | null
           id?: string
           label?: string | null
+          metrics?: Json
           preset?: Json
           status?: string
           tool?: string
           total?: number
           updated_at?: string
           user_id: string
+          worker_version?: string | null
         }
         Update: {
+          callback_seq?: number
           created_at?: string
           done?: number
           errors?: number
+          heartbeat_at?: string | null
           id?: string
           label?: string | null
+          metrics?: Json
           preset?: Json
           status?: string
           tool?: string
           total?: number
           updated_at?: string
           user_id?: string
+          worker_version?: string | null
         }
         Relationships: []
       }
       render_items: {
         Row: {
+          attempts: number
           batch_id: string
+          callback_seq: number
           created_at: string
           error: string | null
+          heartbeat_at: string | null
           id: string
+          metrics: Json
           name: string
           overrides: Json
           progress: number
@@ -327,10 +343,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          attempts?: number
           batch_id: string
+          callback_seq?: number
           created_at?: string
           error?: string | null
+          heartbeat_at?: string | null
           id?: string
+          metrics?: Json
           name: string
           overrides?: Json
           progress?: number
@@ -342,10 +362,14 @@ export type Database = {
           user_id: string
         }
         Update: {
+          attempts?: number
           batch_id?: string
+          callback_seq?: number
           created_at?: string
           error?: string | null
+          heartbeat_at?: string | null
           id?: string
+          metrics?: Json
           name?: string
           overrides?: Json
           progress?: number
