@@ -91,6 +91,7 @@ function IntegrationsPage() {
   const [busy, setBusy] = useState<PlatformKey | null>(null);
 
   const startFacebook = useServerFn(beginFacebookOAuth);
+  const makePrimary = useServerFn(setPrimaryAccount);
 
   useEffect(() => {
     void currentUser().then(setUser);
