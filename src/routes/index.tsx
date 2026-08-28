@@ -2542,7 +2542,7 @@ function Home() {
                   <p className="font-mono text-[11px] text-muted-foreground">{saveMsg}</p>
                 )}
 
-                <CloudRenderPanel tool={mode} />
+                {user ? <CloudRenderPanel tool={mode} /> : null}
 
 
                 {/* progresso detalhado do lote */}
