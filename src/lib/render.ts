@@ -136,14 +136,19 @@ async function recordVideo(
   await video.play();
   loop();
 
+  // limite de segurança: mesmo que o vídeo nunca avance, a gravação termina
+  const maxWait = Math.max(30_000, outDur * 2000 + 30_000);
+  const startedAt = performance.now();
   await new Promise<void>((res) => {
     const check = setInterval(() => {
-      if (video.ended || video.paused || video.currentTime >= endAt) {
+      const timedOut = performance.now() - startedAt > maxWait;
+      if (video.ended || video.paused || video.currentTime >= endAt || timedOut) {
         clearInterval(check);
         res();
       }
     }, 120);
   });
+
 
   cancelAnimationFrame(raf);
   recorder.stop();
