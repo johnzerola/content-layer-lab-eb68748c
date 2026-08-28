@@ -1153,6 +1153,58 @@ function Home() {
     ],
   );
 
+  const [sendingCloud, setSendingCloud] = useState(false);
+
+  /** Manda o lote para a fila da VPS: pode fechar o navegador depois disso. */
+  const processInCloud = async (onlyIds?: string[]) => {
+    const runMode = modeRef.current;
+    const list = (queuesRef.current[runMode] ?? []).filter((i) =>
+      onlyIds ? onlyIds.includes(i.id) : i.status !== "pronto",
+    );
+    if (!list.length) {
+      toast.error("Nenhum vídeo pendente para enviar.");
+      return;
+    }
+    setSendingCloud(true);
+    const toastId = toast.loading("Enviando vídeos para a VPS…");
+    try {
+      await sendBatchToCloud({
+        tool: runMode,
+        label: FLOWS[runMode]?.brand ?? "Lote",
+        preset: {
+          version: PRESET_VERSION,
+          template: active,
+          variants: FLOWS[runMode].export.variants ? Math.max(1, variants) : 1,
+          platforms: FLOWS[runMode].export.platforms ? platforms : ["reels"],
+          captions: Boolean(active.captions?.enabled),
+        },
+        items: list.map((item) => ({
+          name: item.outName ? `${item.outName}.mp4` : item.file.name,
+          file: item.sourceUrl ? undefined : item.file,
+          sourceUrl: item.sourceUrl,
+          overrides: {
+            headline: item.headline || null,
+            cta: item.cta ?? null,
+            clip: item.clip ?? null,
+            offsetX: item.offsetX,
+            offsetY: item.offsetY,
+            preEdit: item.preEdit ?? null,
+            captions: item.captions ?? null,
+          },
+        })),
+        onProgress: (sent, total) =>
+          toast.loading(`Enviando vídeos para a VPS… ${sent}/${total}`, { id: toastId }),
+      });
+      toast.success("Lote na fila da nuvem. Pode fechar o navegador.", { id: toastId });
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Falha ao enviar para a nuvem", {
+        id: toastId,
+      });
+    } finally {
+      setSendingCloud(false);
+    }
+  };
+
   const processAll = async (onlyIds?: string[], safe = false) => {
     // a fila roda presa a ferramenta em que foi disparada
     const runMode = modeRef.current;
