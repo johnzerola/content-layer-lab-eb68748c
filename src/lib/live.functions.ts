@@ -4,6 +4,7 @@ import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { mediaProxyTicket } from "@/lib/cleaner.server";
 import { safeRemoteUrl } from "@/lib/remote-url";
+import { assertSafeRemoteUrl } from "@/lib/remote-url.server";
 
 export interface LiveCheck {
   live: boolean;
@@ -58,7 +59,7 @@ export const signedHlsProxyUrl = createServerFn({ method: "POST" })
     z.object({ url: z.string().min(1) }).parse(input)
   )
   .handler(async ({ data }) => {
-    const safe = safeRemoteUrl(data.url);
+    const safe = await assertSafeRemoteUrl(data.url);
     if (!safe || !/\.m3u8(\?|$)/i.test(safe.pathname + safe.search)) {
       throw new Error("playlist HLS invalida");
     }

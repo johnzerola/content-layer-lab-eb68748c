@@ -15,6 +15,9 @@ const schema = z
     error: z.string().max(1000).optional(),
     done: z.number().int().min(0).optional(),
     errors: z.number().int().min(0).optional(),
+    callback_seq: z.number().int().min(0).optional(),
+    worker_version: z.string().max(60).optional(),
+    metrics: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
 
@@ -55,19 +58,30 @@ export const Route = createFileRoute("/api/public/render-hook")({
           // Lemos o estado atual e ignoramos atualizações atrasadas.
           const { data: current } = await supabaseAdmin
             .from("render_items")
-            .select("status, progress")
+            .select("status, progress, callback_seq")
             .eq("id", payload.item_id)
             .eq("batch_id", payload.job_id)
             .maybeSingle();
 
           if (!current) return new Response("unknown item", { status: 404 });
 
-          const currentRow = current as { status: string | null; progress: number | null };
+          const currentRow = current as {
+            status: string | null;
+            progress: number | null;
+            callback_seq: number | null;
+          };
+          // Sequência monotônica persistida: callback atrasado é descartado.
+          const seq = payload.callback_seq ?? 0;
+          if (seq > 0 && seq <= (currentRow.callback_seq ?? 0)) {
+            return new Response("ok");
+          }
           if (isTerminal(currentRow.status ?? undefined)) {
             return new Response("ok"); // já finalizado: nada a fazer
           }
 
-          const patch: Record<string, unknown> = {};
+          const patch: Record<string, unknown> = { heartbeat_at: new Date().toISOString() };
+          if (seq > 0) patch["callback_seq"] = seq;
+          if (payload.metrics) patch["metrics"] = payload.metrics;
           if (payload.status) patch["status"] = payload.status;
           if (payload.stage !== undefined) patch["stage"] = payload.stage;
           if (payload.progress !== undefined) {
@@ -85,16 +99,18 @@ export const Route = createFileRoute("/api/public/render-hook")({
               .update(patch as never)
               .eq("id", payload.item_id)
               .eq("batch_id", payload.job_id)
+              .lt("callback_seq", seq > 0 ? seq : Number.MAX_SAFE_INTEGER)
               .not("status", "in", `(${TERMINAL.join(",")})`);
             if (error) return new Response(error.message, { status: 500 });
           }
         }
 
-        const batchPatch: Record<string, unknown> = {};
+        const batchPatch: Record<string, unknown> = { heartbeat_at: new Date().toISOString() };
+        if (payload.worker_version) batchPatch["worker_version"] = payload.worker_version;
         if (!payload.item_id && payload.status) batchPatch["status"] = payload.status;
         if (payload.done !== undefined) batchPatch["done"] = payload.done;
         if (payload.errors !== undefined) batchPatch["errors"] = payload.errors;
-        if (Object.keys(batchPatch).length) {
+        {
           await supabaseAdmin
             .from("render_batches")
             .update(batchPatch as never)

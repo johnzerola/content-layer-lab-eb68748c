@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { safeRemoteUrl } from "@/lib/remote-url";
+import { assertSafeRemoteUrl } from "@/lib/remote-url.server";
 import { verifyMediaProxyTicket } from "@/lib/cleaner.server";
 
 const configuredMaxGb = Number(process.env["CLEANER_MAX_UPLOAD_GB"] ?? "2");
@@ -16,7 +17,7 @@ export const Route = createFileRoute("/api/public/media-proxy")({
       GET: async ({ request }) => {
         const ticket = verifyMediaProxyTicket(new URL(request.url).searchParams.get("t"));
         if (!ticket) return new Response("invalid or expired ticket", { status: 401 });
-        const initialTarget = safeRemoteUrl(ticket.url);
+        const initialTarget = await assertSafeRemoteUrl(ticket.url);
         if (!initialTarget) return new Response("url not allowed", { status: 400 });
 
         let target: URL = initialTarget;
@@ -47,7 +48,7 @@ export const Route = createFileRoute("/api/public/media-proxy")({
           if (!upstream || !REDIRECT_CODES.has(upstream.status)) break;
           const location: string | null = upstream.headers.get("location");
           const next: URL | null = location
-            ? safeRemoteUrl(new URL(location, target).toString())
+            ? await assertSafeRemoteUrl(new URL(location, target).toString())
             : null;
           if (!next) return new Response("redirect not allowed", { status: 400 });
           target = next;
