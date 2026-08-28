@@ -203,13 +203,14 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
   const authorization = { authorization: `Bearer ${token}` };
 
   try {
-    const mediaType = input.kind === "stories" ? "STORIES" : "REELS";
+    const isImage = input.mediaType === "image";
+    const mediaType = isImage ? (input.kind === "stories" ? "STORIES" : undefined) : input.kind === "stories" ? "STORIES" : "REELS";
     const create = await fetch(`${accountBase}/media`, {
       method: "POST",
       headers: { "content-type": "application/json", ...authorization },
       body: JSON.stringify({
-        media_type: mediaType,
-        video_url: input.videoUrl,
+        ...(mediaType ? { media_type: mediaType } : {}),
+        ...(isImage ? { image_url: input.videoUrl } : { video_url: input.videoUrl }),
         caption: input.kind === "stories" ? undefined : input.caption,
       }),
     });
