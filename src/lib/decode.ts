@@ -80,11 +80,15 @@ export class FrameReader {
   private configure(cfg: VideoDecoderConfig) {
     this.decoder = new VideoDecoder({
       output: (frame) => {
-        this.queue.push({
+        const item: DecodedFrame = {
           frame,
           time: (frame.timestamp ?? 0) / 1e6,
           duration: (frame.duration ?? 0) / 1e6 || 1 / 30,
-        });
+        };
+        // insere já ordenado por tempo de exibição (quadros B podem sair fora)
+        let i = this.queue.length;
+        while (i > 0 && this.queue[i - 1]!.time > item.time) i--;
+        this.queue.splice(i, 0, item);
         this.wake?.();
       },
       error: (e) => {
