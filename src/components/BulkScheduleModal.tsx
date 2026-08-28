@@ -264,16 +264,17 @@ export function BulkScheduleModal({
 
               {ordered.length > 0 && (
                 <div className="mt-2 max-h-32 overflow-y-auto rounded-lg border border-border bg-surface-2 p-2">
-                  {ordered.slice(0, 60).map((f, i) => (
-                    <p key={`${f.name}-${i}`} className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
-                      {mediaTypeOf(f) === "image" ? (
+                  {ordered.slice(0, 60).map((entry, i) => (
+                    <p key={`${entry.name}-${i}`} className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                      {mediaTypeOf(entry.file) === "image" ? (
                         <ImageIcon className="size-3 shrink-0 text-primary" />
                       ) : (
                         <Video className="size-3 shrink-0 text-primary" />
                       )}
-                      <span className="truncate">{f.name}</span>
+                      <span className="truncate">{entry.name}</span>
                     </p>
                   ))}
+
                   {ordered.length > 60 && (
                     <p className="mt-1 font-mono text-[10px] text-muted-foreground">+{ordered.length - 60} arquivo(s)</p>
                   )}
