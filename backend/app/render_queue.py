@@ -3,7 +3,6 @@ from __future__ import annotations
 import ipaddress
 import json
 import queue
-import shutil
 import socket
 import subprocess
 import threading
@@ -261,6 +260,10 @@ class RenderManager:
                 self._save_item(batch_id, item_id, {
                     "status": "failed", "progress": 100, "stage": "falhou", "error": str(exc)[:1000],
                 })
+            state = self.read(batch_id)
+            state.update(done=done, errors=errors)
+            self.write(batch_id, state)
+            self._notify(state, {"job_id": batch_id, "done": done, "errors": errors})
         state = self.read(batch_id)
         state.update(status="completed" if errors == 0 else "failed", done=done, errors=errors)
         self.write(batch_id, state)

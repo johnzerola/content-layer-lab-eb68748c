@@ -90,6 +90,17 @@ function handle(e: MessageEvent<WorkerResponse>) {
   }
 }
 
+function rejectWorkerJobs(worker: Worker, error: Error) {
+  for (const [id, job] of pending) {
+    if (job.worker !== worker) continue;
+    clearTimeout(job.watchdog);
+    pending.delete(id);
+    job.reject(error);
+  }
+  worker.terminate();
+  workers = workers.filter((candidate) => candidate !== worker);
+}
+
 function ensureWorkers() {
   if (workers.length) return workers;
   const n = poolSize();
@@ -98,16 +109,7 @@ function ensureWorkers() {
       type: "module",
     });
     w.onmessage = handle;
-    w.onerror = () => {
-      for (const [id, job] of pending) {
-        if (job.worker !== w) continue;
-        clearTimeout(job.watchdog);
-        pending.delete(id);
-        job.reject(new Error("Worker de renderização falhou"));
-      }
-      w.terminate();
-      workers = workers.filter((candidate) => candidate !== w);
-    };
+    w.onerror = () => rejectWorkerJobs(w, new Error("Worker de renderização falhou"));
     load.set(w, 0);
     workers.push(w);
   }
@@ -244,10 +246,7 @@ export async function renderInPool(
   opts.onPhase?.("iniciando codificador", 0.92);
   const done = new Promise<ArrayBuffer>((resolve, reject) => {
     const watchdog = setTimeout(() => {
-      pending.delete(id);
-      worker.terminate();
-      workers = workers.filter((candidate) => candidate !== worker);
-      reject(Object.assign(new Error("O codificador não iniciou"), { name: "RenderStalledError" }));
+      rejectWorkerJobs(worker, Object.assign(new Error("O codificador não iniciou"), { name: "RenderStalledError" }));
     }, STALL_MS);
     pending.set(id, { resolve, reject, onProgress: opts.onProgress, worker, watchdog });
   });
