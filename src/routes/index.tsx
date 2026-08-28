@@ -122,8 +122,11 @@ import {
   prepScale,
   registerBatchControls,
   renderScale,
+  markRenderStart,
+  setBatchPath,
   setBatchPhase,
   startBatchItem,
+  useBatchProgress,
   startBatchProgress,
   updateBatchProgress,
 } from "@/lib/batch-runtime";
@@ -1513,8 +1516,8 @@ function Home() {
               plate,
               signal: ac.signal,
               onStats: ({ path, fps }) => {
-                updateBatchProgress({ itemFps: fps });
-                setBatchPhase(`${stageLabel} · ${path}`);
+                setBatchPath(path);
+                if (fps > 0) updateBatchProgress({ itemFps: fps });
               },
               onPhase: (phase, prepProgress) => {
                 if (ac.signal.aborted) return;
@@ -1523,6 +1526,7 @@ function Home() {
                 setItems((prev) => prev.map((x) => (x.id === id ? { ...x, stage: phase } : x)));
               },
               onProgress: (p) => {
+                if (p > 0) markRenderStart();
                 taskProgress.set(at, p);
                 pushProgress();
               },
