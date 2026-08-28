@@ -39,6 +39,7 @@ import { Route as IntegracoesFacebookCallbackRouteImport } from './routes/integr
 import { Route as IntegracoesInstagramCallbackRouteImport } from './routes/integracoes_.instagram.callback'
 import { Route as IntegracoesTiktokCallbackRouteImport } from './routes/integracoes_.tiktok.callback'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
+import { Route as ApiPublicMetaDeauthorizeRouteImport } from './routes/api/public/meta.deauthorize'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -198,6 +199,12 @@ const ApiPublicHooksPublishDueRoute =
     path: '/api/public/hooks/publish-due',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicMetaDeauthorizeRoute =
+  ApiPublicMetaDeauthorizeRouteImport.update({
+    id: '/api/public/meta/deauthorize',
+    path: '/api/public/meta/deauthorize',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -230,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
+  '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -262,6 +270,7 @@ export interface FileRoutesByTo {
   '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
+  '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -295,6 +304,7 @@ export interface FileRoutesById {
   '/integracoes_/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes_/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
+  '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -329,6 +339,7 @@ export interface FileRouteTypes {
     | '/integracoes/instagram/callback'
     | '/integracoes/tiktok/callback'
     | '/api/public/hooks/publish-due'
+    | '/api/public/meta/deauthorize'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -361,6 +372,7 @@ export interface FileRouteTypes {
     | '/integracoes/instagram/callback'
     | '/integracoes/tiktok/callback'
     | '/api/public/hooks/publish-due'
+    | '/api/public/meta/deauthorize'
   id:
     | '__root__'
     | '/'
@@ -393,6 +405,7 @@ export interface FileRouteTypes {
     | '/integracoes_/instagram/callback'
     | '/integracoes_/tiktok/callback'
     | '/api/public/hooks/publish-due'
+    | '/api/public/meta/deauthorize'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -426,6 +439,7 @@ export interface RootRouteChildren {
   IntegracoesInstagramCallbackRoute: typeof IntegracoesInstagramCallbackRoute
   IntegracoesTiktokCallbackRoute: typeof IntegracoesTiktokCallbackRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
+  ApiPublicMetaDeauthorizeRoute: typeof ApiPublicMetaDeauthorizeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -640,6 +654,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksPublishDueRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/meta/deauthorize': {
+      id: '/api/public/meta/deauthorize'
+      path: '/api/public/meta/deauthorize'
+      fullPath: '/api/public/meta/deauthorize'
+      preLoaderRoute: typeof ApiPublicMetaDeauthorizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -675,6 +696,7 @@ const rootRouteChildren: RootRouteChildren = {
   IntegracoesInstagramCallbackRoute: IntegracoesInstagramCallbackRoute,
   IntegracoesTiktokCallbackRoute: IntegracoesTiktokCallbackRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
+  ApiPublicMetaDeauthorizeRoute: ApiPublicMetaDeauthorizeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
