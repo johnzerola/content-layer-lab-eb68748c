@@ -88,7 +88,15 @@ import { detectNiche, mergeTagWeights, nicheContext } from "@/lib/viral-library"
 import { getClipFeedback } from "@/lib/clip-feedback";
 import { cuesToSentences, speechKeepSegments, zoomKeys, type Sentence } from "@/lib/transcript-clips";
 import { resolveVideoLink } from "@/lib/import.functions";
-import { downloadAsZip, fsAccessSupported, saveToFolder } from "@/lib/zip";
+import {
+  downloadAsZip,
+  formatBytes,
+  fsAccessSupported,
+  pickFolder,
+  saveToFolder,
+  writeToFolder,
+} from "@/lib/zip";
+
 import { cuesToSrt, cuesToText, demoCues, generateCaptions, type CaptionCue } from "@/lib/captions";
 import { registerFonts } from "@/lib/fonts";
 import { CaptionStudio } from "@/components/CaptionStudio";
@@ -388,6 +396,11 @@ function Home() {
   const headlineForRef = useRef<(i: Item, idx: number) => ReturnType<typeof headlineTweak>>(
     () => headlineTweak("", "", false),
   );
+  /** nome final do arquivo — usado também pelo salvamento automático no lote */
+  const finalNameRef = useRef<(i: Item, idx: number, o: { label?: string; ext: string }) => string>(
+    (i, _idx, o) => `${i.file.name}.${o.ext}`,
+  );
+
   const [bitrate, setBitrate] = useState(10);
   const [autoBitrate, setAutoBitrate] = useState(true);
   const [platforms, setPlatforms] = useState<string[]>(["reels"]);
@@ -1447,7 +1460,22 @@ function Home() {
           doneCount.current++;
           finishBatchItem(doneCount.current);
 
-
+          // Salvamento automático: o arquivo vai para a pasta escolhida assim
+          // que fica pronto, então nada se perde se o lote for interrompido.
+          const dir = autoFolder.current;
+          if (dir) {
+            setBatchPhase("salvando na pasta", 1);
+            for (const [k, o] of outputs.entries()) {
+              try {
+                await writeToFolder(dir, {
+                  name: finalNameRef.current(item, itemIndex, { ...o, ext: o.ext }),
+                  blob: o.blob,
+                });
+              } catch (err) {
+                console.warn("[download] falha ao salvar na pasta", k, err);
+              }
+            }
+          }
 
           const firstOut = outputs[0]!;
           await finishJob(id, `${outputs.length} arquivo(s) prontos`, { blob: firstOut.blob, fileName: item.file.name });
@@ -1461,11 +1489,14 @@ function Home() {
                     ext: firstOut.ext,
                     outputs,
                     progress: 1,
-                    stage: `${outputs.length} arquivo(s) prontos`,
+                    stage: dir
+                      ? `${outputs.length} arquivo(s) salvos na pasta`
+                      : `${outputs.length} arquivo(s) prontos`,
                   }
                 : x,
             ),
           );
+
         };
 
         // até 2 tentativas por vídeo: uma falha isolada não derruba o lote
@@ -1717,6 +1748,8 @@ function Home() {
     [headlineBank, headlineAuto],
   );
   headlineForRef.current = headlineFor;
+  finalNameRef.current = finalName;
+
 
   /** aplica o padrão de renomeação a todos os itens */
   const applyNamePattern = () => {
@@ -2420,15 +2453,30 @@ function Home() {
                     </Button>
                   )}
                   {fsAccessSupported() && (
-                    <Button
-                      variant="outline"
-                      onClick={() => void saveFolder()}
-                      disabled={readyCount === 0}
-                    >
-                      <FolderDown className="size-4" /> Salvar na pasta
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => void saveFolder()}
+                        disabled={readyCount === 0 || zipping}
+                      >
+                        <FolderDown className="size-4" /> Salvar na pasta
+                      </Button>
+                      <Button
+                        variant={autoFolderName ? "default" : "outline"}
+                        onClick={() => void toggleAutoFolder()}
+                        title="Cada vídeo é gravado na pasta assim que fica pronto — nada se perde se o lote parar"
+                      >
+                        <FolderDown className="size-4" />{" "}
+                        {autoFolderName ? `Auto: ${autoFolderName}` : "Salvar automático"}
+                      </Button>
+                    </>
                   )}
                 </div>
+
+                {saveMsg && (
+                  <p className="font-mono text-[11px] text-muted-foreground">{saveMsg}</p>
+                )}
+
 
                 {/* progresso detalhado do lote */}
                 {(running || batchItems.length > 0) && (
