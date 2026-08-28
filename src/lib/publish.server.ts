@@ -222,8 +222,8 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
     }
 
 
-    let finished = false;
-    for (let i = 0; i < 20; i++) {
+    let finished = isImage;
+    for (let i = 0; !finished && i < 20; i++) {
       await new Promise((resolve) => setTimeout(resolve, 3000));
       const statusResponse = await fetch(`${graphBase}/${creationId}?fields=status_code`, {
         headers: authorization,
