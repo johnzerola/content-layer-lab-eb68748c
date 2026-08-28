@@ -77,6 +77,7 @@ import {
 import { detectOverlays, safeZones } from "@/lib/detect";
 import { buildBackgroundPlate } from "@/lib/plate";
 import { downloadBlob, grabPoster, outputIsWebm, renderVideo } from "@/lib/render";
+import { poolSize } from "@/lib/render-pool";
 import { webCodecsSupported } from "@/lib/encode";
 import {
   MOTION_PRESETS,
