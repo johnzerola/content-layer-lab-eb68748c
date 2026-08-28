@@ -750,6 +750,20 @@ def run_pipeline(
         _notify(callback_url, result_payload)
         return result_payload
 
+    except JobCancelled as exc:
+        empty_cache()
+        callback_seq += 1
+        cancelled = {
+            "job_id": job_id,
+            "callback_seq": callback_seq,
+            "status": "cancelled",
+            "stage": "cancelado",
+            "progress": 0,
+            "error": None,
+        }
+        write_state(job_path, {**read_state(job_path), **cancelled})
+        _notify(callback_url, cancelled)
+        return cancelled
     except Exception as exc:
         empty_cache()
         print(f"[pipeline] falhou: {exc}")

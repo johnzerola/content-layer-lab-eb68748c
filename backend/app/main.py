@@ -520,7 +520,7 @@ async def cancel(job_id: str, x_job_token: Optional[str] = Header(None)):
     directory = job_dir(SETTINGS.storage_dir, job_id)
     directory.mkdir(parents=True, exist_ok=True)
     (directory / ".cancel").touch()
-    _set_state(job_id, {"status": "failed", "error": "cancelado", "progress": 0})
+    _set_state(job_id, {"status": "cancelled", "stage": "cancelado", "error": None, "progress": 0})
     return {"ok": True}
 
 

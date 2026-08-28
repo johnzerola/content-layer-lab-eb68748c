@@ -39,10 +39,10 @@ export function poolSupported() {
   );
 }
 
-/** Concorrência: metade dos núcleos, entre 2 e 4. */
+/** Concorrência conservadora: um worker por quatro núcleos, até quatro. */
 export function poolSize() {
   const cores = typeof navigator !== "undefined" ? (navigator.hardwareConcurrency ?? 4) : 4;
-  return Math.max(1, Math.min(2, Math.floor(cores / 4) || 1));
+  return Math.max(1, Math.min(4, Math.floor(cores / 4) || 1));
 }
 
 const STALL_MS = 90_000;

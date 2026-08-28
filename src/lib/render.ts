@@ -209,7 +209,12 @@ export async function renderVideo(
     );
 
   try {
-    return await runRender(file, template, guarded);
+    const result = await runRender(file, template, guarded);
+    if (opts.jobId) {
+      const { finishJob } = await import("./jobs");
+      void finishJob(opts.jobId, "pronto", { blob: result.blob, fileName: file.name });
+    }
+    return result;
   } catch (err) {
     if (stalled) throw stallError();
     throw err;
@@ -230,10 +235,6 @@ async function runRender(
   if (poolSupported()) {
     try {
       const blob = await renderInPool(file, template, opts);
-      if (opts.jobId) {
-        const { finishJob } = await import("./jobs");
-        void finishJob(opts.jobId, "pronto", { blob, fileName: file.name });
-      }
       return { blob, ext: "mp4" };
     } catch (err) {
       if ((err as Error)?.name === "AbortError") throw err;

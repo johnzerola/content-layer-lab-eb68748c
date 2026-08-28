@@ -147,6 +147,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           setPolling(false);
           if (status.result_url) onComplete(status.result_url);
           toast.success("Vídeo limpo com sucesso.");
+        } else if (status.status === "cancelled") {
+          setPolling(false);
+          toast.info("Processamento cancelado.");
         } else if (status.status === "failed") {
           setPolling(false);
           toast.error(`Falhou: ${status.error || "erro desconhecido"}`);
