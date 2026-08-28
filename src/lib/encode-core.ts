@@ -32,6 +32,8 @@ export interface CoreEncodeOptions {
   headline?: string | undefined;
   fps?: number | undefined;
   bitrate?: number | undefined;
+  /** qualidade alvo quando o bitrate não é informado */
+  tier?: QualityTier | undefined;
   clip?: { start: number; end: number } | undefined;
   pre?: PreEdit | null | undefined;
   captions?: CaptionCue[] | undefined;
