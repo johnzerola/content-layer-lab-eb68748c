@@ -5,6 +5,7 @@ export type PublishInput = {
   kind: PostKind;
   caption: string;
   videoUrl: string;
+  mediaType?: "video" | "image";
   username: string;
   accountId?: string;
   platform?: string;
