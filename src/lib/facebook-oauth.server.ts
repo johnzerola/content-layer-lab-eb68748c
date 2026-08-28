@@ -14,7 +14,13 @@ export const FACEBOOK_SCOPES = [
   "instagram_content_publish",
 ];
 
-type OAuthConfiguration = { appId: string; appSecret: string; redirectUri: string; configId: string };
+type OAuthConfiguration = {
+  appId: string;
+  appSecret: string;
+  redirectUri: string;
+  /** Login para Empresas. Quando ausente, usamos o Login clássico com `scope`. */
+  configId: string | null;
+};
 
 export type FacebookOAuthDiagnostics = {
   ready: true;
