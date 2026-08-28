@@ -15,6 +15,12 @@ import { keptSegments, segmentsDuration, srcTimeAt, type PreEdit } from "./preed
 import { cleanMp4Metadata } from "./mp4meta";
 import { FrameReader, videoDecoderSupported, type DecodedFrame } from "./decode";
 import { envelopeAt, type AudioPcm, type Envelope } from "./audio-track";
+import {
+  pickAudioCodec,
+  pickBitrate,
+  pickVideoCodec,
+  type QualityTier,
+} from "./encode-presets";
 
 export interface CoreEncodeOptions {
   file: File;
@@ -26,6 +32,8 @@ export interface CoreEncodeOptions {
   headline?: string | undefined;
   fps?: number | undefined;
   bitrate?: number | undefined;
+  /** qualidade alvo quando o bitrate não é informado */
+  tier?: QualityTier | undefined;
   clip?: { start: number; end: number } | undefined;
   pre?: PreEdit | null | undefined;
   captions?: CaptionCue[] | undefined;
@@ -38,52 +46,8 @@ export interface CoreEncodeOptions {
 
 const clampOffset = (n: number) => Math.max(-1, Math.min(1, n));
 
-async function pickVideoCodec(width: number, height: number, bitrate: number, framerate: number) {
-  const candidates: { codec: string; mux: "avc" | "vp9" }[] = [
-    { codec: "avc1.640028", mux: "avc" },
-    { codec: "avc1.4d0032", mux: "avc" },
-    { codec: "avc1.42003c", mux: "avc" },
-    { codec: "avc1.42001f", mux: "avc" },
-    { codec: "vp09.00.10.08", mux: "vp9" },
-  ];
-  for (const { codec, mux } of candidates) {
-    try {
-      const cfg: VideoEncoderConfig = {
-        codec,
-        width,
-        height,
-        bitrate,
-        framerate,
-        latencyMode: "quality",
-        ...(mux === "avc" ? { avc: { format: "avc" as const } } : {}),
-      };
-      const sup = await VideoEncoder.isConfigSupported(cfg);
-      if (sup.supported) return { cfg, mux };
-    } catch {
-      /* tenta o próximo */
-    }
-  }
-  return null;
-}
+// escolha de codec/bitrate vive em ./encode-presets (compartilhado com encode.ts)
 
-async function pickAudioCodec(channels: number, sampleRate: number): Promise<"aac" | "opus" | null> {
-  const Enc = globalThis.AudioEncoder;
-  if (!Enc) return null;
-  for (const [mux, codec] of [["aac", "mp4a.40.2"], ["opus", "opus"]] as const) {
-    try {
-      const sup = await Enc.isConfigSupported({
-        codec,
-        sampleRate,
-        numberOfChannels: channels,
-        bitrate: 128_000,
-      });
-      if (sup.supported) return mux;
-    } catch {
-      /* próximo */
-    }
-  }
-  return null;
-}
 
 export function coreEncodeSupported() {
   return (
@@ -101,14 +65,15 @@ const cancelled = () => new DOMException("cancelado", "AbortError");
 /** Renderiza o MP4 completo e devolve os bytes (transferíveis). */
 export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffer> {
   const fps = opts.fps ?? 30;
-  const bitrate = opts.bitrate ?? 10_000_000;
   const t = opts.template;
   const W = t.canvasW ?? CANVAS_W;
   const H = t.canvasH ?? CANVAS_H;
+  const tier = opts.tier ?? "balanced";
+  const bitrate = opts.bitrate ?? pickBitrate({ width: W, height: H, fps, tier });
   const v = opts.variation;
   const abort = () => opts.isCancelled?.() === true;
 
-  const picked = await pickVideoCodec(W, H, bitrate, fps);
+  const picked = await pickVideoCodec(W, H, bitrate, fps, tier);
   if (!picked) throw new Error("Codificação de vídeo não suportada neste navegador");
 
   const reader = await FrameReader.open(opts.file);

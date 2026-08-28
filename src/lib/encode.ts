@@ -8,6 +8,12 @@ import { cleanMp4Metadata } from "./mp4meta";
 import { bgSleep } from "./keepalive";
 import { FrameReader, videoDecoderSupported, type DecodedFrame } from "./decode";
 import { audioEnvelope, envelopeAt, renderAudioTrack } from "./audio-track";
+import {
+  pickAudioCodec,
+  pickBitrate,
+  pickVideoCodec,
+  type QualityTier,
+} from "./encode-presets";
 
 
 
@@ -20,6 +26,8 @@ export interface EncodeOptions {
   headline?: string | undefined;
   fps?: number | undefined;
   bitrate?: number | undefined;
+  /** qualidade alvo quando o bitrate não é informado */
+  tier?: QualityTier | undefined;
   /** aceleração de leitura do vídeo fonte (1 = tempo real) */
   turbo?: number | undefined;
   /** recorte do vídeo fonte (clipagem automática) */
@@ -76,48 +84,8 @@ export function webCodecsSupported() {
   );
 }
 
-async function pickVideoCodec(width: number, height: number, bitrate: number, framerate: number) {
-  const candidates: { codec: string; mux: "avc" | "vp9" }[] = [
-    { codec: "avc1.640028", mux: "avc" },
-    { codec: "avc1.4d0032", mux: "avc" },
-    { codec: "avc1.42003c", mux: "avc" },
-    { codec: "avc1.42001f", mux: "avc" },
-    // último recurso: VP9 dentro do MP4 (quando o navegador não tem H.264)
-    { codec: "vp09.00.10.08", mux: "vp9" },
-  ];
-  for (const { codec, mux } of candidates) {
-    try {
-      const cfg: VideoEncoderConfig = {
-        codec,
-        width,
-        height,
-        bitrate,
-        framerate,
-        latencyMode: "quality",
-        ...(mux === "avc" ? { avc: { format: "avc" as const } } : {}),
-      };
-      const sup = await VideoEncoder.isConfigSupported(cfg);
-      if (sup.supported) return { cfg, mux };
-    } catch {
-      /* tenta o próximo */
-    }
-  }
-  return null;
-}
+// escolha de codec/bitrate vive em ./encode-presets (compartilhado com o worker)
 
-async function pickAudioCodec(channels: number, sampleRate: number): Promise<"aac" | "opus" | null> {
-  const Enc = window.AudioEncoder;
-  if (!Enc) return null;
-  for (const [mux, codec] of [["aac", "mp4a.40.2"], ["opus", "opus"]] as const) {
-    try {
-      const sup = await Enc.isConfigSupported({ codec, sampleRate, numberOfChannels: channels, bitrate: 128_000 });
-      if (sup.supported) return mux;
-    } catch {
-      /* próximo */
-    }
-  }
-  return null;
-}
 
 /** Faixa de áudio da variação — o arquivo é decodificado uma vez só (cache). */
 async function decodeAudio(
@@ -137,13 +105,14 @@ const clampOffset = (n: number) => Math.max(-1, Math.min(1, n));
 /** Renderiza para MP4 (H.264 + AAC) usando WebCodecs — mais rápido que tempo real. */
 export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
   const fps = opts.fps ?? 30;
-  const bitrate = opts.bitrate ?? 10_000_000;
   const t = opts.template;
   const W = t.canvasW ?? CANVAS_W;
   const H = t.canvasH ?? CANVAS_H;
+  const tier = opts.tier ?? "balanced";
+  const bitrate = opts.bitrate ?? pickBitrate({ width: W, height: H, fps, tier });
   const v = opts.variation;
 
-  const picked = await pickVideoCodec(W, H, bitrate, fps);
+  const picked = await pickVideoCodec(W, H, bitrate, fps, tier);
   if (!picked) throw new Error("Codificação de vídeo não suportada neste navegador");
   const videoConfig = picked.cfg;
 

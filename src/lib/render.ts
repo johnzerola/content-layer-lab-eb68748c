@@ -3,6 +3,7 @@ import { drawFrame } from "./draw";
 import { encodeMp4, webCodecsSupported } from "./encode";
 import { poolSupported, renderInPool } from "./render-pool";
 import { motionAt, type Variation } from "./variation";
+import { pickBitrate, type QualityTier } from "./encode-presets";
 
 const clamp1 = (n: number) => Math.max(-1, Math.min(1, n));
 
@@ -16,6 +17,8 @@ export interface RenderOptions {
   headline?: string | undefined;
   fps?: number | undefined;
   bitrate?: number | undefined;
+  /** qualidade alvo quando o bitrate não é informado (preset por resolução) */
+  tier?: QualityTier | undefined;
   turbo?: number | undefined;
   clip?: { start: number; end: number } | undefined;
   /** pré-edição do vídeo fonte (recorte, giro, cor) */
@@ -86,7 +89,14 @@ async function recordVideo(
   const mimeType = pickMime();
   const recorder = new MediaRecorder(stream, {
     mimeType,
-    videoBitsPerSecond: opts.bitrate ?? 10_000_000,
+    videoBitsPerSecond:
+      opts.bitrate ??
+      pickBitrate({
+        width: canvas.width,
+        height: canvas.height,
+        fps: opts.fps ?? 30,
+        tier: opts.tier ?? "balanced",
+      }),
   });
   const chunks: BlobPart[] = [];
   recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
@@ -255,7 +265,8 @@ async function runRender(
         offsetY: opts.offsetY,
         headline: opts.headline,
         fps: opts.fps ?? 30,
-        bitrate: opts.bitrate ?? 10_000_000,
+        ...(opts.bitrate ? { bitrate: opts.bitrate } : {}),
+        tier: opts.tier ?? "balanced",
         turbo: opts.turbo ?? 4,
         clip: opts.clip,
         pre: opts.pre,

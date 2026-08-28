@@ -39,10 +39,10 @@ export function poolSupported() {
   );
 }
 
-/** Concorrência conservadora: um worker por quatro núcleos, até quatro. */
+/** Um worker a cada dois núcleos, até quatro (deixa CPU para a interface). */
 export function poolSize() {
   const cores = typeof navigator !== "undefined" ? (navigator.hardwareConcurrency ?? 4) : 4;
-  return Math.max(1, Math.min(4, Math.floor(cores / 4) || 1));
+  return Math.max(1, Math.min(4, Math.floor(cores / 2) || 1));
 }
 
 const STALL_MS = 90_000;
@@ -274,7 +274,9 @@ export async function renderInPool(
     offsetY: opts.offsetY,
     headline: opts.headline,
     fps: opts.fps ?? 30,
-    bitrate: opts.bitrate ?? 10_000_000,
+    // sem bitrate explícito o worker aplica o preset da resolução
+    ...(opts.bitrate ? { bitrate: opts.bitrate } : {}),
+    tier: opts.tier ?? "balanced",
     clip: opts.clip,
     pre: opts.pre,
     captions: opts.captions,

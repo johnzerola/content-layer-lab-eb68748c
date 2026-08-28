@@ -77,6 +77,7 @@ import {
 import { detectOverlays, safeZones } from "@/lib/detect";
 import { buildBackgroundPlate } from "@/lib/plate";
 import { downloadBlob, grabPoster, outputIsWebm, renderVideo } from "@/lib/render";
+import { poolSize } from "@/lib/render-pool";
 import { webCodecsSupported } from "@/lib/encode";
 import {
   MOTION_PRESETS,
@@ -1413,6 +1414,14 @@ function Home() {
           );
           const head = headlineForRef.current(item, itemIndex);
 
+          // ---- monta a lista de saídas (plataforma x variação) ----
+          type RenderTask = {
+            plat: (typeof outs)[number];
+            tpl: Template;
+            k: number;
+            at: number;
+          };
+          const tasks: RenderTask[] = [];
           for (const plat of outs) {
             // cada plataforma recebe a resolução/fps/bitrate recomendados
             // no modo "limpar" o quadro segue a orientação real do vídeo (sem recorte)
@@ -1445,79 +1454,103 @@ function Home() {
               ? { ...tplHead, cta: { ...tplHead.cta, text: item.cta.trim() } }
               : tplHead;
 
-
-
             for (let k = 0; k < n; k++) {
-              const at = step;
-              const stageLabel = `render ${at + 1}/${total}${outs.length > 1 ? ` · ${plat.short}` : ""}${n > 1 ? ` · v${k + 1}` : ""}`;
-              setItems((prev) =>
-                prev.map((x) =>
-                  x.id === id
-                    ? { ...x, stage: stageLabel, stepIndex: at + 1, stepTotal: total }
-                    : x,
-                ),
-              );
-              updateJob(id, {
-                stage: stageLabel,
-                meta: autoScheduleConfig ? { nextAction: autoScheduleConfig } : {},
-              });
-              const { blob, ext } = await renderVideo(sourceFile, tpl, {
-                variation: variationOf(item, k),
-                offsetX: item.offsetX,
-                offsetY: item.offsetY,
-                headline: head.text || undefined,
-                // modo seguro: menos quadros e bitrate menor para destravar o render
-                fps: safe ? 24 : turboRef.current ? Math.min(plat.fps, 24) : plat.fps,
-                bitrate: safe
-                  ? 4_000_000
-                  : turboRef.current
-                    ? 5_000_000
-                    : (autoBitrate ? plat.bitrate : bitrate) * 1_000_000,
-                clip: item.clip,
-                pre: item.preEdit,
-                captions: cues,
-                plate,
-                signal: ac.signal,
-                onStats: ({ path, fps }) => {
-                  updateBatchProgress({ itemFps: fps });
-                  setBatchPhase(`${stageLabel} · ${path}`);
-                },
-                onPhase: (phase, prepProgress) => {
-                  if (ac.signal.aborted) return;
-                  setBatchPhase(phase, prepScale(prepProgress ?? 0));
-                  updateJob(id, { stage: phase });
-                  setItems((prev) => prev.map((x) => x.id === id ? { ...x, stage: phase } : x));
-                },
-                onProgress: (p) => {
-                  if (ac.signal.aborted) return;
-                  const value = (at + p) / total;
-                  // atualiza a interface no máximo a cada 150 ms: a fila e as
-                  // prévias param de re-renderizar durante o render
-                  const now = performance.now();
-                  if (p < 1 && now - lastTick < 150) return;
-                  lastTick = now;
-                  setItems((prev) =>
-                    prev.map((x) => (x.id === id ? { ...x, progress: value } : x)),
-                  );
-                  updateJob(id, { progress: value });
-                  // o render ocupa a faixa 15%–95% do item; preparo e
-                  // finalização já contam antes e depois
-                  updateBatchProgress({
-                    itemProgress: renderScale(value),
-                    itemLabel: item.file.name,
-                  });
-                },
-
-
-
-              });
-              const label = [outs.length > 1 ? plat.short : "", n > 1 ? `v${k + 1}` : ""]
-                .filter(Boolean)
-                .join("-");
-              outputs.push({ blob, ext, label });
-              step++;
+              tasks.push({ plat, tpl, k, at: tasks.length });
             }
           }
+
+          // progresso agregado: cada saída contribui com a mesma fatia
+          const taskProgress = new Map<number, number>();
+          const pushProgress = () => {
+            if (ac.signal.aborted) return;
+            let sum = 0;
+            for (const p of taskProgress.values()) sum += p;
+            const value = sum / Math.max(1, tasks.length);
+            const now = performance.now();
+            if (value < 1 && now - lastTick < 150) return;
+            lastTick = now;
+            setItems((prev) => prev.map((x) => (x.id === id ? { ...x, progress: value } : x)));
+            updateJob(id, { progress: value });
+            // o render ocupa a faixa 15%–95% do item; preparo e
+            // finalização já contam antes e depois
+            updateBatchProgress({
+              itemProgress: renderScale(value),
+              itemLabel: item.file.name,
+            });
+          };
+
+          const results: ({ blob: Blob; ext: string; label: string } | null)[] = tasks.map(
+            () => null,
+          );
+
+          const runTask = async ({ plat, tpl, k, at }: RenderTask) => {
+            const stageLabel = `render ${at + 1}/${total}${outs.length > 1 ? ` · ${plat.short}` : ""}${n > 1 ? ` · v${k + 1}` : ""}`;
+            setItems((prev) =>
+              prev.map((x) =>
+                x.id === id ? { ...x, stage: stageLabel, stepIndex: at + 1, stepTotal: total } : x,
+              ),
+            );
+            updateJob(id, {
+              stage: stageLabel,
+              meta: autoScheduleConfig ? { nextAction: autoScheduleConfig } : {},
+            });
+            const { blob, ext } = await renderVideo(sourceFile, tpl, {
+              variation: variationOf(item, k),
+              offsetX: item.offsetX,
+              offsetY: item.offsetY,
+              headline: head.text || undefined,
+              // modo seguro: menos quadros para destravar o render
+              fps: safe ? 24 : turboRef.current ? Math.min(plat.fps, 24) : plat.fps,
+              // sem bitrate manual, o preset da resolução decide (mais rápido e
+              // com o mesmo resultado visual)
+              ...(autoBitrate || safe || turboRef.current
+                ? {}
+                : { bitrate: bitrate * 1_000_000 }),
+              tier: safe || turboRef.current ? ("turbo" as const) : ("balanced" as const),
+              clip: item.clip,
+              pre: item.preEdit,
+              captions: cues,
+              plate,
+              signal: ac.signal,
+              onStats: ({ path, fps }) => {
+                updateBatchProgress({ itemFps: fps });
+                setBatchPhase(`${stageLabel} · ${path}`);
+              },
+              onPhase: (phase, prepProgress) => {
+                if (ac.signal.aborted) return;
+                setBatchPhase(phase, prepScale(prepProgress ?? 0));
+                updateJob(id, { stage: phase });
+                setItems((prev) => prev.map((x) => (x.id === id ? { ...x, stage: phase } : x)));
+              },
+              onProgress: (p) => {
+                taskProgress.set(at, p);
+                pushProgress();
+              },
+            });
+            taskProgress.set(at, 1);
+            pushProgress();
+            const label = [outs.length > 1 ? plat.short : "", n > 1 ? `v${k + 1}` : ""]
+              .filter(Boolean)
+              .join("-");
+            results[at] = { blob, ext, label };
+          };
+
+          // várias saídas do mesmo vídeo em paralelo (o pool de workers já
+          // existe; antes ficava ocioso porque a fila era estritamente serial)
+          const lanes = Math.max(1, Math.min(poolSize(), tasks.length));
+          let cursor = 0;
+          await Promise.all(
+            Array.from({ length: lanes }, async () => {
+              while (cursor < tasks.length) {
+                if (ac.signal.aborted) throw new DOMException("cancelado", "AbortError");
+                const task = tasks[cursor++]!;
+                await runTask(task);
+              }
+            }),
+          );
+          for (const r of results) if (r) outputs.push(r);
+          step += tasks.length;
+
 
           setBatchPhase("finalizando", renderScale(1));
           doneCount.current++;
