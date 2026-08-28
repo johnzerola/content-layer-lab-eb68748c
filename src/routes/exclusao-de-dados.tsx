@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { AuthGate } from "@/components/AuthGate";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 import {
   createDataDeletionRequest,
@@ -159,11 +160,13 @@ function DataDeletionPage() {
         {!authReady ? (
           <Loader2 className="mt-6 size-5 animate-spin text-muted-foreground" aria-label="Carregando conta" />
         ) : !user ? (
-          <div className="mt-5 border-l-2 border-primary pl-4">
-            <p className="text-muted-foreground">Entre na sua conta para enviar e acompanhar o pedido.</p>
-            <Link to="/auth" search={{ next: "/exclusao-de-dados" }} className="mt-3 inline-block font-medium text-primary underline">
-              Entrar para solicitar
-            </Link>
+          <div className="mt-6">
+            <AuthGate
+              title="Entre para solicitar a exclusão"
+              description="O login protege sua identidade e permite acompanhar o pedido pelo código de confirmação."
+            >
+              <Loader2 className="mx-auto size-5 animate-spin text-muted-foreground" />
+            </AuthGate>
           </div>
         ) : (
           <>
