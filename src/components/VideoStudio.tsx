@@ -687,6 +687,27 @@ export function VideoStudio({
   const srcAR = width && height ? width / height : 9 / 16;
   const quarter = ((pre.rotate / 90) | 0) % 4;
 
+  // O retângulo de recorte é posicionado em % da caixa. Se a caixa não tiver
+  // exatamente a proporção do vídeo, o vídeo fica com barras (object-contain)
+  // e o recorte deixa de bater com a imagem. Por isso a caixa é medida em px.
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const [stageBox, setStageBox] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const fit = () => {
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      const w = Math.min(r.width, r.height * srcAR);
+      setStageBox({ w, h: w / srcAR });
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [srcAR, view]);
+
+
   const clipWindow = useMemo(() => ({ start, end }), [start, end]);
 
   const save = () =>
@@ -822,14 +843,21 @@ export function VideoStudio({
                   </button>
                 </div>
 
-                <div className="relative flex min-h-0 flex-1 items-center justify-center">
+                <div ref={stageRef} className="relative flex min-h-0 flex-1 items-center justify-center">
                   {/* fonte (sempre montada: alimenta o canvas de saída) */}
                   <div
                     ref={boxRef}
                     className={`relative overflow-hidden rounded-xl border border-border bg-black ${
-                      view === "out" ? "pointer-events-none invisible absolute size-px opacity-0" : "h-full max-h-full"
+                      view === "out" ? "pointer-events-none invisible absolute size-px opacity-0" : ""
                     }`}
-                    style={view === "out" ? undefined : { aspectRatio: String(srcAR), maxWidth: "100%" }}
+                    style={
+                      view === "out"
+                        ? undefined
+                        : stageBox
+                          ? { width: `${stageBox.w}px`, height: `${stageBox.h}px` }
+                          : { aspectRatio: String(srcAR), maxWidth: "100%", maxHeight: "100%" }
+                    }
+
                     onPointerMove={onPointerMove}
                     onPointerUp={() => (dragRef.current = null)}
                     onPointerCancel={() => (dragRef.current = null)}
