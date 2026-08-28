@@ -396,6 +396,11 @@ function Home() {
   const headlineForRef = useRef<(i: Item, idx: number) => ReturnType<typeof headlineTweak>>(
     () => headlineTweak("", "", false),
   );
+  /** nome final do arquivo — usado também pelo salvamento automático no lote */
+  const finalNameRef = useRef<(i: Item, idx: number, o: { label?: string; ext: string }) => string>(
+    (i, _idx, o) => `${i.file.name}.${o.ext}`,
+  );
+
   const [bitrate, setBitrate] = useState(10);
   const [autoBitrate, setAutoBitrate] = useState(true);
   const [platforms, setPlatforms] = useState<string[]>(["reels"]);
