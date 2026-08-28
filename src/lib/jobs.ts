@@ -15,9 +15,21 @@ export type NextAction = {
   accountId: string;
   kind: "reels" | "feed" | "stories" | "shorts";
   caption?: string;
+  /** Modo antigo: intervalo fixo entre posts. */
   intervalHours?: number;
   intervalDays?: number;
+  /** Modo novo (mesmo motor da Agenda): X posts por dia. */
+  perDay?: number;
+  slotMode?: "auto" | "fixed";
+  times?: string[];
+  windowStart?: string;
+  windowEnd?: string;
+  weekdays?: number[];
 };
+
+/** Quantos itens já foram agendados automaticamente nesta sessão (por conta). */
+const autoScheduleCount = new Map<string, number>();
+
 
 export interface JobStep {
   label: string;
@@ -153,10 +165,30 @@ export async function finishJob(id: string, stage = "pronto", result?: { blob: B
       const { path, url } = await uploadPostVideo(result.blob, result.fileName);
       
       updateJob(id, { stage: "agendando..." });
-      const scheduledAt = new Date();
-      if (action.intervalDays) scheduledAt.setDate(scheduledAt.getDate() + action.intervalDays);
-      if (action.intervalHours) scheduledAt.setHours(scheduledAt.getHours() + action.intervalHours);
-      if (!action.intervalDays && !action.intervalHours) scheduledAt.setMinutes(scheduledAt.getMinutes() + 5);
+      let scheduledAt = new Date();
+      if (action.perDay && action.perDay > 0) {
+        // Mesma divisão automática por dia usada na Agenda.
+        const { buildSchedulePlan } = await import("@/lib/schedule-plan");
+        const key = `${action.accountId}:${action.perDay}:${action.slotMode ?? "auto"}`;
+        const index = autoScheduleCount.get(key) ?? 0;
+        const plan = buildSchedulePlan(index + 1, {
+          start: new Date(),
+          perDay: action.perDay,
+          mode: action.slotMode ?? "auto",
+          ...(action.times ? { times: action.times } : {}),
+          ...(action.windowStart ? { windowStart: action.windowStart } : {}),
+          ...(action.windowEnd ? { windowEnd: action.windowEnd } : {}),
+          ...(action.weekdays ? { weekdays: action.weekdays } : {}),
+        });
+        const when = plan[plan.length - 1];
+        if (when) scheduledAt = when;
+        autoScheduleCount.set(key, index + 1);
+      } else {
+        if (action.intervalDays) scheduledAt.setDate(scheduledAt.getDate() + action.intervalDays);
+        if (action.intervalHours) scheduledAt.setHours(scheduledAt.getHours() + action.intervalHours);
+        if (!action.intervalDays && !action.intervalHours) scheduledAt.setMinutes(scheduledAt.getMinutes() + 5);
+      }
+
 
       await schedulePost({
         accountId: action.accountId,

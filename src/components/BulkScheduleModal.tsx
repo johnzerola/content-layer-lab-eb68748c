@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, FolderOpen, Image as ImageIcon, Loader2, Video, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -13,6 +13,26 @@ import {
 } from "@/lib/schedule-plan";
 import { KIND_LABEL, schedulePost, uploadPostMedia, type PostKind, type SocialAccount } from "@/lib/social";
 
+/** Item pronto vindo de outra ferramenta (ViralBatch / CorteIA). */
+export type BulkScheduleItem = {
+  file: File;
+  /** Legenda específica (headline). Se vazia, usa a legenda padrão do lote. */
+  caption?: string;
+  meta?: Record<string, unknown>;
+};
+
+export type BulkScheduleConfig = {
+  accountId: string;
+  kind: PostKind;
+  caption: string;
+  perDay: number;
+  mode: SlotMode;
+  times: string[];
+  windowStart: string;
+  windowEnd: string;
+  weekdays: number[];
+};
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -20,7 +40,17 @@ type Props = {
   onDone: () => void;
   /** Arquivos já prontos (ex.: saída do ViralBatch / CorteIA). */
   initialFiles?: File[];
+  /** Itens prontos com legenda/metadados (ViralBatch / CorteIA). */
+  items?: BulkScheduleItem[];
+  /** Chamado após cada item agendado com sucesso. */
+  onItemScheduled?: (item: BulkScheduleItem, postId: string | null) => void | Promise<void>;
+  /** Esconde os seletores de arquivo (quando os itens vêm prontos). */
+  hideFilePicker?: boolean;
+  /** Ação extra no rodapé (ex.: "Agendar no lote" do ViralBatch). */
+  secondaryAction?: { label: string; run: (config: BulkScheduleConfig) => void };
+  subtitle?: string;
 };
+
 
 const WEEKDAYS = [
   { value: 0, label: "D" },
@@ -39,11 +69,24 @@ function todayInput() {
 }
 
 /** Agendamento em massa: pasta inteira dividida em X posts por dia. */
-export function BulkScheduleModal({ open, onClose, accounts, onDone, initialFiles }: Props) {
+export function BulkScheduleModal({
+  open,
+  onClose,
+  accounts,
+  onDone,
+  initialFiles,
+  items,
+  onItemScheduled,
+  hideFilePicker,
+  secondaryAction,
+  subtitle,
+}: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
 
-  const [files, setFiles] = useState<File[]>(initialFiles ?? []);
+  const [entries, setEntries] = useState<BulkScheduleItem[]>(
+    items ?? (initialFiles ?? []).map((file) => ({ file })),
+  );
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const [kind, setKind] = useState<PostKind>("reels");
   const [caption, setCaption] = useState("");
@@ -58,7 +101,19 @@ export function BulkScheduleModal({ open, onClose, accounts, onDone, initialFile
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
 
-  const ordered = useMemo(() => sortByName(files), [files]);
+  // Itens vindos de outra ferramenta: sincroniza ao abrir.
+  useEffect(() => {
+    if (open && items) setEntries(items);
+  }, [open, items]);
+
+  useEffect(() => {
+    if (!accountId && accounts[0]) setAccountId(accounts[0].id);
+  }, [accounts, accountId]);
+
+  const ordered = useMemo(
+    () => sortByName(entries.map((e) => ({ ...e, name: e.file.name }))),
+    [entries],
+  );
 
   const config = useMemo(() => {
     const [y, m, d] = startDate.split("-").map(Number);
@@ -87,7 +142,7 @@ export function BulkScheduleModal({ open, onClose, accounts, onDone, initialFile
       toast.error("Selecione fotos ou vídeos.");
       return;
     }
-    setFiles((prev) => [...prev, ...incoming]);
+    setEntries((prev) => [...prev, ...incoming.map((file) => ({ file }))]);
   };
 
   const run = async () => {
@@ -110,16 +165,17 @@ export function BulkScheduleModal({ open, onClose, accounts, onDone, initialFile
     const failed: string[] = [];
 
     for (let i = 0; i < ordered.length; i++) {
-      const file = ordered[i] as File;
+      const entry = ordered[i] as BulkScheduleItem & { name: string };
+      const file = entry.file;
       const when = plan[i];
       if (!when) break;
       try {
         const media = mediaTypeOf(file);
         const uploaded = await uploadPostMedia(file, file.name);
-        await schedulePost({
+        const postId = await schedulePost({
           accountId,
           kind: media === "image" && kind === "reels" ? "feed" : kind,
-          caption,
+          caption: entry.caption?.trim() ? entry.caption : caption,
           scheduledAt: when,
           videoPath: uploaded.path,
           videoUrl: uploaded.url,
@@ -127,6 +183,7 @@ export function BulkScheduleModal({ open, onClose, accounts, onDone, initialFile
           mediaType: media,
           consent: true,
         });
+        await onItemScheduled?.(entry, (postId as string | null) ?? null);
         ok++;
       } catch (e) {
         failed.push(`${file.name}: ${e instanceof Error ? e.message : "erro"}`);
@@ -138,11 +195,12 @@ export function BulkScheduleModal({ open, onClose, accounts, onDone, initialFile
     if (ok > 0) toast.success(`${ok} publicação(ões) agendada(s) em ${days.length} dia(s).`);
     if (failed.length > 0) toast.error(`${failed.length} falharam. ${failed[0] ?? ""}`);
     if (ok > 0) {
-      setFiles([]);
+      setEntries([]);
       onDone();
       onClose();
     }
   };
+
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-3 sm:p-6">
@@ -154,8 +212,9 @@ export function BulkScheduleModal({ open, onClose, accounts, onDone, initialFile
               Agendamento em massa
             </p>
             <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-              suba a pasta inteira e o sistema divide por dia automaticamente
+              {subtitle ?? "suba a pasta inteira e o sistema divide por dia automaticamente"}
             </p>
+
           </div>
           <button onClick={onClose} className="rounded-lg p-2 hover:bg-surface-2" aria-label="Fechar">
             <X className="size-4" />
@@ -167,49 +226,55 @@ export function BulkScheduleModal({ open, onClose, accounts, onDone, initialFile
           <div className="space-y-4">
             <div>
               <p className="mono-label">1. arquivos ({ordered.length})</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-                  Selecionar arquivos
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => folderRef.current?.click()}>
-                  <FolderOpen className="mr-1 size-4" />
-                  Selecionar pasta
-                </Button>
-                {ordered.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={() => setFiles([])}>
-                    Limpar
-                  </Button>
-                )}
-              </div>
-              <input
-                ref={fileRef}
-                type="file"
-                multiple
-                accept="video/*,image/*"
-                hidden
-                onChange={(e) => addFiles(e.target.files)}
-              />
-              <input
-                ref={folderRef}
-                type="file"
-                multiple
-                hidden
-                // @ts-expect-error atributo não tipado
-                webkitdirectory=""
-                onChange={(e) => addFiles(e.target.files)}
-              />
+              {!hideFilePicker && (
+                <>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+                      Selecionar arquivos
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => folderRef.current?.click()}>
+                      <FolderOpen className="mr-1 size-4" />
+                      Selecionar pasta
+                    </Button>
+                    {ordered.length > 0 && (
+                      <Button variant="ghost" size="sm" onClick={() => setEntries([])}>
+                        Limpar
+                      </Button>
+                    )}
+                  </div>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    multiple
+                    accept="video/*,image/*"
+                    hidden
+                    onChange={(e) => addFiles(e.target.files)}
+                  />
+                  <input
+                    ref={folderRef}
+                    type="file"
+                    multiple
+                    hidden
+                    // @ts-expect-error atributo não tipado
+                    webkitdirectory=""
+                    onChange={(e) => addFiles(e.target.files)}
+                  />
+                </>
+              )}
+
               {ordered.length > 0 && (
                 <div className="mt-2 max-h-32 overflow-y-auto rounded-lg border border-border bg-surface-2 p-2">
-                  {ordered.slice(0, 60).map((f, i) => (
-                    <p key={`${f.name}-${i}`} className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
-                      {mediaTypeOf(f) === "image" ? (
+                  {ordered.slice(0, 60).map((entry, i) => (
+                    <p key={`${entry.name}-${i}`} className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                      {mediaTypeOf(entry.file) === "image" ? (
                         <ImageIcon className="size-3 shrink-0 text-primary" />
                       ) : (
                         <Video className="size-3 shrink-0 text-primary" />
                       )}
-                      <span className="truncate">{f.name}</span>
+                      <span className="truncate">{entry.name}</span>
                     </p>
                   ))}
+
                   {ordered.length > 60 && (
                     <p className="mt-1 font-mono text-[10px] text-muted-foreground">+{ordered.length - 60} arquivo(s)</p>
                   )}
@@ -401,11 +466,33 @@ export function BulkScheduleModal({ open, onClose, accounts, onDone, initialFile
               <Button variant="outline" onClick={onClose} disabled={busy}>
                 Cancelar
               </Button>
+              {secondaryAction && (
+                <Button
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() =>
+                    secondaryAction.run({
+                      accountId,
+                      kind,
+                      caption,
+                      perDay,
+                      mode,
+                      times: times.split(",").map((t) => t.trim()).filter(Boolean),
+                      windowStart,
+                      windowEnd,
+                      weekdays,
+                    })
+                  }
+                >
+                  {secondaryAction.label}
+                </Button>
+              )}
               <Button onClick={run} disabled={busy || ordered.length === 0}>
                 {busy ? <Loader2 className="mr-1 size-4 animate-spin" /> : <CalendarClock className="mr-1 size-4" />}
                 Agendar tudo
               </Button>
             </div>
+
           </div>
         </footer>
       </div>
