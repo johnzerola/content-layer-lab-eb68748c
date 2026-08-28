@@ -14,7 +14,13 @@ export const FACEBOOK_SCOPES = [
   "instagram_content_publish",
 ];
 
-type OAuthConfiguration = { appId: string; appSecret: string; redirectUri: string; configId: string };
+type OAuthConfiguration = {
+  appId: string;
+  appSecret: string;
+  redirectUri: string;
+  /** Login para Empresas. Quando ausente, usamos o Login clássico com `scope`. */
+  configId: string | null;
+};
 
 export type FacebookOAuthDiagnostics = {
   ready: true;
@@ -41,14 +47,16 @@ export function facebookOAuthConfiguration(
   const appId = environment["META_APP_ID"]?.trim();
   const appSecret = environment["META_APP_SECRET"]?.trim();
   const redirectUri = callbackFromEnvironment(environment);
-  const configId = environment["META_LOGIN_CONFIG_ID"]?.trim();
-  if (!appId || !appSecret || !redirectUri || !configId) {
+  const classicMode = environment["META_LOGIN_MODE"]?.trim().toLowerCase() === "classic";
+  const rawConfigId = environment["META_LOGIN_CONFIG_ID"]?.trim();
+  const configId = classicMode || !rawConfigId ? null : rawConfigId;
+  if (!appId || !appSecret || !redirectUri) {
     throw new MetaLinkError(
       "SERVER_CONFIG_MISSING",
-      "O Login do Facebook para Empresas ainda não está configurado no servidor.",
+      "O Login do Facebook ainda não está configurado no servidor.",
     );
   }
-  if (!/^\d+$/.test(appId) || !/^\d+$/.test(configId)) {
+  if (!/^\d+$/.test(appId) || (configId !== null && !/^\d+$/.test(configId))) {
     throw new MetaLinkError(
       "SERVER_CONFIG_MISSING",
       "O App ID ou o ID da configuração empresarial da Meta é inválido.",
@@ -118,8 +126,9 @@ export function facebookConfigChecklist(
   if (!appId) issues.push("META_APP_ID não está definido.");
   else if (!/^\d+$/.test(appId)) issues.push("META_APP_ID deve conter apenas números.");
   if (!environment["META_APP_SECRET"]?.trim()) issues.push("META_APP_SECRET não está definido.");
-  if (!configId) issues.push("META_LOGIN_CONFIG_ID não está definido.");
-  else if (!/^\d+$/.test(configId)) issues.push("META_LOGIN_CONFIG_ID deve conter apenas números.");
+  if (configId && !/^\d+$/.test(configId)) {
+    issues.push("META_LOGIN_CONFIG_ID deve conter apenas números.");
+  }
 
   if (!redirectUri) {
     issues.push("Nenhuma URL de retorno pôde ser calculada (defina FACEBOOK_REDIRECT_URI ou PUBLIC_SITE_URL).");
@@ -257,8 +266,10 @@ export function verifyFacebookOAuthState(
 export function facebookAuthorizationUrl(
   userId: string,
   environment: NodeJS.ProcessEnv = process.env,
+  options: { forceClassic?: boolean } = {},
 ): string {
-  const configuration = facebookOAuthConfiguration(environment);
+  const base = facebookOAuthConfiguration(environment);
+  const configuration = options.forceClassic ? { ...base, configId: null } : base;
   // O Login for Business deve usar a mesma versão configurada para as chamadas Graph.
   // Isso evita a Meta resolver o diálogo com uma versão padrão diferente da configuração.
   const url = new URL(`https://www.facebook.com/${metaGraphVersion(environment)}/dialog/oauth`);
@@ -266,12 +277,16 @@ export function facebookAuthorizationUrl(
   url.searchParams.set("redirect_uri", configuration.redirectUri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("state", createFacebookOAuthState(userId, environment));
-  // No Login para Empresas, as permissões pertencem à configuração da Meta.
-  // Enviar `scope` junto (ou cair no OAuth clássico) faz a Meta rejeitar permissões
-  // empresariais como pages_read_engagement antes mesmo de abrir o consentimento.
-  url.searchParams.set("config_id", configuration.configId);
-  // Obrigatório para receber `code` no Login para Empresas.
-  url.searchParams.set("override_default_response_type", "true");
+  if (configuration.configId) {
+    // No Login para Empresas, as permissões pertencem à configuração da Meta.
+    url.searchParams.set("config_id", configuration.configId);
+    // Obrigatório para receber `code` no Login para Empresas.
+    url.searchParams.set("override_default_response_type", "true");
+  } else {
+    // Login clássico: as permissões vão em `scope` (usado quando não há
+    // configuração empresarial publicada, evitando o erro genérico da Meta).
+    url.searchParams.set("scope", FACEBOOK_SCOPES.join(","));
+  }
   return url.toString();
 }
 

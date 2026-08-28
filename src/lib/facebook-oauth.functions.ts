@@ -17,10 +17,15 @@ export const beginFacebookOAuth = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     try {
       const diagnostics = diagnoseFacebookOAuth();
+      // Se a configuração empresarial não existir/estiver despublicada, a Meta
+      // devolve "Sorry, something went wrong". Nesse caso usamos o login clássico.
+      const { verifyFacebookLoginConfiguration } = await import("@/lib/facebook-oauth.server");
+      const loginConfiguration = await verifyFacebookLoginConfiguration();
+      const forceClassic = !loginConfiguration.ok;
       return {
         ok: true as const,
-        authorizationUrl: facebookAuthorizationUrl(context.userId),
-        diagnostics,
+        authorizationUrl: facebookAuthorizationUrl(context.userId, process.env, { forceClassic }),
+        diagnostics: { ...diagnostics, mode: forceClassic ? ("classic" as const) : ("business" as const) },
       };
     } catch (error) {
       if (error instanceof MetaLinkError) {
