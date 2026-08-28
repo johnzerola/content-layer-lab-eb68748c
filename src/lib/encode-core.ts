@@ -11,6 +11,7 @@ import { drawFrame } from "./draw";
 import { CANVAS_H, CANVAS_W, type Template } from "./template";
 import { motionAt, type Variation } from "./variation";
 import type { CaptionCue } from "./captions";
+import { setBackdropQuality } from "./draw";
 import { keptSegments, segmentsDuration, srcTimeAt, type PreEdit } from "./preedit";
 import { cleanMp4Metadata } from "./mp4meta";
 import { FrameReader, videoDecoderSupported, type DecodedFrame } from "./decode";
@@ -166,7 +167,28 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
   };
   let checked = false;
 
+  // medição do custo de desenho: se cair muito, o fundo desfocado é degradado
+  // automaticamente em vez de deixar a exportação levar horas
+  let drawMs = 0;
+  let drawCount = 0;
+  let quality: "alta" | "media" | "baixa" = "alta";
+  setBackdropQuality("alta");
+  const watchDrawCost = (ms: number) => {
+    drawMs += ms;
+    drawCount++;
+    if (drawCount < 12) return;
+    const avg = drawMs / drawCount;
+    drawMs = 0;
+    drawCount = 0;
+    const next: typeof quality = avg > 120 ? "baixa" : avg > 45 ? "media" : quality;
+    if (next !== quality) {
+      quality = next;
+      setBackdropQuality(next);
+    }
+  };
+
   const emit = async (src: { el: CanvasImageSource; width: number; height: number }) => {
+    const drawStart = performance.now();
     const outTime = frameIndex / fps;
     const srcTime = srcTimeAt(segments, outTime * v.speed);
     const mo = hasMotion
@@ -198,6 +220,8 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
     }
 
 
+
+    watchDrawCost(performance.now() - drawStart);
 
     const frame = new VideoFrame(canvas, {
       timestamp: frameIndex * frameDur,
