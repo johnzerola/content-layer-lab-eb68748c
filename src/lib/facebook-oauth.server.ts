@@ -275,12 +275,16 @@ export function facebookAuthorizationUrl(
   url.searchParams.set("redirect_uri", configuration.redirectUri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("state", createFacebookOAuthState(userId, environment));
-  // No Login para Empresas, as permissões pertencem à configuração da Meta.
-  // Enviar `scope` junto (ou cair no OAuth clássico) faz a Meta rejeitar permissões
-  // empresariais como pages_read_engagement antes mesmo de abrir o consentimento.
-  url.searchParams.set("config_id", configuration.configId);
-  // Obrigatório para receber `code` no Login para Empresas.
-  url.searchParams.set("override_default_response_type", "true");
+  if (configuration.configId) {
+    // No Login para Empresas, as permissões pertencem à configuração da Meta.
+    url.searchParams.set("config_id", configuration.configId);
+    // Obrigatório para receber `code` no Login para Empresas.
+    url.searchParams.set("override_default_response_type", "true");
+  } else {
+    // Login clássico: as permissões vão em `scope` (usado quando não há
+    // configuração empresarial publicada, evitando o erro genérico da Meta).
+    url.searchParams.set("scope", FACEBOOK_SCOPES.join(","));
+  }
   return url.toString();
 }
 
