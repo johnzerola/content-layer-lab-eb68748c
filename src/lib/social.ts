@@ -2,6 +2,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import { currentUser } from "@/lib/cloud";
 import type { LinkAccountResult } from "@/lib/social-linking.server";
+import {
+  summarizeIssues,
+  validateMediaForPlatform,
+  type MediaPlatform,
+  type MediaSpec,
+} from "@/lib/platform-media";
 
 export type PostKind = "reels" | "feed" | "stories" | "shorts";
 
