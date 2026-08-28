@@ -82,6 +82,7 @@ export function AutoScheduleModal({
               label: "Agendar no lote",
               run: (config) => {
                 onAutoConfig({
+                  type: "schedule",
                   accountId: config.accountId,
                   kind: config.kind,
                   caption: config.caption,
