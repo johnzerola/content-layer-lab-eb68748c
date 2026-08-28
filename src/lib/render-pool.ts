@@ -96,16 +96,6 @@ function handle(e: MessageEvent<WorkerResponse>) {
     job.onProgress?.(msg.p);
     return;
   }
-  if (false) {
-    job.watchdog = setTimeout(() => {
-      pending.delete(msg.id);
-      job.worker.terminate();
-      workers = workers.filter((candidate) => candidate !== job.worker);
-      job.reject(Object.assign(new Error("A renderização parou de responder"), { name: "RenderStalledError" }));
-    }, STALL_MS);
-    job.onProgress?.(msg.p);
-    return;
-  }
   pending.delete(msg.id);
   clearTimeout(job.watchdog);
   load.set(job.worker, Math.max(0, (load.get(job.worker) ?? 1) - 1));
