@@ -105,13 +105,14 @@ const clampOffset = (n: number) => Math.max(-1, Math.min(1, n));
 /** Renderiza para MP4 (H.264 + AAC) usando WebCodecs — mais rápido que tempo real. */
 export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
   const fps = opts.fps ?? 30;
-  const bitrate = opts.bitrate ?? 10_000_000;
   const t = opts.template;
   const W = t.canvasW ?? CANVAS_W;
   const H = t.canvasH ?? CANVAS_H;
+  const tier = opts.tier ?? "balanced";
+  const bitrate = opts.bitrate ?? pickBitrate({ width: W, height: H, fps, tier });
   const v = opts.variation;
 
-  const picked = await pickVideoCodec(W, H, bitrate, fps);
+  const picked = await pickVideoCodec(W, H, bitrate, fps, tier);
   if (!picked) throw new Error("Codificação de vídeo não suportada neste navegador");
   const videoConfig = picked.cfg;
 
