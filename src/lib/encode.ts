@@ -242,8 +242,11 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     const frameDur = Math.round(1_000_000 / fps);
 
     let averageFrameMs = 1000 / fps;
+    /** caminho de leitura em uso — reportado para o painel de diagnóstico */
+    let path: "turbo" | "reprodução" | "busca precisa" = "turbo";
     const emit = async (src?: { el: CanvasImageSource; width: number; height: number }) => {
       const startedAt = performance.now();
+
       // tempo do vídeo fonte correspondente a este frame (legendas sincronizadas)
       const outTime = frameIndex / fps;
       const srcTime = srcTimeAt(segments, outTime * v.speed);
