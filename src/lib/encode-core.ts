@@ -177,6 +177,30 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
   const frameDur = Math.round(1_000_000 / fps);
   let frameIndex = 0;
 
+  // Verificação anti-quadro-preto: se o vídeo da fonte tem imagem mas o quadro
+  // montado sai praticamente preto, o desenho falhou (decodificação sem pixels
+  // úteis). Melhor abortar e deixar o caminho com <video> assumir.
+  const probe = new OffscreenCanvas(32, 32);
+  const pctx = probe.getContext("2d", { willReadFrequently: true }) as
+    | OffscreenCanvasRenderingContext2D
+    | null;
+  const litRatio = (img: CanvasImageSource) => {
+    if (!pctx) return 1;
+    pctx.clearRect(0, 0, 32, 32);
+    try {
+      pctx.drawImage(img, 0, 0, 32, 32);
+    } catch {
+      return 1;
+    }
+    const d = pctx.getImageData(0, 0, 32, 32).data;
+    let lit = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i]! > 12 || d[i + 1]! > 12 || d[i + 2]! > 12) lit++;
+    }
+    return lit / (32 * 32);
+  };
+  let checked = false;
+
   const emit = async (src: { el: CanvasImageSource; width: number; height: number }) => {
     const outTime = frameIndex / fps;
     const srcTime = srcTimeAt(segments, outTime * v.speed);
@@ -198,6 +222,17 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
       time: srcTime,
       quality: "hq" as const,
     });
+
+    if (!checked && frameIndex >= 2) {
+      checked = true;
+      const srcLit = litRatio(src.el);
+      const outLit = litRatio(canvas);
+      if (srcLit > 0.2 && outLit < 0.05) {
+        throw new Error("Quadros saíram pretos na renderização em segundo plano");
+      }
+    }
+
+
 
     const frame = new VideoFrame(canvas, {
       timestamp: frameIndex * frameDur,
