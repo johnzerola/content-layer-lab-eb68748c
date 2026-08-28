@@ -346,6 +346,7 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
   }
 
   muxer.finalize();
+  if (seeks > 0) console.info(`[render] ${seeks} reposicionamentos do decodificador`);
   opts.onProgress?.(1);
   const raw = muxer.target.buffer as ArrayBuffer;
   return t.antiDup?.cleanMetadata === false ? raw : cleanMp4Metadata(raw);
