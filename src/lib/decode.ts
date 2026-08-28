@@ -55,6 +55,12 @@ export class FrameReader {
     if (!videoDecoderSupported()) return null;
     const track = await demuxMp4(file);
     if (!track || !track.samples.length) return null;
+    // tabela de amostras precisa apontar para dentro do arquivo, senão o
+    // decodificador recebe bytes errados e a imagem sai embaralhada.
+    for (const s of track.samples) {
+      if (s.offset < 0 || s.size <= 0 || s.offset + s.size > file.size) return null;
+    }
+
     try {
       const cfg: VideoDecoderConfig = {
         codec: track.codec,
