@@ -3,6 +3,7 @@ import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { mediaProxyTicket, workerResolveMedia } from "@/lib/cleaner.server";
 import { safeRemoteUrl } from "@/lib/remote-url";
+import { assertSafeRemoteUrl } from "@/lib/remote-url.server";
 
 export interface ResolvedVideo {
   ok: boolean;
@@ -46,7 +47,7 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
     return { url: input.url.trim() };
   })
   .handler(async ({ data }): Promise<ResolvedVideo> => {
-    const target = safeRemoteUrl(data.url);
+    const target = await assertSafeRemoteUrl(data.url);
     if (!target) return { ok: false, message: "Link inválido ou não permitido." };
 
     const host = target.hostname.replace(/^www\./, "");
