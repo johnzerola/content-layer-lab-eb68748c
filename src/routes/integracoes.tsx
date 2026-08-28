@@ -123,15 +123,22 @@ function IntegrationsPage() {
           return;
         }
         const authorizationUrl = new URL(response.authorizationUrl);
-        if (
-          authorizationUrl.pathname !== `/${response.diagnostics.graphVersion}/dialog/oauth` ||
-          authorizationUrl.searchParams.get("redirect_uri") !==
-            `${response.diagnostics.redirectOrigin}${response.diagnostics.redirectPath}`
-        ) {
-          toast.error("A configuração gerada para o Facebook não passou na validação de segurança.");
+        const expectedPath = `/${response.diagnostics.graphVersion}/dialog/oauth`;
+        const expectedRedirect = `${response.diagnostics.redirectOrigin}${response.diagnostics.redirectPath}`;
+        if (authorizationUrl.pathname !== expectedPath) {
+          toast.error(
+            `Versão do Graph divergente: esperado ${expectedPath}, gerado ${authorizationUrl.pathname}.`,
+          );
+          return;
+        }
+        if (authorizationUrl.searchParams.get("redirect_uri") !== expectedRedirect) {
+          toast.error(
+            `URL de retorno divergente: esperado ${expectedRedirect}, gerado ${authorizationUrl.searchParams.get("redirect_uri") ?? "vazio"}.`,
+          );
           return;
         }
         window.location.href = response.authorizationUrl;
+
       } catch {
         toast.error("Não foi possível iniciar a autorização.");
       } finally {
