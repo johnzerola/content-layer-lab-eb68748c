@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useState } from "react";
 import {
   CheckCircle2,
+  Star,
   Facebook,
   Instagram,
   Loader2,
