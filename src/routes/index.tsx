@@ -1403,6 +1403,10 @@ function Home() {
                 captions: cues,
                 plate,
                 signal: ac.signal,
+                onStats: ({ path, fps }) => {
+                  updateBatchProgress({ itemFps: fps });
+                  setBatchPhase(`${stageLabel} · ${path}`);
+                },
                 onProgress: (p) => {
                   const value = (at + p) / total;
                   // atualiza a interface no máximo a cada 150 ms: a fila e as
@@ -1414,8 +1418,15 @@ function Home() {
                     prev.map((x) => (x.id === id ? { ...x, progress: value } : x)),
                   );
                   updateJob(id, { progress: value });
-                  updateBatchProgress({ itemProgress: value, itemLabel: item.file.name });
+                  // o render ocupa a faixa 15%–95% do item; preparo e
+                  // finalização já contam antes e depois
+                  updateBatchProgress({
+                    itemProgress: renderScale(value),
+                    itemLabel: item.file.name,
+                  });
                 },
+
+
 
               });
               const label = [outs.length > 1 ? plat.short : "", n > 1 ? `v${k + 1}` : ""]
