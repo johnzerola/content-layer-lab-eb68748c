@@ -26,6 +26,8 @@ export interface EncodeOptions {
   headline?: string | undefined;
   fps?: number | undefined;
   bitrate?: number | undefined;
+  /** qualidade alvo quando o bitrate não é informado */
+  tier?: QualityTier | undefined;
   /** aceleração de leitura do vídeo fonte (1 = tempo real) */
   turbo?: number | undefined;
   /** recorte do vídeo fonte (clipagem automática) */
