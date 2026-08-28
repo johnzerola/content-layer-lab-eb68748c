@@ -366,7 +366,11 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     // Sem reprodução em tempo real: cada quadro sai do decodificador com o
     // carimbo de tempo exato, na velocidade máxima da máquina.
     if (frameIndex < totalFrames && videoDecoderSupported()) {
-      const reader = await FrameReader.open(opts.file).catch(() => null);
+      path = "turbo";
+      const reader = await FrameReader.open(opts.file).catch((err) => {
+        console.warn("Turbo indisponível (leitor de quadros):", err);
+        return null;
+      });
       if (reader) {
         let cur: DecodedFrame | null = null;
         try {
@@ -399,12 +403,14 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
         } catch (err) {
           if ((err as Error)?.name === "AbortError") throw err;
           // qualquer falha na decodificação direta: segue pelos caminhos antigos
+          console.warn("Turbo interrompido, caindo para reprodução:", err);
         } finally {
           cur?.frame.close();
           reader.close();
         }
       }
     }
+
 
 
 
