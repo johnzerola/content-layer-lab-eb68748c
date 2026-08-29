@@ -25,6 +25,7 @@ import {
   Eye,
   CalendarClock,
   CloudCog,
+  LayoutTemplate,
 } from "lucide-react";
 import { QuickPreviewModal } from "@/components/QuickPreviewModal";
 import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
