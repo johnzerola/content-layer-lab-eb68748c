@@ -2045,6 +2045,14 @@ function Home() {
               </div>
             )}
             <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" onClick={() => setLibraryOpen(true)}>
+                <LayoutTemplate className="size-4" /> Meus templates
+                {templates.length > 0 && (
+                  <span className="ml-1 font-mono text-[11px] text-muted-foreground">
+                    ({templates.length})
+                  </span>
+                )}
+              </Button>
               {templates.length > 0 && (
                 <select
                   className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm"
