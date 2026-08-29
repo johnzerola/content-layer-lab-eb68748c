@@ -59,7 +59,8 @@ export function buildPhotoVariation(
     crop: Math.abs(span(0.05)),
     zoom: 1 + Math.abs(span(0.05)),
     rotate: span(0.9),
-    mirror: mirrorAllowed && rnd() > 0.5,
+    // quando o usuário liga o espelhamento, ele é sempre aplicado (escolha explícita)
+    mirror: mirrorAllowed,
     brightness: 1 + span(0.07),
     contrast: 1 + span(0.07),
     saturation: 1 + span(0.09),
