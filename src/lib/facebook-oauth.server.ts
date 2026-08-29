@@ -8,8 +8,8 @@ const OAUTH_TTL_MS = 10 * 60 * 1000;
 /**
  * Permissões mínimas para publicar em Páginas do Facebook e contas IG Business.
  * `pages_read_engagement` fica de fora por padrão: em apps sem o caso de uso
- * liberado a Meta rejeita o diálogo com "Invalid Scopes". Pode ser reativada
- * (ou ajustada) com META_LOGIN_SCOPES, separando por vírgula.
+ * liberado a Meta rejeita o diálogo com "Invalid Scopes". Overrides de ambiente
+ * também passam pela allowlist abaixo e nunca conseguem reativá-la.
  */
 export const FACEBOOK_SCOPES = [
   "pages_show_list",
@@ -117,6 +117,8 @@ export type FacebookConfigCheck = {
   graphVersion: string;
   appId: string | null;
   configId: string | null;
+  mode: "classic" | "business";
+  effectiveScopes: string[];
   redirectUri: string | null;
   siteUrl: string | null;
   authorizationUrl: string | null;
@@ -136,6 +138,9 @@ export function facebookConfigChecklist(
   const issues: string[] = [];
   const appId = environment["META_APP_ID"]?.trim() ?? null;
   const configId = environment["META_LOGIN_CONFIG_ID"]?.trim() ?? null;
+  const mode = environment["META_LOGIN_MODE"]?.trim().toLowerCase() === "classic" || !configId
+    ? "classic"
+    : "business";
   const siteUrl = environment["PUBLIC_SITE_URL"]?.trim().replace(/\/$/, "") ?? null;
   const redirectUri = callbackFromEnvironment(environment) || null;
   const graphVersion = metaGraphVersion(environment);
@@ -179,6 +184,8 @@ export function facebookConfigChecklist(
     graphVersion,
     appId,
     configId: mask(configId),
+    mode,
+    effectiveScopes: mode === "classic" ? facebookScopes(environment) : [],
     redirectUri,
     siteUrl,
     authorizationUrl,
@@ -195,6 +202,14 @@ export async function verifyFacebookLoginConfiguration(input: {
   const appId = environment["META_APP_ID"]?.trim();
   const appSecret = environment["META_APP_SECRET"]?.trim();
   const configId = environment["META_LOGIN_CONFIG_ID"]?.trim();
+  const classicMode = environment["META_LOGIN_MODE"]?.trim().toLowerCase() === "classic";
+  if (classicMode) {
+    return {
+      checked: false,
+      ok: true,
+      detail: "Modo clássico ativo; a configuração do Login para Empresas não é usada.",
+    };
+  }
   if (!appId || !appSecret || !configId) {
     return { checked: false, ok: false, detail: "Credenciais incompletas no servidor." };
   }
