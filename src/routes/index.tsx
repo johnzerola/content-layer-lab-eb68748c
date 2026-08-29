@@ -26,6 +26,7 @@ import {
   CalendarClock,
   CloudCog,
   LayoutTemplate,
+  CopyPlus,
 } from "lucide-react";
 import { QuickPreviewModal } from "@/components/QuickPreviewModal";
 import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
@@ -68,6 +69,7 @@ import {
   fitCanvasToSource,
   orientationOf,
   loadTemplates,
+  duplicateTemplate,
   migrate,
   PLATFORM_PRESETS,
   RATIO_PRESETS,
@@ -2057,7 +2059,7 @@ function Home() {
                 variant="outline"
                 title="Cria um template novo a partir do atual, sem mexer no original"
                 onClick={() => {
-                  const base = activeRef.current;
+                  const base = active;
                   const name = window.prompt(
                     "Nome do novo template (o atual fica intacto):",
                     `${base.name} 2`,
