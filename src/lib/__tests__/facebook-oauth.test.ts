@@ -42,6 +42,32 @@ describe("Facebook Login for Business", () => {
     expect(url.searchParams.get("scope")).not.toContain("unknown_scope");
   });
 
+  it("uses the complete safe allowlist when no scope override exists", () => {
+    const url = new URL(facebookAuthorizationUrl("user-123", {
+      ...environment,
+      META_LOGIN_MODE: "classic",
+      META_LOGIN_SCOPES: undefined,
+    }));
+    expect(url.searchParams.get("scope")?.split(",")).toEqual([
+      "pages_show_list",
+      "pages_manage_posts",
+      "instagram_basic",
+      "instagram_content_publish",
+    ]);
+  });
+
+  it("falls back to the safe allowlist when an override contains only invalid scopes", () => {
+    const url = new URL(facebookAuthorizationUrl("user-123", {
+      ...environment,
+      META_LOGIN_MODE: "classic",
+      META_LOGIN_SCOPES: "pages_read_engagement,unknown_scope",
+    }));
+    expect(url.searchParams.get("scope")).toBe(
+      "pages_show_list,pages_manage_posts,instagram_basic,instagram_content_publish",
+    );
+    expect(url.searchParams.get("scope")).not.toContain("pages_read_engagement");
+  });
+
   it("returns only safe diagnostics", () => {
     const diagnostics = diagnoseFacebookOAuth(environment);
     expect(diagnostics).toEqual({

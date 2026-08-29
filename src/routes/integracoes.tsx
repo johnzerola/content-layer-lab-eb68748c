@@ -340,6 +340,8 @@ type MetaCheck = {
   graphVersion: string;
   appId: string | null;
   configId: string | null;
+  mode: "classic" | "business";
+  effectiveScopes: string[];
   redirectUri: string | null;
   siteUrl: string | null;
   authorizationUrl: string | null;
@@ -390,6 +392,11 @@ function MetaDiagnosticsPanel() {
             <Row label="Versão do Graph" value={state.check.graphVersion} />
             <Row label="App ID" value={state.check.appId ?? "não definido"} />
             <Row label="config_id" value={state.check.configId ?? "não definido"} />
+            <Row label="Modo efetivo" value={state.check.mode === "classic" ? "Login clássico" : "Login para Empresas"} />
+            <Row
+              label="Permissões enviadas"
+              value={state.check.mode === "classic" ? state.check.effectiveScopes.join(", ") : "Definidas no config_id da Meta"}
+            />
             <Row label="URL de retorno" value={state.check.redirectUri ?? "não definida"} />
             <Row label="Site público" value={state.check.siteUrl ?? "não definido"} />
           </dl>
