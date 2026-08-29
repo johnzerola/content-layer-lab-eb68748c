@@ -18,7 +18,9 @@ import {
   Settings2,
   BarChart3,
   Shield,
+  Images,
 } from "lucide-react";
+
 import { PlanGate } from "@/components/PlanGate";
 import { useAccess } from "@/lib/subscription";
 import { planFromId } from "@/lib/plan";
@@ -229,6 +231,14 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             {open && "Templates"}
           </button>
           <Link
+            to="/fotos"
+            title="FotoViral — fotos em lote"
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+          >
+            <Images className="size-[18px] shrink-0" />
+            {open && "FotoViral"}
+          </Link>
+          <Link
             to="/live"
             title="Monitora Live"
             className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
@@ -236,6 +246,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             <Radio className="size-[18px] shrink-0" />
             {open && "Monitora Live"}
           </Link>
+
           <Link
             to="/biblioteca"
             title="Biblioteca de Resultados"
