@@ -174,7 +174,7 @@ function IntegrationsPage() {
         setBusy(null);
       }
     },
-    [startFacebook],
+    [startFacebook, startYoutube],
   );
 
   const disconnect = useCallback(
