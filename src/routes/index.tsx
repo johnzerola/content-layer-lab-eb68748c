@@ -2053,6 +2053,21 @@ function Home() {
                   </span>
                 )}
               </Button>
+              <Button
+                variant="outline"
+                title="Cria um template novo a partir do atual, sem mexer no original"
+                onClick={() => {
+                  const base = activeRef.current;
+                  const name = window.prompt(
+                    "Nome do novo template (o atual fica intacto):",
+                    `${base.name} 2`,
+                  );
+                  if (name === null) return;
+                  commit(duplicateTemplate(base, name.trim() || `${base.name} 2`), "novo template");
+                }}
+              >
+                <CopyPlus className="size-4" /> Salvar como novo
+              </Button>
               {templates.length > 0 && (
                 <select
                   className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm"
