@@ -20,6 +20,7 @@ import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 import { listAccounts, removeAccount, type SocialAccount } from "@/lib/social";
 
 import { beginFacebookOAuth, diagnoseFacebookIntegration } from "@/lib/facebook-oauth.functions";
+import { beginYoutubeOAuth } from "@/lib/youtube-oauth.functions";
 import { setPrimaryAccount } from "@/lib/social-primary.functions";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,14 @@ const META_PLATFORMS: Array<{
   },
 ];
 
+const YOUTUBE_PLATFORM = {
+  platform: "youtube" as const,
+  name: "YouTube",
+  description:
+    "Vídeos longos e Shorts com publicação automática via YouTube Data API. A autorização é feita pela sua conta Google.",
+  icon: Youtube,
+};
+
 function IntegrationsPage() {
   const [mode, setMode] = useState<AppMode>("external");
   const jobs = listJobs();
@@ -77,6 +86,7 @@ function IntegrationsPage() {
   const [busy, setBusy] = useState<PlatformKey | null>(null);
 
   const startFacebook = useServerFn(beginFacebookOAuth);
+  const startYoutube = useServerFn(beginYoutubeOAuth);
   const makePrimary = useServerFn(setPrimaryAccount);
 
   useEffect(() => {
@@ -102,6 +112,15 @@ function IntegrationsPage() {
     async (platform: PlatformKey) => {
       setBusy(platform);
       try {
+        if (platform === "youtube") {
+          const response = await startYoutube();
+          if (!response.ok) {
+            toast.error(response.error);
+            return;
+          }
+          window.location.href = response.authorizationUrl;
+          return;
+        }
         // O mesmo Facebook Login autoriza a Página e a conta Instagram
         // profissional vinculada a ela.
         const response = await startFacebook();
@@ -147,7 +166,7 @@ function IntegrationsPage() {
         setBusy(null);
       }
     },
-    [startFacebook],
+    [startFacebook, startYoutube],
   );
 
   const disconnect = useCallback(
@@ -182,7 +201,9 @@ function IntegrationsPage() {
 
   const facebookAccounts = accounts.filter((account) => account.platform === "facebook");
   const instagramAccounts = accounts.filter((account) => account.platform === "instagram");
+  const youtubeAccounts = accounts.filter((account) => account.platform === "youtube");
   const hasMetaAccounts = facebookAccounts.length + instagramAccounts.length > 0;
+  const hasYoutubeAccounts = youtubeAccounts.length > 0;
   const syncingMeta = busy === "facebook" || busy === "instagram";
 
   return (
@@ -197,28 +218,46 @@ function IntegrationsPage() {
         <header className="mb-6 flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="mono-label text-primary">Contas sociais</p>
-            <h1 className="mt-2 font-display text-2xl font-bold">Facebook e Instagram</h1>
+            <h1 className="mt-2 font-display text-2xl font-bold">Canais de publicação</h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              As Páginas autorizadas e seus Instagrams profissionais vinculados são sincronizados
-              juntos pelo Login da Meta.
+              Sincronize Páginas, contas profissionais e canais autorizados para publicar sem
+              precisar compartilhar senhas.
             </p>
           </div>
           {user && (
-            <Button
-              type="button"
-              disabled={syncingMeta}
-              onClick={() => void connect("facebook")}
-              className="min-h-10 shrink-0"
-            >
-              {syncingMeta ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : hasMetaAccounts ? (
-                <RefreshCw className="size-4" />
-              ) : (
-                <Facebook className="size-4" />
-              )}
-              {hasMetaAccounts ? "Atualizar seleção Meta" : "Conectar com a Meta"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                disabled={syncingMeta}
+                onClick={() => void connect("facebook")}
+                className="min-h-10 shrink-0"
+              >
+                {syncingMeta ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : hasMetaAccounts ? (
+                  <RefreshCw className="size-4" />
+                ) : (
+                  <Facebook className="size-4" />
+                )}
+                {hasMetaAccounts ? "Atualizar Meta" : "Conectar Meta"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy === "youtube"}
+                onClick={() => void connect("youtube")}
+                className="min-h-10 shrink-0"
+              >
+                {busy === "youtube" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : hasYoutubeAccounts ? (
+                  <RefreshCw className="size-4" />
+                ) : (
+                  <Youtube className="size-4" />
+                )}
+                {hasYoutubeAccounts ? "Atualizar YouTube" : "Conectar YouTube"}
+              </Button>
+            </div>
           )}
         </header>
 
@@ -254,12 +293,31 @@ function IntegrationsPage() {
           </section>
         )}
 
+        {user && (
+          <section className="mt-4 border border-border/70 bg-surface/50">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <ShieldCheck className="size-4 text-emerald-400" />
+                Conexão oficial Google
+              </div>
+              <p className="text-xs text-muted-foreground">{youtubeAccounts.length} canal(is)</p>
+            </div>
+            <AccountsColumn
+              platform={YOUTUBE_PLATFORM}
+              accounts={youtubeAccounts}
+              divided={false}
+              onPrimary={choosePrimary}
+              onRemove={disconnect}
+            />
+          </section>
+        )}
+
         <section className="mt-6 grid gap-4 border-t border-border pt-5 text-xs text-muted-foreground sm:grid-cols-[1fr_auto] sm:items-start">
           <div>
             <p className="font-medium text-foreground">Segurança da conexão</p>
             <p className="mt-1 max-w-3xl leading-relaxed">
-              O VaiViral recebe tokens oficiais da Meta, armazena-os criptografados e nunca solicita
-              sua senha. Você pode remover qualquer Página ou Instagram desta lista.
+              O VaiViral recebe tokens oficiais da Meta e do Google, armazena-os criptografados e
+              nunca solicita sua senha. Você pode remover qualquer conexão desta lista.
             </p>
           </div>
           <div className="flex gap-4">
@@ -276,7 +334,6 @@ function IntegrationsPage() {
           <p className="mono-label text-muted-foreground">Próximas integrações</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <ComingSoon icon={Settings2} name="TikTok" />
-            <ComingSoon icon={Youtube} name="YouTube" />
           </div>
         </section>
       </main>
@@ -291,7 +348,7 @@ function AccountsColumn({
   onPrimary,
   onRemove,
 }: {
-  platform: (typeof META_PLATFORMS)[number];
+  platform: (typeof META_PLATFORMS)[number] | typeof YOUTUBE_PLATFORM;
   accounts: SocialAccount[];
   divided: boolean;
   onPrimary: (account: SocialAccount) => Promise<void>;
