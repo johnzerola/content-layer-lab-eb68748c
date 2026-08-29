@@ -73,6 +73,12 @@ describe("anti-duplicidade de fotos", () => {
     }
   });
 
+  it("espelha sempre quando o espelhamento está ligado", () => {
+    for (let i = 0; i < 5; i += 1) {
+      expect(buildPhotoVariation(hashSeed(`mm${i}`), 1, true).mirror).toBe(true);
+    }
+  });
+
   it("não espelha quando o espelhamento está desligado", () => {
     for (let i = 0; i < 20; i += 1) {
       expect(buildPhotoVariation(hashSeed(`m${i}`), 1, false).mirror).toBe(false);
