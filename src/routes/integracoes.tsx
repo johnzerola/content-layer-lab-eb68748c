@@ -341,7 +341,10 @@ type MetaCheck = {
   appId: string | null;
   configId: string | null;
   mode: "classic" | "business";
+  usesConfigId: boolean;
   effectiveScopes: string[];
+  permissionSource: "manual-scope" | "meta-business-configuration";
+  permissionWarning: string | null;
   redirectUri: string | null;
   siteUrl: string | null;
   authorizationUrl: string | null;
@@ -391,15 +394,22 @@ function MetaDiagnosticsPanel() {
           <dl className="grid gap-2 sm:grid-cols-2">
             <Row label="Versão do Graph" value={state.check.graphVersion} />
             <Row label="App ID" value={state.check.appId ?? "não definido"} />
-            <Row label="config_id" value={state.check.configId ?? "não definido"} />
             <Row label="Modo efetivo" value={state.check.mode === "classic" ? "Login clássico" : "Login para Empresas"} />
+            <Row label="Usando config_id" value={state.check.usesConfigId ? `Sim (${state.check.configId ?? "configurado"})` : "Não"} />
             <Row
-              label="Permissões enviadas"
-              value={state.check.mode === "classic" ? state.check.effectiveScopes.join(", ") : "Definidas no config_id da Meta"}
+              label="Scopes enviados pelo app"
+              value={state.check.mode === "classic" ? state.check.effectiveScopes.join(",") : "Nenhum — definidos na configuração da Meta"}
             />
             <Row label="URL de retorno" value={state.check.redirectUri ?? "não definida"} />
             <Row label="Site público" value={state.check.siteUrl ?? "não definido"} />
           </dl>
+
+          {state.check.permissionWarning && (
+            <p className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-300">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+              <span>{state.check.permissionWarning}</span>
+            </p>
+          )}
 
           <p
             className={
@@ -441,7 +451,11 @@ function MetaDiagnosticsPanel() {
               </li>
               <li>• Domínio do SDK do JavaScript sem barra final</li>
               <li>• Ícone quadrado do app e Página do app associada</li>
-              <li>• Configuração do Login para Empresas publicada e app em modo Ativo</li>
+              {state.check.mode === "business" ? (
+                <li>• Configuração do Login para Empresas publicada e app em modo Ativo</li>
+              ) : (
+                <li>• Modo clássico ativo: config_id e permissões do caso de uso Business são ignorados</li>
+              )}
             </ul>
           </div>
         </div>

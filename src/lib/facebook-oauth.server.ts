@@ -23,10 +23,11 @@ const FACEBOOK_SCOPE_ALLOWLIST = new Set(FACEBOOK_SCOPES);
 export function facebookScopes(environment: NodeJS.ProcessEnv = process.env): string[] {
   const raw = environment["META_LOGIN_SCOPES"]?.trim();
   if (!raw) return FACEBOOK_SCOPES;
-  const parsed = raw
+  const requested = new Set(raw
     .split(",")
     .map((scope) => scope.trim())
-    .filter((scope) => FACEBOOK_SCOPE_ALLOWLIST.has(scope));
+    .filter((scope) => FACEBOOK_SCOPE_ALLOWLIST.has(scope)));
+  const parsed = FACEBOOK_SCOPES.filter((scope) => requested.has(scope));
   return parsed.length > 0 ? parsed : FACEBOOK_SCOPES;
 }
 
@@ -118,7 +119,10 @@ export type FacebookConfigCheck = {
   appId: string | null;
   configId: string | null;
   mode: "classic" | "business";
+  usesConfigId: boolean;
   effectiveScopes: string[];
+  permissionSource: "manual-scope" | "meta-business-configuration";
+  permissionWarning: string | null;
   redirectUri: string | null;
   siteUrl: string | null;
   authorizationUrl: string | null;
@@ -141,6 +145,7 @@ export function facebookConfigChecklist(
   const mode = environment["META_LOGIN_MODE"]?.trim().toLowerCase() === "classic" || !configId
     ? "classic"
     : "business";
+  const usesConfigId = mode === "business";
   const siteUrl = environment["PUBLIC_SITE_URL"]?.trim().replace(/\/$/, "") ?? null;
   const redirectUri = callbackFromEnvironment(environment) || null;
   const graphVersion = metaGraphVersion(environment);
@@ -183,9 +188,14 @@ export function facebookConfigChecklist(
   return {
     graphVersion,
     appId,
-    configId: mask(configId),
+    configId: usesConfigId ? mask(configId) : null,
     mode,
+    usesConfigId,
     effectiveScopes: mode === "classic" ? facebookScopes(environment) : [],
+    permissionSource: mode === "classic" ? "manual-scope" : "meta-business-configuration",
+    permissionWarning: mode === "business"
+      ? "No modo Business, as permissões vêm da configuração externa da Meta e podem incluir pages_read_engagement mesmo sem esse scope existir no código."
+      : null,
     redirectUri,
     siteUrl,
     authorizationUrl,

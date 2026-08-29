@@ -42,6 +42,29 @@ describe("Facebook Login for Business", () => {
     expect(url.searchParams.get("scope")).not.toContain("unknown_scope");
   });
 
+  it("forces classic mode without config_id and with the exact configured safe scopes", () => {
+    const url = new URL(facebookAuthorizationUrl("user-123", {
+      ...environment,
+      META_LOGIN_MODE: "classic",
+      META_LOGIN_SCOPES: "pages_show_list,pages_manage_posts,instagram_basic,instagram_content_publish",
+    }));
+    expect(url.searchParams.has("config_id")).toBe(false);
+    expect(url.searchParams.has("override_default_response_type")).toBe(false);
+    expect(url.searchParams.get("scope")).toBe(
+      "pages_show_list,pages_manage_posts,instagram_basic,instagram_content_publish",
+    );
+    expect(url.searchParams.get("scope")).not.toContain("pages_read_engagement");
+  });
+
+  it("keeps safe scope order, removes duplicates, and discards invalid overrides", () => {
+    const url = new URL(facebookAuthorizationUrl("user-123", {
+      ...environment,
+      META_LOGIN_MODE: "classic",
+      META_LOGIN_SCOPES: "unknown_scope,instagram_content_publish,pages_read_engagement,pages_show_list,instagram_content_publish",
+    }));
+    expect(url.searchParams.get("scope")).toBe("pages_show_list,instagram_content_publish");
+  });
+
   it("uses the complete safe allowlist when no scope override exists", () => {
     const url = new URL(facebookAuthorizationUrl("user-123", {
       ...environment,
@@ -80,6 +103,32 @@ describe("Facebook Login for Business", () => {
     expect(JSON.stringify(diagnostics)).not.toContain("37730893806558210");
     expect(JSON.stringify(diagnostics)).not.toContain("2291311094966424");
     expect(JSON.stringify(diagnostics)).not.toContain("server-only-secret");
+  });
+
+  it("reports that classic mode ignores a configured business login", () => {
+    const diagnostics = facebookConfigChecklist({
+      ...environment,
+      META_LOGIN_MODE: "classic",
+      META_LOGIN_SCOPES: "pages_show_list,pages_manage_posts,instagram_basic,instagram_content_publish",
+    });
+    expect(diagnostics.mode).toBe("classic");
+    expect(diagnostics.usesConfigId).toBe(false);
+    expect(diagnostics.configId).toBeNull();
+    expect(diagnostics.effectiveScopes).toEqual([
+      "pages_show_list",
+      "pages_manage_posts",
+      "instagram_basic",
+      "instagram_content_publish",
+    ]);
+    expect(diagnostics.permissionWarning).toBeNull();
+  });
+
+  it("reports that business mode delegates permissions to the Meta configuration", () => {
+    const diagnostics = facebookConfigChecklist(environment);
+    expect(diagnostics.mode).toBe("business");
+    expect(diagnostics.usesConfigId).toBe(true);
+    expect(diagnostics.effectiveScopes).toEqual([]);
+    expect(diagnostics.permissionWarning).toContain("pages_read_engagement");
   });
 
   it("rejects malformed IDs and callback URLs before redirecting", () => {
