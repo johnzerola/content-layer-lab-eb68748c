@@ -17,11 +17,6 @@ export interface SaveProgress {
   target: "disco" | "memória";
 }
 
-type SavePicker = (opts?: {
-  suggestedName?: string;
-  types?: { description: string; accept: Record<string, string[]> }[];
-}) => Promise<FileSystemFileHandle>;
-
 type DirPicker = () => Promise<FileSystemDirectoryHandle>;
 
 function triggerDownload(blob: Blob, name: string) {
@@ -29,8 +24,16 @@ function triggerDownload(blob: Blob, name: string) {
   const a = document.createElement("a");
   a.href = url;
   a.download = name;
+  a.rel = "noopener";
+  // alguns navegadores só disparam o download se o link estiver no DOM
+  a.style.display = "none";
+  document.body.appendChild(a);
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 8000);
+  // arquivos grandes precisam de tempo para o navegador iniciar a gravação
+  setTimeout(() => {
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, 60_000);
 }
 
 function totalBytes(files: OutFile[]) {
@@ -61,10 +64,9 @@ export function formatBytes(n: number) {
 /**
  * Baixa vários arquivos como ZIP.
  *
- * Quando o navegador permite (Chrome/Edge), o ZIP é escrito direto no disco em
- * streaming: não importa se são 50 MB ou 20 GB, a memória fica estável e o
- * usuário vê o progresso real em bytes. Sem essa API, montamos o pacote em
- * pedaços (também com progresso) antes de entregar o arquivo.
+ * O pacote é montado em pedaços (com progresso real em bytes) e entregue como
+ * download direto — sem diálogo de "salvar como", que em iframes/abas sem
+ * ativação de usuário podia travar silenciosamente e nada baixar.
  */
 export async function downloadAsZip(
   files: OutFile[],
@@ -80,38 +82,7 @@ export async function downloadAsZip(
 
   const total = totalBytes(files);
   const entries = files.map((f) => ({ name: f.name, input: f.blob, lastModified: new Date() }));
-  const picker = (window as unknown as { showSaveFilePicker?: SavePicker }).showSaveFilePicker;
 
-  if (picker) {
-    try {
-      const handle = await picker({
-        suggestedName: zipName,
-        types: [{ description: "ZIP", accept: { "application/zip": [".zip"] } }],
-      });
-      const writable = await handle.createWritable();
-      const reader = downloadZip(entries).body?.getReader();
-      if (reader) {
-        let bytes = 0;
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          await writable.write(value);
-          bytes += value.byteLength;
-          onProgress?.({ bytes, total, files: 0, target: "disco" });
-        }
-        await writable.close();
-        return;
-      }
-      await writable.write(await downloadZip(entries).blob());
-      await writable.close();
-      return;
-    } catch (err) {
-      if ((err as Error)?.name === "AbortError") return;
-      /* sem permissão: cai no download normal */
-    }
-  }
-
-  // Sem acesso ao disco: junta em pedaços para conseguir reportar progresso.
   const stream = downloadZip(entries).body;
   if (!stream) {
     triggerDownload(await downloadZip(entries).blob(), zipName);
