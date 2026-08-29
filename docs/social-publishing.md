@@ -85,7 +85,7 @@ curl --request POST \
 Resposta saudável, mesmo sem posts:
 
 ```json
-{"ok":true,"processed":0,"published":0,"retrying":0,"failed":0}
+{ "ok": true, "processed": 0, "published": 0, "retrying": 0, "failed": 0 }
 ```
 
 Depois confira o job e as últimas execuções no SQL Editor:
@@ -136,8 +136,60 @@ o fallback global, que existe apenas para registros legados `pending`.
 Uma conexão por conta pode selecionar `meta` ou `ayrshare`, mas credenciais por
 usuário só devem ser ativadas depois que o secret store estiver disponível.
 
-Facebook, TikTok e YouTube aparecem como “Em preparação”; não existem adapters
-de publicação para essas plataformas.
+Facebook e Instagram usam OAuth oficial da Meta e adapters próprios de
+publicação. TikTok e YouTube continuam em preparação.
+
+## OAuth Meta (Facebook e Instagram)
+
+O conector combinado usa Facebook Login, troca o código por token de longa
+duração e chama `GET /me/accounts` para obter os tokens das Páginas e a conta
+Instagram profissional vinculada. Os scopes mínimos são fixos no código:
+
+```text
+pages_show_list
+pages_read_engagement
+pages_manage_posts
+instagram_basic
+instagram_content_publish
+```
+
+`pages_read_engagement` não é opcional neste fluxo: ela é necessária para ler
+as Páginas e o vínculo `instagram_business_account`. Definir um secret não
+adiciona uma permissão ao App Dashboard da Meta.
+
+No painel Meta for Developers, abra os casos de uso **Gerenciar Páginas** e
+**API do Instagram com login do Facebook**, depois entre em **Permissões e
+recursos**. Cada permissão acima deve estar adicionada ao app. Se
+`pages_read_engagement` mostrar o botão **Adicionar** ou apenas **Encontrado em
+casos de uso**, clique em **Adicionar** (ou em **Add required content
+permissions** no assistente do Instagram) antes de testar o login.
+
+Secrets de produção:
+
+```text
+META_APP_ID=<app id numérico>
+META_APP_SECRET=<segredo do app>
+META_GRAPH_VERSION=v26.0
+META_LOGIN_MODE=classic
+FACEBOOK_REDIRECT_URI=https://content-layer-lab.lovable.app/integracoes/facebook/callback
+PUBLIC_SITE_URL=https://content-layer-lab.lovable.app
+```
+
+O modo clássico é o padrão e sempre envia os scopes acima. Um
+`META_LOGIN_CONFIG_ID` antigo é ignorado. Para usar Login para Empresas, altere
+explicitamente para `META_LOGIN_MODE=business`, defina
+`META_LOGIN_CONFIG_ID` e publique na Meta uma configuração que contenha todos
+os scopes obrigatórios.
+
+Após o callback, o servidor consulta `/debug_token` e interrompe a conexão se o
+token pertencer a outro app ou se faltar qualquer permissão. O painel
+administrativo em `/integracoes` mostra modo, scopes e URL OAuth sem expor
+segredos ou tokens.
+
+Referências de implementação: coleção oficial da Meta para Instagram API e o
+projeto MIT `Binary-Black-Holes/instagram-api`. O projeto AGPL BrightBean Studio
+foi usado apenas para comparação de comportamento; nenhum código AGPL foi
+copiado.
 
 ## Diagnóstico
 

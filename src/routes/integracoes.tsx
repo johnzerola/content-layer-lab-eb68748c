@@ -30,7 +30,8 @@ export const Route = createFileRoute("/integracoes")({
       { title: "Minhas contas sociais — VaiViral" },
       {
         name: "description",
-        content: "Conecte quantas contas do Instagram e Páginas do Facebook quiser para publicar em lote.",
+        content:
+          "Conecte quantas contas do Instagram e Páginas do Facebook quiser para publicar em lote.",
       },
       { property: "og:title", content: "Minhas contas sociais — VaiViral" },
       {
@@ -99,7 +100,9 @@ function IntegrationsPage() {
   }, []);
 
   const reload = useCallback(() => {
-    void listAccounts().then(setAccounts).catch(() => setAccounts([]));
+    void listAccounts()
+      .then(setAccounts)
+      .catch(() => setAccounts([]));
   }, []);
 
   useEffect(() => {
@@ -114,8 +117,8 @@ function IntegrationsPage() {
     async (platform: PlatformKey) => {
       setBusy(platform);
       try {
-        // Instagram Business é autorizado pelo Facebook Login for Business
-        // (o login direto do Instagram exige um app do tipo Instagram API).
+        // O mesmo Facebook Login autoriza a Página e a conta Instagram
+        // profissional vinculada a ela.
         const response = await startFacebook();
 
         if (!response.ok) {
@@ -137,8 +140,22 @@ function IntegrationsPage() {
           );
           return;
         }
+        const sentScopes = authorizationUrl.searchParams.get("scope")?.split(",") ?? [];
+        if (
+          response.diagnostics.mode === "classic" &&
+          response.diagnostics.requestedScopes.some((scope) => !sentScopes.includes(scope))
+        ) {
+          toast.error("A URL OAuth não contém todas as permissões obrigatórias.");
+          return;
+        }
+        if (
+          response.diagnostics.mode === "classic" &&
+          authorizationUrl.searchParams.has("config_id")
+        ) {
+          toast.error("O modo clássico não pode enviar config_id.");
+          return;
+        }
         window.location.href = response.authorizationUrl;
-
       } catch {
         toast.error("Não foi possível iniciar a autorização.");
       } finally {
@@ -179,13 +196,17 @@ function IntegrationsPage() {
   );
 
   return (
-    <AppShell mode={mode} onMode={setMode} count={jobs.length} onLibrary={() => {}} onCloud={() => {}}>
+    <AppShell
+      mode={mode}
+      onMode={setMode}
+      count={jobs.length}
+      onLibrary={() => {}}
+      onCloud={() => {}}
+    >
       <main className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
         <section className="mb-6 rounded-2xl border border-border/70 bg-[var(--gradient-surface)] p-5">
           <p className="mono-label text-primary">Minhas contas</p>
-          <h1 className="mt-2 font-display text-2xl font-bold">
-            Conecte quantas contas quiser
-          </h1>
+          <h1 className="mt-2 font-display text-2xl font-bold">Conecte quantas contas quiser</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             Cada conta é vinculada apenas ao seu login e autorizada pelo próprio provedor. Senhas
             nunca são solicitadas: você aprova o acesso na Meta e nós guardamos somente o token
@@ -194,8 +215,6 @@ function IntegrationsPage() {
         </section>
 
         {user && <MetaDiagnosticsPanel />}
-
-
 
         {!user ? (
           <div className="rounded-2xl border border-border bg-surface/60 p-6 text-center text-sm text-muted-foreground">
@@ -230,7 +249,8 @@ function IntegrationsPage() {
                       </li>
                     )}
                     {rows.map((account) => {
-                      const connected = account.status === "conectado" && account.provider !== "pending";
+                      const connected =
+                        account.status === "conectado" && account.provider !== "pending";
                       return (
                         <li
                           key={account.id}
@@ -313,13 +333,14 @@ function IntegrationsPage() {
             Apareceu “Recurso indisponível” ou “estamos atualizando detalhes” na tela do Facebook?
           </p>
           <p className="mt-2">
-            Esse aviso vem da Meta, não do VaiViral: o app precisa estar ativo, com a configuração do Login for
-            Business publicada e com política de privacidade, exclusão de dados, ícone, categoria e e-mail de contato
-            preenchidos. Se você é o administrador do app, revise essas informações no painel da Meta e tente de novo.
+            Esse aviso vem da Meta, não do VaiViral: o app precisa estar ativo e cada permissão
+            solicitada precisa estar adicionada ao caso de uso. Política de privacidade, exclusão de
+            dados, ícone, categoria e e-mail de contato também precisam estar preenchidos. Se você
+            é o administrador do app, revise essas informações no painel da Meta e tente de novo.
           </p>
           <p className="mt-2">
-            Não guardamos senhas: só o token que a Meta emite, criptografado. Remova a conta aqui a qualquer momento —
-            veja a{" "}
+            Não guardamos senhas: só o token que a Meta emite, criptografado. Remova a conta aqui a
+            qualquer momento — veja a{" "}
             <a href="/privacidade" className="underline hover:text-foreground">
               política de privacidade
             </a>{" "}
@@ -331,7 +352,6 @@ function IntegrationsPage() {
           </p>
         </section>
       </main>
-
     </AppShell>
   );
 }
@@ -342,6 +362,7 @@ type MetaCheck = {
   configId: string | null;
   mode: "classic" | "business";
   usesConfigId: boolean;
+  requiredScopes: string[];
   effectiveScopes: string[];
   permissionSource: "manual-scope" | "meta-business-configuration";
   permissionWarning: string | null;
@@ -355,14 +376,21 @@ type MetaCheck = {
 function MetaDiagnosticsPanel() {
   const runDiagnosis = useServerFn(diagnoseFacebookIntegration);
   const [state, setState] = useState<
-    { status: "idle" } | { status: "loading" } | { status: "denied" } | { status: "ready"; check: MetaCheck }
+    | { status: "idle" }
+    | { status: "loading" }
+    | { status: "denied" }
+    | { status: "ready"; check: MetaCheck }
   >({ status: "idle" });
 
   const run = useCallback(async () => {
     setState({ status: "loading" });
     try {
       const response = await runDiagnosis();
-      setState(response.ok ? { status: "ready", check: response.check as MetaCheck } : { status: "denied" });
+      setState(
+        response.ok
+          ? { status: "ready", check: response.check as MetaCheck }
+          : { status: "denied" },
+      );
     } catch {
       setState({ status: "denied" });
     }
@@ -377,7 +405,12 @@ function MetaDiagnosticsPanel() {
             Disponível para administradores. Nenhum segredo é exibido.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => void run()} disabled={state.status === "loading"}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void run()}
+          disabled={state.status === "loading"}
+        >
           {state.status === "loading" ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
           Verificar configuração
         </Button>
@@ -394,11 +427,24 @@ function MetaDiagnosticsPanel() {
           <dl className="grid gap-2 sm:grid-cols-2">
             <Row label="Versão do Graph" value={state.check.graphVersion} />
             <Row label="App ID" value={state.check.appId ?? "não definido"} />
-            <Row label="Modo efetivo" value={state.check.mode === "classic" ? "Login clássico" : "Login para Empresas"} />
-            <Row label="Usando config_id" value={state.check.usesConfigId ? `Sim (${state.check.configId ?? "configurado"})` : "Não"} />
+            <Row
+              label="Modo efetivo"
+              value={state.check.mode === "classic" ? "Login clássico" : "Login para Empresas"}
+            />
+            <Row
+              label="Usando config_id"
+              value={
+                state.check.usesConfigId ? `Sim (${state.check.configId ?? "configurado"})` : "Não"
+              }
+            />
+            <Row label="Scopes obrigatórios" value={state.check.requiredScopes.join(",")} />
             <Row
               label="Scopes enviados pelo app"
-              value={state.check.mode === "classic" ? state.check.effectiveScopes.join(",") : "Nenhum — definidos na configuração da Meta"}
+              value={
+                state.check.mode === "classic"
+                  ? state.check.effectiveScopes.join(",")
+                  : "Nenhum — definidos na configuração da Meta"
+              }
             />
             <Row label="URL de retorno" value={state.check.redirectUri ?? "não definida"} />
             <Row label="Site público" value={state.check.siteUrl ?? "não definido"} />
@@ -447,14 +493,20 @@ function MetaDiagnosticsPanel() {
             <ul className="mt-1 space-y-1">
               <li>• URIs de redirecionamento válidos: {state.check.redirectUri ?? "—"}</li>
               <li>
-                • Adicione também {state.check.siteUrl ?? "https://seu-dominio"}/integracoes/instagram/callback
+                • Adicione também {state.check.siteUrl ?? "https://seu-dominio"}
+                /integracoes/instagram/callback
               </li>
               <li>• Domínio do SDK do JavaScript sem barra final</li>
               <li>• Ícone quadrado do app e Página do app associada</li>
               {state.check.mode === "business" ? (
-                <li>• Configuração do Login para Empresas publicada e app em modo Ativo</li>
+                <li>
+                  • Configuração do Login para Empresas publicada com todos os scopes obrigatórios
+                </li>
               ) : (
-                <li>• Modo clássico ativo: config_id e permissões do caso de uso Business são ignorados</li>
+                <li>
+                  • Em Permissões e recursos, pages_read_engagement deve estar adicionada, não
+                  apenas encontrada no caso de uso
+                </li>
               )}
             </ul>
           </div>

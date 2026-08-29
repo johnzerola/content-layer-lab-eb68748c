@@ -1,4 +1,4 @@
-/** Facebook Login for Business: autoriza Páginas do Facebook e contas IG Business. */
+/** Facebook Login: autoriza Páginas do Facebook e contas Instagram profissionais. */
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { facebookGraphBase, metaGraphVersion } from "@/lib/meta.server";
 import { MetaLinkError } from "@/lib/social-linking.server";
@@ -6,31 +6,36 @@ import { MetaLinkError } from "@/lib/social-linking.server";
 const OAUTH_TTL_MS = 10 * 60 * 1000;
 
 /**
- * Permissões mínimas para publicar em Páginas do Facebook e contas IG Business.
- * `pages_read_engagement` fica de fora por padrão: em apps sem o caso de uso
- * liberado a Meta rejeita o diálogo com "Invalid Scopes". Overrides de ambiente
- * também passam pela allowlist abaixo e nunca conseguem reativá-la.
+ * Permissões mínimas do fluxo usado por este projeto.
+ *
+ * `pages_read_engagement` é necessária para descobrir Páginas e a conta
+ * Instagram vinculada por `GET /me/accounts`. A permissão também precisa estar
+ * adicionada ao caso de uso do app no painel da Meta; código não ativa uma
+ * permissão externa que ainda aparece como "Adicionar" no App Dashboard.
  */
 export const FACEBOOK_SCOPES = [
   "pages_show_list",
+  "pages_read_engagement",
   "pages_manage_posts",
   "instagram_basic",
   "instagram_content_publish",
-];
+] as const;
 
-const FACEBOOK_SCOPE_ALLOWLIST = new Set(FACEBOOK_SCOPES);
-
-export function facebookScopes(environment: NodeJS.ProcessEnv = process.env): string[] {
-  const raw = environment["META_LOGIN_SCOPES"]?.trim();
-  if (!raw) return FACEBOOK_SCOPES;
-  const requested = new Set(raw
-    .split(",")
-    .map((scope) => scope.trim())
-    .filter((scope) => FACEBOOK_SCOPE_ALLOWLIST.has(scope)));
-  const parsed = FACEBOOK_SCOPES.filter((scope) => requested.has(scope));
-  return parsed.length > 0 ? parsed : FACEBOOK_SCOPES;
+export function facebookScopes(_environment: NodeJS.ProcessEnv = process.env): string[] {
+  // O fluxo combinado sempre descobre Páginas e Instagram antes de publicar;
+  // por isso todos os scopes abaixo são invariantes, não configuração de deploy.
+  return [...FACEBOOK_SCOPES];
 }
 
+export type FacebookLoginMode = "classic" | "business";
+
+export function facebookLoginMode(environment: NodeJS.ProcessEnv = process.env): FacebookLoginMode {
+  // Business Login só é habilitado de forma explícita. Isso impede que um
+  // META_LOGIN_CONFIG_ID antigo reative silenciosamente permissões do caso de uso.
+  return environment["META_LOGIN_MODE"]?.trim().toLowerCase() === "business"
+    ? "business"
+    : "classic";
+}
 
 type OAuthConfiguration = {
   appId: string;
@@ -42,10 +47,13 @@ type OAuthConfiguration = {
 
 export type FacebookOAuthDiagnostics = {
   ready: true;
-  flowVersion: "facebook-login-for-business-v1";
+  flowVersion: "facebook-login-v2";
   graphVersion: string;
   redirectOrigin: string;
   redirectPath: "/integracoes/facebook/callback";
+  mode: FacebookLoginMode;
+  usesConfigId: boolean;
+  requestedScopes: string[];
 };
 
 function callbackFromEnvironment(environment: NodeJS.ProcessEnv): string {
@@ -53,7 +61,10 @@ function callbackFromEnvironment(environment: NodeJS.ProcessEnv): string {
   if (explicit) return explicit;
   const instagramRedirect = environment["META_REDIRECT_URI"]?.trim();
   if (instagramRedirect?.includes("/integracoes/instagram/callback")) {
-    return instagramRedirect.replace("/integracoes/instagram/callback", "/integracoes/facebook/callback");
+    return instagramRedirect.replace(
+      "/integracoes/instagram/callback",
+      "/integracoes/facebook/callback",
+    );
   }
   const siteUrl = environment["PUBLIC_SITE_URL"]?.trim().replace(/\/$/, "");
   return siteUrl ? `${siteUrl}/integracoes/facebook/callback` : "";
@@ -65,13 +76,19 @@ export function facebookOAuthConfiguration(
   const appId = environment["META_APP_ID"]?.trim();
   const appSecret = environment["META_APP_SECRET"]?.trim();
   const redirectUri = callbackFromEnvironment(environment);
-  const classicMode = environment["META_LOGIN_MODE"]?.trim().toLowerCase() === "classic";
+  const mode = facebookLoginMode(environment);
   const rawConfigId = environment["META_LOGIN_CONFIG_ID"]?.trim();
-  const configId = classicMode || !rawConfigId ? null : rawConfigId;
+  const configId = mode === "business" ? (rawConfigId ?? null) : null;
   if (!appId || !appSecret || !redirectUri) {
     throw new MetaLinkError(
       "SERVER_CONFIG_MISSING",
       "O Login do Facebook ainda não está configurado no servidor.",
+    );
+  }
+  if (mode === "business" && !configId) {
+    throw new MetaLinkError(
+      "SERVER_CONFIG_MISSING",
+      "META_LOGIN_MODE=business exige META_LOGIN_CONFIG_ID.",
     );
   }
   if (!/^\d+$/.test(appId) || (configId !== null && !/^\d+$/.test(configId))) {
@@ -105,12 +122,16 @@ export function diagnoseFacebookOAuth(
 ): FacebookOAuthDiagnostics {
   const configuration = facebookOAuthConfiguration(environment);
   const callback = new URL(configuration.redirectUri);
+  const mode = configuration.configId ? "business" : "classic";
   return {
     ready: true,
-    flowVersion: "facebook-login-for-business-v1",
+    flowVersion: "facebook-login-v2",
     graphVersion: metaGraphVersion(environment),
     redirectOrigin: callback.origin,
     redirectPath: "/integracoes/facebook/callback",
+    mode,
+    usesConfigId: mode === "business",
+    requestedScopes: mode === "classic" ? facebookScopes(environment) : [],
   };
 }
 
@@ -120,6 +141,7 @@ export type FacebookConfigCheck = {
   configId: string | null;
   mode: "classic" | "business";
   usesConfigId: boolean;
+  requiredScopes: string[];
   effectiveScopes: string[];
   permissionSource: "manual-scope" | "meta-business-configuration";
   permissionWarning: string | null;
@@ -142,9 +164,7 @@ export function facebookConfigChecklist(
   const issues: string[] = [];
   const appId = environment["META_APP_ID"]?.trim() ?? null;
   const configId = environment["META_LOGIN_CONFIG_ID"]?.trim() ?? null;
-  const mode = environment["META_LOGIN_MODE"]?.trim().toLowerCase() === "classic" || !configId
-    ? "classic"
-    : "business";
+  const mode = facebookLoginMode(environment);
   const usesConfigId = mode === "business";
   const siteUrl = environment["PUBLIC_SITE_URL"]?.trim().replace(/\/$/, "") ?? null;
   const redirectUri = callbackFromEnvironment(environment) || null;
@@ -153,12 +173,17 @@ export function facebookConfigChecklist(
   if (!appId) issues.push("META_APP_ID não está definido.");
   else if (!/^\d+$/.test(appId)) issues.push("META_APP_ID deve conter apenas números.");
   if (!environment["META_APP_SECRET"]?.trim()) issues.push("META_APP_SECRET não está definido.");
+  if (mode === "business" && !configId) {
+    issues.push("META_LOGIN_MODE=business exige META_LOGIN_CONFIG_ID.");
+  }
   if (configId && !/^\d+$/.test(configId)) {
     issues.push("META_LOGIN_CONFIG_ID deve conter apenas números.");
   }
 
   if (!redirectUri) {
-    issues.push("Nenhuma URL de retorno pôde ser calculada (defina FACEBOOK_REDIRECT_URI ou PUBLIC_SITE_URL).");
+    issues.push(
+      "Nenhuma URL de retorno pôde ser calculada (defina FACEBOOK_REDIRECT_URI ou PUBLIC_SITE_URL).",
+    );
   } else {
     try {
       const callback = new URL(redirectUri);
@@ -167,7 +192,9 @@ export function facebookConfigChecklist(
         issues.push("A URL de retorno precisa terminar em /integracoes/facebook/callback.");
       }
       if (siteUrl && callback.origin !== siteUrl) {
-        issues.push(`A URL de retorno (${callback.origin}) não bate com PUBLIC_SITE_URL (${siteUrl}).`);
+        issues.push(
+          `A URL de retorno (${callback.origin}) não bate com PUBLIC_SITE_URL (${siteUrl}).`,
+        );
       }
     } catch {
       issues.push("A URL de retorno é inválida.");
@@ -191,11 +218,13 @@ export function facebookConfigChecklist(
     configId: usesConfigId ? mask(configId) : null,
     mode,
     usesConfigId,
+    requiredScopes: facebookScopes(environment),
     effectiveScopes: mode === "classic" ? facebookScopes(environment) : [],
     permissionSource: mode === "classic" ? "manual-scope" : "meta-business-configuration",
-    permissionWarning: mode === "business"
-      ? "No modo Business, as permissões vêm da configuração externa da Meta e podem incluir pages_read_engagement mesmo sem esse scope existir no código."
-      : null,
+    permissionWarning:
+      mode === "business"
+        ? "No modo Business, confirme que a configuração publicada da Meta contém todos os scopes obrigatórios, incluindo pages_read_engagement."
+        : "No modo clássico, cada scope enviado também precisa aparecer como adicionado no caso de uso do App Dashboard da Meta.",
     redirectUri,
     siteUrl,
     authorizationUrl,
@@ -204,16 +233,17 @@ export function facebookConfigChecklist(
 }
 
 /** Confirma na Graph API se a configuração do Login para Empresas existe e pertence ao app. */
-export async function verifyFacebookLoginConfiguration(input: {
-  environment?: NodeJS.ProcessEnv;
-  fetch?: typeof fetch;
-} = {}): Promise<FacebookConfigCheck["loginConfiguration"]> {
+export async function verifyFacebookLoginConfiguration(
+  input: {
+    environment?: NodeJS.ProcessEnv;
+    fetch?: typeof fetch;
+  } = {},
+): Promise<FacebookConfigCheck["loginConfiguration"]> {
   const environment = input.environment ?? process.env;
   const appId = environment["META_APP_ID"]?.trim();
   const appSecret = environment["META_APP_SECRET"]?.trim();
   const configId = environment["META_LOGIN_CONFIG_ID"]?.trim();
-  const classicMode = environment["META_LOGIN_MODE"]?.trim().toLowerCase() === "classic";
-  if (classicMode) {
+  if (facebookLoginMode(environment) === "classic") {
     return {
       checked: false,
       ok: true,
@@ -241,11 +271,18 @@ export async function verifyFacebookLoginConfiguration(input: {
   }
   const id = readString(payload, "id");
   if (id !== configId) {
-    return { checked: true, ok: false, detail: "A configuração retornada não corresponde ao config_id." };
+    return {
+      checked: true,
+      ok: false,
+      detail: "A configuração retornada não corresponde ao config_id.",
+    };
   }
   const status = readString(payload, "status");
   const published = asObject(payload)?.["is_published"];
-  if (published === false || (status && status.toUpperCase() !== "LIVE" && status.toUpperCase() !== "PUBLISHED")) {
+  if (
+    published === false ||
+    (status && status.toUpperCase() !== "LIVE" && status.toUpperCase() !== "PUBLISHED")
+  ) {
     return {
       checked: true,
       ok: false,
@@ -256,11 +293,11 @@ export async function verifyFacebookLoginConfiguration(input: {
   return {
     checked: true,
     ok: true,
-    detail: name ? `Configuração "${name}" publicada e válida.` : "Configuração publicada e válida.",
+    detail: name
+      ? `Configuração "${name}" publicada e válida.`
+      : "Configuração publicada e válida.",
   };
 }
-
-
 
 function signState(payload: string, secret: string): string {
   return createHmac("sha256", secret).update(payload).digest("base64url");
@@ -273,7 +310,11 @@ export function createFacebookOAuthState(
 ): string {
   const { appSecret } = facebookOAuthConfiguration(environment);
   const payload = Buffer.from(
-    JSON.stringify({ userId, expiresAt: now + OAUTH_TTL_MS, nonce: randomBytes(24).toString("base64url") }),
+    JSON.stringify({
+      userId,
+      expiresAt: now + OAUTH_TTL_MS,
+      nonce: randomBytes(24).toString("base64url"),
+    }),
   ).toString("base64url");
   return `${payload}.${signState(payload, appSecret)}`;
 }
@@ -325,17 +366,26 @@ export function facebookAuthorizationUrl(
     // Obrigatório para receber `code` no Login para Empresas.
     url.searchParams.set("override_default_response_type", "true");
   } else {
-    // Login clássico: as permissões vão em `scope` (usado quando não há
-    // configuração empresarial publicada, evitando o erro genérico da Meta).
-    url.searchParams.set("scope", facebookScopes(environment).join(","));
-
+    // O fluxo clássico segue o padrão dos conectores open source auditados:
+    // scopes explícitos e rerequest para reapresentar permissões adicionadas
+    // depois de uma tentativa anterior ter sido recusada.
+    const scopes = facebookScopes(environment);
+    url.searchParams.set("scope", scopes.join(","));
+    url.searchParams.set("auth_type", "rerequest");
+    if (!scopes.includes("pages_read_engagement")) {
+      throw new MetaLinkError(
+        "SERVER_CONFIG_MISSING",
+        "O OAuth não pode iniciar sem pages_read_engagement, exigida por /me/accounts.",
+      );
+    }
   }
   return url.toString();
 }
 
-
 function asObject(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function readString(value: unknown, key: string): string | null {
@@ -351,9 +401,60 @@ async function readJson(response: Response | null): Promise<unknown> {
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     const message = readString(asObject(payload)?.["error"], "message");
-    throw new MetaLinkError("META_AUTH_INVALID", message || "A autorização do Facebook é inválida.");
+    throw new MetaLinkError(
+      "META_AUTH_INVALID",
+      message || "A autorização do Facebook é inválida.",
+    );
   }
   return payload;
+}
+
+/**
+ * Confirma que o token pertence a este app e recebeu todas as permissões que
+ * serão usadas para descobrir contas e publicar. Tokens nunca são retornados
+ * pelo diagnóstico nem incluídos em mensagens de erro.
+ */
+export async function validateFacebookAccessTokenScopes(input: {
+  accessToken: string;
+  environment?: NodeJS.ProcessEnv;
+  fetch?: typeof fetch;
+}): Promise<string[]> {
+  const environment = input.environment ?? process.env;
+  const configuration = facebookOAuthConfiguration(environment);
+  const url = new URL(`${facebookGraphBase(environment)}/debug_token`);
+  url.searchParams.set("input_token", input.accessToken);
+  url.searchParams.set("access_token", `${configuration.appId}|${configuration.appSecret}`);
+  const payload = await readJson(await (input.fetch ?? fetch)(url).catch(() => null));
+  const data = asObject(asObject(payload)?.["data"]);
+  const appId = readString(data, "app_id");
+  const valid = data?.["is_valid"] === true;
+  const rawScopes = data?.["scopes"];
+  const grantedScopes = Array.isArray(rawScopes)
+    ? rawScopes.filter((scope): scope is string => typeof scope === "string")
+    : typeof rawScopes === "string"
+      ? rawScopes
+          .split(",")
+          .map((scope) => scope.trim())
+          .filter(Boolean)
+      : [];
+
+  if (!valid || appId !== configuration.appId) {
+    throw new MetaLinkError(
+      "META_AUTH_INVALID",
+      "A Meta retornou um token inválido ou emitido para outro aplicativo.",
+    );
+  }
+
+  const missingScopes = facebookScopes(environment).filter(
+    (scope) => !grantedScopes.includes(scope),
+  );
+  if (missingScopes.length > 0) {
+    throw new MetaLinkError(
+      "META_AUTH_INVALID",
+      `A Meta não concedeu: ${missingScopes.join(", ")}. Adicione essas permissões ao caso de uso do app e conecte novamente.`,
+    );
+  }
+  return grantedScopes;
 }
 
 export async function exchangeFacebookAuthorizationCode(input: {
@@ -368,13 +469,25 @@ export async function exchangeFacebookAuthorizationCode(input: {
   const now = input.now ?? Date.now();
 
   const shortUrl = new URL(`${facebookGraphBase(environment)}/oauth/access_token`);
-  shortUrl.searchParams.set("client_id", configuration.appId);
-  shortUrl.searchParams.set("client_secret", configuration.appSecret);
-  shortUrl.searchParams.set("redirect_uri", configuration.redirectUri);
-  shortUrl.searchParams.set("code", input.code.replace(/#_$/, ""));
-  const shortPayload = await readJson(await request(shortUrl).catch(() => null));
+  const shortBody = new URLSearchParams({
+    client_id: configuration.appId,
+    client_secret: configuration.appSecret,
+    redirect_uri: configuration.redirectUri,
+    code: input.code.replace(/#_$/, ""),
+  });
+  const shortPayload = await readJson(
+    await request(shortUrl, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: shortBody,
+    }).catch(() => null),
+  );
   const shortToken = readString(shortPayload, "access_token");
-  if (!shortToken) throw new MetaLinkError("META_RESPONSE_INVALID", "A Meta retornou uma resposta inválida.");
+  if (!shortToken)
+    throw new MetaLinkError("META_RESPONSE_INVALID", "A Meta retornou uma resposta inválida.");
 
   const longUrl = new URL(`${facebookGraphBase(environment)}/oauth/access_token`);
   longUrl.searchParams.set("grant_type", "fb_exchange_token");
@@ -384,7 +497,8 @@ export async function exchangeFacebookAuthorizationCode(input: {
   const longPayload = await readJson(await request(longUrl).catch(() => null));
   const longToken = readString(longPayload, "access_token") ?? shortToken;
   const expiresInRaw = asObject(longPayload)?.["expires_in"];
-  const expiresIn = typeof expiresInRaw === "number" && expiresInRaw > 0 ? expiresInRaw : 60 * 24 * 60 * 60;
+  const expiresIn =
+    typeof expiresInRaw === "number" && expiresInRaw > 0 ? expiresInRaw : 60 * 24 * 60 * 60;
   return { accessToken: longToken, expiresAt: new Date(now + expiresIn * 1000) };
 }
 
@@ -403,10 +517,7 @@ export async function fetchFacebookPages(input: {
 }): Promise<FacebookPage[]> {
   const environment = input.environment ?? process.env;
   const url = new URL(`${facebookGraphBase(environment)}/me/accounts`);
-  url.searchParams.set(
-    "fields",
-    "id,name,access_token,instagram_business_account{id,username}",
-  );
+  url.searchParams.set("fields", "id,name,access_token,instagram_business_account{id,username}");
   url.searchParams.set("limit", "100");
   url.searchParams.set("access_token", input.accessToken);
   const payload = await readJson(await (input.fetch ?? fetch)(url).catch(() => null));

@@ -7,6 +7,7 @@ import {
   exchangeFacebookAuthorizationCode,
   facebookAuthorizationUrl,
   fetchFacebookPages,
+  validateFacebookAccessTokenScopes,
   verifyFacebookOAuthState,
 } from "@/lib/facebook-oauth.server";
 import { persistFacebookPages } from "@/lib/facebook-persistence.server";
@@ -17,17 +18,21 @@ export const beginFacebookOAuth = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     try {
       const diagnostics = diagnoseFacebookOAuth();
-      // Quando existe uma configuração empresarial, ela é a fonte das permissões.
-      // A Graph API pode impedir a leitura direta de um config_id válido; por isso
-      // essa sondagem não deve forçar o login clássico nem acrescentar scopes.
       const authorizationUrl = facebookAuthorizationUrl(context.userId);
-      const mode = new URL(authorizationUrl).searchParams.has("config_id")
-        ? ("business" as const)
-        : ("classic" as const);
+      const parsedUrl = new URL(authorizationUrl);
+      if (
+        diagnostics.mode === "classic" &&
+        parsedUrl.searchParams.get("scope") !== diagnostics.requestedScopes.join(",")
+      ) {
+        throw new MetaLinkError(
+          "SERVER_CONFIG_MISSING",
+          "A URL OAuth gerada não contém as permissões obrigatórias.",
+        );
+      }
       return {
         ok: true as const,
         authorizationUrl,
-        diagnostics: { ...diagnostics, mode },
+        diagnostics,
       };
     } catch (error) {
       if (error instanceof MetaLinkError) {
@@ -56,6 +61,7 @@ export const completeFacebookOAuth = createServerFn({ method: "POST" })
       }
       verifyFacebookOAuthState(data.state, context.userId);
       const token = await exchangeFacebookAuthorizationCode({ code: data.code });
+      await validateFacebookAccessTokenScopes({ accessToken: token.accessToken });
       const pages = await fetchFacebookPages({ accessToken: token.accessToken });
       if (pages.length === 0) {
         throw new MetaLinkError(
@@ -93,9 +99,8 @@ export const diagnoseFacebookIntegration = createServerFn({ method: "POST" })
     if (!isAdmin) {
       return { ok: false as const, error: "Apenas administradores podem ver o diagnóstico." };
     }
-    const { facebookConfigChecklist, verifyFacebookLoginConfiguration } = await import(
-      "@/lib/facebook-oauth.server"
-    );
+    const { facebookConfigChecklist, verifyFacebookLoginConfiguration } =
+      await import("@/lib/facebook-oauth.server");
     const checklist = facebookConfigChecklist();
     const loginConfiguration = await verifyFacebookLoginConfiguration();
     return { ok: true as const, check: { ...checklist, loginConfiguration } };
