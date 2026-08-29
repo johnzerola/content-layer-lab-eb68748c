@@ -17,6 +17,7 @@ import { Route as BibliotecaRouteImport } from './routes/biblioteca'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as ContaRouteImport } from './routes/conta'
 import { Route as ExclusaoDeDadosRouteImport } from './routes/exclusao-de-dados'
+import { Route as FotosRouteImport } from './routes/fotos'
 import { Route as IntegracoesRouteImport } from './routes/integracoes'
 import { Route as LimparIaRouteImport } from './routes/limpar-ia'
 import { Route as LiveRouteImport } from './routes/live'
@@ -80,6 +81,11 @@ const ContaRoute = ContaRouteImport.update({
 const ExclusaoDeDadosRoute = ExclusaoDeDadosRouteImport.update({
   id: '/exclusao-de-dados',
   path: '/exclusao-de-dados',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FotosRoute = FotosRouteImport.update({
+  id: '/fotos',
+  path: '/fotos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IntegracoesRoute = IntegracoesRouteImport.update({
@@ -222,6 +228,7 @@ export interface FileRoutesByFullPath {
   '/checkout': typeof CheckoutRoute
   '/conta': typeof ContaRoute
   '/exclusao-de-dados': typeof ExclusaoDeDadosRoute
+  '/fotos': typeof FotosRoute
   '/integracoes': typeof IntegracoesRoute
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
@@ -256,6 +263,7 @@ export interface FileRoutesByTo {
   '/checkout': typeof CheckoutRoute
   '/conta': typeof ContaRoute
   '/exclusao-de-dados': typeof ExclusaoDeDadosRoute
+  '/fotos': typeof FotosRoute
   '/integracoes': typeof IntegracoesRoute
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
@@ -291,6 +299,7 @@ export interface FileRoutesById {
   '/checkout': typeof CheckoutRoute
   '/conta': typeof ContaRoute
   '/exclusao-de-dados': typeof ExclusaoDeDadosRoute
+  '/fotos': typeof FotosRoute
   '/integracoes': typeof IntegracoesRoute
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
@@ -327,6 +336,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/conta'
     | '/exclusao-de-dados'
+    | '/fotos'
     | '/integracoes'
     | '/limpar-ia'
     | '/live'
@@ -361,6 +371,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/conta'
     | '/exclusao-de-dados'
+    | '/fotos'
     | '/integracoes'
     | '/limpar-ia'
     | '/live'
@@ -395,6 +406,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/conta'
     | '/exclusao-de-dados'
+    | '/fotos'
     | '/integracoes'
     | '/limpar-ia'
     | '/live'
@@ -430,6 +442,7 @@ export interface RootRouteChildren {
   CheckoutRoute: typeof CheckoutRoute
   ContaRoute: typeof ContaRoute
   ExclusaoDeDadosRoute: typeof ExclusaoDeDadosRoute
+  FotosRoute: typeof FotosRoute
   IntegracoesRoute: typeof IntegracoesRoute
   LimparIaRoute: typeof LimparIaRoute
   LiveRoute: typeof LiveRoute
@@ -512,6 +525,13 @@ declare module '@tanstack/react-router' {
       path: '/exclusao-de-dados'
       fullPath: '/exclusao-de-dados'
       preLoaderRoute: typeof ExclusaoDeDadosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fotos': {
+      id: '/fotos'
+      path: '/fotos'
+      fullPath: '/fotos'
+      preLoaderRoute: typeof FotosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/integracoes': {
@@ -694,6 +714,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutRoute: CheckoutRoute,
   ContaRoute: ContaRoute,
   ExclusaoDeDadosRoute: ExclusaoDeDadosRoute,
+  FotosRoute: FotosRoute,
   IntegracoesRoute: IntegracoesRoute,
   LimparIaRoute: LimparIaRoute,
   LiveRoute: LiveRoute,
