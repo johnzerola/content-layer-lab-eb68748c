@@ -24,7 +24,7 @@ export function PhotoAdjustModal({
   const [adjust, setAdjust] = useState<PhotoAdjust>(DEFAULT_ADJUST);
 
   useEffect(() => {
-    if (target) setAdjust(target.adjust);
+    if (target) setAdjust({ ...DEFAULT_ADJUST, ...target.adjust });
   }, [target]);
 
   const rotate = () =>
@@ -32,7 +32,9 @@ export function PhotoAdjustModal({
 
   const row = (
     label: string,
-    key: "brightness" | "contrast" | "saturation",
+    key: "brightness" | "contrast" | "saturation" | "sharpness" | "zoom",
+    min: number,
+    max: number,
   ) => (
     <div key={key} className="space-y-2">
       <div className="flex items-center justify-between text-xs">
@@ -41,10 +43,10 @@ export function PhotoAdjustModal({
       </div>
       <Slider
         value={[adjust[key]]}
-        min={0.6}
-        max={1.4}
+        min={min}
+        max={max}
         step={0.01}
-        onValueChange={([v]) => setAdjust((a) => ({ ...a, [key]: v ?? 1 }))}
+        onValueChange={([v]) => setAdjust((a) => ({ ...a, [key]: v ?? min }))}
       />
     </div>
   );
@@ -56,24 +58,26 @@ export function PhotoAdjustModal({
           <DialogTitle>Ajuste individual</DialogTitle>
         </DialogHeader>
         {target ? (
-          <div className="space-y-4">
+          <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
             <div className="overflow-hidden rounded-xl border border-border bg-black/40">
               <img
                 src={target.preview}
                 alt={`Prévia de ${target.name}`}
                 className="mx-auto max-h-64 object-contain transition-transform"
                 style={{
-                  transform: `rotate(${adjust.rotate90}deg)`,
-                  filter: `brightness(${adjust.brightness}) contrast(${adjust.contrast}) saturate(${adjust.saturation})`,
+                  transform: `rotate(${adjust.rotate90}deg) scale(${adjust.zoom})`,
+                  filter: `brightness(${adjust.brightness}) contrast(${adjust.contrast + adjust.sharpness * 0.1}) saturate(${adjust.saturation})`,
                 }}
               />
             </div>
             <Button variant="outline" size="sm" onClick={rotate} className="gap-2">
               <RotateCw className="size-4" /> Girar 90°
             </Button>
-            {row("Brilho", "brightness")}
-            {row("Contraste", "contrast")}
-            {row("Saturação", "saturation")}
+            {row("Brilho", "brightness", 0.6, 1.4)}
+            {row("Contraste", "contrast", 0.6, 1.4)}
+            {row("Saturação", "saturation", 0.6, 1.6)}
+            {row("Nitidez", "sharpness", 0, 1)}
+            {row("Zoom", "zoom", 1, 1.6)}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" onClick={() => setAdjust(DEFAULT_ADJUST)}>
                 Redefinir
