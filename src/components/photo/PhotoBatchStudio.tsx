@@ -275,7 +275,7 @@ export function PhotoBatchStudio() {
             onValueChange={([v]) => setIntensity(v ?? 0.6)}
           />
           <label className="flex items-center justify-between text-xs">
-            <span>Permitir espelhar</span>
+            <span>Espelhar horizontalmente</span>
             <Switch checked={allowMirror} onCheckedChange={setAllowMirror} />
           </label>
           <div className="flex items-center justify-between text-xs text-muted-foreground">
