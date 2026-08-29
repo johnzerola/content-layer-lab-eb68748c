@@ -276,6 +276,46 @@ export function PhotoBatchStudio() {
 
         <div className="space-y-3">
           <h2 className="flex items-center gap-2 font-display text-sm font-semibold">
+            <Sliders className="size-4 text-primary" /> Edição (todas as fotos)
+          </h2>
+          {(
+            [
+              ["Brilho", "brightness", 0.6, 1.5],
+              ["Contraste", "contrast", 0.6, 1.5],
+              ["Saturação", "saturation", 0.6, 1.8],
+              ["Nitidez", "sharpness", 0, 1],
+              ["Zoom (corta bordas)", "zoom", 1, 1.5],
+            ] as const
+          ).map(([label, key, min, max]) => (
+            <div key={key} className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{label}</span>
+                <span className="tabular-nums">{Math.round(globalAdjust[key] * 100)}%</span>
+              </div>
+              <Slider
+                value={[globalAdjust[key]]}
+                min={min}
+                max={max}
+                step={0.01}
+                onValueChange={([v]) =>
+                  setGlobalAdjust((a) => ({ ...a, [key]: v ?? min }) as PhotoAdjust)
+                }
+              />
+            </div>
+          ))}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setGlobalAdjust({ ...DEFAULT_ADJUST })}
+            className="w-full"
+          >
+            Redefinir edição
+          </Button>
+        </div>
+
+
+        <div className="space-y-3">
+          <h2 className="flex items-center gap-2 font-display text-sm font-semibold">
             <Type className="size-4 text-primary" /> Texto na imagem
           </h2>
           <Input
