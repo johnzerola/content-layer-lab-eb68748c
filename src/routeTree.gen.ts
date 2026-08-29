@@ -39,6 +39,7 @@ import { Route as ApiPublicRenderUploadRouteImport } from './routes/api/public/r
 import { Route as IntegracoesFacebookCallbackRouteImport } from './routes/integracoes_.facebook.callback'
 import { Route as IntegracoesInstagramCallbackRouteImport } from './routes/integracoes_.instagram.callback'
 import { Route as IntegracoesTiktokCallbackRouteImport } from './routes/integracoes_.tiktok.callback'
+import { Route as IntegracoesYoutubeCallbackRouteImport } from './routes/integracoes_.youtube.callback'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
 import { Route as ApiPublicMetaDataDeletionRouteImport } from './routes/api/public/meta.data-deletion'
 import { Route as ApiPublicMetaDeauthorizeRouteImport } from './routes/api/public/meta.deauthorize'
@@ -200,6 +201,12 @@ const IntegracoesTiktokCallbackRoute =
     path: '/integracoes/tiktok/callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const IntegracoesYoutubeCallbackRoute =
+  IntegracoesYoutubeCallbackRouteImport.update({
+    id: '/integracoes_/youtube/callback',
+    path: '/integracoes/youtube/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksPublishDueRoute =
   ApiPublicHooksPublishDueRouteImport.update({
     id: '/api/public/hooks/publish-due',
@@ -250,6 +257,7 @@ export interface FileRoutesByFullPath {
   '/integracoes/facebook/callback': typeof IntegracoesFacebookCallbackRoute
   '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
+  '/integracoes/youtube/callback': typeof IntegracoesYoutubeCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
   '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
@@ -285,6 +293,7 @@ export interface FileRoutesByTo {
   '/integracoes/facebook/callback': typeof IntegracoesFacebookCallbackRoute
   '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
+  '/integracoes/youtube/callback': typeof IntegracoesYoutubeCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
   '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
@@ -321,6 +330,7 @@ export interface FileRoutesById {
   '/integracoes_/facebook/callback': typeof IntegracoesFacebookCallbackRoute
   '/integracoes_/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes_/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
+  '/integracoes_/youtube/callback': typeof IntegracoesYoutubeCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
   '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
@@ -358,6 +368,7 @@ export interface FileRouteTypes {
     | '/integracoes/facebook/callback'
     | '/integracoes/instagram/callback'
     | '/integracoes/tiktok/callback'
+    | '/integracoes/youtube/callback'
     | '/api/public/hooks/publish-due'
     | '/api/public/meta/data-deletion'
     | '/api/public/meta/deauthorize'
@@ -393,6 +404,7 @@ export interface FileRouteTypes {
     | '/integracoes/facebook/callback'
     | '/integracoes/instagram/callback'
     | '/integracoes/tiktok/callback'
+    | '/integracoes/youtube/callback'
     | '/api/public/hooks/publish-due'
     | '/api/public/meta/data-deletion'
     | '/api/public/meta/deauthorize'
@@ -428,6 +440,7 @@ export interface FileRouteTypes {
     | '/integracoes_/facebook/callback'
     | '/integracoes_/instagram/callback'
     | '/integracoes_/tiktok/callback'
+    | '/integracoes_/youtube/callback'
     | '/api/public/hooks/publish-due'
     | '/api/public/meta/data-deletion'
     | '/api/public/meta/deauthorize'
@@ -464,6 +477,7 @@ export interface RootRouteChildren {
   IntegracoesFacebookCallbackRoute: typeof IntegracoesFacebookCallbackRoute
   IntegracoesInstagramCallbackRoute: typeof IntegracoesInstagramCallbackRoute
   IntegracoesTiktokCallbackRoute: typeof IntegracoesTiktokCallbackRoute
+  IntegracoesYoutubeCallbackRoute: typeof IntegracoesYoutubeCallbackRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
   ApiPublicMetaDataDeletionRoute: typeof ApiPublicMetaDataDeletionRoute
   ApiPublicMetaDeauthorizeRoute: typeof ApiPublicMetaDeauthorizeRoute
@@ -681,6 +695,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IntegracoesTiktokCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/integracoes_/youtube/callback': {
+      id: '/integracoes_/youtube/callback'
+      path: '/integracoes/youtube/callback'
+      fullPath: '/integracoes/youtube/callback'
+      preLoaderRoute: typeof IntegracoesYoutubeCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/publish-due': {
       id: '/api/public/hooks/publish-due'
       path: '/api/public/hooks/publish-due'
@@ -737,6 +758,7 @@ const rootRouteChildren: RootRouteChildren = {
   IntegracoesFacebookCallbackRoute: IntegracoesFacebookCallbackRoute,
   IntegracoesInstagramCallbackRoute: IntegracoesInstagramCallbackRoute,
   IntegracoesTiktokCallbackRoute: IntegracoesTiktokCallbackRoute,
+  IntegracoesYoutubeCallbackRoute: IntegracoesYoutubeCallbackRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
   ApiPublicMetaDataDeletionRoute: ApiPublicMetaDataDeletionRoute,
   ApiPublicMetaDeauthorizeRoute: ApiPublicMetaDeauthorizeRoute,

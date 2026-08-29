@@ -18,6 +18,7 @@ import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 import { listAccounts, removeAccount, type SocialAccount } from "@/lib/social";
 
 import { beginFacebookOAuth, diagnoseFacebookIntegration } from "@/lib/facebook-oauth.functions";
+import { beginYoutubeOAuth } from "@/lib/youtube-oauth.functions";
 import { setPrimaryAccount } from "@/lib/social-primary.functions";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -78,9 +79,10 @@ const PLATFORMS: Array<{
   {
     platform: "youtube",
     name: "YouTube",
-    description: "Upload de Shorts ainda não configurado.",
+    description:
+      "Vídeos longos e Shorts com publicação automática via YouTube Data API. Você autoriza o canal pela sua conta Google.",
     icon: Youtube,
-    available: false,
+    available: true,
   },
 ];
 
@@ -92,6 +94,7 @@ function IntegrationsPage() {
   const [busy, setBusy] = useState<PlatformKey | null>(null);
 
   const startFacebook = useServerFn(beginFacebookOAuth);
+  const startYoutube = useServerFn(beginYoutubeOAuth);
   const makePrimary = useServerFn(setPrimaryAccount);
 
   useEffect(() => {
@@ -117,6 +120,15 @@ function IntegrationsPage() {
     async (platform: PlatformKey) => {
       setBusy(platform);
       try {
+        if (platform === "youtube") {
+          const response = await startYoutube();
+          if (!response.ok) {
+            toast.error(response.error);
+            return;
+          }
+          window.location.href = response.authorizationUrl;
+          return;
+        }
         // O mesmo Facebook Login autoriza a Página e a conta Instagram
         // profissional vinculada a ela.
         const response = await startFacebook();
@@ -162,7 +174,7 @@ function IntegrationsPage() {
         setBusy(null);
       }
     },
-    [startFacebook],
+    [startFacebook, startYoutube],
   );
 
   const disconnect = useCallback(
