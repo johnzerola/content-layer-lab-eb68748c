@@ -17,15 +17,17 @@ export const beginFacebookOAuth = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     try {
       const diagnostics = diagnoseFacebookOAuth();
-      // Se a configuração empresarial não existir/estiver despublicada, a Meta
-      // devolve "Sorry, something went wrong". Nesse caso usamos o login clássico.
-      const { verifyFacebookLoginConfiguration } = await import("@/lib/facebook-oauth.server");
-      const loginConfiguration = await verifyFacebookLoginConfiguration();
-      const forceClassic = !loginConfiguration.ok;
+      // Quando existe uma configuração empresarial, ela é a fonte das permissões.
+      // A Graph API pode impedir a leitura direta de um config_id válido; por isso
+      // essa sondagem não deve forçar o login clássico nem acrescentar scopes.
+      const authorizationUrl = facebookAuthorizationUrl(context.userId);
+      const mode = new URL(authorizationUrl).searchParams.has("config_id")
+        ? ("business" as const)
+        : ("classic" as const);
       return {
         ok: true as const,
-        authorizationUrl: facebookAuthorizationUrl(context.userId, process.env, { forceClassic }),
-        diagnostics: { ...diagnostics, mode: forceClassic ? ("classic" as const) : ("business" as const) },
+        authorizationUrl,
+        diagnostics: { ...diagnostics, mode },
       };
     } catch (error) {
       if (error instanceof MetaLinkError) {

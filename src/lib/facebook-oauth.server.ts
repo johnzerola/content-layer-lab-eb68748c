@@ -18,13 +18,15 @@ export const FACEBOOK_SCOPES = [
   "instagram_content_publish",
 ];
 
+const FACEBOOK_SCOPE_ALLOWLIST = new Set(FACEBOOK_SCOPES);
+
 export function facebookScopes(environment: NodeJS.ProcessEnv = process.env): string[] {
   const raw = environment["META_LOGIN_SCOPES"]?.trim();
   if (!raw) return FACEBOOK_SCOPES;
   const parsed = raw
     .split(",")
     .map((scope) => scope.trim())
-    .filter(Boolean);
+    .filter((scope) => FACEBOOK_SCOPE_ALLOWLIST.has(scope));
   return parsed.length > 0 ? parsed : FACEBOOK_SCOPES;
 }
 

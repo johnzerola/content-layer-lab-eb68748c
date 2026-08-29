@@ -31,6 +31,17 @@ describe("Facebook Login for Business", () => {
     expect(url.toString()).not.toContain("server-only-secret");
   });
 
+  it("never restores unsupported scopes from an environment override", () => {
+    const url = new URL(facebookAuthorizationUrl("user-123", {
+      ...environment,
+      META_LOGIN_MODE: "classic",
+      META_LOGIN_SCOPES: "pages_read_engagement,pages_manage_posts,unknown_scope",
+    }));
+    expect(url.searchParams.get("scope")).toBe("pages_manage_posts");
+    expect(url.searchParams.get("scope")).not.toContain("pages_read_engagement");
+    expect(url.searchParams.get("scope")).not.toContain("unknown_scope");
+  });
+
   it("returns only safe diagnostics", () => {
     const diagnostics = diagnoseFacebookOAuth(environment);
     expect(diagnostics).toEqual({
