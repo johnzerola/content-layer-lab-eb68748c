@@ -18,6 +18,7 @@ import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 import { listAccounts, removeAccount, type SocialAccount } from "@/lib/social";
 
 import { beginFacebookOAuth, diagnoseFacebookIntegration } from "@/lib/facebook-oauth.functions";
+import { beginYoutubeOAuth } from "@/lib/youtube-oauth.functions";
 import { setPrimaryAccount } from "@/lib/social-primary.functions";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -78,9 +79,10 @@ const PLATFORMS: Array<{
   {
     platform: "youtube",
     name: "YouTube",
-    description: "Upload de Shorts ainda não configurado.",
+    description:
+      "Vídeos longos e Shorts com publicação automática via YouTube Data API. Você autoriza o canal pela sua conta Google.",
     icon: Youtube,
-    available: false,
+    available: true,
   },
 ];
 
