@@ -4,6 +4,7 @@ import {
   diagnoseFacebookOAuth,
   exchangeFacebookAuthorizationCode,
   facebookAuthorizationUrl,
+  facebookConfigChecklist,
   fetchFacebookPages,
   verifyFacebookOAuthState,
 } from "@/lib/facebook-oauth.server";
