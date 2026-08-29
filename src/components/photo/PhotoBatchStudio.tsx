@@ -178,7 +178,12 @@ export function PhotoBatchStudio() {
     try {
       for (const item of items) {
         for (let v = 0; v < variations; v += 1) {
-          const result = await renderPhoto(item.file, { ...options, adjust: item.adjust }, v);
+          const result = await renderPhoto(
+            item.file,
+            { ...options, adjust: mergeAdjust(item.adjust) },
+            v,
+          );
+
           const url = URL.createObjectURL(result.blob);
           urlsRef.current.push(url);
           produced.push({ ...result, id: `${item.id}-${v}`, sourceId: item.id, url });
