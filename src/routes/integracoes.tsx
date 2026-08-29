@@ -94,6 +94,7 @@ function IntegrationsPage() {
   const [busy, setBusy] = useState<PlatformKey | null>(null);
 
   const startFacebook = useServerFn(beginFacebookOAuth);
+  const startYoutube = useServerFn(beginYoutubeOAuth);
   const makePrimary = useServerFn(setPrimaryAccount);
 
   useEffect(() => {
