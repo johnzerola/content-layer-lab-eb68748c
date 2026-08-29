@@ -783,10 +783,12 @@ function drawVideoLayer(
       ctx.restore();
       dest = paint(box, "contain", full, { useOffset: false });
     } else {
-      // "auto": só recorta quando a orientação bate com a do quadro; senão mostra inteiro
+      // "auto": recorte manual/enquadramento dinâmico PREENCHE a caixa (cover),
+      // sem bordas pretas — a região escolhida pelo usuário vira o quadro inteiro.
+      // Sem recorte, só encolhe (contain) quando a orientação não bate com a do quadro.
       const useContain =
         v.fit === "contain" ||
-        ((v.fit === "auto" || manualCrop) && Math.abs(srcAR - boxAR) / boxAR > 0.02);
+        (v.fit === "auto" && !manualCrop && Math.abs(srcAR - boxAR) / boxAR > 0.02);
       dest = paint(box, useContain ? "contain" : "cover");
     }
     ctx.filter = "none";
