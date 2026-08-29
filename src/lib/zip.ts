@@ -17,11 +17,6 @@ export interface SaveProgress {
   target: "disco" | "memória";
 }
 
-type SavePicker = (opts?: {
-  suggestedName?: string;
-  types?: { description: string; accept: Record<string, string[]> }[];
-}) => Promise<FileSystemFileHandle>;
-
 type DirPicker = () => Promise<FileSystemDirectoryHandle>;
 
 function triggerDownload(blob: Blob, name: string) {
@@ -29,8 +24,16 @@ function triggerDownload(blob: Blob, name: string) {
   const a = document.createElement("a");
   a.href = url;
   a.download = name;
+  a.rel = "noopener";
+  // alguns navegadores só disparam o download se o link estiver no DOM
+  a.style.display = "none";
+  document.body.appendChild(a);
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 8000);
+  // arquivos grandes precisam de tempo para o navegador iniciar a gravação
+  setTimeout(() => {
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, 60_000);
 }
 
 function totalBytes(files: OutFile[]) {
