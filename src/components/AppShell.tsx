@@ -18,7 +18,9 @@ import {
   Settings2,
   BarChart3,
   Shield,
+  Images,
 } from "lucide-react";
+
 import { PlanGate } from "@/components/PlanGate";
 import { useAccess } from "@/lib/subscription";
 import { planFromId } from "@/lib/plan";
