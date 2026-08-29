@@ -61,21 +61,42 @@ export const completeFacebookOAuth = createServerFn({ method: "POST" })
       }
       verifyFacebookOAuthState(data.state, context.userId);
       const token = await exchangeFacebookAuthorizationCode({ code: data.code });
-      await validateFacebookAccessTokenScopes({ accessToken: token.accessToken });
-      const pages = await fetchFacebookPages({ accessToken: token.accessToken });
-      if (pages.length === 0) {
+      const authorization = await validateFacebookAccessTokenScopes({
+        accessToken: token.accessToken,
+      });
+      const discovery = await fetchFacebookPages({
+        accessToken: token.accessToken,
+        authorizedPageIds: authorization.authorizedPageIds,
+      });
+      if (discovery.pages.length === 0) {
+        const selectedDetail =
+          authorization.authorizedPageIds.length > 0
+            ? ` A Meta confirmou ${authorization.authorizedPageIds.length} Página(s), mas não liberou o token de publicação para elas.`
+            : "";
         throw new MetaLinkError(
           "META_ACCOUNT_MISMATCH",
-          "Nenhuma Página do Facebook foi autorizada. Refaça o login e marque as Páginas desejadas.",
+          `Nenhuma Página publicável foi devolvida.${selectedDetail} Confirme o controle total das Páginas e refaça o login.`,
         );
       }
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const accounts = await persistFacebookPages(supabaseAdmin as never, {
         userId: context.userId,
-        pages,
+        pages: discovery.pages,
         expiresAt: token.expiresAt,
       });
-      return { ok: true as const, accounts };
+      return {
+        ok: true as const,
+        accounts,
+        summary: {
+          facebook: discovery.pages.map((page) => page.name),
+          instagram: discovery.pages.flatMap((page) =>
+            page.instagram ? [page.instagram.username] : [],
+          ),
+          selectedPageCount: discovery.authorizedPageIds.length,
+          unavailablePageIds: discovery.unavailablePageIds,
+          selectedInstagramCount: authorization.authorizedInstagramIds.length,
+        },
+      };
     } catch (error) {
       if (error instanceof MetaLinkError) {
         return { ok: false as const, code: error.code, error: error.message };

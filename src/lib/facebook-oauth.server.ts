@@ -418,7 +418,7 @@ export async function validateFacebookAccessTokenScopes(input: {
   accessToken: string;
   environment?: NodeJS.ProcessEnv;
   fetch?: typeof fetch;
-}): Promise<string[]> {
+}): Promise<FacebookTokenAuthorization> {
   const environment = input.environment ?? process.env;
   const configuration = facebookOAuthConfiguration(environment);
   const url = new URL(`${facebookGraphBase(environment)}/debug_token`);
@@ -454,7 +454,11 @@ export async function validateFacebookAccessTokenScopes(input: {
       `A Meta não concedeu: ${missingScopes.join(", ")}. Adicione essas permissões ao caso de uso do app e conecte novamente.`,
     );
   }
-  return grantedScopes;
+  return {
+    grantedScopes,
+    authorizedPageIds: granularTargetIds(data, "pages_"),
+    authorizedInstagramIds: granularTargetIds(data, "instagram_"),
+  };
 }
 
 export async function exchangeFacebookAuthorizationCode(input: {
@@ -509,37 +513,135 @@ export type FacebookPage = {
   instagram: { id: string; username: string } | null;
 };
 
-/** Lista as Páginas administradas e a conta IG Business vinculada a cada uma. */
+export type FacebookTokenAuthorization = {
+  grantedScopes: string[];
+  authorizedPageIds: string[];
+  authorizedInstagramIds: string[];
+};
+
+export type FacebookPageDiscovery = {
+  pages: FacebookPage[];
+  authorizedPageIds: string[];
+  unavailablePageIds: string[];
+};
+
+function granularTargetIds(data: Record<string, unknown> | null, prefix: string): string[] {
+  const rows = data?.["granular_scopes"];
+  if (!Array.isArray(rows)) return [];
+  const ids = new Set<string>();
+  for (const row of rows) {
+    const scope = readString(row, "scope");
+    if (!scope?.startsWith(prefix)) continue;
+    const targetIds = asObject(row)?.["target_ids"];
+    if (!Array.isArray(targetIds)) continue;
+    for (const targetId of targetIds) {
+      if (typeof targetId === "string" || typeof targetId === "number") {
+        const normalized = String(targetId).trim();
+        if (/^\d+$/.test(normalized)) ids.add(normalized);
+      }
+    }
+  }
+  return [...ids];
+}
+
+function parseFacebookPage(value: unknown): FacebookPage | null {
+  const pageId = readString(value, "id");
+  const name = readString(value, "name");
+  const pageAccessToken = readString(value, "access_token");
+  if (!pageId || !pageAccessToken) return null;
+  const igRaw = asObject(value)?.["instagram_business_account"];
+  const igId = readString(igRaw, "id");
+  const igUsername = readString(igRaw, "username");
+  return {
+    pageId,
+    name: name || `Página ${pageId}`,
+    pageAccessToken,
+    instagram: igId ? { id: igId, username: (igUsername ?? igId).toLowerCase() } : null,
+  };
+}
+
+function graphRequest(
+  url: URL,
+  accessToken: string,
+  request: typeof fetch,
+): Promise<Response | null> {
+  return request(url, {
+    headers: {
+      accept: "application/json",
+      authorization: `Bearer ${accessToken}`,
+    },
+  }).catch(() => null);
+}
+
+/**
+ * Combina `/me/accounts` com os IDs granulares escolhidos no diálogo. A Meta
+ * pode omitir ativos selecionados da listagem agregada, mas permite consultá-los
+ * diretamente para obter o Page Access Token.
+ */
 export async function fetchFacebookPages(input: {
   accessToken: string;
+  authorizedPageIds?: string[];
   environment?: NodeJS.ProcessEnv;
   fetch?: typeof fetch;
-}): Promise<FacebookPage[]> {
+}): Promise<FacebookPageDiscovery> {
   const environment = input.environment ?? process.env;
+  const request = input.fetch ?? fetch;
+  const authorizedPageIds = [...new Set(input.authorizedPageIds ?? [])].filter((id) =>
+    /^\d+$/.test(id),
+  );
   const url = new URL(`${facebookGraphBase(environment)}/me/accounts`);
-  url.searchParams.set("fields", "id,name,access_token,instagram_business_account{id,username}");
+  url.searchParams.set(
+    "fields",
+    "id,name,access_token,tasks,instagram_business_account{id,username}",
+  );
   url.searchParams.set("limit", "100");
-  url.searchParams.set("access_token", input.accessToken);
-  const payload = await readJson(await (input.fetch ?? fetch)(url).catch(() => null));
-  const rows = asObject(payload)?.["data"];
-  if (!Array.isArray(rows)) {
-    throw new MetaLinkError("META_RESPONSE_INVALID", "A Meta retornou uma resposta inválida.");
+  const pages = new Map<string, FacebookPage>();
+  const seenCursors = new Set<string>();
+  for (let pageNumber = 0; pageNumber < 100; pageNumber += 1) {
+    const payload = await readJson(await graphRequest(url, input.accessToken, request));
+    const payloadObject = asObject(payload);
+    const rows = payloadObject?.["data"];
+    if (!Array.isArray(rows)) {
+      throw new MetaLinkError("META_RESPONSE_INVALID", "A Meta retornou uma resposta inválida.");
+    }
+    for (const row of rows) {
+      const page = parseFacebookPage(row);
+      if (page) pages.set(page.pageId, page);
+    }
+
+    const paging = asObject(payloadObject?.["paging"]);
+    const cursors = asObject(paging?.["cursors"]);
+    const after = readString(cursors, "after");
+    if (!after || seenCursors.has(after)) break;
+    seenCursors.add(after);
+    url.searchParams.set("after", after);
   }
-  const pages: FacebookPage[] = [];
-  for (const row of rows) {
-    const pageId = readString(row, "id");
-    const name = readString(row, "name");
-    const pageAccessToken = readString(row, "access_token");
-    if (!pageId || !pageAccessToken) continue;
-    const igRaw = asObject(row)?.["instagram_business_account"];
-    const igId = readString(igRaw, "id");
-    const igUsername = readString(igRaw, "username");
-    pages.push({
-      pageId,
-      name: name || `Página ${pageId}`,
-      pageAccessToken,
-      instagram: igId ? { id: igId, username: (igUsername ?? igId).toLowerCase() } : null,
-    });
+
+  const unavailablePageIds: string[] = [];
+  for (const pageId of authorizedPageIds) {
+    if (pages.has(pageId)) continue;
+    const pageUrl = new URL(`${facebookGraphBase(environment)}/${pageId}`);
+    pageUrl.searchParams.set(
+      "fields",
+      "id,name,access_token,tasks,instagram_business_account{id,username}",
+    );
+    try {
+      const directPayload = await readJson(await graphRequest(pageUrl, input.accessToken, request));
+      const page = parseFacebookPage(directPayload);
+      if (page) pages.set(page.pageId, page);
+      else unavailablePageIds.push(pageId);
+    } catch (error) {
+      if (error instanceof MetaLinkError && error.code === "META_AUTH_INVALID") {
+        unavailablePageIds.push(pageId);
+        continue;
+      }
+      throw error;
+    }
   }
-  return pages;
+
+  return {
+    pages: [...pages.values()],
+    authorizedPageIds,
+    unavailablePageIds,
+  };
 }

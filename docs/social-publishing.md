@@ -143,7 +143,12 @@ publicação. TikTok e YouTube continuam em preparação.
 
 O conector combinado usa Facebook Login, troca o código por token de longa
 duração e chama `GET /me/accounts` para obter os tokens das Páginas e a conta
-Instagram profissional vinculada. Os scopes mínimos são fixos no código:
+Instagram profissional vinculada. A listagem percorre todas as páginas da
+resposta da Graph API. Como a Meta pode omitir da lista agregada um ativo que o
+usuário acabou de selecionar, o callback também lê os `target_ids` granulares
+de `/debug_token` e consulta diretamente cada ID ausente. Os resultados são
+mesclados por Page ID antes da persistência. Os scopes mínimos são fixos no
+código:
 
 ```text
 pages_show_list
@@ -185,6 +190,12 @@ Após o callback, o servidor consulta `/debug_token` e interrompe a conexão se 
 token pertencer a outro app ou se faltar qualquer permissão. O painel
 administrativo em `/integracoes` mostra modo, scopes e URL OAuth sem expor
 segredos ou tokens.
+
+Ao atualizar a seleção, escolha as Páginas e depois as contas profissionais do
+Instagram vinculadas. O retorno mostra separadamente quantas Páginas e quantos
+Instagrams foram sincronizados. Se um ID selecionado não liberar Page Access
+Token, o callback preserva as demais contas e informa quantas exigem revisão de
+controle total no Business Portfolio.
 
 Referências de implementação: coleção oficial da Meta para Instagram API e o
 projeto MIT `Binary-Black-Holes/instagram-api`. O projeto AGPL BrightBean Studio

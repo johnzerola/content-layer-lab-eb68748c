@@ -22,6 +22,9 @@ async function persistOne(
     expiresAt: Date;
   },
 ): Promise<LinkedSocialAccount> {
+  // Falha antes de criar registros se a chave de criptografia estiver ausente.
+  const encryptedAccessToken = encryptSocialToken(input.accessToken);
+
   const { data: account, error: accountError } = await admin
     .from("social_accounts")
     .upsert(
@@ -68,7 +71,7 @@ async function persistOne(
   const { error: credentialError } = await admin.from("social_connection_credentials").upsert(
     {
       connection_id: connection.id,
-      access_token_ciphertext: encryptSocialToken(input.accessToken),
+      access_token_ciphertext: encryptedAccessToken,
       expires_at: input.expiresAt.toISOString(),
       updated_at: new Date().toISOString(),
     },

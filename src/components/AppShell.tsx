@@ -25,7 +25,6 @@ import { PlanGate } from "@/components/PlanGate";
 import { useAccess } from "@/lib/subscription";
 import { planFromId } from "@/lib/plan";
 
-
 export type AppMode = "lote" | "clip" | "limpar" | "limpar-ia" | "external";
 
 type ModeDef = {
@@ -109,7 +108,8 @@ const MODES: ModeDef[] = [
     mark: "VV",
     tagline: "clipagem em tempo real",
     headline: "Cortes Automáticos de Lives",
-    description: "Monitore transmissões do X, Kick e TikTok e gere cortes automáticos baseados em IA sem precisar de templates.",
+    description:
+      "Monitore transmissões do X, Kick e TikTok e gere cortes automáticos baseados em IA sem precisar de templates.",
     chips: ["monitoramento HLS", "score viral IA", "exportação rápida"],
     icon: Sparkle,
     badge: Sparkle,
@@ -165,31 +165,39 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
               <p className="truncate font-display text-base font-bold tracking-tight text-foreground">
                 {current.brand}
               </p>
-              <p className="truncate font-mono text-[10px] text-muted-foreground">{current.tagline}</p>
+              <p className="truncate font-mono text-[10px] text-muted-foreground">
+                {current.tagline}
+              </p>
             </div>
           )}
         </div>
 
         <nav className="flex flex-col gap-1 px-3">
           {open && <p className="mono-label px-2 pb-2 pt-3">Ferramentas</p>}
-          {MODES.filter(m => m.id !== "external").map((m) => {
+          {MODES.filter((m) => m.id !== "external").map((m) => {
             const active = m.id === mode;
-            const isExternal = ["/live", "/biblioteca", "/agenda", "/integracoes", "/armazenamento", "/metricas", "/admin"].some(path =>
-              typeof window !== "undefined" && window.location.pathname.startsWith(path)
+            const isExternal = [
+              "/live",
+              "/biblioteca",
+              "/agenda",
+              "/integracoes",
+              "/armazenamento",
+              "/metricas",
+              "/admin",
+            ].some(
+              (path) => typeof window !== "undefined" && window.location.pathname.startsWith(path),
             );
 
             // Se estiver em uma rota externa/fixa, desativa o destaque visual das ferramentas de lote
             const visuallyActive = active && !isExternal;
             return (
               <button
-
                 key={m.id}
                 onClick={() => onMode(m.id)}
                 title={m.brand}
                 aria-current={active ? "page" : undefined}
                 className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
                   visuallyActive
-
                     ? "bg-accent text-accent-foreground ring-1 ring-primary/30"
                     : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
                 }`}
@@ -197,7 +205,6 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
                 <span
                   className={`grid size-7 shrink-0 place-items-center rounded-lg border transition ${
                     visuallyActive
-
                       ? "border-primary/40 bg-primary/15 text-primary"
                       : "border-border bg-surface-2 text-muted-foreground group-hover:text-foreground"
                   }`}
@@ -207,7 +214,9 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
                 {open && (
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">{m.brand}</span>
-                    <span className="block truncate font-mono text-[10px] opacity-70">{m.hint}</span>
+                    <span className="block truncate font-mono text-[10px] opacity-70">
+                      {m.hint}
+                    </span>
                   </span>
                 )}
                 {open && (counts?.[m.id] ?? 0) > 0 && (
@@ -305,7 +314,6 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             <Cloud className="size-[18px] shrink-0" />
             {open && "Nuvem"}
           </button>
-
         </div>
 
         <div className="mt-auto p-3">
@@ -314,7 +322,11 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             aria-label={open ? "Recolher menu" : "Expandir menu"}
             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
           >
-            {open ? <PanelLeftClose className="size-[18px]" /> : <PanelLeftOpen className="size-[18px]" />}
+            {open ? (
+              <PanelLeftClose className="size-[18px]" />
+            ) : (
+              <PanelLeftOpen className="size-[18px]" />
+            )}
             {open && "Recolher"}
           </button>
         </div>
@@ -322,19 +334,23 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-3 sm:px-6">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 py-3 sm:gap-4 sm:px-6">
             <div className="flex min-w-0 items-center gap-3">
               <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-primary/35 bg-primary/12 text-primary md:hidden">
                 <current.icon className="size-4" />
               </span>
               <div className="min-w-0">
-                <h1 className="truncate font-display text-lg font-bold tracking-tight">{current.brand}</h1>
-                <p className="truncate font-mono text-[11px] text-muted-foreground">{current.hint}</p>
+                <h1 className="truncate font-display text-lg font-bold tracking-tight">
+                  {current.brand}
+                </h1>
+                <p className="truncate font-mono text-[11px] text-muted-foreground">
+                  {current.hint}
+                </p>
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <div className="flex rounded-xl border border-border bg-surface-2 p-0.5 md:hidden">
-                {MODES.filter(m => m.id !== "external").map((m) => (
+                {MODES.filter((m) => m.id !== "external").map((m) => (
                   <button
                     key={m.id}
                     onClick={() => onMode(m.id)}
@@ -358,7 +374,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
                   {plan.credits === null ? " · ilimitado" : ` · ${sub.credits} créditos`}
                 </Link>
               )}
-              <span className="rounded-full border border-primary/35 bg-accent px-3 py-1.5 font-mono text-[11px] text-accent-foreground">
+              <span className="hidden rounded-full border border-primary/35 bg-accent px-3 py-1.5 font-mono text-[11px] text-accent-foreground sm:inline-flex">
                 ● {count} vídeo{count === 1 ? "" : "s"}
               </span>
             </div>
@@ -366,7 +382,17 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
         </header>
 
         <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
-          {mode === "external" || (typeof window !== "undefined" && ["/live", "/biblioteca", "/agenda", "/integracoes", "/armazenamento", "/metricas", "/admin"].includes(window.location.pathname)) ? null : (
+          {mode === "external" ||
+          (typeof window !== "undefined" &&
+            [
+              "/live",
+              "/biblioteca",
+              "/agenda",
+              "/integracoes",
+              "/armazenamento",
+              "/metricas",
+              "/admin",
+            ].includes(window.location.pathname)) ? null : (
             <section
               key={current.id}
               className="mb-6 overflow-hidden rounded-2xl border border-border/70 bg-[var(--gradient-surface)] p-5 shadow-[var(--shadow-panel)] sm:p-6"

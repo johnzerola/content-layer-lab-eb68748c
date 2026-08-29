@@ -263,7 +263,53 @@ describe("Facebook Login", () => {
         environment,
         fetch: request,
       }),
-    ).resolves.toContain("pages_read_engagement");
+    ).resolves.toMatchObject({
+      grantedScopes: expect.arrayContaining(["pages_read_engagement"]),
+      authorizedPageIds: [],
+      authorizedInstagramIds: [],
+    });
+  });
+
+  it("reads every Page and Instagram selected in Meta granular permissions", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            app_id: environment["META_APP_ID"],
+            is_valid: true,
+            scopes: [
+              "pages_show_list",
+              "pages_read_engagement",
+              "pages_manage_posts",
+              "instagram_basic",
+              "instagram_content_publish",
+            ],
+            granular_scopes: [
+              { scope: "pages_manage_posts", target_ids: ["391439484568257"] },
+              {
+                scope: "pages_read_engagement",
+                target_ids: ["391439484568257", "108606147304398"],
+              },
+              {
+                scope: "instagram_content_publish",
+                target_ids: ["17841404963501636", "17841426174344908"],
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    await expect(
+      validateFacebookAccessTokenScopes({
+        accessToken: "user-token",
+        environment,
+        fetch: request,
+      }),
+    ).resolves.toMatchObject({
+      authorizedPageIds: ["391439484568257", "108606147304398"],
+      authorizedInstagramIds: ["17841404963501636", "17841426174344908"],
+    });
   });
 
   it("explains which permission is missing before account discovery", async () => {
@@ -309,13 +355,123 @@ describe("Facebook Login", () => {
     );
     await expect(
       fetchFacebookPages({ accessToken: "user-token", environment, fetch: request }),
-    ).resolves.toEqual([
-      {
-        pageId: "page-1",
-        name: "Minha Página",
-        pageAccessToken: "page-token",
-        instagram: { id: "ig-1", username: "minha.conta" },
-      },
+    ).resolves.toEqual({
+      pages: [
+        {
+          pageId: "page-1",
+          name: "Minha Página",
+          pageAccessToken: "page-token",
+          instagram: { id: "ig-1", username: "minha.conta" },
+        },
+      ],
+      authorizedPageIds: [],
+      unavailablePageIds: [],
+    });
+  });
+
+  it("recovers selected Pages omitted by /me/accounts using their granular IDs", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] })))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: "391439484568257",
+            name: "Dino pizzaria",
+            access_token: "page-token-1",
+            instagram_business_account: {
+              id: "17841404963501636",
+              username: "dinopizzaria",
+            },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: "108606147304398",
+            name: "mestredomarket",
+            access_token: "page-token-2",
+            instagram_business_account: {
+              id: "17841426174344908",
+              username: "mestredomarketing",
+            },
+          }),
+        ),
+      );
+
+    const result = await fetchFacebookPages({
+      accessToken: "user-token",
+      authorizedPageIds: ["391439484568257", "108606147304398"],
+      environment,
+      fetch: request,
+    });
+
+    expect(result.pages.map((page) => page.name)).toEqual(["Dino pizzaria", "mestredomarket"]);
+    expect(result.pages.map((page) => page.instagram?.username)).toEqual([
+      "dinopizzaria",
+      "mestredomarketing",
     ]);
+    expect(result.unavailablePageIds).toEqual([]);
+    expect(request).toHaveBeenCalledTimes(3);
+    expect(new URL(String(request.mock.calls[1]?.[0])).pathname).toBe("/v26.0/391439484568257");
+  });
+
+  it("loads every page of /me/accounts before resolving selected assets", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [{ id: "100", name: "Primeira", access_token: "page-token-1" }],
+            paging: { cursors: { after: "next-page" } },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [{ id: "200", name: "Segunda", access_token: "page-token-2" }],
+          }),
+        ),
+      );
+
+    const result = await fetchFacebookPages({
+      accessToken: "user-token",
+      environment,
+      fetch: request,
+    });
+
+    expect(result.pages.map((page) => page.name)).toEqual(["Primeira", "Segunda"]);
+    expect(new URL(String(request.mock.calls[1]?.[0])).searchParams.get("after")).toBe("next-page");
+  });
+
+  it("keeps available Pages and reports selected assets that Meta refuses", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [{ id: "100", name: "Disponível", access_token: "page-token" }],
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: { message: "Unsupported get request" } }), {
+          status: 400,
+        }),
+      );
+
+    await expect(
+      fetchFacebookPages({
+        accessToken: "user-token",
+        authorizedPageIds: ["100", "200"],
+        environment,
+        fetch: request,
+      }),
+    ).resolves.toMatchObject({
+      pages: [{ pageId: "100", name: "Disponível" }],
+      unavailablePageIds: ["200"],
+    });
   });
 });

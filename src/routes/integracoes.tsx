@@ -3,11 +3,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useState } from "react";
 import {
   CheckCircle2,
+  Clock3,
   Star,
   Facebook,
   Instagram,
   Loader2,
-  Plus,
+  RefreshCw,
+  ShieldCheck,
   Settings2,
   Trash2,
   TriangleAlert,
@@ -46,12 +48,11 @@ export const Route = createFileRoute("/integracoes")({
 
 type PlatformKey = "instagram" | "facebook" | "tiktok" | "youtube";
 
-const PLATFORMS: Array<{
-  platform: PlatformKey;
+const META_PLATFORMS: Array<{
+  platform: "instagram" | "facebook";
   name: string;
   description: string;
   icon: typeof Instagram;
-  available: boolean;
 }> = [
   {
     platform: "instagram",
@@ -59,28 +60,12 @@ const PLATFORMS: Array<{
     description:
       "Reels, Feed e Stories. A autorização é feita pelo Facebook (o Instagram Profissional precisa estar vinculado a uma Página).",
     icon: Instagram,
-    available: true,
   },
   {
     platform: "facebook",
     name: "Facebook",
     description: "Páginas com Reels e vídeos no Feed via Facebook Login.",
     icon: Facebook,
-    available: true,
-  },
-  {
-    platform: "tiktok",
-    name: "TikTok",
-    description: "Content Posting API ainda não liberada.",
-    icon: Settings2,
-    available: false,
-  },
-  {
-    platform: "youtube",
-    name: "YouTube",
-    description: "Upload de Shorts ainda não configurado.",
-    icon: Youtube,
-    available: false,
   },
 ];
 
@@ -195,6 +180,11 @@ function IntegrationsPage() {
     [makePrimary, reload],
   );
 
+  const facebookAccounts = accounts.filter((account) => account.platform === "facebook");
+  const instagramAccounts = accounts.filter((account) => account.platform === "instagram");
+  const hasMetaAccounts = facebookAccounts.length + instagramAccounts.length > 0;
+  const syncingMeta = busy === "facebook" || busy === "instagram";
+
   return (
     <AppShell
       mode={mode}
@@ -203,156 +193,199 @@ function IntegrationsPage() {
       onLibrary={() => {}}
       onCloud={() => {}}
     >
-      <main className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
-        <section className="mb-6 rounded-2xl border border-border/70 bg-[var(--gradient-surface)] p-5">
-          <p className="mono-label text-primary">Minhas contas</p>
-          <h1 className="mt-2 font-display text-2xl font-bold">Conecte quantas contas quiser</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Cada conta é vinculada apenas ao seu login e autorizada pelo próprio provedor. Senhas
-            nunca são solicitadas: você aprova o acesso na Meta e nós guardamos somente o token
-            criptografado.
-          </p>
-        </section>
+      <main className="w-full min-w-0">
+        <header className="mb-6 flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="mono-label text-primary">Contas sociais</p>
+            <h1 className="mt-2 font-display text-2xl font-bold">Facebook e Instagram</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              As Páginas autorizadas e seus Instagrams profissionais vinculados são sincronizados
+              juntos pelo Login da Meta.
+            </p>
+          </div>
+          {user && (
+            <Button
+              type="button"
+              disabled={syncingMeta}
+              onClick={() => void connect("facebook")}
+              className="min-h-10 shrink-0"
+            >
+              {syncingMeta ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : hasMetaAccounts ? (
+                <RefreshCw className="size-4" />
+              ) : (
+                <Facebook className="size-4" />
+              )}
+              {hasMetaAccounts ? "Atualizar seleção Meta" : "Conectar com a Meta"}
+            </Button>
+          )}
+        </header>
 
         {user && <MetaDiagnosticsPanel />}
 
         {!user ? (
-          <div className="rounded-2xl border border-border bg-surface/60 p-6 text-center text-sm text-muted-foreground">
+          <div className="border border-border bg-surface/60 p-6 text-center text-sm text-muted-foreground">
             Faça login na Nuvem para conectar suas contas.
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {PLATFORMS.map((platform) => {
-              const Icon = platform.icon;
-              const rows = accounts.filter((account) => account.platform === platform.platform);
-              return (
-                <article
+          <section className="border border-border/70 bg-surface/50">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <ShieldCheck className="size-4 text-emerald-400" />
+                Conexão oficial Meta
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {facebookAccounts.length} Página(s) · {instagramAccounts.length} Instagram
+              </p>
+            </div>
+            <div className="grid md:grid-cols-2">
+              {META_PLATFORMS.map((platform, index) => (
+                <AccountsColumn
                   key={platform.platform}
-                  className="rounded-2xl border border-border/70 bg-surface/60 p-5"
-                >
-                  <div className="flex items-start gap-3">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-primary/35 bg-primary/12 text-primary">
-                      <Icon className="size-5" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <h2 className="font-display text-lg font-semibold">{platform.name}</h2>
-                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                        {platform.description}
-                      </p>
-                    </div>
-                  </div>
-
-                  <ul className="mt-4 space-y-2">
-                    {rows.length === 0 && (
-                      <li className="rounded-xl border border-border bg-surface-2 p-3 text-sm text-muted-foreground">
-                        Nenhuma conta conectada.
-                      </li>
-                    )}
-                    {rows.map((account) => {
-                      const connected =
-                        account.status === "conectado" && account.provider !== "pending";
-                      return (
-                        <li
-                          key={account.id}
-                          className="flex items-center gap-3 rounded-xl border border-border bg-surface-2 p-3"
-                        >
-                          {connected ? (
-                            <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />
-                          ) : (
-                            <TriangleAlert className="size-4 shrink-0 text-amber-400" />
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium">
-                              {platform.platform === "facebook" ? "" : "@"}
-                              {account.username}
-                            </p>
-                            <p className="truncate text-xs text-muted-foreground">
-                              {account.is_primary
-                                ? "Conta ativa desta rede"
-                                : connected
-                                  ? "Pronta para publicar"
-                                  : "Precisa reautorizar"}
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            disabled={!connected || account.is_primary}
-                            onClick={() => void choosePrimary(account)}
-                            aria-label={`Definir ${account.username} como conta ativa`}
-                            title={
-                              account.is_primary
-                                ? "Conta ativa"
-                                : "Usar esta Página/conta por padrão nas publicações"
-                            }
-                            className={`border border-border ${
-                              account.is_primary ? "text-amber-400" : "text-muted-foreground"
-                            }`}
-                          >
-                            <Star
-                              className={`size-4 ${account.is_primary ? "fill-current" : ""}`}
-                            />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => void disconnect(account)}
-                            aria-label={`Remover ${account.username}`}
-                            className="border border-border text-muted-foreground hover:text-destructive"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-
-                  <Button
-                    type="button"
-                    disabled={!platform.available || busy === platform.platform}
-                    onClick={() => void connect(platform.platform)}
-                    className="mt-4 w-full"
-                  >
-                    {busy === platform.platform ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Plus className="size-4" />
-                    )}
-                    {platform.available ? "Adicionar conta" : "Em preparação"}
-                  </Button>
-                </article>
-              );
-            })}
-          </div>
+                  platform={platform}
+                  accounts={platform.platform === "facebook" ? facebookAccounts : instagramAccounts}
+                  divided={index > 0}
+                  onPrimary={choosePrimary}
+                  onRemove={disconnect}
+                />
+              ))}
+            </div>
+          </section>
         )}
 
-        <section className="mt-6 rounded-2xl border border-border/70 bg-surface/60 p-5 text-xs leading-relaxed text-muted-foreground">
-          <p className="font-medium text-foreground">
-            Apareceu “Recurso indisponível” ou “estamos atualizando detalhes” na tela do Facebook?
-          </p>
-          <p className="mt-2">
-            Esse aviso vem da Meta, não do VaiViral: o app precisa estar ativo e cada permissão
-            solicitada precisa estar adicionada ao caso de uso. Política de privacidade, exclusão de
-            dados, ícone, categoria e e-mail de contato também precisam estar preenchidos. Se você
-            é o administrador do app, revise essas informações no painel da Meta e tente de novo.
-          </p>
-          <p className="mt-2">
-            Não guardamos senhas: só o token que a Meta emite, criptografado. Remova a conta aqui a
-            qualquer momento — veja a{" "}
+        <section className="mt-6 grid gap-4 border-t border-border pt-5 text-xs text-muted-foreground sm:grid-cols-[1fr_auto] sm:items-start">
+          <div>
+            <p className="font-medium text-foreground">Segurança da conexão</p>
+            <p className="mt-1 max-w-3xl leading-relaxed">
+              O VaiViral recebe tokens oficiais da Meta, armazena-os criptografados e nunca solicita
+              sua senha. Você pode remover qualquer Página ou Instagram desta lista.
+            </p>
+          </div>
+          <div className="flex gap-4">
             <a href="/privacidade" className="underline hover:text-foreground">
-              política de privacidade
-            </a>{" "}
-            e a{" "}
-            <a href="/exclusao-de-dados" className="underline hover:text-foreground">
-              exclusão de dados
+              Privacidade
             </a>
-            .
-          </p>
+            <a href="/exclusao-de-dados" className="underline hover:text-foreground">
+              Excluir dados
+            </a>
+          </div>
+        </section>
+
+        <section className="mt-6 border-t border-border pt-5">
+          <p className="mono-label text-muted-foreground">Próximas integrações</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <ComingSoon icon={Settings2} name="TikTok" />
+            <ComingSoon icon={Youtube} name="YouTube" />
+          </div>
         </section>
       </main>
     </AppShell>
+  );
+}
+
+function AccountsColumn({
+  platform,
+  accounts,
+  divided,
+  onPrimary,
+  onRemove,
+}: {
+  platform: (typeof META_PLATFORMS)[number];
+  accounts: SocialAccount[];
+  divided: boolean;
+  onPrimary: (account: SocialAccount) => Promise<void>;
+  onRemove: (account: SocialAccount) => Promise<void>;
+}) {
+  const Icon = platform.icon;
+  return (
+    <div
+      className={`min-w-0 p-4 sm:p-5 ${divided ? "border-t border-border md:border-l md:border-t-0" : ""}`}
+    >
+      <div className="flex items-start gap-3">
+        <span className="grid size-9 shrink-0 place-items-center border border-primary/35 bg-primary/10 text-primary">
+          <Icon className="size-4" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="font-display text-base font-semibold">{platform.name}</h2>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            {platform.description}
+          </p>
+        </div>
+      </div>
+
+      <ul className="mt-4 space-y-2">
+        {accounts.length === 0 && (
+          <li className="border border-dashed border-border p-4 text-sm text-muted-foreground">
+            Nenhuma conta vinculada.
+          </li>
+        )}
+        {accounts.map((account) => {
+          const connected = account.status === "conectado" && account.provider !== "pending";
+          const accountName = account.display_name || account.username;
+          return (
+            <li
+              key={account.id}
+              className="flex min-h-16 items-center gap-3 border border-border bg-surface-2 p-3"
+            >
+              {connected ? (
+                <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />
+              ) : (
+                <TriangleAlert className="size-4 shrink-0 text-amber-400" />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">
+                  {platform.platform === "instagram" ? "@" : ""}
+                  {platform.platform === "instagram" ? account.username : accountName}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {account.is_primary
+                    ? "Conta principal"
+                    : connected
+                      ? "Pronta para publicar"
+                      : "Reconexão necessária"}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={!connected || account.is_primary}
+                onClick={() => void onPrimary(account)}
+                aria-label={`Definir ${accountName} como conta principal`}
+                title={account.is_primary ? "Conta principal" : "Definir como conta principal"}
+                className={account.is_primary ? "text-amber-400" : "text-muted-foreground"}
+              >
+                <Star className={`size-4 ${account.is_primary ? "fill-current" : ""}`} />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => void onRemove(account)}
+                aria-label={`Remover ${accountName}`}
+                title="Remover conexão"
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function ComingSoon({ icon: Icon, name }: { icon: typeof Settings2; name: string }) {
+  return (
+    <div className="flex items-center gap-3 border border-border px-4 py-3 text-sm text-muted-foreground">
+      <Icon className="size-4" />
+      <span className="font-medium text-foreground">{name}</span>
+      <span className="ml-auto flex items-center gap-1 text-xs">
+        <Clock3 className="size-3.5" /> Em preparação
+      </span>
+    </div>
   );
 }
 
@@ -397,7 +430,7 @@ function MetaDiagnosticsPanel() {
   }, [runDiagnosis]);
 
   return (
-    <section className="mb-6 rounded-2xl border border-border/70 bg-surface/60 p-5">
+    <section className="mb-6 rounded-lg border border-border/70 bg-surface/60 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-base font-semibold">Diagnóstico da integração Meta</h2>
@@ -451,7 +484,7 @@ function MetaDiagnosticsPanel() {
           </dl>
 
           {state.check.permissionWarning && (
-            <p className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-300">
+            <p className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-300">
               <TriangleAlert className="mt-0.5 size-4 shrink-0" />
               <span>{state.check.permissionWarning}</span>
             </p>
@@ -473,7 +506,7 @@ function MetaDiagnosticsPanel() {
           </p>
 
           {state.check.issues.length > 0 ? (
-            <ul className="space-y-1 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-amber-300">
+            <ul className="space-y-1 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-amber-300">
               {state.check.issues.map((issue) => (
                 <li key={issue}>• {issue}</li>
               ))}
@@ -483,12 +516,12 @@ function MetaDiagnosticsPanel() {
           )}
 
           {state.check.authorizationUrl && (
-            <p className="break-all rounded-xl border border-border bg-surface-2 p-3 text-xs text-muted-foreground">
+            <p className="break-all rounded-lg border border-border bg-surface-2 p-3 text-xs text-muted-foreground">
               {state.check.authorizationUrl}
             </p>
           )}
 
-          <div className="rounded-xl border border-border bg-surface-2 p-3 text-xs text-muted-foreground">
+          <div className="rounded-lg border border-border bg-surface-2 p-3 text-xs text-muted-foreground">
             <p className="font-medium text-foreground">Checklist no painel da Meta</p>
             <ul className="mt-1 space-y-1">
               <li>• URIs de redirecionamento válidos: {state.check.redirectUri ?? "—"}</li>
@@ -518,7 +551,7 @@ function MetaDiagnosticsPanel() {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border bg-surface-2 p-3">
+    <div className="rounded-lg border border-border bg-surface-2 p-3">
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="break-all text-sm">{value}</dd>
     </div>
