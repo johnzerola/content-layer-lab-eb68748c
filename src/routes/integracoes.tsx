@@ -120,6 +120,15 @@ function IntegrationsPage() {
     async (platform: PlatformKey) => {
       setBusy(platform);
       try {
+        if (platform === "youtube") {
+          const response = await startYoutube();
+          if (!response.ok) {
+            toast.error(response.error);
+            return;
+          }
+          window.location.href = response.authorizationUrl;
+          return;
+        }
         // O mesmo Facebook Login autoriza a Página e a conta Instagram
         // profissional vinculada a ela.
         const response = await startFacebook();
