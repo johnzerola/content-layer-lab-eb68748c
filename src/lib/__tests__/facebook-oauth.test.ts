@@ -5,6 +5,7 @@ import {
   exchangeFacebookAuthorizationCode,
   facebookAuthorizationUrl,
   facebookConfigChecklist,
+  facebookOAuthConfiguration,
   fetchFacebookPages,
   verifyFacebookOAuthState,
 } from "@/lib/facebook-oauth.server";
@@ -55,6 +56,13 @@ describe("Facebook Login for Business", () => {
       "pages_show_list,pages_manage_posts,instagram_basic,instagram_content_publish",
     );
     expect(url.searchParams.get("scope")).not.toContain("pages_read_engagement");
+  });
+
+  it("ignores META_LOGIN_CONFIG_ID at configuration level when classic mode is active", () => {
+    expect(facebookOAuthConfiguration({
+      ...environment,
+      META_LOGIN_MODE: "classic",
+    }).configId).toBeNull();
   });
 
   it("keeps safe scope order, removes duplicates, and discards invalid overrides", () => {
