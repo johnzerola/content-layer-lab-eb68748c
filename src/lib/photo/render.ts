@@ -15,6 +15,10 @@ export interface PhotoAdjust {
   brightness: number;
   contrast: number;
   saturation: number;
+  /** 0 = sem nitidez extra, 1 = máximo */
+  sharpness: number;
+  /** zoom manual (1 = sem zoom) */
+  zoom: number;
 }
 
 export const DEFAULT_ADJUST: PhotoAdjust = {
@@ -22,14 +26,47 @@ export const DEFAULT_ADJUST: PhotoAdjust = {
   brightness: 1,
   contrast: 1,
   saturation: 1,
+  sharpness: 0,
+  zoom: 1,
 };
+
+export const PHOTO_FONTS = [
+  { id: "Inter, system-ui, sans-serif", label: "Inter" },
+  { id: "'Arial Black', Impact, sans-serif", label: "Arial Black" },
+  { id: "Impact, 'Arial Black', sans-serif", label: "Impact" },
+  { id: "Georgia, serif", label: "Georgia" },
+  { id: "'Courier New', monospace", label: "Courier" },
+  { id: "'Trebuchet MS', sans-serif", label: "Trebuchet" },
+] as const;
+
+export type PhotoTextPosition = "top" | "center" | "bottom";
 
 export interface PhotoTextOverlay {
   headline?: string | undefined;
   cta?: string | undefined;
   color: string;
   background: string;
+  /** família de fonte CSS */
+  fontFamily: string;
+  /** tamanho relativo à largura da imagem (0.02–0.14) */
+  fontScale: number;
+  weight: number;
+  uppercase: boolean;
+  /** caixa atrás do texto */
+  boxed: boolean;
+  position: PhotoTextPosition;
 }
+
+export const DEFAULT_TEXT: PhotoTextOverlay = {
+  color: "#ffffff",
+  background: "#0f172a",
+  fontFamily: PHOTO_FONTS[0].id,
+  fontScale: 0.055,
+  weight: 700,
+  uppercase: false,
+  boxed: true,
+  position: "bottom",
+};
 
 export interface PhotoRenderOptions {
   presetId: string;
@@ -48,6 +85,8 @@ export interface PhotoRenderOptions {
     days: number;
   };
   seed: string;
+  /** limita o lado maior — usado nas prévias rápidas */
+  maxSide?: number | undefined;
 }
 
 export interface PhotoResult {
@@ -68,6 +107,7 @@ function targetSize(
   presetId: string,
   rotate90: number,
   jitter: number,
+  maxSide?: number,
 ): { width: number; height: number } {
   const preset = presetById(presetId);
   const swapped = rotate90 === 90 || rotate90 === 270;
@@ -76,40 +116,94 @@ function targetSize(
   const baseW = preset.width || srcW;
   const baseH = preset.height || srcH;
   const scale = 1 + jitter;
-  return {
-    width: Math.max(64, Math.round((baseW * scale) / 2) * 2),
-    height: Math.max(64, Math.round((baseH * scale) / 2) * 2),
-  };
+  let width = Math.max(64, Math.round((baseW * scale) / 2) * 2);
+  let height = Math.max(64, Math.round((baseH * scale) / 2) * 2);
+  if (maxSide && Math.max(width, height) > maxSide) {
+    const k = maxSide / Math.max(width, height);
+    width = Math.max(64, Math.round((width * k) / 2) * 2);
+    height = Math.max(64, Math.round((height * k) / 2) * 2);
+  }
+  return { width, height };
 }
 
-function drawText(
+function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (ctx.measureText(next).width > maxWidth && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+export function drawPhotoText(
   ctx: CanvasRenderingContext2D,
   text: PhotoTextOverlay,
   width: number,
   height: number,
 ) {
-  const lines = [text.headline, text.cta].filter(Boolean) as string[];
-  if (!lines.length) return;
-  const size = Math.round(width * 0.055);
+  const blocks = [
+    { value: text.headline, scale: 1 },
+    { value: text.cta, scale: 0.72 },
+  ].filter((b) => b.value && b.value.trim()) as { value: string; scale: number }[];
+  if (!blocks.length) return;
+
+  const base = Math.round(width * text.fontScale);
+  const maxWidth = width * 0.86;
   ctx.save();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  lines.forEach((line, index) => {
-    ctx.font = `700 ${index === 0 ? size : Math.round(size * 0.72)}px Inter, system-ui, sans-serif`;
-    const metrics = ctx.measureText(line);
-    const padding = size * 0.4;
-    const boxW = metrics.width + padding * 2;
-    const boxH = (index === 0 ? size : size * 0.72) + padding;
-    const y = height - height * 0.12 - index * (boxH + size * 0.25);
-    ctx.fillStyle = text.background;
-    ctx.globalAlpha = 0.82;
-    ctx.beginPath();
-    ctx.roundRect((width - boxW) / 2, y - boxH / 2, boxW, boxH, boxH / 3);
-    ctx.fill();
-    ctx.globalAlpha = 1;
+
+  type Line = { text: string; size: number };
+  const lines: Line[] = [];
+  for (const block of blocks) {
+    const size = Math.max(12, Math.round(base * block.scale));
+    ctx.font = `${text.weight} ${size}px ${text.fontFamily}`;
+    const value = text.uppercase ? block.value.toUpperCase() : block.value;
+    for (const line of wrapLines(ctx, value, maxWidth)) lines.push({ text: line, size });
+  }
+
+  const gap = base * 0.28;
+  const totalHeight = lines.reduce((sum, l) => sum + l.size * 1.25, 0) + gap * (lines.length - 1);
+  const margin = height * 0.08;
+  const startY =
+    text.position === "top"
+      ? margin + totalHeight / 2
+      : text.position === "center"
+        ? height / 2
+        : height - margin - totalHeight / 2;
+
+  let y = startY - totalHeight / 2;
+  for (const line of lines) {
+    const lineH = line.size * 1.25;
+    const cy = y + lineH / 2;
+    ctx.font = `${text.weight} ${line.size}px ${text.fontFamily}`;
+    if (text.boxed) {
+      const padding = line.size * 0.42;
+      const boxW = ctx.measureText(line.text).width + padding * 2;
+      const boxH = lineH + padding * 0.4;
+      ctx.fillStyle = text.background;
+      ctx.globalAlpha = 0.82;
+      ctx.beginPath();
+      ctx.roundRect((width - boxW) / 2, cy - boxH / 2, boxW, boxH, boxH / 3);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.shadowColor = "rgba(0,0,0,0.6)";
+      ctx.shadowBlur = line.size * 0.25;
+    }
     ctx.fillStyle = text.color;
-    ctx.fillText(line, width / 2, y);
-  });
+    ctx.fillText(line.text, width / 2, cy);
+    ctx.shadowBlur = 0;
+    y += lineH + gap;
+  }
   ctx.restore();
 }
 
@@ -125,6 +219,45 @@ function applyGrain(ctx: CanvasRenderingContext2D, width: number, height: number
     data[i + 2] = Math.max(0, Math.min(255, data[i + 2]! + delta));
   }
   ctx.putImageData(image, 0, 0);
+}
+
+/** Máscara de nitidez (unsharp mask) leve. */
+function applySharpen(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  amount: number,
+) {
+  if (amount <= 0.01) return;
+  const src = ctx.getImageData(0, 0, width, height);
+  const out = ctx.createImageData(width, height);
+  const s = src.data;
+  const d = out.data;
+  const k = amount * 1.2;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = (y * width + x) * 4;
+      if (x === 0 || y === 0 || x === width - 1 || y === height - 1) {
+        d[i] = s[i]!;
+        d[i + 1] = s[i + 1]!;
+        d[i + 2] = s[i + 2]!;
+        d[i + 3] = s[i + 3]!;
+        continue;
+      }
+      for (let c = 0; c < 3; c += 1) {
+        const center = s[i + c]!;
+        const around =
+          s[i - 4 + c]! +
+          s[i + 4 + c]! +
+          s[i - width * 4 + c]! +
+          s[i + width * 4 + c]!;
+        const value = center + k * (center * 4 - around) * 0.25;
+        d[i + c] = value < 0 ? 0 : value > 255 ? 255 : value;
+      }
+      d[i + 3] = s[i + 3]!;
+    }
+  }
+  ctx.putImageData(out, 0, 0);
 }
 
 async function canvasToBlob(
@@ -157,6 +290,7 @@ export async function renderPhoto(
     options.presetId,
     options.adjust.rotate90,
     variation.sizeJitter,
+    options.maxSide,
   );
 
   const canvas = document.createElement("canvas");
@@ -192,15 +326,17 @@ export async function renderPhoto(
   const swapped = options.adjust.rotate90 === 90 || options.adjust.rotate90 === 270;
   const boxW = swapped ? height : width;
   const boxH = swapped ? width : height;
-  const cover = Math.max(boxW / srcW, boxH / srcH) * variation.zoom;
+  const cover =
+    Math.max(boxW / srcW, boxH / srcH) * variation.zoom * Math.max(1, options.adjust.zoom);
   const drawW = srcW * cover;
   const drawH = srcH * cover;
   ctx.drawImage(bitmap, cropX, cropY, srcW, srcH, -drawW / 2, -drawH / 2, drawW, drawH);
   ctx.restore();
   ctx.filter = "none";
 
+  applySharpen(ctx, width, height, options.adjust.sharpness);
   applyGrain(ctx, width, height, variation.noise);
-  if (options.text) drawText(ctx, options.text, width, height);
+  if (options.text) drawPhotoText(ctx, options.text, width, height);
   bitmap.close?.();
 
   const blob = await canvasToBlob(canvas, options.format, variation.quality);
