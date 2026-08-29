@@ -276,15 +276,114 @@ export function PhotoBatchStudio() {
 
         <div className="space-y-3">
           <h2 className="flex items-center gap-2 font-display text-sm font-semibold">
-            <Sliders className="size-4 text-primary" /> Texto opcional
+            <Type className="size-4 text-primary" /> Texto na imagem
           </h2>
           <Input
-            value={headline}
-            onChange={(e) => setHeadline(e.target.value)}
-            placeholder="Headline"
+            value={text.headline ?? ""}
+            onChange={(e) => setText((t) => ({ ...t, headline: e.target.value }))}
+            placeholder="Frase principal"
           />
-          <Input value={cta} onChange={(e) => setCta(e.target.value)} placeholder="CTA" />
+          <Input
+            value={text.cta ?? ""}
+            onChange={(e) => setText((t) => ({ ...t, cta: e.target.value }))}
+            placeholder="Segunda linha / CTA"
+          />
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Fonte</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {PHOTO_FONTS.map((font) => (
+                <button
+                  key={font.id}
+                  type="button"
+                  onClick={() => setText((t) => ({ ...t, fontFamily: font.id }))}
+                  style={{ fontFamily: font.id }}
+                  className={`rounded-lg border px-2 py-1.5 text-xs ${
+                    text.fontFamily === font.id
+                      ? "border-primary bg-primary/10"
+                      : "border-border text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  {font.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Tamanho da letra</span>
+            <span className="tabular-nums">{Math.round(text.fontScale * 1000) / 10}</span>
+          </div>
+          <Slider
+            value={[text.fontScale]}
+            min={0.025}
+            max={0.13}
+            step={0.005}
+            onValueChange={([v]) => setText((t) => ({ ...t, fontScale: v ?? 0.055 }))}
+          />
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Peso</span>
+            <span className="tabular-nums">{text.weight}</span>
+          </div>
+          <Slider
+            value={[text.weight]}
+            min={400}
+            max={900}
+            step={100}
+            onValueChange={([v]) => setText((t) => ({ ...t, weight: v ?? 700 }))}
+          />
+          <div className="grid grid-cols-3 gap-2">
+            {(["top", "center", "bottom"] as const).map((pos) => (
+              <button
+                key={pos}
+                type="button"
+                onClick={() => setText((t) => ({ ...t, position: pos }))}
+                className={`rounded-lg border px-2 py-1.5 text-[11px] ${
+                  text.position === pos
+                    ? "border-primary bg-primary/10"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                {pos === "top" ? "Topo" : pos === "center" ? "Centro" : "Base"}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Cor</span>
+              <input
+                type="color"
+                value={text.color}
+                onChange={(e) => setText((t) => ({ ...t, color: e.target.value }))}
+                className="size-7 cursor-pointer rounded border border-border bg-transparent"
+                aria-label="Cor do texto"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Caixa</span>
+              <input
+                type="color"
+                value={text.background}
+                onChange={(e) => setText((t) => ({ ...t, background: e.target.value }))}
+                className="size-7 cursor-pointer rounded border border-border bg-transparent"
+                aria-label="Cor da caixa"
+              />
+            </label>
+          </div>
+          <label className="flex items-center justify-between text-xs">
+            <span>Fundo atrás do texto</span>
+            <Switch
+              checked={text.boxed}
+              onCheckedChange={(v) => setText((t) => ({ ...t, boxed: v }))}
+            />
+          </label>
+          <label className="flex items-center justify-between text-xs">
+            <span>MAIÚSCULAS</span>
+            <Switch
+              checked={text.uppercase}
+              onCheckedChange={(v) => setText((t) => ({ ...t, uppercase: v }))}
+            />
+          </label>
         </div>
+
       </aside>
 
       <section className="space-y-5">
