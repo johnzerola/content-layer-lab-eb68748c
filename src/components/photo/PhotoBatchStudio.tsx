@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Sliders,
   Trash2,
+  Type,
   Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -21,12 +22,16 @@ import { PhotoAdjustModal, type PhotoAdjustTarget } from "@/components/photo/Pho
 import { PHOTO_FORMATS, PHOTO_PRESETS, type PhotoFormat } from "@/lib/photo/presets";
 import {
   DEFAULT_ADJUST,
+  DEFAULT_TEXT,
+  PHOTO_FONTS,
   renderPhoto,
   type PhotoAdjust,
   type PhotoRenderOptions,
   type PhotoResult,
+  type PhotoTextOverlay,
 } from "@/lib/photo/render";
 import { downloadAsZip, formatBytes } from "@/lib/zip";
+
 
 interface PhotoItem {
   id: string;
