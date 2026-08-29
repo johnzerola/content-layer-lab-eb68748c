@@ -55,11 +55,12 @@ export function PhotoBatchStudio() {
   const [metaEnabled, setMetaEnabled] = useState(true);
   const [gpsEnabled, setGpsEnabled] = useState(false);
   const [artist, setArtist] = useState("");
-  const [headline, setHeadline] = useState("");
-  const [cta, setCta] = useState("");
+  const [globalAdjust, setGlobalAdjust] = useState<PhotoAdjust>({ ...DEFAULT_ADJUST });
+  const [text, setText] = useState<PhotoTextOverlay>({ ...DEFAULT_TEXT });
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [adjustTarget, setAdjustTarget] = useState<PhotoAdjustTarget | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const urlsRef = useRef<string[]>([]);
 
@@ -98,6 +99,21 @@ export function PhotoBatchStudio() {
 
   const removeItem = (id: string) => setItems((prev) => prev.filter((item) => item.id !== id));
 
+  /** Combina a edição global com o ajuste individual de cada foto. */
+  const mergeAdjust = useCallback(
+    (adjust: PhotoAdjust): PhotoAdjust => ({
+      rotate90: adjust.rotate90,
+      brightness: globalAdjust.brightness * adjust.brightness,
+      contrast: globalAdjust.contrast * adjust.contrast,
+      saturation: globalAdjust.saturation * adjust.saturation,
+      sharpness: Math.min(1, globalAdjust.sharpness + adjust.sharpness),
+      zoom: globalAdjust.zoom * adjust.zoom,
+    }),
+    [globalAdjust],
+  );
+
+  const hasText = Boolean(text.headline?.trim() || text.cta?.trim());
+
   const options = useMemo<Omit<PhotoRenderOptions, "adjust">>(
     () => ({
       presetId,
@@ -105,16 +121,7 @@ export function PhotoBatchStudio() {
       intensity,
       allowMirror,
       seed: "fotoviral",
-      ...(headline || cta
-        ? {
-            text: {
-              headline: headline || undefined,
-              cta: cta || undefined,
-              color: "#ffffff",
-              background: "#0f172a",
-            },
-          }
-        : {}),
+      ...(hasText ? { text } : {}),
       metadata: {
         enabled: metaEnabled,
         artist: artist || undefined,
@@ -122,8 +129,40 @@ export function PhotoBatchStudio() {
         ...(gpsEnabled ? { gps: { lat: -23.55052, lon: -46.633308 } } : {}),
       },
     }),
-    [presetId, format, intensity, allowMirror, headline, cta, metaEnabled, artist, gpsEnabled],
+    [presetId, format, intensity, allowMirror, hasText, text, metaEnabled, artist, gpsEnabled],
   );
+
+  // prévia ao vivo da primeira foto (baixa resolução, com debounce)
+  const first = items[0];
+  useEffect(() => {
+    if (!first) {
+      setPreviewUrl(null);
+      return;
+    }
+    let cancelled = false;
+    let url: string | null = null;
+    const timer = setTimeout(() => {
+      renderPhoto(
+        first.file,
+        { ...options, maxSide: 640, adjust: mergeAdjust(first.adjust) },
+        0,
+      )
+        .then((result) => {
+          if (cancelled) return;
+          url = URL.createObjectURL(result.blob);
+          setPreviewUrl((old) => {
+            if (old) URL.revokeObjectURL(old);
+            return url;
+          });
+        })
+        .catch(() => undefined);
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [first, options, mergeAdjust]);
+
 
   const process = async () => {
     if (!items.length) {
