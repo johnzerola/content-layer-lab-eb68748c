@@ -505,7 +505,24 @@ export function PhotoBatchStudio() {
           />
         </div>
 
+        {previewUrl && (
+          <div className="space-y-3 rounded-2xl border border-border bg-surface/60 p-5">
+            <div>
+              <h2 className="font-display text-sm font-semibold">Prévia ao vivo</h2>
+              <p className="text-xs text-muted-foreground">
+                Como a primeira foto vai sair com a edição e o texto atuais.
+              </p>
+            </div>
+            <img
+              src={previewUrl}
+              alt="Prévia da primeira foto processada"
+              className="mx-auto max-h-[420px] rounded-xl border border-border object-contain"
+            />
+          </div>
+        )}
+
         {items.length > 0 && (
+
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-muted-foreground">
