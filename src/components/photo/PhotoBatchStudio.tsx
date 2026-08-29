@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Sliders,
   Trash2,
+  Type,
   Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -21,12 +22,16 @@ import { PhotoAdjustModal, type PhotoAdjustTarget } from "@/components/photo/Pho
 import { PHOTO_FORMATS, PHOTO_PRESETS, type PhotoFormat } from "@/lib/photo/presets";
 import {
   DEFAULT_ADJUST,
+  DEFAULT_TEXT,
+  PHOTO_FONTS,
   renderPhoto,
   type PhotoAdjust,
   type PhotoRenderOptions,
   type PhotoResult,
+  type PhotoTextOverlay,
 } from "@/lib/photo/render";
 import { downloadAsZip, formatBytes } from "@/lib/zip";
+
 
 interface PhotoItem {
   id: string;
@@ -55,11 +60,12 @@ export function PhotoBatchStudio() {
   const [metaEnabled, setMetaEnabled] = useState(true);
   const [gpsEnabled, setGpsEnabled] = useState(false);
   const [artist, setArtist] = useState("");
-  const [headline, setHeadline] = useState("");
-  const [cta, setCta] = useState("");
+  const [globalAdjust, setGlobalAdjust] = useState<PhotoAdjust>({ ...DEFAULT_ADJUST });
+  const [text, setText] = useState<PhotoTextOverlay>({ ...DEFAULT_TEXT });
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [adjustTarget, setAdjustTarget] = useState<PhotoAdjustTarget | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const urlsRef = useRef<string[]>([]);
 
@@ -98,6 +104,21 @@ export function PhotoBatchStudio() {
 
   const removeItem = (id: string) => setItems((prev) => prev.filter((item) => item.id !== id));
 
+  /** Combina a edição global com o ajuste individual de cada foto. */
+  const mergeAdjust = useCallback(
+    (adjust: PhotoAdjust): PhotoAdjust => ({
+      rotate90: adjust.rotate90,
+      brightness: globalAdjust.brightness * adjust.brightness,
+      contrast: globalAdjust.contrast * adjust.contrast,
+      saturation: globalAdjust.saturation * adjust.saturation,
+      sharpness: Math.min(1, globalAdjust.sharpness + adjust.sharpness),
+      zoom: globalAdjust.zoom * adjust.zoom,
+    }),
+    [globalAdjust],
+  );
+
+  const hasText = Boolean(text.headline?.trim() || text.cta?.trim());
+
   const options = useMemo<Omit<PhotoRenderOptions, "adjust">>(
     () => ({
       presetId,
@@ -105,16 +126,7 @@ export function PhotoBatchStudio() {
       intensity,
       allowMirror,
       seed: "fotoviral",
-      ...(headline || cta
-        ? {
-            text: {
-              headline: headline || undefined,
-              cta: cta || undefined,
-              color: "#ffffff",
-              background: "#0f172a",
-            },
-          }
-        : {}),
+      ...(hasText ? { text } : {}),
       metadata: {
         enabled: metaEnabled,
         artist: artist || undefined,
@@ -122,8 +134,40 @@ export function PhotoBatchStudio() {
         ...(gpsEnabled ? { gps: { lat: -23.55052, lon: -46.633308 } } : {}),
       },
     }),
-    [presetId, format, intensity, allowMirror, headline, cta, metaEnabled, artist, gpsEnabled],
+    [presetId, format, intensity, allowMirror, hasText, text, metaEnabled, artist, gpsEnabled],
   );
+
+  // prévia ao vivo da primeira foto (baixa resolução, com debounce)
+  const first = items[0];
+  useEffect(() => {
+    if (!first) {
+      setPreviewUrl(null);
+      return;
+    }
+    let cancelled = false;
+    let url: string | null = null;
+    const timer = setTimeout(() => {
+      renderPhoto(
+        first.file,
+        { ...options, maxSide: 640, adjust: mergeAdjust(first.adjust) },
+        0,
+      )
+        .then((result) => {
+          if (cancelled) return;
+          url = URL.createObjectURL(result.blob);
+          setPreviewUrl((old) => {
+            if (old) URL.revokeObjectURL(old);
+            return url;
+          });
+        })
+        .catch(() => undefined);
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [first, options, mergeAdjust]);
+
 
   const process = async () => {
     if (!items.length) {
@@ -139,7 +183,12 @@ export function PhotoBatchStudio() {
     try {
       for (const item of items) {
         for (let v = 0; v < variations; v += 1) {
-          const result = await renderPhoto(item.file, { ...options, adjust: item.adjust }, v);
+          const result = await renderPhoto(
+            item.file,
+            { ...options, adjust: mergeAdjust(item.adjust) },
+            v,
+          );
+
           const url = URL.createObjectURL(result.blob);
           urlsRef.current.push(url);
           produced.push({ ...result, id: `${item.id}-${v}`, sourceId: item.id, url });
@@ -276,15 +325,154 @@ export function PhotoBatchStudio() {
 
         <div className="space-y-3">
           <h2 className="flex items-center gap-2 font-display text-sm font-semibold">
-            <Sliders className="size-4 text-primary" /> Texto opcional
+            <Sliders className="size-4 text-primary" /> Edição (todas as fotos)
+          </h2>
+          {(
+            [
+              ["Brilho", "brightness", 0.6, 1.5],
+              ["Contraste", "contrast", 0.6, 1.5],
+              ["Saturação", "saturation", 0.6, 1.8],
+              ["Nitidez", "sharpness", 0, 1],
+              ["Zoom (corta bordas)", "zoom", 1, 1.5],
+            ] as const
+          ).map(([label, key, min, max]) => (
+            <div key={key} className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{label}</span>
+                <span className="tabular-nums">{Math.round(globalAdjust[key] * 100)}%</span>
+              </div>
+              <Slider
+                value={[globalAdjust[key]]}
+                min={min}
+                max={max}
+                step={0.01}
+                onValueChange={([v]) =>
+                  setGlobalAdjust((a) => ({ ...a, [key]: v ?? min }) as PhotoAdjust)
+                }
+              />
+            </div>
+          ))}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setGlobalAdjust({ ...DEFAULT_ADJUST })}
+            className="w-full"
+          >
+            Redefinir edição
+          </Button>
+        </div>
+
+
+        <div className="space-y-3">
+          <h2 className="flex items-center gap-2 font-display text-sm font-semibold">
+            <Type className="size-4 text-primary" /> Texto na imagem
           </h2>
           <Input
-            value={headline}
-            onChange={(e) => setHeadline(e.target.value)}
-            placeholder="Headline"
+            value={text.headline ?? ""}
+            onChange={(e) => setText((t) => ({ ...t, headline: e.target.value }))}
+            placeholder="Frase principal"
           />
-          <Input value={cta} onChange={(e) => setCta(e.target.value)} placeholder="CTA" />
+          <Input
+            value={text.cta ?? ""}
+            onChange={(e) => setText((t) => ({ ...t, cta: e.target.value }))}
+            placeholder="Segunda linha / CTA"
+          />
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Fonte</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {PHOTO_FONTS.map((font) => (
+                <button
+                  key={font.id}
+                  type="button"
+                  onClick={() => setText((t) => ({ ...t, fontFamily: font.id }))}
+                  style={{ fontFamily: font.id }}
+                  className={`rounded-lg border px-2 py-1.5 text-xs ${
+                    text.fontFamily === font.id
+                      ? "border-primary bg-primary/10"
+                      : "border-border text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  {font.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Tamanho da letra</span>
+            <span className="tabular-nums">{Math.round(text.fontScale * 1000) / 10}</span>
+          </div>
+          <Slider
+            value={[text.fontScale]}
+            min={0.025}
+            max={0.13}
+            step={0.005}
+            onValueChange={([v]) => setText((t) => ({ ...t, fontScale: v ?? 0.055 }))}
+          />
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Peso</span>
+            <span className="tabular-nums">{text.weight}</span>
+          </div>
+          <Slider
+            value={[text.weight]}
+            min={400}
+            max={900}
+            step={100}
+            onValueChange={([v]) => setText((t) => ({ ...t, weight: v ?? 700 }))}
+          />
+          <div className="grid grid-cols-3 gap-2">
+            {(["top", "center", "bottom"] as const).map((pos) => (
+              <button
+                key={pos}
+                type="button"
+                onClick={() => setText((t) => ({ ...t, position: pos }))}
+                className={`rounded-lg border px-2 py-1.5 text-[11px] ${
+                  text.position === pos
+                    ? "border-primary bg-primary/10"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                {pos === "top" ? "Topo" : pos === "center" ? "Centro" : "Base"}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Cor</span>
+              <input
+                type="color"
+                value={text.color}
+                onChange={(e) => setText((t) => ({ ...t, color: e.target.value }))}
+                className="size-7 cursor-pointer rounded border border-border bg-transparent"
+                aria-label="Cor do texto"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Caixa</span>
+              <input
+                type="color"
+                value={text.background}
+                onChange={(e) => setText((t) => ({ ...t, background: e.target.value }))}
+                className="size-7 cursor-pointer rounded border border-border bg-transparent"
+                aria-label="Cor da caixa"
+              />
+            </label>
+          </div>
+          <label className="flex items-center justify-between text-xs">
+            <span>Fundo atrás do texto</span>
+            <Switch
+              checked={text.boxed}
+              onCheckedChange={(v) => setText((t) => ({ ...t, boxed: v }))}
+            />
+          </label>
+          <label className="flex items-center justify-between text-xs">
+            <span>MAIÚSCULAS</span>
+            <Switch
+              checked={text.uppercase}
+              onCheckedChange={(v) => setText((t) => ({ ...t, uppercase: v }))}
+            />
+          </label>
         </div>
+
       </aside>
 
       <section className="space-y-5">
@@ -317,7 +505,24 @@ export function PhotoBatchStudio() {
           />
         </div>
 
+        {previewUrl && (
+          <div className="space-y-3 rounded-2xl border border-border bg-surface/60 p-5">
+            <div>
+              <h2 className="font-display text-sm font-semibold">Prévia ao vivo</h2>
+              <p className="text-xs text-muted-foreground">
+                Como a primeira foto vai sair com a edição e o texto atuais.
+              </p>
+            </div>
+            <img
+              src={previewUrl}
+              alt="Prévia da primeira foto processada"
+              className="mx-auto max-h-[420px] rounded-xl border border-border object-contain"
+            />
+          </div>
+        )}
+
         {items.length > 0 && (
+
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-muted-foreground">
