@@ -11,6 +11,7 @@ import {
   verifyYoutubeOAuthState,
 } from "@/lib/youtube-oauth.server";
 import { persistYoutubeAccount } from "@/lib/youtube-persistence.server";
+import { syncYoutubeChannelsForUser } from "@/lib/youtube-sync.server";
 
 function oauthError(error: unknown) {
   if (error instanceof MetaLinkError) {
@@ -70,6 +71,28 @@ export const completeYoutubeOAuth = createServerFn({ method: "POST" })
         accounts,
         summary: { channels: channels.map((channel) => channel.title) },
       };
+    } catch (error) {
+      return oauthError(error);
+    }
+  });
+
+/** Relista todos os canais autorizados e atualiza cada conexão separadamente. */
+export const syncYoutubeChannels = createServerFn({ method: "POST" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    try {
+      if (!linkingServerRuntimeReady()) {
+        throw new MetaLinkError(
+          "SERVER_CONFIG_MISSING",
+          "A integração segura do servidor não está configurada.",
+        );
+      }
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { accounts, channels } = await syncYoutubeChannelsForUser(
+        supabaseAdmin as never,
+        context.userId,
+      );
+      return { ok: true as const, accounts, summary: { channels } };
     } catch (error) {
       return oauthError(error);
     }
