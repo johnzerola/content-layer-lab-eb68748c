@@ -19,7 +19,11 @@ import { toast } from "sonner";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 import { listAccounts, removeAccount, type SocialAccount } from "@/lib/social";
 
-import { beginFacebookOAuth, diagnoseFacebookIntegration } from "@/lib/facebook-oauth.functions";
+import {
+  beginFacebookOAuth,
+  diagnoseFacebookIntegration,
+  syncMetaAccounts,
+} from "@/lib/facebook-oauth.functions";
 import { beginYoutubeOAuth, syncYoutubeChannels } from "@/lib/youtube-oauth.functions";
 import { setPrimaryAccount } from "@/lib/social-primary.functions";
 import { AppShell, type AppMode } from "@/components/AppShell";
@@ -88,6 +92,8 @@ function IntegrationsPage() {
   const startFacebook = useServerFn(beginFacebookOAuth);
   const startYoutube = useServerFn(beginYoutubeOAuth);
   const syncYoutube = useServerFn(syncYoutubeChannels);
+  const syncMeta = useServerFn(syncMetaAccounts);
+  const [syncingMetaAccounts, setSyncingMetaAccounts] = useState(false);
   const [syncingYoutube, setSyncingYoutube] = useState(false);
   const makePrimary = useServerFn(setPrimaryAccount);
 
@@ -201,6 +207,25 @@ function IntegrationsPage() {
     [makePrimary, reload],
   );
 
+  const refreshMeta = useCallback(async () => {
+    setSyncingMetaAccounts(true);
+    try {
+      const response = await syncMeta();
+      if (!response.ok) {
+        toast.error(response.error);
+        return;
+      }
+      toast.success(
+        `${response.summary.facebook.length} Página(s) e ${response.summary.instagram.length} Instagram sincronizado(s).`,
+      );
+      reload();
+    } catch {
+      toast.error("Não foi possível sincronizar as contas Meta.");
+    } finally {
+      setSyncingMetaAccounts(false);
+    }
+  }, [reload, syncMeta]);
+
   const refreshYoutube = useCallback(async () => {
     setSyncingYoutube(true);
     try {
@@ -247,6 +272,22 @@ function IntegrationsPage() {
           </div>
           {user && (
             <div className="flex flex-wrap gap-2">
+              {hasMetaAccounts && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={syncingMetaAccounts}
+                  onClick={() => void refreshMeta()}
+                  className="min-h-10 shrink-0"
+                >
+                  {syncingMetaAccounts ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="size-4" />
+                  )}
+                  Sincronizar Páginas/Instagram
+                </Button>
+              )}
               <Button
                 type="button"
                 disabled={syncingMeta}

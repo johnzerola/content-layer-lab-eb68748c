@@ -126,3 +126,63 @@ export const diagnoseFacebookIntegration = createServerFn({ method: "POST" })
     const loginConfiguration = await verifyFacebookLoginConfiguration();
     return { ok: true as const, check: { ...checklist, loginConfiguration } };
   });
+
+/** Relista Páginas e Instagram já autorizados, atualizando cada conexão. */
+export const syncMetaAccounts = createServerFn({ method: "POST" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    try {
+      if (!linkingServerRuntimeReady()) {
+        throw new MetaLinkError(
+          "SERVER_CONFIG_MISSING",
+          "A integração segura do servidor não está configurada.",
+        );
+      }
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { syncMetaAccountsForUser } = await import("@/lib/meta-sync.server");
+      const result = await syncMetaAccountsForUser(supabaseAdmin as never, context.userId);
+      return {
+        ok: true as const,
+        accounts: result.accounts,
+        summary: { facebook: result.facebook, instagram: result.instagram },
+      };
+    } catch (error) {
+      if (error instanceof MetaLinkError) {
+        return { ok: false as const, code: error.code, error: error.message };
+      }
+      return {
+        ok: false as const,
+        code: "META_AUTH_INVALID" as const,
+        error: "Não foi possível sincronizar as contas Meta.",
+      };
+    }
+  });
+
+/**
+ * Etapa de seleção: mantém apenas as contas escolhidas após a autorização.
+ * As não escolhidas são desconectadas (removidas da lista de publicação).
+ */
+export const applyMetaAccountSelection = createServerFn({ method: "POST" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .validator((data: unknown) =>
+    z
+      .object({
+        discovered: z.array(z.string().uuid()).min(1).max(200),
+        keep: z.array(z.string().uuid()).max(200),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const keep = new Set(data.keep);
+    const remove = data.discovered.filter((id) => !keep.has(id));
+    if (remove.length === 0) return { ok: true as const, removed: 0 };
+    const { error } = await context.supabase
+      .from("social_accounts")
+      .delete()
+      .in("id", remove)
+      .eq("user_id", context.userId);
+    if (error) {
+      return { ok: false as const, code: "DATABASE_ERROR" as const, error: "Não foi possível aplicar a seleção." };
+    }
+    return { ok: true as const, removed: remove.length };
+  });
