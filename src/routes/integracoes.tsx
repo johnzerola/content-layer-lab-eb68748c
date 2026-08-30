@@ -20,7 +20,7 @@ import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 import { listAccounts, removeAccount, type SocialAccount } from "@/lib/social";
 
 import { beginFacebookOAuth, diagnoseFacebookIntegration } from "@/lib/facebook-oauth.functions";
-import { beginYoutubeOAuth } from "@/lib/youtube-oauth.functions";
+import { beginYoutubeOAuth, syncYoutubeChannels } from "@/lib/youtube-oauth.functions";
 import { setPrimaryAccount } from "@/lib/social-primary.functions";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -87,6 +87,8 @@ function IntegrationsPage() {
 
   const startFacebook = useServerFn(beginFacebookOAuth);
   const startYoutube = useServerFn(beginYoutubeOAuth);
+  const syncYoutube = useServerFn(syncYoutubeChannels);
+  const [syncingYoutube, setSyncingYoutube] = useState(false);
   const makePrimary = useServerFn(setPrimaryAccount);
 
   useEffect(() => {
@@ -199,6 +201,25 @@ function IntegrationsPage() {
     [makePrimary, reload],
   );
 
+  const refreshYoutube = useCallback(async () => {
+    setSyncingYoutube(true);
+    try {
+      const response = await syncYoutube();
+      if (!response.ok) {
+        toast.error(response.error);
+        return;
+      }
+      toast.success(
+        `${response.accounts.length} canal(is) sincronizado(s): ${response.summary.channels.join(", ")}`,
+      );
+      reload();
+    } catch {
+      toast.error("Não foi possível sincronizar os canais do YouTube.");
+    } finally {
+      setSyncingYoutube(false);
+    }
+  }, [reload, syncYoutube]);
+
   const facebookAccounts = accounts.filter((account) => account.platform === "facebook");
   const instagramAccounts = accounts.filter((account) => account.platform === "instagram");
   const youtubeAccounts = accounts.filter((account) => account.platform === "youtube");
@@ -241,6 +262,22 @@ function IntegrationsPage() {
                 )}
                 {hasMetaAccounts ? "Atualizar Meta" : "Conectar Meta"}
               </Button>
+              {hasYoutubeAccounts && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={syncingYoutube}
+                  onClick={() => void refreshYoutube()}
+                  className="min-h-10 shrink-0"
+                >
+                  {syncingYoutube ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="size-4" />
+                  )}
+                  Sincronizar canais
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="outline"
