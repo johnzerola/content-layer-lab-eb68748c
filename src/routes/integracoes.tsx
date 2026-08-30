@@ -686,6 +686,22 @@ function YoutubeChannels({
                     type="button"
                     variant="ghost"
                     size="icon"
+                    disabled={isRefreshing || !connected}
+                    onClick={() => void onRefresh(account)}
+                    aria-label={`Atualizar status de ${name}`}
+                    title="Atualizar status"
+                    className="text-muted-foreground"
+                  >
+                    {isRefreshing ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="size-4" />
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
                     disabled={!connected || account.is_primary}
                     onClick={() => void onPrimary(account)}
                     aria-label={`Definir ${name} como canal principal`}
