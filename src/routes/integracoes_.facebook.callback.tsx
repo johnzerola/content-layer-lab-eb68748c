@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { CheckCircle2, Loader2, TriangleAlert } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { CheckCircle2, Facebook, Instagram, Loader2, TriangleAlert } from "lucide-react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { facebookCallbackSearch } from "@/lib/facebook-callback";
 import { applyMetaAccountSelection, completeFacebookOAuth } from "@/lib/facebook-oauth.functions";
 
@@ -16,7 +16,14 @@ export const Route = createFileRoute("/integracoes_/facebook/callback")({
   }),
 });
 
-type DiscoveredAccount = { id: string; platform: string; username: string };
+type DiscoveredAccount = {
+  key: string;
+  platform: "facebook" | "instagram";
+  providerAccountId: string;
+  username: string;
+  displayName: string;
+  linkedPageName: string | null;
+};
 
 type CallbackResult = {
   ok: boolean;
@@ -25,6 +32,7 @@ type CallbackResult = {
   instagram?: string[];
   warning?: string | null;
   discovered?: DiscoveredAccount[];
+  selectionToken?: string;
 };
 
 function FacebookOAuthCallback() {
@@ -62,18 +70,15 @@ function FacebookOAuthCallback() {
         const facebook = response.summary.facebook;
         const instagram = response.summary.instagram;
         const unavailable = response.summary.unavailablePageIds.length;
-        const discovered = response.accounts.map((account) => ({
-          id: account.id,
-          platform: account.platform,
-          username: account.username,
-        }));
-        setSelected(discovered.map((account) => account.id));
+        const discovered = response.candidates;
+        setSelected(discovered.map((account) => account.key));
         setResult({
           ok: true,
           facebook,
           instagram,
           discovered,
-          message: `${facebook.length} Página(s) e ${instagram.length} Instagram conectado(s).`,
+          selectionToken: response.selectionToken,
+          message: `${facebook.length} Página(s) e ${instagram.length} Instagram encontrado(s). Escolha os canais que deseja manter.`,
           warning:
             unavailable > 0
               ? `${unavailable} Página(s) selecionada(s) não liberaram token de publicação. Verifique o controle total dessas Páginas.`
@@ -101,16 +106,24 @@ function FacebookOAuthCallback() {
 
   const confirmSelection = async () => {
     const discovered = result?.discovered ?? [];
-    if (discovered.length === 0) return;
+    if (discovered.length === 0 || !result?.selectionToken || selected.length === 0) return;
     setSaving(true);
     try {
       const response = await applySelection({
-        data: { discovered: discovered.map((account) => account.id), keep: selected },
+        data: { selectionToken: result.selectionToken, keep: selected },
       });
       if (!response.ok) {
         setResult((current) => (current ? { ...current, warning: response.error } : current));
         return;
       }
+      setResult((current) =>
+        current
+          ? {
+              ...current,
+              message: `${response.summary.facebook} Página(s) e ${response.summary.instagram} Instagram salvos como conexões separadas.`,
+            }
+          : current,
+      );
       setConfirmed(true);
     } catch {
       setResult((current) =>
@@ -147,7 +160,7 @@ function FacebookOAuthCallback() {
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">{result.message}</p>
 
-            {result.ok && (
+            {result.ok && !confirmed && (
               <div className="mt-5 grid gap-3 text-left sm:grid-cols-2">
                 <AccountSummary label="Facebook" names={result.facebook ?? []} />
                 <AccountSummary
@@ -159,56 +172,61 @@ function FacebookOAuthCallback() {
 
             {result.ok && !confirmed && (result.discovered?.length ?? 0) > 0 && (
               <div className="mt-5 border border-border bg-surface-2 p-4 text-left">
-                <p className="text-sm font-medium">Escolha o que deve aparecer</p>
+                <p className="text-sm font-medium">Escolha os canais para publicar</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Desmarque as Páginas ou contas do Instagram que você não quer usar para publicar.
+                  Cada item selecionado será salvo como uma conexão independente. Você pode conectar
+                  outros perfis da Meta depois sem perder estes canais.
                 </p>
-                <ul className="mt-3 max-h-64 space-y-1 overflow-y-auto">
-                  {(result.discovered ?? []).map((account) => (
-                    <li key={account.id}>
-                      <label className="flex cursor-pointer items-center gap-3 border border-border/60 bg-surface px-3 py-2 text-sm">
-                        <input
-                          type="checkbox"
-                          className="size-4 accent-[var(--color-primary)]"
-                          checked={selected.includes(account.id)}
-                          onChange={(event) =>
-                            setSelected((current) =>
-                              event.target.checked
-                                ? [...current, account.id]
-                                : current.filter((id) => id !== account.id),
-                            )
-                          }
-                        />
-                        <span className="min-w-0 flex-1 truncate">
-                          {account.platform === "instagram" ? `@${account.username}` : account.username}
-                        </span>
-                        <span className="mono-label text-xs text-muted-foreground">
-                          {account.platform === "instagram" ? "Instagram" : "Facebook"}
-                        </span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
+                <div className="mt-4 max-h-80 space-y-4 overflow-y-auto pr-1">
+                  <CandidateGroup
+                    platform="facebook"
+                    candidates={(result.discovered ?? []).filter(
+                      (account) => account.platform === "facebook",
+                    )}
+                    selected={selected}
+                    onSelected={setSelected}
+                  />
+                  <CandidateGroup
+                    platform="instagram"
+                    candidates={(result.discovered ?? []).filter(
+                      (account) => account.platform === "instagram",
+                    )}
+                    selected={selected}
+                    onSelected={setSelected}
+                  />
+                </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => void confirmSelection()}
-                    disabled={saving}
+                    disabled={saving || selected.length === 0}
                     className="inline-flex min-h-10 items-center gap-2 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
                   >
                     {saving && <Loader2 className="size-4 animate-spin" />}
-                    Confirmar seleção ({selected.length})
+                    Salvar {selected.length} canal(is)
                   </button>
                   <button
                     type="button"
                     onClick={() =>
-                      setSelected((result.discovered ?? []).map((account) => account.id))
+                      setSelected((result.discovered ?? []).map((account) => account.key))
                     }
                     className="min-h-10 border border-border px-4 py-2 text-sm"
                   >
                     Selecionar todas
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelected([])}
+                    className="min-h-10 px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    Limpar
+                  </button>
                 </div>
+                {selected.length === 0 && (
+                  <p className="mt-2 text-xs text-amber-300">
+                    Selecione ao menos um canal para concluir.
+                  </p>
+                )}
               </div>
             )}
 
@@ -244,5 +262,58 @@ function AccountSummary({ label, names }: { label: string; names: string[] }) {
         {names.length > 0 ? names.join(", ") : "Nenhuma vinculada"}
       </p>
     </div>
+  );
+}
+
+function CandidateGroup({
+  platform,
+  candidates,
+  selected,
+  onSelected,
+}: {
+  platform: "facebook" | "instagram";
+  candidates: DiscoveredAccount[];
+  selected: string[];
+  onSelected: Dispatch<SetStateAction<string[]>>;
+}) {
+  if (candidates.length === 0) return null;
+  const Icon = platform === "facebook" ? Facebook : Instagram;
+  const label = platform === "facebook" ? "Páginas do Facebook" : "Instagram profissional";
+  return (
+    <section>
+      <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <Icon className="size-4 text-primary" />
+        <span>{label}</span>
+        <span className="ml-auto">{candidates.length}</span>
+      </div>
+      <ul className="space-y-1">
+        {candidates.map((account) => (
+          <li key={account.key}>
+            <label className="flex min-h-12 cursor-pointer items-center gap-3 border border-border/60 bg-surface px-3 py-2 text-sm hover:border-primary/40">
+              <input
+                type="checkbox"
+                className="size-4 shrink-0 accent-[var(--color-primary)]"
+                checked={selected.includes(account.key)}
+                onChange={(event) =>
+                  onSelected((current) =>
+                    event.target.checked
+                      ? [...new Set([...current, account.key])]
+                      : current.filter((key) => key !== account.key),
+                  )
+                }
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{account.displayName}</span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {account.linkedPageName
+                    ? `Vinculado a ${account.linkedPageName}`
+                    : `ID ${account.providerAccountId}`}
+                </span>
+              </span>
+            </label>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

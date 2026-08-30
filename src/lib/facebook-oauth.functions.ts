@@ -11,6 +11,11 @@ import {
   verifyFacebookOAuthState,
 } from "@/lib/facebook-oauth.server";
 import { persistFacebookPages } from "@/lib/facebook-persistence.server";
+import {
+  createMetaSelection,
+  metaSelectionCandidates,
+  openMetaSelection,
+} from "@/lib/meta-selection.server";
 import { MetaLinkError, linkingServerRuntimeReady } from "@/lib/social-linking.server";
 
 export const beginFacebookOAuth = createServerFn({ method: "POST" })
@@ -74,22 +79,24 @@ export const completeFacebookOAuth = createServerFn({ method: "POST" })
             ? ` A Meta confirmou ${authorization.authorizedPageIds.length} Página(s), mas não liberou o token de publicação para elas.`
             : "";
         const diagnosticDetail =
-          discovery.diagnostics.length > 0 ? ` Detalhe da Meta: ${discovery.diagnostics.join(" ")}` : "";
+          discovery.diagnostics.length > 0
+            ? ` Detalhe da Meta: ${discovery.diagnostics.join(" ")}`
+            : "";
         throw new MetaLinkError(
           "META_ACCOUNT_MISMATCH",
           `Nenhuma Página publicável foi devolvida.${selectedDetail}${diagnosticDetail} Confirme que você é administrador com controle total das Páginas no Gerenciador de Negócios e refaça o login.`,
         );
       }
 
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const accounts = await persistFacebookPages(supabaseAdmin as never, {
+      const selection = createMetaSelection({
         userId: context.userId,
         pages: discovery.pages,
-        expiresAt: token.expiresAt,
+        tokenExpiresAt: token.expiresAt,
       });
       return {
         ok: true as const,
-        accounts,
+        selectionToken: selection.selectionToken,
+        candidates: selection.candidates,
         summary: {
           facebook: discovery.pages.map((page) => page.name),
           instagram: discovery.pages.flatMap((page) =>
@@ -147,7 +154,11 @@ export const syncMetaAccounts = createServerFn({ method: "POST" })
       return {
         ok: true as const,
         accounts: result.accounts,
-        summary: { facebook: result.facebook, instagram: result.instagram },
+        summary: {
+          facebook: result.facebook,
+          instagram: result.instagram,
+          failed: result.failed,
+        },
       };
     } catch (error) {
       if (error instanceof MetaLinkError) {
@@ -162,30 +173,90 @@ export const syncMetaAccounts = createServerFn({ method: "POST" })
   });
 
 /**
- * Etapa de seleção: mantém apenas as contas escolhidas após a autorização.
- * As não escolhidas são desconectadas (removidas da lista de publicação).
+ * Persiste somente os canais escolhidos. O pacote temporário é criptografado,
+ * vinculado ao usuário e expira rapidamente.
  */
 export const applyMetaAccountSelection = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .validator((data: unknown) =>
     z
       .object({
-        discovered: z.array(z.string().uuid()).min(1).max(200),
-        keep: z.array(z.string().uuid()).max(200),
+        selectionToken: z.string().min(20).max(1_000_000),
+        keep: z
+          .array(z.string().regex(/^(facebook|instagram):\d+$/))
+          .min(1)
+          .max(400),
       })
       .parse(data),
   )
   .handler(async ({ data, context }) => {
-    const keep = new Set(data.keep);
-    const remove = data.discovered.filter((id) => !keep.has(id));
-    if (remove.length === 0) return { ok: true as const, removed: 0 };
-    const { error } = await context.supabase
-      .from("social_accounts")
-      .delete()
-      .in("id", remove)
-      .eq("user_id", context.userId);
-    if (error) {
-      return { ok: false as const, code: "DATABASE_ERROR" as const, error: "Não foi possível aplicar a seleção." };
+    try {
+      if (!linkingServerRuntimeReady()) {
+        throw new MetaLinkError(
+          "SERVER_CONFIG_MISSING",
+          "A integração segura do servidor não está configurada.",
+        );
+      }
+      const payload = openMetaSelection({
+        selectionToken: data.selectionToken,
+        userId: context.userId,
+      });
+      const candidates = metaSelectionCandidates(payload.pages);
+      const allowed = new Set(candidates.map((candidate) => candidate.key));
+      const keep = [...new Set(data.keep)];
+      if (keep.some((key) => !allowed.has(key))) {
+        throw new MetaLinkError(
+          "ACCOUNT_OWNERSHIP_INVALID",
+          "A seleção contém uma conta que não foi autorizada.",
+        );
+      }
+
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const accounts = await persistFacebookPages(supabaseAdmin as never, {
+        userId: context.userId,
+        pages: payload.pages,
+        expiresAt: new Date(payload.tokenExpiresAt),
+        selectedChannelKeys: keep,
+      });
+
+      const removed = candidates.filter((candidate) => !keep.includes(candidate.key));
+      for (const platform of ["facebook", "instagram"] as const) {
+        const providerIds = removed
+          .filter((candidate) => candidate.platform === platform)
+          .map((candidate) => candidate.providerAccountId);
+        if (providerIds.length === 0) continue;
+        const { error } = await supabaseAdmin
+          .from("social_accounts")
+          .delete()
+          .eq("user_id", context.userId)
+          .eq("provider", "meta")
+          .eq("platform", platform)
+          .in("provider_account_id", providerIds);
+        if (error) {
+          throw new MetaLinkError(
+            "DATABASE_ERROR",
+            "Os canais escolhidos foram salvos, mas não foi possível remover todos os desmarcados.",
+          );
+        }
+      }
+
+      return {
+        ok: true as const,
+        accounts,
+        removed: removed.length,
+        summary: {
+          facebook: accounts.filter((account) => account.platform === "facebook").length,
+          instagram: accounts.filter((account) => account.platform === "instagram").length,
+        },
+      };
+    } catch (error) {
+      if (error instanceof MetaLinkError) {
+        return { ok: false as const, code: error.code, error: error.message };
+      }
+      return {
+        ok: false as const,
+        code: "DATABASE_ERROR" as const,
+        error: "Não foi possível aplicar a seleção.",
+      };
     }
-    return { ok: true as const, removed: remove.length };
   });

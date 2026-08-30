@@ -215,9 +215,14 @@ function IntegrationsPage() {
         toast.error(response.error);
         return;
       }
-      toast.success(
-        `${response.summary.facebook.length} Página(s) e ${response.summary.instagram.length} Instagram sincronizado(s).`,
-      );
+      const synchronized = `${response.summary.facebook.length} Página(s) e ${response.summary.instagram.length} Instagram sincronizado(s).`;
+      if (response.summary.failed > 0) {
+        toast.warning(
+          `${synchronized} ${response.summary.failed} conexão(ões) precisa(m) de reautorização.`,
+        );
+      } else {
+        toast.success(synchronized);
+      }
       reload();
     } catch {
       toast.error("Não foi possível sincronizar as contas Meta.");
@@ -285,7 +290,7 @@ function IntegrationsPage() {
                   ) : (
                     <RefreshCw className="size-4" />
                   )}
-                  Sincronizar Páginas/Instagram
+                  Verificar conexões
                 </Button>
               )}
               <Button
@@ -301,7 +306,7 @@ function IntegrationsPage() {
                 ) : (
                   <Facebook className="size-4" />
                 )}
-                {hasMetaAccounts ? "Atualizar Meta" : "Conectar Meta"}
+                {hasMetaAccounts ? "Adicionar/selecionar canais Meta" : "Conectar Meta"}
               </Button>
               {hasYoutubeAccounts && (
                 <Button
@@ -395,7 +400,8 @@ function IntegrationsPage() {
             <p className="font-medium text-foreground">Segurança da conexão</p>
             <p className="mt-1 max-w-3xl leading-relaxed">
               O VaiViral recebe tokens oficiais da Meta e do Google, armazena-os criptografados e
-              nunca solicita sua senha. Você pode remover qualquer conexão desta lista.
+              nunca solicita sua senha. Você pode autorizar outros perfis da Meta, manter várias
+              Páginas e contas do Instagram e remover cada conexão separadamente.
             </p>
           </div>
           <div className="flex gap-4">

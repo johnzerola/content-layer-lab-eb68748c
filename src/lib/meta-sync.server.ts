@@ -1,43 +1,52 @@
-/**
- * Sincroniza as Páginas do Facebook e os Instagram Business já autorizados.
- * Usa o token de Página salvo (criptografado) para reler nome e IG vinculado,
- * mantendo cada Página e cada Instagram como uma conexão separada.
- */
+/** Atualiza cada canal Meta salvo sem recriar canais que o usuario desmarcou. */
+import { persistMetaAccount } from "@/lib/facebook-persistence.server";
+import { facebookGraphBase } from "@/lib/meta.server";
 import { decryptSocialToken } from "@/lib/social-credentials.server";
 import { MetaLinkError, type LinkedSocialAccount } from "@/lib/social-linking.server";
-import { facebookGraphBase } from "@/lib/meta.server";
-import { persistFacebookPages } from "@/lib/facebook-persistence.server";
-import type { FacebookPage } from "@/lib/facebook-oauth.server";
 
 type AdminClient = { from: (table: string) => any };
+type Platform = "facebook" | "instagram";
+
+type StoredAccount = {
+  id: string;
+  platform: Platform;
+  provider_account_id: string;
+};
 
 function readString(value: unknown, key: string): string | null {
-  if (!value || typeof value !== "object") return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const raw = (value as Record<string, unknown>)[key];
-  return typeof raw === "string" ? raw : null;
+  return typeof raw === "string" ? raw : typeof raw === "number" ? String(raw) : null;
 }
 
-async function readPage(
-  pageId: string,
-  accessToken: string,
-  request: typeof fetch,
-): Promise<FacebookPage | null> {
-  const url = new URL(`${facebookGraphBase()}/${pageId}`);
-  url.searchParams.set("fields", "id,name,instagram_business_account{id,username}");
-  const response = await request(url, {
-    headers: { accept: "application/json", authorization: `Bearer ${accessToken}` },
-  }).catch(() => null);
-  if (!response || !response.ok) return null;
-  const payload = (await response.json().catch(() => null)) as Record<string, unknown> | null;
-  if (!payload) return null;
-  const igRaw = payload["instagram_business_account"];
-  const igId = readString(igRaw, "id");
-  const igUsername = readString(igRaw, "username");
+async function fetchChannel(input: {
+  platform: Platform;
+  providerAccountId: string;
+  accessToken: string;
+  request: typeof fetch;
+}): Promise<{ username: string; displayName: string } | null> {
+  const url = new URL(`${facebookGraphBase()}/${input.providerAccountId}`);
+  url.searchParams.set("fields", input.platform === "facebook" ? "id,name" : "id,username,name");
+  const response = await input
+    .request(url, {
+      headers: { accept: "application/json", authorization: `Bearer ${input.accessToken}` },
+    })
+    .catch(() => null);
+  if (!response?.ok) return null;
+  const payload: unknown = await response.json().catch(() => null);
+  const id = readString(payload, "id");
+  if (id !== input.providerAccountId) return null;
+  if (input.platform === "facebook") {
+    return {
+      username: input.providerAccountId,
+      displayName: readString(payload, "name") ?? `Pagina ${input.providerAccountId}`,
+    };
+  }
+  const username = readString(payload, "username")?.toLowerCase();
+  if (!username) return null;
   return {
-    pageId,
-    name: readString(payload, "name") ?? `Página ${pageId}`,
-    pageAccessToken: accessToken,
-    instagram: igId ? { id: igId, username: (igUsername ?? igId).toLowerCase() } : null,
+    username,
+    displayName: readString(payload, "name") ?? `@${username}`,
   };
 }
 
@@ -45,23 +54,31 @@ export async function syncMetaAccountsForUser(
   admin: AdminClient,
   userId: string,
   request: typeof fetch = fetch,
-): Promise<{ accounts: LinkedSocialAccount[]; facebook: string[]; instagram: string[] }> {
+): Promise<{
+  accounts: LinkedSocialAccount[];
+  facebook: string[];
+  instagram: string[];
+  failed: number;
+}> {
   const { data: accountRows, error: accountError } = await admin
     .from("social_accounts")
-    .select("id,provider_account_id")
+    .select("id,platform,provider_account_id")
     .eq("user_id", userId)
-    .eq("platform", "facebook");
+    .eq("provider", "meta")
+    .in("platform", ["facebook", "instagram"]);
 
   if (accountError) {
-    throw new MetaLinkError("DATABASE_ERROR", "Não foi possível ler as Páginas conectadas.");
+    throw new MetaLinkError("DATABASE_ERROR", "Nao foi possivel ler as contas Meta.");
   }
-  const pageAccounts = (accountRows ?? []).filter(
-    (row: { provider_account_id: string | null }) => row.provider_account_id,
-  );
-  if (pageAccounts.length === 0) {
+  const stored = (accountRows ?? []).filter(
+    (row: StoredAccount) =>
+      (row.platform === "facebook" || row.platform === "instagram") &&
+      Boolean(row.provider_account_id),
+  ) as StoredAccount[];
+  if (stored.length === 0) {
     throw new MetaLinkError(
       "META_AUTH_INVALID",
-      "Nenhuma Página conectada ainda. Autorize a Meta primeiro.",
+      "Nenhuma Pagina ou Instagram esta conectado. Autorize a Meta primeiro.",
     );
   }
 
@@ -71,79 +88,111 @@ export async function syncMetaAccountsForUser(
     .eq("user_id", userId)
     .in(
       "social_account_id",
-      pageAccounts.map((row: { id: string }) => row.id),
+      stored.map((account) => account.id),
     );
-
   if (connectionError) {
-    throw new MetaLinkError("DATABASE_ERROR", "Não foi possível ler as conexões Meta.");
+    throw new MetaLinkError("DATABASE_ERROR", "Nao foi possivel ler as conexoes Meta.");
+  }
+
+  const connectionByAccount = new Map<string, { id: string; expires_at: string | null }>();
+  for (const row of connections ?? []) {
+    const connection = row as { id: string; social_account_id: string; expires_at: string | null };
+    connectionByAccount.set(connection.social_account_id, connection);
+  }
+  const connectionIds = [...connectionByAccount.values()].map((connection) => connection.id);
+  if (connectionIds.length === 0) {
+    throw new MetaLinkError(
+      "META_AUTH_INVALID",
+      "As conexoes Meta nao possuem credenciais. Autorize novamente.",
+    );
   }
 
   const { data: credentials, error: credentialError } = await admin
     .from("social_connection_credentials")
     .select("connection_id,access_token_ciphertext,expires_at")
-    .in(
-      "connection_id",
-      (connections ?? []).map((row: { id: string }) => row.id),
-    );
-
+    .in("connection_id", connectionIds);
   if (credentialError) {
-    throw new MetaLinkError("DATABASE_ERROR", "Não foi possível ler as credenciais Meta.");
+    throw new MetaLinkError("DATABASE_ERROR", "Nao foi possivel ler as credenciais Meta.");
   }
-
   const credentialByConnection = new Map<string, { ciphertext: string; expiresAt: string }>();
   for (const row of credentials ?? []) {
-    const typed = row as {
+    const credential = row as {
       connection_id: string;
       access_token_ciphertext: string;
       expires_at: string;
     };
-    credentialByConnection.set(typed.connection_id, {
-      ciphertext: typed.access_token_ciphertext,
-      expiresAt: typed.expires_at,
+    credentialByConnection.set(credential.connection_id, {
+      ciphertext: credential.access_token_ciphertext,
+      expiresAt: credential.expires_at,
     });
   }
 
-  const pages: Array<{ page: FacebookPage; expiresAt: Date }> = [];
-  for (const connection of connections ?? []) {
-    const typed = connection as { id: string; social_account_id: string; expires_at: string | null };
-    const credential = credentialByConnection.get(typed.id);
-    const account = pageAccounts.find((row: { id: string }) => row.id === typed.social_account_id);
-    if (!credential || !account?.provider_account_id) continue;
+  const saved: LinkedSocialAccount[] = [];
+  const failedIds: string[] = [];
+  for (const account of stored) {
+    const connection = connectionByAccount.get(account.id);
+    const credential = connection ? credentialByConnection.get(connection.id) : null;
+    if (!connection || !credential) {
+      failedIds.push(account.id);
+      continue;
+    }
+    const expiresAt = new Date(credential.expiresAt ?? connection.expires_at ?? 0);
+    if (!Number.isFinite(expiresAt.getTime()) || expiresAt <= new Date()) {
+      failedIds.push(account.id);
+      continue;
+    }
     let accessToken: string;
     try {
       accessToken = decryptSocialToken(credential.ciphertext);
     } catch {
+      failedIds.push(account.id);
       continue;
     }
-    const page = await readPage(account.provider_account_id, accessToken, request);
-    if (!page) continue;
-    const expiresAt = new Date(credential.expiresAt ?? typed.expires_at ?? Date.now());
-    pages.push({ page, expiresAt: Number.isFinite(expiresAt.getTime()) ? expiresAt : new Date() });
-  }
-
-  if (pages.length === 0) {
-    throw new MetaLinkError(
-      "META_AUTH_INVALID",
-      "Os tokens das Páginas expiraram. Clique em Atualizar Meta e autorize novamente.",
+    const channel = await fetchChannel({
+      platform: account.platform,
+      providerAccountId: account.provider_account_id,
+      accessToken,
+      request,
+    });
+    if (!channel) {
+      failedIds.push(account.id);
+      continue;
+    }
+    saved.push(
+      await persistMetaAccount(admin, {
+        userId,
+        platform: account.platform,
+        username: channel.username,
+        displayName: channel.displayName,
+        providerAccountId: account.provider_account_id,
+        accessToken,
+        expiresAt,
+      }),
     );
   }
 
-  const accounts: LinkedSocialAccount[] = [];
-  for (const entry of pages) {
-    accounts.push(
-      ...(await persistFacebookPages(admin, {
-        userId,
-        pages: [entry.page],
-        expiresAt: entry.expiresAt,
-      })),
+  if (failedIds.length > 0) {
+    await admin
+      .from("social_accounts")
+      .update({ status: "reautorizacao", updated_at: new Date().toISOString() })
+      .in("id", failedIds)
+      .eq("user_id", userId);
+  }
+  if (saved.length === 0) {
+    throw new MetaLinkError(
+      "META_AUTH_INVALID",
+      "Todas as conexoes Meta precisam de reautorizacao. Clique em Atualizar Meta.",
     );
   }
 
   return {
-    accounts,
-    facebook: pages.map((entry) => entry.page.name),
-    instagram: pages.flatMap((entry) =>
-      entry.page.instagram ? [entry.page.instagram.username] : [],
-    ),
+    accounts: saved,
+    facebook: saved
+      .filter((account) => account.platform === "facebook")
+      .map((account) => account.display_name ?? account.username),
+    instagram: saved
+      .filter((account) => account.platform === "instagram")
+      .map((account) => account.username),
+    failed: failedIds.length,
   };
 }
