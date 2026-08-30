@@ -52,7 +52,7 @@ function YoutubeOAuthCallback() {
           response.ok
             ? {
                 ok: true,
-                message: `Canal conectado: ${response.accounts
+                message: `${response.accounts.length === 1 ? "Canal conectado" : "Canais conectados"}: ${response.accounts
                   .map((account) => `@${account.username}`)
                   .join(", ")}.`,
               }
