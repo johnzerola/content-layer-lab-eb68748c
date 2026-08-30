@@ -30,7 +30,11 @@ import {
   diagnoseFacebookIntegration,
   syncMetaAccounts,
 } from "@/lib/facebook-oauth.functions";
-import { beginYoutubeOAuth, syncYoutubeChannels } from "@/lib/youtube-oauth.functions";
+import {
+  beginYoutubeOAuth,
+  refreshYoutubeChannel,
+  syncYoutubeChannels,
+} from "@/lib/youtube-oauth.functions";
 import { setPrimaryAccount } from "@/lib/social-primary.functions";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
