@@ -102,9 +102,11 @@ function IntegrationsPage() {
   const startFacebook = useServerFn(beginFacebookOAuth);
   const startYoutube = useServerFn(beginYoutubeOAuth);
   const syncYoutube = useServerFn(syncYoutubeChannels);
+  const refreshChannel = useServerFn(refreshYoutubeChannel);
   const syncMeta = useServerFn(syncMetaAccounts);
   const [syncingMetaAccounts, setSyncingMetaAccounts] = useState(false);
   const [syncingYoutube, setSyncingYoutube] = useState(false);
+  const [refreshingYoutube, setRefreshingYoutube] = useState<Set<string>>(new Set());
   const makePrimary = useServerFn(setPrimaryAccount);
 
   useEffect(() => {
