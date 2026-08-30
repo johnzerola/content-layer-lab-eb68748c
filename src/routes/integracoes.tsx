@@ -378,14 +378,16 @@ function IntegrationsPage() {
                 <ShieldCheck className="size-4 text-emerald-400" />
                 Conexão oficial Google
               </div>
-              <p className="text-xs text-muted-foreground">{youtubeAccounts.length} canal(is)</p>
+              <p className="text-xs text-muted-foreground">
+                {youtubeAccounts.length} canal(is) conectado(s)
+              </p>
             </div>
-            <AccountsColumn
-              platform={YOUTUBE_PLATFORM}
+            <YoutubeChannels
               accounts={youtubeAccounts}
-              divided={false}
+              syncing={syncingYoutube}
               onPrimary={choosePrimary}
               onRemove={disconnect}
+              onRename={rename}
             />
           </section>
         )}
