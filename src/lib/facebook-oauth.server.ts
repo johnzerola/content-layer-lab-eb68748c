@@ -523,7 +523,10 @@ export type FacebookPageDiscovery = {
   pages: FacebookPage[];
   authorizedPageIds: string[];
   unavailablePageIds: string[];
+  /** Mensagens originais da Meta (sem tokens) para diagnosticar falhas de token. */
+  diagnostics: string[];
 };
+
 
 function granularTargetIds(data: Record<string, unknown> | null, prefix: string): string[] {
   const rows = data?.["granular_scopes"];
@@ -597,6 +600,8 @@ export async function fetchFacebookPages(input: {
   url.searchParams.set("limit", "100");
   const pages = new Map<string, FacebookPage>();
   const seenCursors = new Set<string>();
+  const diagnostics: string[] = [];
+  const listedWithoutToken = new Set<string>();
   for (let pageNumber = 0; pageNumber < 100; pageNumber += 1) {
     const payload = await readJson(await graphRequest(url, input.accessToken, request));
     const payloadObject = asObject(payload);
@@ -606,7 +611,12 @@ export async function fetchFacebookPages(input: {
     }
     for (const row of rows) {
       const page = parseFacebookPage(row);
-      if (page) pages.set(page.pageId, page);
+      if (page) {
+        pages.set(page.pageId, page);
+        continue;
+      }
+      const listedId = readString(row, "id");
+      if (listedId) listedWithoutToken.add(listedId);
     }
 
     const paging = asObject(payloadObject?.["paging"]);
@@ -617,8 +627,15 @@ export async function fetchFacebookPages(input: {
     url.searchParams.set("after", after);
   }
 
+  if (listedWithoutToken.size > 0) {
+    diagnostics.push(
+      `A Meta listou ${listedWithoutToken.size} Página(s) em /me/accounts sem access_token.`,
+    );
+  }
+
   const unavailablePageIds: string[] = [];
-  for (const pageId of authorizedPageIds) {
+  const missingIds = new Set<string>([...authorizedPageIds, ...listedWithoutToken]);
+  for (const pageId of missingIds) {
     if (pages.has(pageId)) continue;
     const pageUrl = new URL(`${facebookGraphBase(environment)}/${pageId}`);
     pageUrl.searchParams.set(
@@ -628,11 +645,16 @@ export async function fetchFacebookPages(input: {
     try {
       const directPayload = await readJson(await graphRequest(pageUrl, input.accessToken, request));
       const page = parseFacebookPage(directPayload);
-      if (page) pages.set(page.pageId, page);
-      else unavailablePageIds.push(pageId);
+      if (page) {
+        pages.set(page.pageId, page);
+        continue;
+      }
+      unavailablePageIds.push(pageId);
+      diagnostics.push(`Página ${pageId}: a Meta respondeu sem access_token.`);
     } catch (error) {
       if (error instanceof MetaLinkError && error.code === "META_AUTH_INVALID") {
         unavailablePageIds.push(pageId);
+        diagnostics.push(`Página ${pageId}: ${error.message}`);
         continue;
       }
       throw error;
@@ -643,5 +665,7 @@ export async function fetchFacebookPages(input: {
     pages: [...pages.values()],
     authorizedPageIds,
     unavailablePageIds,
+    diagnostics,
   };
+
 }

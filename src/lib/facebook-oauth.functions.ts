@@ -73,11 +73,14 @@ export const completeFacebookOAuth = createServerFn({ method: "POST" })
           authorization.authorizedPageIds.length > 0
             ? ` A Meta confirmou ${authorization.authorizedPageIds.length} Página(s), mas não liberou o token de publicação para elas.`
             : "";
+        const diagnosticDetail =
+          discovery.diagnostics.length > 0 ? ` Detalhe da Meta: ${discovery.diagnostics.join(" ")}` : "";
         throw new MetaLinkError(
           "META_ACCOUNT_MISMATCH",
-          `Nenhuma Página publicável foi devolvida.${selectedDetail} Confirme o controle total das Páginas e refaça o login.`,
+          `Nenhuma Página publicável foi devolvida.${selectedDetail}${diagnosticDetail} Confirme que você é administrador com controle total das Páginas no Gerenciador de Negócios e refaça o login.`,
         );
       }
+
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const accounts = await persistFacebookPages(supabaseAdmin as never, {
         userId: context.userId,

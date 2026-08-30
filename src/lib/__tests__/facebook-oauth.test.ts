@@ -365,7 +365,7 @@ describe("Facebook Login", () => {
         },
       ],
       authorizedPageIds: [],
-      unavailablePageIds: [],
+      unavailablePageIds: [], diagnostics: [],
     });
   });
 
@@ -471,7 +471,7 @@ describe("Facebook Login", () => {
       }),
     ).resolves.toMatchObject({
       pages: [{ pageId: "100", name: "Disponível" }],
-      unavailablePageIds: ["200"],
+      unavailablePageIds: ["200"], diagnostics: expect.any(Array),
     });
   });
 });
