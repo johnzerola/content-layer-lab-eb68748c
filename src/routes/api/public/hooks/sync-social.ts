@@ -3,7 +3,7 @@
  * Chamado por um agendador (pg_cron) com o mesmo segredo da fila de publicação.
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { requireCronAuthorization } from "@/lib/publish-auth.server";
+import { validCronSecret } from "@/lib/publish-auth.server";
 
 const BATCH_LIMIT = 25;
 
@@ -12,8 +12,13 @@ export const Route = createFileRoute("/api/public/hooks/sync-social")({
     handlers: {
       GET: async () => new Response(null, { status: 405, headers: { Allow: "POST" } }),
       POST: async ({ request }) => {
-        const unauthorized = requireCronAuthorization(request);
-        if (unauthorized) return unauthorized;
+        const authorization = request.headers.get("authorization");
+        const authorized =
+          validCronSecret(authorization, process.env["SYNC_CRON_SECRET"]) ||
+          validCronSecret(authorization);
+        if (!authorized) {
+          return Response.json({ ok: false, error: "Não autorizado." }, { status: 401 });
+        }
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { syncSingleYoutubeChannel } = await import("@/lib/youtube-sync.server");
