@@ -41,6 +41,7 @@ import { Route as IntegracoesInstagramCallbackRouteImport } from './routes/integ
 import { Route as IntegracoesTiktokCallbackRouteImport } from './routes/integracoes_.tiktok.callback'
 import { Route as IntegracoesYoutubeCallbackRouteImport } from './routes/integracoes_.youtube.callback'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
+import { Route as ApiPublicHooksSyncSocialRouteImport } from './routes/api/public/hooks/sync-social'
 import { Route as ApiPublicMetaDataDeletionRouteImport } from './routes/api/public/meta.data-deletion'
 import { Route as ApiPublicMetaDeauthorizeRouteImport } from './routes/api/public/meta.deauthorize'
 
@@ -213,6 +214,12 @@ const ApiPublicHooksPublishDueRoute =
     path: '/api/public/hooks/publish-due',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksSyncSocialRoute =
+  ApiPublicHooksSyncSocialRouteImport.update({
+    id: '/api/public/hooks/sync-social',
+    path: '/api/public/hooks/sync-social',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicMetaDataDeletionRoute =
   ApiPublicMetaDataDeletionRouteImport.update({
     id: '/api/public/meta/data-deletion',
@@ -259,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/integracoes/youtube/callback': typeof IntegracoesYoutubeCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
+  '/api/public/hooks/sync-social': typeof ApiPublicHooksSyncSocialRoute
   '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
   '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
 }
@@ -295,6 +303,7 @@ export interface FileRoutesByTo {
   '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/integracoes/youtube/callback': typeof IntegracoesYoutubeCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
+  '/api/public/hooks/sync-social': typeof ApiPublicHooksSyncSocialRoute
   '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
   '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
 }
@@ -332,6 +341,7 @@ export interface FileRoutesById {
   '/integracoes_/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/integracoes_/youtube/callback': typeof IntegracoesYoutubeCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
+  '/api/public/hooks/sync-social': typeof ApiPublicHooksSyncSocialRoute
   '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
   '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
 }
@@ -370,6 +380,7 @@ export interface FileRouteTypes {
     | '/integracoes/tiktok/callback'
     | '/integracoes/youtube/callback'
     | '/api/public/hooks/publish-due'
+    | '/api/public/hooks/sync-social'
     | '/api/public/meta/data-deletion'
     | '/api/public/meta/deauthorize'
   fileRoutesByTo: FileRoutesByTo
@@ -406,6 +417,7 @@ export interface FileRouteTypes {
     | '/integracoes/tiktok/callback'
     | '/integracoes/youtube/callback'
     | '/api/public/hooks/publish-due'
+    | '/api/public/hooks/sync-social'
     | '/api/public/meta/data-deletion'
     | '/api/public/meta/deauthorize'
   id:
@@ -442,6 +454,7 @@ export interface FileRouteTypes {
     | '/integracoes_/tiktok/callback'
     | '/integracoes_/youtube/callback'
     | '/api/public/hooks/publish-due'
+    | '/api/public/hooks/sync-social'
     | '/api/public/meta/data-deletion'
     | '/api/public/meta/deauthorize'
   fileRoutesById: FileRoutesById
@@ -479,6 +492,7 @@ export interface RootRouteChildren {
   IntegracoesTiktokCallbackRoute: typeof IntegracoesTiktokCallbackRoute
   IntegracoesYoutubeCallbackRoute: typeof IntegracoesYoutubeCallbackRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
+  ApiPublicHooksSyncSocialRoute: typeof ApiPublicHooksSyncSocialRoute
   ApiPublicMetaDataDeletionRoute: typeof ApiPublicMetaDataDeletionRoute
   ApiPublicMetaDeauthorizeRoute: typeof ApiPublicMetaDeauthorizeRoute
 }
@@ -709,6 +723,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksPublishDueRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/sync-social': {
+      id: '/api/public/hooks/sync-social'
+      path: '/api/public/hooks/sync-social'
+      fullPath: '/api/public/hooks/sync-social'
+      preLoaderRoute: typeof ApiPublicHooksSyncSocialRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/meta/data-deletion': {
       id: '/api/public/meta/data-deletion'
       path: '/api/public/meta/data-deletion'
@@ -760,6 +781,7 @@ const rootRouteChildren: RootRouteChildren = {
   IntegracoesTiktokCallbackRoute: IntegracoesTiktokCallbackRoute,
   IntegracoesYoutubeCallbackRoute: IntegracoesYoutubeCallbackRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
+  ApiPublicHooksSyncSocialRoute: ApiPublicHooksSyncSocialRoute,
   ApiPublicMetaDataDeletionRoute: ApiPublicMetaDataDeletionRoute,
   ApiPublicMetaDeauthorizeRoute: ApiPublicMetaDeauthorizeRoute,
 }

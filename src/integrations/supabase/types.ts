@@ -600,6 +600,59 @@ export type Database = {
           },
         ]
       }
+      social_sync_schedules: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          interval_minutes: number
+          last_error: string | null
+          last_run_at: string | null
+          last_status: string | null
+          next_run_at: string
+          provider: string
+          social_account_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          interval_minutes?: number
+          last_error?: string | null
+          last_run_at?: string | null
+          last_status?: string | null
+          next_run_at?: string
+          provider?: string
+          social_account_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          interval_minutes?: number
+          last_error?: string | null
+          last_run_at?: string | null
+          last_status?: string | null
+          next_run_at?: string
+          provider?: string
+          social_account_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_sync_schedules_social_account_id_fkey"
+            columns: ["social_account_id"]
+            isOneToOne: true
+            referencedRelation: "social_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           created_at: string

@@ -36,6 +36,13 @@ import {
   syncYoutubeChannels,
 } from "@/lib/youtube-oauth.functions";
 import { setPrimaryAccount } from "@/lib/social-primary.functions";
+import {
+  describeSchedule,
+  listSyncSchedules,
+  setSyncSchedule,
+  SYNC_INTERVAL_OPTIONS,
+  type SyncSchedule,
+} from "@/lib/sync-schedule";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { listJobs } from "@/lib/jobs";
@@ -108,6 +115,30 @@ function IntegrationsPage() {
   const [syncingYoutube, setSyncingYoutube] = useState(false);
   const [refreshingYoutube, setRefreshingYoutube] = useState<Set<string>>(new Set());
   const makePrimary = useServerFn(setPrimaryAccount);
+  const [schedules, setSchedules] = useState<Record<string, SyncSchedule>>({});
+
+  const reloadSchedules = useCallback(() => {
+    void listSyncSchedules()
+      .then(setSchedules)
+      .catch(() => setSchedules({}));
+  }, []);
+
+  const changeSchedule = useCallback(
+    async (account: SocialAccount, intervalMinutes: number) => {
+      try {
+        await setSyncSchedule(account.id, intervalMinutes);
+        toast.success(
+          intervalMinutes > 0
+            ? "Sincronização automática agendada."
+            : "Sincronização automática desligada.",
+        );
+        reloadSchedules();
+      } catch {
+        toast.error("Não foi possível salvar o agendamento.");
+      }
+    },
+    [reloadSchedules],
+  );
 
   useEffect(() => {
     void currentUser().then(setUser);
@@ -126,7 +157,8 @@ function IntegrationsPage() {
       return;
     }
     reload();
-  }, [reload, user]);
+    reloadSchedules();
+  }, [reload, reloadSchedules, user]);
 
   const connect = useCallback(
     async (platform: PlatformKey) => {
@@ -444,6 +476,8 @@ function IntegrationsPage() {
               onRemove={disconnect}
               onRename={rename}
               onRefresh={refreshYoutubeAccount}
+              schedules={schedules}
+              onSchedule={changeSchedule}
             />
           </section>
         )}
@@ -586,6 +620,8 @@ function YoutubeChannels({
   onRemove,
   onRename,
   onRefresh,
+  schedules,
+  onSchedule,
 }: {
   accounts: SocialAccount[];
   syncing: boolean;
@@ -594,6 +630,8 @@ function YoutubeChannels({
   onRemove: (account: SocialAccount) => Promise<void>;
   onRename: (account: SocialAccount, name: string) => Promise<void>;
   onRefresh: (account: SocialAccount) => Promise<void>;
+  schedules: Record<string, SyncSchedule>;
+  onSchedule: (account: SocialAccount, intervalMinutes: number) => Promise<void>;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -623,6 +661,8 @@ function YoutubeChannels({
           const name = account.display_name || account.username;
           const isEditing = editing === account.id;
           const isRefreshing = refreshing.has(account.id);
+          const schedule = schedules[account.id];
+          const scheduleValue = schedule?.enabled ? schedule.interval_minutes : 0;
           return (
             <li
               key={account.id}
@@ -677,11 +717,31 @@ function YoutubeChannels({
                             ? formatSync(account.updated_at ?? account.created_at)
                             : "Reconexão necessária"}
                     </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {describeSchedule(schedule)}
+                    </p>
                   </>
                 )}
               </div>
               {!isEditing && (
-                <div className="flex items-center">
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span className="sr-only">{`Sincronização automática de ${name}`}</span>
+                    <select
+                      value={scheduleValue}
+                      disabled={!connected}
+                      onChange={(event) => void onSchedule(account, Number(event.target.value))}
+                      aria-label={`Sincronização automática de ${name}`}
+                      title="Sincronização automática"
+                      className="min-h-9 border border-border bg-surface px-2 py-1 text-xs outline-none focus:border-primary"
+                    >
+                      {SYNC_INTERVAL_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <Button
                     type="button"
                     variant="ghost"
