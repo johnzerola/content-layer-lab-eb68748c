@@ -11,7 +11,10 @@ import {
   verifyYoutubeOAuthState,
 } from "@/lib/youtube-oauth.server";
 import { persistYoutubeAccount } from "@/lib/youtube-persistence.server";
-import { syncYoutubeChannelsForUser } from "@/lib/youtube-sync.server";
+import {
+  syncSingleYoutubeChannel,
+  syncYoutubeChannelsForUser,
+} from "@/lib/youtube-sync.server";
 
 function oauthError(error: unknown) {
   if (error instanceof MetaLinkError) {
