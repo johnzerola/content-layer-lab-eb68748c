@@ -3,7 +3,7 @@
  * cada conexão para renovar o acesso, relistar TODOS os canais da conta Google
  * e manter cada canal como uma conexão separada (upsert).
  */
-import { decryptSocialToken, encryptSocialToken } from "@/lib/social-credentials.server";
+import { decryptSocialToken } from "@/lib/social-credentials.server";
 import { MetaLinkError, type LinkedSocialAccount } from "@/lib/social-linking.server";
 import { fetchYoutubeChannels, refreshYoutubeAccessToken } from "@/lib/youtube-oauth.server";
 import { persistYoutubeAccount } from "@/lib/youtube-persistence.server";
@@ -99,7 +99,5 @@ export async function syncYoutubeChannelsForUser(
     );
   }
 
-  // Mantém a criptografia dos tokens em dia com o novo access_token.
-  void encryptSocialToken;
   return { accounts, channels: channelTitles };
 }
