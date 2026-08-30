@@ -17,7 +17,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
-import { listAccounts, removeAccount, type SocialAccount } from "@/lib/social";
+import {
+  listAccounts,
+  removeAccount,
+  renameAccount,
+  type SocialAccount,
+} from "@/lib/social";
 
 import {
   beginFacebookOAuth,
@@ -185,6 +190,19 @@ function IntegrationsPage() {
         reload();
       } catch {
         toast.error("Não foi possível remover a conta.");
+      }
+    },
+    [reload],
+  );
+
+  const rename = useCallback(
+    async (account: SocialAccount, name: string) => {
+      try {
+        await renameAccount(account.id, name);
+        toast.success("Nome atualizado.");
+        reload();
+      } catch {
+        toast.error("Não foi possível renomear o canal.");
       }
     },
     [reload],
