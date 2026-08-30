@@ -581,15 +581,19 @@ function formatSync(value?: string | null) {
 function YoutubeChannels({
   accounts,
   syncing,
+  refreshing,
   onPrimary,
   onRemove,
   onRename,
+  onRefresh,
 }: {
   accounts: SocialAccount[];
   syncing: boolean;
+  refreshing: Set<string>;
   onPrimary: (account: SocialAccount) => Promise<void>;
   onRemove: (account: SocialAccount) => Promise<void>;
   onRename: (account: SocialAccount, name: string) => Promise<void>;
+  onRefresh: (account: SocialAccount) => Promise<void>;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
