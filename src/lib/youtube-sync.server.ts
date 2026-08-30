@@ -5,7 +5,11 @@
  */
 import { decryptSocialToken } from "@/lib/social-credentials.server";
 import { MetaLinkError, type LinkedSocialAccount } from "@/lib/social-linking.server";
-import { fetchYoutubeChannels, refreshYoutubeAccessToken } from "@/lib/youtube-oauth.server";
+import {
+  fetchYoutubeChannelById,
+  fetchYoutubeChannels,
+  refreshYoutubeAccessToken,
+} from "@/lib/youtube-oauth.server";
 import { persistYoutubeAccount } from "@/lib/youtube-persistence.server";
 
 type AdminClient = { from: (table: string) => any };
