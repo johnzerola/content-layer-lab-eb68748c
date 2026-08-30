@@ -439,9 +439,11 @@ function IntegrationsPage() {
             <YoutubeChannels
               accounts={youtubeAccounts}
               syncing={syncingYoutube}
+              refreshing={refreshingYoutube}
               onPrimary={choosePrimary}
               onRemove={disconnect}
               onRename={rename}
+              onRefresh={refreshYoutubeAccount}
             />
           </section>
         )}
