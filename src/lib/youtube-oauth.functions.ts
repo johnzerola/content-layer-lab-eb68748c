@@ -11,7 +11,10 @@ import {
   verifyYoutubeOAuthState,
 } from "@/lib/youtube-oauth.server";
 import { persistYoutubeAccount } from "@/lib/youtube-persistence.server";
-import { syncYoutubeChannelsForUser } from "@/lib/youtube-sync.server";
+import {
+  syncSingleYoutubeChannel,
+  syncYoutubeChannelsForUser,
+} from "@/lib/youtube-sync.server";
 
 function oauthError(error: unknown) {
   if (error instanceof MetaLinkError) {
@@ -93,6 +96,30 @@ export const syncYoutubeChannels = createServerFn({ method: "POST" })
         context.userId,
       );
       return { ok: true as const, accounts, summary: { channels } };
+    } catch (error) {
+      return oauthError(error);
+    }
+  });
+
+/** Sincroniza um único canal do YouTube agora, usando o refresh_token salvo. */
+export const refreshYoutubeChannel = createServerFn({ method: "POST" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .validator((data: unknown) => z.object({ accountId: z.string().uuid() }).parse(data))
+  .handler(async ({ data, context }) => {
+    try {
+      if (!linkingServerRuntimeReady()) {
+        throw new MetaLinkError(
+          "SERVER_CONFIG_MISSING",
+          "A integração segura do servidor não está configurada.",
+        );
+      }
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const account = await syncSingleYoutubeChannel(
+        supabaseAdmin as never,
+        context.userId,
+        data.accountId,
+      );
+      return { ok: true as const, account };
     } catch (error) {
       return oauthError(error);
     }

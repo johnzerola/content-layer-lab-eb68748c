@@ -30,7 +30,11 @@ import {
   diagnoseFacebookIntegration,
   syncMetaAccounts,
 } from "@/lib/facebook-oauth.functions";
-import { beginYoutubeOAuth, syncYoutubeChannels } from "@/lib/youtube-oauth.functions";
+import {
+  beginYoutubeOAuth,
+  refreshYoutubeChannel,
+  syncYoutubeChannels,
+} from "@/lib/youtube-oauth.functions";
 import { setPrimaryAccount } from "@/lib/social-primary.functions";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -98,9 +102,11 @@ function IntegrationsPage() {
   const startFacebook = useServerFn(beginFacebookOAuth);
   const startYoutube = useServerFn(beginYoutubeOAuth);
   const syncYoutube = useServerFn(syncYoutubeChannels);
+  const refreshChannel = useServerFn(refreshYoutubeChannel);
   const syncMeta = useServerFn(syncMetaAccounts);
   const [syncingMetaAccounts, setSyncingMetaAccounts] = useState(false);
   const [syncingYoutube, setSyncingYoutube] = useState(false);
+  const [refreshingYoutube, setRefreshingYoutube] = useState<Set<string>>(new Set());
   const makePrimary = useServerFn(setPrimaryAccount);
 
   useEffect(() => {
@@ -269,6 +275,30 @@ function IntegrationsPage() {
     }
   }, [reload, syncYoutube]);
 
+  const refreshYoutubeAccount = useCallback(
+    async (account: SocialAccount) => {
+      setRefreshingYoutube((prev) => new Set(prev).add(account.id));
+      try {
+        const response = await refreshChannel({ data: { accountId: account.id } });
+        if (!response.ok) {
+          toast.error(response.error);
+          return;
+        }
+        toast.success(`Canal ${response.account.display_name ?? response.account.username} atualizado.`);
+        reload();
+      } catch {
+        toast.error("Não foi possível atualizar o canal do YouTube.");
+      } finally {
+        setRefreshingYoutube((prev) => {
+          const next = new Set(prev);
+          next.delete(account.id);
+          return next;
+        });
+      }
+    },
+    [refreshChannel, reload],
+  );
+
   const facebookAccounts = accounts.filter((account) => account.platform === "facebook");
   const instagramAccounts = accounts.filter((account) => account.platform === "instagram");
   const youtubeAccounts = accounts.filter((account) => account.platform === "youtube");
@@ -409,9 +439,11 @@ function IntegrationsPage() {
             <YoutubeChannels
               accounts={youtubeAccounts}
               syncing={syncingYoutube}
+              refreshing={refreshingYoutube}
               onPrimary={choosePrimary}
               onRemove={disconnect}
               onRename={rename}
+              onRefresh={refreshYoutubeAccount}
             />
           </section>
         )}
@@ -549,15 +581,19 @@ function formatSync(value?: string | null) {
 function YoutubeChannels({
   accounts,
   syncing,
+  refreshing,
   onPrimary,
   onRemove,
   onRename,
+  onRefresh,
 }: {
   accounts: SocialAccount[];
   syncing: boolean;
+  refreshing: Set<string>;
   onPrimary: (account: SocialAccount) => Promise<void>;
   onRemove: (account: SocialAccount) => Promise<void>;
   onRename: (account: SocialAccount, name: string) => Promise<void>;
+  onRefresh: (account: SocialAccount) => Promise<void>;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -586,12 +622,13 @@ function YoutubeChannels({
           const connected = account.status === "conectado" && account.provider !== "pending";
           const name = account.display_name || account.username;
           const isEditing = editing === account.id;
+          const isRefreshing = refreshing.has(account.id);
           return (
             <li
               key={account.id}
               className="flex min-h-16 flex-wrap items-center gap-3 border border-border bg-surface-2 p-3"
             >
-              {syncing ? (
+              {isRefreshing || syncing ? (
                 <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
               ) : connected ? (
                 <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />
@@ -632,17 +669,35 @@ function YoutubeChannels({
                     <p className="truncate text-sm font-medium">{name}</p>
                     <p className="truncate text-xs text-muted-foreground">
                       {account.is_primary ? "Canal principal · " : ""}
-                      {syncing
-                        ? "Sincronizando…"
-                        : connected
-                          ? formatSync(account.updated_at ?? account.created_at)
-                          : "Reconexão necessária"}
+                      {isRefreshing
+                        ? "Atualizando status…"
+                        : syncing
+                          ? "Sincronizando…"
+                          : connected
+                            ? formatSync(account.updated_at ?? account.created_at)
+                            : "Reconexão necessária"}
                     </p>
                   </>
                 )}
               </div>
               {!isEditing && (
                 <div className="flex items-center">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={isRefreshing || !connected}
+                    onClick={() => void onRefresh(account)}
+                    aria-label={`Atualizar status de ${name}`}
+                    title="Atualizar status"
+                    className="text-muted-foreground"
+                  >
+                    {isRefreshing ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="size-4" />
+                    )}
+                  </Button>
                   <Button
                     type="button"
                     variant="ghost"

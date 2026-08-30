@@ -5,7 +5,11 @@
  */
 import { decryptSocialToken } from "@/lib/social-credentials.server";
 import { MetaLinkError, type LinkedSocialAccount } from "@/lib/social-linking.server";
-import { fetchYoutubeChannels, refreshYoutubeAccessToken } from "@/lib/youtube-oauth.server";
+import {
+  fetchYoutubeChannelById,
+  fetchYoutubeChannels,
+  refreshYoutubeAccessToken,
+} from "@/lib/youtube-oauth.server";
 import { persistYoutubeAccount } from "@/lib/youtube-persistence.server";
 
 type AdminClient = { from: (table: string) => any };
@@ -100,4 +104,90 @@ export async function syncYoutubeChannelsForUser(
   }
 
   return { accounts, channels: channelTitles };
+}
+
+/** Sincroniza UM canal do YouTube, atualizando nome, handle e avatar pelo ID oficial. */
+export async function syncSingleYoutubeChannel(
+  admin: AdminClient,
+  userId: string,
+  accountId: string,
+): Promise<LinkedSocialAccount> {
+  const { data: account, error: accountError } = await admin
+    .from("social_accounts")
+    .select("id,provider_account_id")
+    .eq("id", accountId)
+    .eq("user_id", userId)
+    .eq("platform", "youtube")
+    .maybeSingle();
+
+  if (accountError || !account) {
+    throw new MetaLinkError("DATABASE_ERROR", "Canal do YouTube não encontrado.");
+  }
+  const channelId = (account as { provider_account_id: string | null }).provider_account_id;
+  if (!channelId) {
+    throw new MetaLinkError("DATABASE_ERROR", "Canal do YouTube sem ID oficial.");
+  }
+
+  const { data: connection, error: connectionError } = await admin
+    .from("social_connections")
+    .select("id")
+    .eq("social_account_id", accountId)
+    .eq("provider", "youtube")
+    .maybeSingle();
+
+  if (connectionError || !connection) {
+    throw new MetaLinkError("DATABASE_ERROR", "Conexão do YouTube não encontrada.");
+  }
+
+  const { data: credential, error: credentialError } = await admin
+    .from("social_connection_credentials")
+    .select("refresh_token_ciphertext")
+    .eq("connection_id", connection.id)
+    .maybeSingle();
+
+  if (credentialError || !credential) {
+    throw new MetaLinkError("DATABASE_ERROR", "Credenciais do YouTube não encontradas.");
+  }
+
+  const ciphertext = (credential as { refresh_token_ciphertext: string | null })
+    .refresh_token_ciphertext;
+  if (!ciphertext) {
+    throw new MetaLinkError(
+      "META_AUTH_INVALID",
+      "Credenciais do YouTube inválidas. Conecte novamente.",
+    );
+  }
+
+  let refreshToken: string;
+  try {
+    refreshToken = decryptSocialToken(ciphertext);
+  } catch {
+    throw new MetaLinkError(
+      "META_AUTH_INVALID",
+      "Credenciais do YouTube inválidas. Conecte novamente.",
+    );
+  }
+  if (!refreshToken) {
+    throw new MetaLinkError(
+      "META_AUTH_INVALID",
+      "Credenciais do YouTube inválidas. Conecte novamente.",
+    );
+  }
+
+  const refreshed = await refreshYoutubeAccessToken({ refreshToken });
+  const channel = await fetchYoutubeChannelById({
+    accessToken: refreshed.accessToken,
+    channelId,
+  });
+
+  return persistYoutubeAccount(admin, {
+    userId,
+    channel,
+    tokens: {
+      accessToken: refreshed.accessToken,
+      refreshToken,
+      expiresAt: refreshed.expiresAt,
+      scope: "",
+    },
+  });
 }
