@@ -297,6 +297,37 @@ export async function fetchYoutubeChannels(input: {
   return list;
 }
 
+/** Busca um canal específico do YouTube pelo ID oficial. */
+export async function fetchYoutubeChannelById(input: {
+  accessToken: string;
+  channelId: string;
+  fetch?: typeof fetch;
+}): Promise<YoutubeChannel> {
+  const request = input.fetch ?? fetch;
+  const url = new URL(`${YOUTUBE_API_BASE}/channels`);
+  url.searchParams.set("part", "snippet");
+  url.searchParams.set("id", input.channelId);
+  const response = await request(url, {
+    headers: { authorization: `Bearer ${input.accessToken}` },
+  }).catch(() => null);
+  if (!response || response.status >= 500) {
+    throw new MetaLinkError("META_TEMPORARY_ERROR", "O YouTube está temporariamente indisponível.");
+  }
+  const payload = asObject(await response.json().catch(() => null));
+  const items = payload?.["items"];
+  if (!response.ok || !Array.isArray(items) || items.length === 0) {
+    throw new MetaLinkError(
+      "META_AUTH_INVALID",
+      "Não foi possível ler o canal do YouTube. A conta do Google precisa ter um canal criado.",
+    );
+  }
+  const channel = parseYoutubeChannel(items[0]);
+  if (!channel) {
+    throw new MetaLinkError("META_RESPONSE_INVALID", "O Google retornou dados inválidos para o canal.");
+  }
+  return channel;
+}
+
 /** @deprecated use fetchYoutubeChannels — mantido por compatibilidade. */
 export async function fetchYoutubeChannel(input: {
   accessToken: string;
