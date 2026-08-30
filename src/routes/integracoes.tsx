@@ -8,6 +8,7 @@ import {
   Facebook,
   Instagram,
   Loader2,
+  Pencil,
   RefreshCw,
   ShieldCheck,
   Settings2,
@@ -524,6 +525,157 @@ function AccountsColumn({
               >
                 <Trash2 className="size-4" />
               </Button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function formatSync(value?: string | null) {
+  if (!value) return "Sincronização pendente";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Sincronização pendente";
+  return `Sincronizado em ${date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}`;
+}
+
+function YoutubeChannels({
+  accounts,
+  syncing,
+  onPrimary,
+  onRemove,
+  onRename,
+}: {
+  accounts: SocialAccount[];
+  syncing: boolean;
+  onPrimary: (account: SocialAccount) => Promise<void>;
+  onRemove: (account: SocialAccount) => Promise<void>;
+  onRename: (account: SocialAccount, name: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+
+  return (
+    <div className="min-w-0 p-4 sm:p-5">
+      <div className="flex items-start gap-3">
+        <span className="grid size-9 shrink-0 place-items-center border border-primary/35 bg-primary/10 text-primary">
+          <Youtube className="size-4" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="font-display text-base font-semibold">Canais do YouTube</h2>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            {YOUTUBE_PLATFORM.description}
+          </p>
+        </div>
+      </div>
+
+      <ul className="mt-4 space-y-2">
+        {accounts.length === 0 && (
+          <li className="border border-dashed border-border p-4 text-sm text-muted-foreground">
+            Nenhum canal conectado. Use “Conectar YouTube” para autorizar o primeiro canal.
+          </li>
+        )}
+        {accounts.map((account) => {
+          const connected = account.status === "conectado" && account.provider !== "pending";
+          const name = account.display_name || account.username;
+          const isEditing = editing === account.id;
+          return (
+            <li
+              key={account.id}
+              className="flex min-h-16 flex-wrap items-center gap-3 border border-border bg-surface-2 p-3"
+            >
+              {syncing ? (
+                <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
+              ) : connected ? (
+                <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />
+              ) : (
+                <TriangleAlert className="size-4 shrink-0 text-amber-400" />
+              )}
+              <div className="min-w-0 flex-1">
+                {isEditing ? (
+                  <form
+                    className="flex flex-wrap items-center gap-2"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void onRename(account, draft).then(() => setEditing(null));
+                    }}
+                  >
+                    <input
+                      autoFocus
+                      value={draft}
+                      onChange={(event) => setDraft(event.target.value)}
+                      aria-label={`Novo nome para ${name}`}
+                      className="min-w-0 flex-1 border border-border bg-surface px-2 py-1 text-sm outline-none focus:border-primary"
+                    />
+                    <Button type="submit" size="sm" className="min-h-9">
+                      Salvar
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="min-h-9"
+                      onClick={() => setEditing(null)}
+                    >
+                      Cancelar
+                    </Button>
+                  </form>
+                ) : (
+                  <>
+                    <p className="truncate text-sm font-medium">{name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {account.is_primary ? "Canal principal · " : ""}
+                      {syncing
+                        ? "Sincronizando…"
+                        : connected
+                          ? formatSync(account.updated_at ?? account.created_at)
+                          : "Reconexão necessária"}
+                    </p>
+                  </>
+                )}
+              </div>
+              {!isEditing && (
+                <div className="flex items-center">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={!connected || account.is_primary}
+                    onClick={() => void onPrimary(account)}
+                    aria-label={`Definir ${name} como canal principal`}
+                    title={account.is_primary ? "Canal principal" : "Definir como canal principal"}
+                    className={account.is_primary ? "text-amber-400" : "text-muted-foreground"}
+                  >
+                    <Star className={`size-4 ${account.is_primary ? "fill-current" : ""}`} />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setDraft(name);
+                      setEditing(account.id);
+                    }}
+                    aria-label={`Renomear ${name}`}
+                    title="Renomear canal"
+                    className="text-muted-foreground"
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => void onRemove(account)}
+                    aria-label={`Remover ${name}`}
+                    title="Remover canal"
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              )}
             </li>
           );
         })}
