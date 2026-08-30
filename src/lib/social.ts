@@ -29,6 +29,7 @@ export type SocialAccount = {
   status: string;
   is_primary?: boolean;
   created_at: string;
+  updated_at?: string | null;
 };
 
 export type MediaType = "video" | "image";
@@ -72,7 +73,7 @@ export function resolveAccountLinkUi(
 /* ------------------------------- contas -------------------------------- */
 
 export const SOCIAL_ACCOUNT_SELECT =
-  "id,platform,username,display_name,avatar_url,provider,status,provider_account_id,is_primary,created_at";
+  "id,platform,username,display_name,avatar_url,provider,status,provider_account_id,is_primary,created_at,updated_at";
 
 export async function listAccounts(): Promise<SocialAccount[]> {
   const { data, error } = await supabase
@@ -81,6 +82,17 @@ export async function listAccounts(): Promise<SocialAccount[]> {
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data ?? []) as SocialAccount[];
+}
+
+/** Renomeia o apelido local da conta (não altera o nome na plataforma). */
+export async function renameAccount(id: string, displayName: string) {
+  const name = displayName.trim();
+  if (!name) throw new Error("Informe um nome para o canal.");
+  const { error } = await supabase
+    .from("social_accounts")
+    .update({ display_name: name })
+    .eq("id", id);
+  if (error) throw error;
 }
 
 export async function removeAccount(id: string) {
