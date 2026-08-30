@@ -622,12 +622,13 @@ function YoutubeChannels({
           const connected = account.status === "conectado" && account.provider !== "pending";
           const name = account.display_name || account.username;
           const isEditing = editing === account.id;
+          const isRefreshing = refreshing.has(account.id);
           return (
             <li
               key={account.id}
               className="flex min-h-16 flex-wrap items-center gap-3 border border-border bg-surface-2 p-3"
             >
-              {syncing ? (
+              {isRefreshing || syncing ? (
                 <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
               ) : connected ? (
                 <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />
@@ -668,11 +669,13 @@ function YoutubeChannels({
                     <p className="truncate text-sm font-medium">{name}</p>
                     <p className="truncate text-xs text-muted-foreground">
                       {account.is_primary ? "Canal principal · " : ""}
-                      {syncing
-                        ? "Sincronizando…"
-                        : connected
-                          ? formatSync(account.updated_at ?? account.created_at)
-                          : "Reconexão necessária"}
+                      {isRefreshing
+                        ? "Atualizando status…"
+                        : syncing
+                          ? "Sincronizando…"
+                          : connected
+                            ? formatSync(account.updated_at ?? account.created_at)
+                            : "Reconexão necessária"}
                     </p>
                   </>
                 )}
