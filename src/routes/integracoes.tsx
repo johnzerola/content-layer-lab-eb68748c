@@ -78,7 +78,7 @@ const YOUTUBE_PLATFORM = {
   platform: "youtube" as const,
   name: "YouTube",
   description:
-    "Vídeos longos e Shorts com publicação automática via YouTube Data API. A autorização é feita pela sua conta Google.",
+    "Vídeos longos e Shorts via YouTube Data API. Cada canal ou Conta de marca deve ser adicionado separadamente.",
   icon: Youtube,
 };
 
@@ -333,7 +333,7 @@ function IntegrationsPage() {
                 ) : (
                   <Youtube className="size-4" />
                 )}
-                {hasYoutubeAccounts ? "Atualizar YouTube" : "Conectar YouTube"}
+                {hasYoutubeAccounts ? "Adicionar outro canal" : "Conectar YouTube"}
               </Button>
             </div>
           )}
