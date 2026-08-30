@@ -523,7 +523,10 @@ export type FacebookPageDiscovery = {
   pages: FacebookPage[];
   authorizedPageIds: string[];
   unavailablePageIds: string[];
+  /** Mensagens originais da Meta (sem tokens) para diagnosticar falhas de token. */
+  diagnostics: string[];
 };
+
 
 function granularTargetIds(data: Record<string, unknown> | null, prefix: string): string[] {
   const rows = data?.["granular_scopes"];
