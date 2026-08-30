@@ -13,23 +13,36 @@ export async function persistYoutubeAccount(
   input: { userId: string; channel: YoutubeChannel; tokens: YoutubeTokens },
 ): Promise<LinkedSocialAccount> {
   const now = new Date().toISOString();
+  const accountValues = {
+    user_id: input.userId,
+    platform: "youtube",
+    username: input.channel.handle,
+    display_name: input.channel.title,
+    avatar_url: input.channel.avatarUrl,
+    provider: "youtube",
+    provider_account_id: input.channel.channelId,
+    status: "conectado",
+    updated_at: now,
+  };
 
-  const { data: account, error: accountError } = await admin
+  // O ID oficial do canal é imutável. O handle e o título podem mudar, então
+  // não podem decidir se uma nova autorização substitui uma conexão existente.
+  const { data: existing, error: lookupError } = await admin
     .from("social_accounts")
-    .upsert(
-      {
-        user_id: input.userId,
-        platform: "youtube",
-        username: input.channel.handle,
-        display_name: input.channel.title,
-        avatar_url: input.channel.avatarUrl,
-        provider: "youtube",
-        provider_account_id: input.channel.channelId,
-        status: "conectado",
-        updated_at: now,
-      },
-      { onConflict: "user_id,platform,username" },
-    )
+    .select("id")
+    .eq("user_id", input.userId)
+    .eq("platform", "youtube")
+    .eq("provider_account_id", input.channel.channelId)
+    .maybeSingle();
+
+  if (lookupError) {
+    throw new MetaLinkError("DATABASE_ERROR", "Não foi possível localizar o canal do YouTube.");
+  }
+
+  const accountQuery = existing?.id
+    ? admin.from("social_accounts").update(accountValues).eq("id", existing.id)
+    : admin.from("social_accounts").insert(accountValues);
+  const { data: account, error: accountError } = await accountQuery
     .select(ACCOUNT_SELECT)
     .single();
 

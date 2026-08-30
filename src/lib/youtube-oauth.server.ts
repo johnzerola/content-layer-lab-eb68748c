@@ -107,9 +107,10 @@ export function youtubeAuthorizationUrl(
   url.searchParams.set("redirect_uri", configuration.redirectUri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", YOUTUBE_SCOPES.join(" "));
-  // offline = emite refresh_token; consent = garante refresh_token em toda autorização
+  // offline = emite refresh_token. select_account reabre o seletor para que o
+  // usuário possa autorizar outro canal/Brand Account sem substituir o atual.
   url.searchParams.set("access_type", "offline");
-  url.searchParams.set("prompt", "consent");
+  url.searchParams.set("prompt", "select_account consent");
   url.searchParams.set("include_granted_scopes", "true");
   url.searchParams.set("state", createYoutubeOAuthState(userId, environment));
   return url.toString();
@@ -301,5 +302,9 @@ export async function fetchYoutubeChannel(input: {
   accessToken: string;
   fetch?: typeof fetch;
 }): Promise<YoutubeChannel> {
-  return (await fetchYoutubeChannels(input))[0]!;
+  const channel = (await fetchYoutubeChannels(input))[0];
+  if (!channel) {
+    throw new MetaLinkError("META_RESPONSE_INVALID", "O Google não retornou um canal do YouTube.");
+  }
+  return channel;
 }
