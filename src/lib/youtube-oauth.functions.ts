@@ -5,7 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { MetaLinkError, linkingServerRuntimeReady } from "@/lib/social-linking.server";
 import {
   exchangeYoutubeAuthorizationCode,
-  fetchYoutubeChannel,
+  fetchYoutubeChannels,
   youtubeAuthorizationUrl,
   youtubeConfigured,
   verifyYoutubeOAuthState,
@@ -52,14 +52,24 @@ export const completeYoutubeOAuth = createServerFn({ method: "POST" })
       }
       verifyYoutubeOAuthState(data.state, context.userId);
       const tokens = await exchangeYoutubeAuthorizationCode({ code: data.code });
-      const channel = await fetchYoutubeChannel({ accessToken: tokens.accessToken });
+      // Importa todos os canais da conta Google (principal + canais de marca).
+      const channels = await fetchYoutubeChannels({ accessToken: tokens.accessToken });
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const account = await persistYoutubeAccount(supabaseAdmin as never, {
-        userId: context.userId,
-        channel,
-        tokens,
-      });
-      return { ok: true as const, accounts: [account] };
+      const accounts = [];
+      for (const channel of channels) {
+        accounts.push(
+          await persistYoutubeAccount(supabaseAdmin as never, {
+            userId: context.userId,
+            channel,
+            tokens,
+          }),
+        );
+      }
+      return {
+        ok: true as const,
+        accounts,
+        summary: { channels: channels.map((channel) => channel.title) },
+      };
     } catch (error) {
       return oauthError(error);
     }

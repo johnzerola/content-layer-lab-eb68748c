@@ -229,30 +229,11 @@ export type YoutubeChannel = {
   avatarUrl: string | null;
 };
 
-export async function fetchYoutubeChannel(input: {
-  accessToken: string;
-  fetch?: typeof fetch;
-}): Promise<YoutubeChannel> {
-  const url = new URL(`${YOUTUBE_API_BASE}/channels`);
-  url.searchParams.set("part", "snippet");
-  url.searchParams.set("mine", "true");
-  const response = await (input.fetch ?? fetch)(url, {
-    headers: { authorization: `Bearer ${input.accessToken}` },
-  }).catch(() => null);
-  if (!response || response.status >= 500) {
-    throw new MetaLinkError("META_TEMPORARY_ERROR", "O YouTube está temporariamente indisponível.");
-  }
-  const payload = asObject(await response.json().catch(() => null));
-  const items = payload?.["items"];
-  const channel = asObject(Array.isArray(items) ? items[0] : null);
+function parseYoutubeChannel(value: unknown): YoutubeChannel | null {
+  const channel = asObject(value);
   const snippet = asObject(channel?.["snippet"]);
   const channelId = readString(channel, "id");
-  if (!response.ok || !channelId || !snippet) {
-    throw new MetaLinkError(
-      "META_AUTH_INVALID",
-      "Não foi possível ler o canal do YouTube. A conta do Google precisa ter um canal criado.",
-    );
-  }
+  if (!channelId || !snippet) return null;
   const title = readString(snippet, "title") ?? "YouTube";
   const handle = (readString(snippet, "customUrl") ?? title).replace(/^@/, "").slice(0, 60);
   const thumbnails = asObject(snippet["thumbnails"]);
@@ -264,4 +245,61 @@ export async function fetchYoutubeChannel(input: {
     handle: handle || channelId,
     avatarUrl: readString(avatar, "url"),
   };
+}
+
+/**
+ * Lista TODOS os canais da conta Google autorizada (canal principal + canais de
+ * marca / brand accounts). `mine=true` devolve todos; paginamos até o fim.
+ */
+export async function fetchYoutubeChannels(input: {
+  accessToken: string;
+  fetch?: typeof fetch;
+}): Promise<YoutubeChannel[]> {
+  const request = input.fetch ?? fetch;
+  const url = new URL(`${YOUTUBE_API_BASE}/channels`);
+  url.searchParams.set("part", "snippet");
+  url.searchParams.set("mine", "true");
+  url.searchParams.set("maxResults", "50");
+  const channels = new Map<string, YoutubeChannel>();
+  const seenTokens = new Set<string>();
+  for (let pageNumber = 0; pageNumber < 20; pageNumber += 1) {
+    const response = await request(url, {
+      headers: { authorization: `Bearer ${input.accessToken}` },
+    }).catch(() => null);
+    if (!response || response.status >= 500) {
+      throw new MetaLinkError("META_TEMPORARY_ERROR", "O YouTube está temporariamente indisponível.");
+    }
+    const payload = asObject(await response.json().catch(() => null));
+    const items = payload?.["items"];
+    if (!response.ok || !Array.isArray(items)) {
+      throw new MetaLinkError(
+        "META_AUTH_INVALID",
+        "Não foi possível ler os canais do YouTube. A conta do Google precisa ter um canal criado.",
+      );
+    }
+    for (const item of items) {
+      const channel = parseYoutubeChannel(item);
+      if (channel) channels.set(channel.channelId, channel);
+    }
+    const nextToken = readString(payload, "nextPageToken");
+    if (!nextToken || seenTokens.has(nextToken)) break;
+    seenTokens.add(nextToken);
+    url.searchParams.set("pageToken", nextToken);
+  }
+  const list = [...channels.values()];
+  if (list.length === 0) {
+    throw new MetaLinkError(
+      "META_AUTH_INVALID",
+      "Não foi possível ler os canais do YouTube. A conta do Google precisa ter um canal criado.",
+    );
+  }
+  return list;
+}
+
+/** @deprecated use fetchYoutubeChannels — mantido por compatibilidade. */
+export async function fetchYoutubeChannel(input: {
+  accessToken: string;
+  fetch?: typeof fetch;
+}): Promise<YoutubeChannel> {
+  return (await fetchYoutubeChannels(input))[0]!;
 }
