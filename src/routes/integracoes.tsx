@@ -275,6 +275,30 @@ function IntegrationsPage() {
     }
   }, [reload, syncYoutube]);
 
+  const refreshYoutubeAccount = useCallback(
+    async (account: SocialAccount) => {
+      setRefreshingYoutube((prev) => new Set(prev).add(account.id));
+      try {
+        const response = await refreshChannel({ data: { accountId: account.id } });
+        if (!response.ok) {
+          toast.error(response.error);
+          return;
+        }
+        toast.success(`Canal ${response.account.display_name ?? response.account.username} atualizado.`);
+        reload();
+      } catch {
+        toast.error("Não foi possível atualizar o canal do YouTube.");
+      } finally {
+        setRefreshingYoutube((prev) => {
+          const next = new Set(prev);
+          next.delete(account.id);
+          return next;
+        });
+      }
+    },
+    [refreshChannel, reload],
+  );
+
   const facebookAccounts = accounts.filter((account) => account.platform === "facebook");
   const instagramAccounts = accounts.filter((account) => account.platform === "instagram");
   const youtubeAccounts = accounts.filter((account) => account.platform === "youtube");
