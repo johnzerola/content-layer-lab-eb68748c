@@ -2,6 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { currentUser } from "@/lib/cloud";
 import type { LinkAccountResult } from "@/lib/social-linking.server";
+import { disconnectSocialAccount } from "@/lib/social.functions";
 import {
   summarizeIssues,
   validateMediaForPlatform,
@@ -97,7 +98,6 @@ export async function renameAccount(id: string, displayName: string) {
 
 export async function removeAccount(id: string) {
   // A tabela de conexões é server-only; a remoção acontece no servidor com service role.
-  const { disconnectSocialAccount } = await import("@/lib/social.functions");
   const result = await disconnectSocialAccount({ data: { accountId: id } });
   if (!result.ok) throw new Error(result.error);
 }
