@@ -87,7 +87,8 @@ function FacebookOAuthCallback() {
         }
         const facebook = response.summary.facebook;
         const instagram = response.summary.instagram;
-        const unavailable = response.summary.unavailablePageIds.length;
+        const unavailablePages = response.summary.unavailablePages ?? [];
+        const unavailable = unavailablePages.length;
         const discovered = response.candidates;
         setSelected(discovered.map((account) => account.key));
         setResult({
@@ -96,10 +97,11 @@ function FacebookOAuthCallback() {
           instagram,
           discovered,
           selectionToken: response.selectionToken,
+          unavailablePages,
           message: `${facebook.length} Página(s) e ${instagram.length} Instagram encontrado(s). Revise e salve os canais que devem aparecer no VaiViral.`,
           warning:
             unavailable > 0
-              ? `${unavailable} Página(s) selecionada(s) não liberaram token de publicação. Verifique o controle total dessas Páginas.`
+              ? `${unavailable} página(s) foram selecionadas no consentimento do Facebook, mas a Meta não liberou o token de publicação. Isso acontece quando você não é administrador da página, o app não foi adicionado às configurações avançadas da página, ou a página está em um Business Manager onde você não tem controle total. Veja abaixo como resolver.`
               : null,
         });
       })
