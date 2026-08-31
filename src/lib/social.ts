@@ -96,10 +96,10 @@ export async function renameAccount(id: string, displayName: string) {
 }
 
 export async function removeAccount(id: string) {
-  // Remove a conexão antes da conta para não esbarrar na chave estrangeira.
-  await supabase.from("social_connections").delete().eq("social_account_id", id);
-  const { error } = await supabase.from("social_accounts").delete().eq("id", id);
-  if (error) throw error;
+  // A tabela de conexões é server-only; a remoção acontece no servidor com service role.
+  const { disconnectSocialAccount } = await import("@/lib/social.functions");
+  const result = await disconnectSocialAccount({ data: { accountId: id } });
+  if (!result.ok) throw new Error(result.error);
 }
 
 /* ---------------------------- mídia no storage --------------------------- */
