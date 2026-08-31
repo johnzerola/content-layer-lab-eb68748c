@@ -73,6 +73,7 @@ export const publishPostNow = createServerFn({ method: "POST" })
           lock_id: null,
           locked_at: null,
           next_attempt_at: null,
+          provider_container_id: null,
         })
         .eq("id", post.id);
       return { ok: true, permalink: result.permalink ?? null, providerPostId: result.providerPostId ?? null };
@@ -86,6 +87,7 @@ export const publishPostNow = createServerFn({ method: "POST" })
         error_code: result.code,
         lock_id: null,
         locked_at: null,
+        provider_container_id: result.pendingContainerId ?? null,
       })
       .eq("id", post.id);
     return { ok: false, error: result.error, code: result.code };

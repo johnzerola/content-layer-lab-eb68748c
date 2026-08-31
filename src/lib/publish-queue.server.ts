@@ -46,6 +46,7 @@ export type PostUpdate = {
   lock_id?: string | null;
   locked_at?: string | null;
   next_attempt_at?: string | null;
+  provider_container_id?: string | null;
 };
 
 export type QueueDependencies = {
@@ -53,6 +54,8 @@ export type QueueDependencies = {
   loadAccount: (accountId: string) => Promise<PublishingAccount | null>;
   loadConnection: (accountId: string, userId: string) => Promise<PublishingConnection | null>;
   loadProviderAccessToken?: (connection: PublishingConnection) => Promise<string | null>;
+  /** Container Meta pendente de uma tentativa anterior, para não reenviar o vídeo. */
+  loadPendingContainerId?: (postId: string) => Promise<string | null>;
   createSignedUrl: (videoPath: string, expiresInSeconds: number) => Promise<string>;
   removeStorageObject?: (videoPath: string) => Promise<void>;
   publish: (input: PublishInput) => Promise<PublishResult>;
@@ -119,6 +122,10 @@ export async function publishClaimedPost(post: ClaimedPost, deps: QueueDependenc
     return failure("MEDIA_NOT_FOUND", "O agendamento não possui um vídeo.");
   }
 
+  const pendingContainerId = deps.loadPendingContainerId
+    ? await deps.loadPendingContainerId(post.id)
+    : null;
+
   return deps.publish({
     accountId: account.id,
     kind: post.kind as PostKind,
@@ -131,6 +138,7 @@ export async function publishClaimedPost(post: ClaimedPost, deps: QueueDependenc
     providerAccountId: connection?.provider_account_id ?? account.provider_account_id,
     ...(providerAccessToken ? { providerAccessToken } : {}),
     idempotencyKey: post.id,
+    ...(pendingContainerId ? { pendingContainerId } : {}),
   });
 }
 
@@ -172,6 +180,7 @@ export async function runPublishQueue(
         lock_id: null,
         locked_at: null,
         next_attempt_at: null,
+        provider_container_id: null,
       });
       summary.published++;
     } else {
@@ -185,6 +194,7 @@ export async function runPublishQueue(
           : null,
         lock_id: null,
         locked_at: null,
+        provider_container_id: shouldRetry ? (result.pendingContainerId ?? null) : null,
       });
       if (shouldRetry) summary.retrying++;
       else summary.failed++;
