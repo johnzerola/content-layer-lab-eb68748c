@@ -43,6 +43,7 @@ import {
 } from "@/lib/social";
 
 import { beginInstagramOAuth } from "@/lib/meta-oauth.functions";
+import { publishPostNow } from "@/lib/publish.functions";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 
 export const Route = createFileRoute("/agenda")({
