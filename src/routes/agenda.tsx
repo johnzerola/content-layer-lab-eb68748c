@@ -510,6 +510,20 @@ function AgendaPage() {
                             </span>
                           </div>
                           <div className="mt-3 flex justify-end gap-2 border-t border-border/50 pt-2">
+                            {(p.status === "falhou" || p.status === "agendado") && (
+                              <button
+                                disabled={publishingId === p.id}
+                                onClick={() => void onPublishNow(p.id)}
+                                className="flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary hover:bg-primary/20 disabled:opacity-60"
+                              >
+                                {publishingId === p.id ? (
+                                  <Loader2 className="size-3 animate-spin" />
+                                ) : (
+                                  <UploadCloud className="size-3" />
+                                )}
+                                {publishingId === p.id ? "Publicando…" : "Publicar agora"}
+                              </button>
+                            )}
                             {p.status === "falhou" && (
                               <button
                                 onClick={async () => {
@@ -520,32 +534,17 @@ function AgendaPage() {
                                     );
                                     toast.success("Publicação reenviada para a fila.");
                                     await refresh();
-                                  } catch (e) {
+                                  } catch {
                                     toast.error("Falha ao re-agendar.");
                                   }
                                 }}
-                                className="flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary hover:bg-primary/20"
+                                className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground transition hover:text-foreground"
                               >
-                                Tentar agora
+                                re-agendar
                               </button>
                             )}
                             {p.status === "agendado" && (
                               <>
-                                <button
-                                  onClick={async () => {
-                                    try {
-                                      // Para publicação imediata, agendamos para o passado
-                                      await reschedulePost(p.id, new Date(Date.now() - 60000));
-                                      toast.success("Enviando para publicação imediata...");
-                                      await refresh();
-                                    } catch (e) {
-                                      toast.error("Falha ao forçar publicação.");
-                                    }
-                                  }}
-                                  className="flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary hover:bg-primary/20"
-                                >
-                                  Tentar agora
-                                </button>
                                 <button
                                   onClick={async () => {
                                     await cancelPost(p.id);
