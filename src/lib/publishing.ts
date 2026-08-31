@@ -47,9 +47,9 @@ export const PLATFORM_CAPABILITIES: Record<SocialPlatform, PlatformCapabilities>
     canRefreshToken: false,
   },
   youtube: {
-    canPublishReels: false,
+    canPublishReels: true,
     canPublishStories: false,
-    canPublishFeed: false,
+    canPublishFeed: true,
     canPublishShorts: true,
     canRefreshToken: true,
   },
@@ -58,6 +58,7 @@ export const PLATFORM_CAPABILITIES: Record<SocialPlatform, PlatformCapabilities>
 export function canPublish(platform: string, kind: PostKind): boolean {
   const capabilities = PLATFORM_CAPABILITIES[platform as SocialPlatform];
   if (!capabilities) return false;
+  if (kind === "shorts") return capabilities.canPublishShorts;
   if (kind === "reels") return capabilities.canPublishReels;
   if (kind === "stories") return capabilities.canPublishStories;
   return capabilities.canPublishFeed;
