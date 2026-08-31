@@ -203,6 +203,25 @@ function AgendaPage() {
     }
   }
 
+  async function onPublishNow(postId: string) {
+    setPublishingId(postId);
+    try {
+      const result = await runPublishNow({ data: { postId } });
+      if (result.ok) {
+        toast.success(
+          result.permalink ? `Publicado: ${result.permalink}` : "Publicado com sucesso.",
+        );
+      } else {
+        toast.error(result.error);
+      }
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao publicar agora.");
+    } finally {
+      setPublishingId(null);
+    }
+  }
+
   async function onSchedule() {
     if (!file) {
       toast.error("Escolha o vídeo que será publicado.");
