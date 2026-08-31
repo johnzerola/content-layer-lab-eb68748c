@@ -281,3 +281,56 @@ describe("Meta Instagram Login publisher", () => {
     });
   });
 });
+
+describe("Instagram via Página conectada (Page Access Token)", () => {
+  it("publica Reels pelo graph.facebook.com usando o token salvo", async () => {
+    delete process.env["META_ACCESS_TOKEN"];
+    delete process.env["META_IG_USER_ID"];
+    process.env["META_GRAPH_VERSION"] = "v26.0";
+    vi.spyOn(globalThis, "setTimeout").mockImplementation((callback) => {
+      if (typeof callback === "function") callback();
+      return 0 as unknown as ReturnType<typeof setTimeout>;
+    });
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse(200, { id: "c1" }))
+      .mockResolvedValueOnce(jsonResponse(200, { status_code: "FINISHED" }))
+      .mockResolvedValueOnce(jsonResponse(200, { id: "m1" }))
+      .mockResolvedValueOnce(jsonResponse(200, { permalink: "https://www.instagram.com/reel/x/" }));
+
+    const result = await publish({ ...metaInput, providerAccessToken: "page-token" });
+
+    expect(result).toEqual({ ok: true, providerPostId: "m1", permalink: "https://www.instagram.com/reel/x/" });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      "https://graph.facebook.com/v26.0/instagram-user-id/media?access_token=page-token",
+    );
+  });
+
+  it("envia Stories sem legenda usando o token da Página", async () => {
+    delete process.env["META_ACCESS_TOKEN"];
+    delete process.env["META_IG_USER_ID"];
+    vi.spyOn(globalThis, "setTimeout").mockImplementation((callback) => {
+      if (typeof callback === "function") callback();
+      return 0 as unknown as ReturnType<typeof setTimeout>;
+    });
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse(200, { id: "c2" }))
+      .mockResolvedValueOnce(jsonResponse(200, { status_code: "FINISHED" }))
+      .mockResolvedValueOnce(jsonResponse(200, { id: "m2" }))
+      .mockResolvedValueOnce(jsonResponse(200, {}));
+
+    const result = await publish({
+      ...metaInput,
+      kind: "stories",
+      caption: "nao deve ir",
+      providerAccessToken: "page-token",
+    });
+
+    expect(result).toEqual({ ok: true, providerPostId: "m2" });
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+      media_type: "STORIES",
+      video_url: metaInput.videoUrl,
+    });
+  });
+});
