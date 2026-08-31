@@ -22,11 +22,30 @@ import { MetaLinkError, linkingServerRuntimeReady } from "@/lib/social-linking.s
 
 export const beginFacebookOAuth = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .validator((data: unknown) =>
+    z
+      .object({
+        forceClassic: z.boolean().optional(),
+      })
+      .optional()
+      .parse(data) ?? {},
+  )
+  .handler(async ({ data, context }) => {
     try {
-      const diagnostics = diagnoseFacebookOAuth();
-      const authorizationUrl = facebookAuthorizationUrl(context.userId);
+      const forceClassic = data.forceClassic === true;
+      const configuredDiagnostics = diagnoseFacebookOAuth();
+      const authorizationUrl = facebookAuthorizationUrl(context.userId, process.env, {
+        forceClassic,
+      });
       const parsedUrl = new URL(authorizationUrl);
+      const diagnostics = forceClassic
+        ? ({
+            ...configuredDiagnostics,
+            mode: "classic",
+            usesConfigId: false,
+            requestedScopes: parsedUrl.searchParams.get("scope")?.split(",").filter(Boolean) ?? [],
+          } as const)
+        : configuredDiagnostics;
       if (
         diagnostics.mode === "classic" &&
         parsedUrl.searchParams.get("scope") !== diagnostics.requestedScopes.join(",")
@@ -40,6 +59,7 @@ export const beginFacebookOAuth = createServerFn({ method: "POST" })
         ok: true as const,
         authorizationUrl,
         diagnostics,
+        fallbackUsed: forceClassic,
       };
     } catch (error) {
       if (error instanceof MetaLinkError) {

@@ -177,7 +177,7 @@ function IntegrationsPage() {
         }
         // O mesmo Facebook Login autoriza a Página e a conta Instagram
         // profissional vinculada a ela.
-        const response = await startFacebook();
+        const response = await startFacebook({ data: { forceClassic: true } });
 
         if (!response.ok) {
           toast.error(response.error);

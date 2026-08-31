@@ -41,6 +41,24 @@ describe("Facebook Login", () => {
     expect(url.toString()).not.toContain("server-only-secret");
   });
 
+  it("can force the classic rerequest flow when business login blocks another profile", () => {
+    const url = new URL(
+      facebookAuthorizationUrl("user-123", businessEnvironment, { forceClassic: true }),
+    );
+    expect(url.origin + url.pathname).toBe("https://www.facebook.com/v26.0/dialog/oauth");
+    expect(url.searchParams.has("config_id")).toBe(false);
+    expect(url.searchParams.has("override_default_response_type")).toBe(false);
+    expect(url.searchParams.get("auth_type")).toBe("rerequest");
+    expect(url.searchParams.get("scope")?.split(",")).toEqual([
+      "pages_show_list",
+      "pages_read_engagement",
+      "business_management",
+      "pages_manage_posts",
+      "instagram_basic",
+      "instagram_content_publish",
+    ]);
+  });
+
   it("keeps every required scope even when an environment override is incomplete", () => {
     const url = new URL(
       facebookAuthorizationUrl("user-123", {
