@@ -65,9 +65,9 @@ export async function createPublishDependencies(): Promise<QueueDependencies> {
         const { decryptSocialToken } = await import("@/lib/social-credentials.server");
         const { refreshYoutubeAccessToken } = await import("@/lib/youtube-oauth.server");
         try {
-          const refreshToken = await decryptSocialToken(data.refresh_token_ciphertext);
-          const refreshed = await refreshYoutubeAccessToken(refreshToken);
-          return refreshed?.accessToken ?? null;
+          const refreshToken = decryptSocialToken(data.refresh_token_ciphertext);
+          const refreshed = await refreshYoutubeAccessToken({ refreshToken });
+          return refreshed.accessToken ?? null;
         } catch {
           return null;
         }
