@@ -95,6 +95,15 @@ export async function createPublishDependencies(): Promise<QueueDependencies> {
         },
       });
     },
+    loadPendingContainerId: async (postId) => {
+      const { data, error } = await supabaseAdmin
+        .from("scheduled_posts")
+        .select("provider_container_id")
+        .eq("id", postId)
+        .maybeSingle();
+      if (error) return null;
+      return (data as { provider_container_id?: string | null } | null)?.provider_container_id ?? null;
+    },
     createSignedUrl: async (videoPath, expiresInSeconds) => {
       const { data, error } = await supabaseAdmin.storage
         .from("posts")
