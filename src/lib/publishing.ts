@@ -1,4 +1,4 @@
-export type PostKind = "reels" | "feed" | "stories";
+export type PostKind = "reels" | "feed" | "stories" | "shorts";
 export type SocialPlatform = "instagram" | "facebook" | "tiktok" | "youtube";
 export type SocialProvider = "ayrshare" | "meta" | "tiktok" | "youtube" | "pending";
 
