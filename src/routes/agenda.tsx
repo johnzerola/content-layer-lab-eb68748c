@@ -364,6 +364,17 @@ function AgendaPage() {
                   />
                 </label>
 
+                {previewUrl && (
+                  <div className="mt-3 overflow-hidden rounded-xl border border-border bg-black">
+                    <video
+                      src={previewUrl}
+                      controls
+                      playsInline
+                      className="mx-auto max-h-64 w-full object-contain"
+                    />
+                  </div>
+                )}
+
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <label className="flex flex-col gap-1.5">
                     <span className="mono-label">Conta</span>
