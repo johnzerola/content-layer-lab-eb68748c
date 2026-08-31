@@ -191,24 +191,28 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
   try {
     const isImage = input.mediaType === "image";
     const mediaType = input.kind === "stories" ? "STORIES" : isImage ? undefined : "REELS";
-    const create = await fetch(withToken(`${accountBase}/media`), {
-      method: "POST",
-      headers: { "content-type": "application/json", ...authorization },
-      body: JSON.stringify({
-        ...(mediaType ? { media_type: mediaType } : {}),
-        ...(isImage ? { image_url: input.videoUrl } : { video_url: input.videoUrl }),
-        caption: input.kind === "stories" ? undefined : input.caption,
-      }),
-    });
-    const created: unknown = await create.json().catch(() => null);
-    const creationId = nestedString(created, ["id"]);
-    if (!create.ok || !creationId) {
-      const errorMsg = nestedString(created, ["error", "message"]) || "erro desconhecido";
-      return providerFailure("Meta criar container", create.status, { detail: errorMsg });
+    let creationId = input.pendingContainerId ?? undefined;
+
+    if (!creationId) {
+      const create = await fetch(withToken(`${accountBase}/media`), {
+        method: "POST",
+        headers: { "content-type": "application/json", ...authorization },
+        body: JSON.stringify({
+          ...(mediaType ? { media_type: mediaType } : {}),
+          ...(isImage ? { image_url: input.videoUrl } : { video_url: input.videoUrl }),
+          caption: input.kind === "stories" ? undefined : input.caption,
+        }),
+      });
+      const created: unknown = await create.json().catch(() => null);
+      creationId = nestedString(created, ["id"]);
+      if (!create.ok || !creationId) {
+        const errorMsg = nestedString(created, ["error", "message"]) || "erro desconhecido";
+        return providerFailure("Meta criar container", create.status, { detail: errorMsg });
+      }
     }
 
     let finished = isImage;
-    for (let i = 0; !finished && i < 20; i++) {
+    for (let i = 0; !finished && i < 40; i++) {
       await new Promise((resolve) => setTimeout(resolve, 3000));
       const statusResponse = await fetch(withToken(`${graphBase}/${creationId}?fields=status_code`), {
         headers: authorization,
@@ -240,8 +244,10 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
         code: "PROVIDER_TEMPORARY_ERROR",
         retryable: true,
         error: "Meta ainda esta processando o video.",
+        pendingContainerId: creationId,
       };
     }
+
 
     const publishResponse = await fetch(withToken(`${accountBase}/media_publish`), {
       method: "POST",
