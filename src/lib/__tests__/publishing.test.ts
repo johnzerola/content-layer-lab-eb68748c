@@ -130,17 +130,24 @@ describe("Meta Instagram Login publisher", () => {
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(jsonResponse(200, { id: "container-id" }))
       .mockResolvedValueOnce(jsonResponse(200, { status_code: "FINISHED" }))
-      .mockResolvedValueOnce(jsonResponse(200, { id: "published-id" }));
+      .mockResolvedValueOnce(jsonResponse(200, { id: "published-id" }))
+      .mockResolvedValueOnce(jsonResponse(200, { permalink: "https://www.instagram.com/reel/abc/" }));
 
-    await expect(publish(metaInput)).resolves.toEqual({ ok: true, providerPostId: "published-id" });
+    await expect(publish(metaInput)).resolves.toEqual({
+      ok: true,
+      providerPostId: "published-id",
+      permalink: "https://www.instagram.com/reel/abc/",
+    });
 
     const requests = fetchMock.mock.calls;
     expect(requests.map(([url]) => String(url))).toEqual([
       "https://graph.instagram.com/v25.0/instagram-user-id/media",
       "https://graph.instagram.com/v25.0/container-id?fields=status_code",
       "https://graph.instagram.com/v25.0/instagram-user-id/media_publish",
+      "https://graph.instagram.com/v25.0/published-id?fields=permalink",
     ]);
     expectBearer(requests);
+
 
     const createBody = JSON.parse(String(requests[0]?.[1]?.body));
     expect(createBody).toEqual({
