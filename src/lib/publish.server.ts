@@ -1,5 +1,6 @@
 import type { PostKind, PublishErrorCode, SocialProvider } from "@/lib/publishing";
 import { facebookGraphBase, globalMetaCredentials, metaGraphBase } from "@/lib/meta.server";
+import { uploadYoutubeVideo, youtubeTitleFromCaption } from "@/lib/youtube-upload.server";
 
 export type PublishInput = {
   kind: PostKind;
@@ -55,7 +56,8 @@ function providerFailure(provider: string, status: number, payload: unknown): Pu
 export function activeProvider(requested?: SocialProvider): "ayrshare" | "meta" | "youtube" | "tiktok" | null {
   if (requested === "ayrshare") return process.env["AYRSHARE_API_KEY"] ? "ayrshare" : null;
   if (requested === "meta") return process.env["META_ACCESS_TOKEN"] && process.env["META_IG_USER_ID"] ? "meta" : null;
-  if (requested === "youtube" || requested === "tiktok") return null;
+  if (requested === "youtube") return null;
+  if (requested === "tiktok") return null;
   
   if (requested && requested !== "pending") return null;
   
@@ -73,6 +75,18 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
       retryable: false,
       error: `Publicacao para ${input.platform} ainda nao esta disponivel.`,
     };
+  }
+
+  if (input.platform === "youtube") {
+    if (!input.providerAccessToken || !input.providerAccountId) {
+      return {
+        ok: false,
+        code: "ACCOUNT_NOT_CONNECTED",
+        retryable: false,
+        error: "O canal do YouTube não possui credencial conectada. Reconecte o canal.",
+      };
+    }
+    return publishYoutube(input);
   }
 
   const provider = input.provider === "meta" && input.providerAccessToken
@@ -322,4 +336,46 @@ async function publishFacebookPage(input: PublishInput): Promise<PublishResult> 
       error: error instanceof Error ? error.message : "Facebook indisponivel.",
     };
   }
+}
+
+/** Publica no canal do YouTube usando upload resumável (Shorts ou vídeo longo). */
+async function publishYoutube(input: PublishInput): Promise<PublishResult> {
+  if (input.mediaType === "image") {
+    return {
+      ok: false,
+      code: "CAPABILITY_UNAVAILABLE",
+      retryable: false,
+      error: "O YouTube aceita apenas vídeos.",
+    };
+  }
+
+  const isShort = input.kind === "shorts" || input.kind === "reels";
+  const title = youtubeTitleFromCaption(input.caption);
+  const description = isShort && !/#shorts/i.test(input.caption)
+    ? `${input.caption}\n\n#Shorts`.trim()
+    : input.caption;
+
+  const result = await uploadYoutubeVideo({
+    accessToken: input.providerAccessToken!,
+    videoUrl: input.videoUrl,
+    title: isShort && !/#shorts/i.test(title) ? `${title} #Shorts`.slice(0, 100) : title,
+    description,
+  });
+
+  if (result.ok) {
+    return { ok: true, providerPostId: result.videoId, permalink: result.permalink };
+  }
+
+  if (result.status === 401 || result.status === 403) {
+    return { ok: false, code: "AUTH_INVALID", retryable: false, error: `YouTube: ${result.error}` };
+  }
+  if (result.status === 429) {
+    return { ok: false, code: "PROVIDER_RATE_LIMIT", retryable: true, error: `YouTube: ${result.error}` };
+  }
+  return {
+    ok: false,
+    code: result.retryable ? "PROVIDER_TEMPORARY_ERROR" : "PROVIDER_PERMANENT_ERROR",
+    retryable: result.retryable,
+    error: `YouTube: ${result.error}`,
+  };
 }
