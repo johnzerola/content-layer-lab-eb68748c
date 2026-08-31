@@ -20,6 +20,7 @@ const FACEBOOK_PAGE_FIELDS_FALLBACK =
 export const FACEBOOK_SCOPES = [
   "pages_show_list",
   "pages_read_engagement",
+  "business_management",
   "pages_manage_posts",
   "instagram_basic",
   "instagram_content_publish",
@@ -530,6 +531,27 @@ export type FacebookPageDiscovery = {
   /** Mensagens originais da Meta (sem tokens) para diagnosticar falhas de token. */
   diagnostics: string[];
 };
+
+export function assertCompleteFacebookPageDiscovery(
+  authorization: FacebookTokenAuthorization,
+  discovery: FacebookPageDiscovery,
+): void {
+  if (discovery.unavailablePageIds.length > 0) {
+    throw new MetaLinkError(
+      "META_ACCOUNT_MISMATCH",
+      `A Meta confirmou ${authorization.authorizedPageIds.length} PÃ¡gina(s), mas nÃ£o liberou token de publicaÃ§Ã£o para ${discovery.unavailablePageIds.length}. Clique em Reconectar conta, entre em Editar configuraÃ§Ãµes no Facebook e marque todas as PÃ¡ginas e Instagrams desejados.`,
+    );
+  }
+  if (
+    authorization.authorizedPageIds.length > 0 &&
+    discovery.pages.length < authorization.authorizedPageIds.length
+  ) {
+    throw new MetaLinkError(
+      "META_ACCOUNT_MISMATCH",
+      `AutorizaÃ§Ã£o parcial: a Meta confirmou ${authorization.authorizedPageIds.length} PÃ¡gina(s), mas retornou apenas ${discovery.pages.length} com Page Access Token. Reconecte e aprove todas as PÃ¡ginas na tela de permissÃµes.`,
+    );
+  }
+}
 
 function granularTargetIds(data: Record<string, unknown> | null, prefix: string): string[] {
   const rows = data?.["granular_scopes"];

@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, Loader2, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
-import { completeYoutubeOAuth } from "@/lib/youtube-oauth.functions";
+import { beginYoutubeOAuth, completeYoutubeOAuth } from "@/lib/youtube-oauth.functions";
 
 const callbackSearch = z.object({
   code: z.coerce.string().optional(),
@@ -32,9 +32,11 @@ export const Route = createFileRoute("/integracoes_/youtube/callback")({
 
 function YoutubeOAuthCallback() {
   const search = Route.useSearch();
+  const startOAuth = useServerFn(beginYoutubeOAuth);
   const completeOAuth = useServerFn(completeYoutubeOAuth);
   const started = useRef(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [reconnecting, setReconnecting] = useState(false);
 
   useEffect(() => {
     if (started.current) return;
@@ -67,6 +69,22 @@ function YoutubeOAuthCallback() {
       .catch(() => setResult({ ok: false, message: "Não foi possível concluir a conexão." }));
   }, [completeOAuth, search.code, search.error, search.error_description, search.state]);
 
+  const reconnect = async () => {
+    setReconnecting(true);
+    try {
+      const response = await startOAuth();
+      if (!response.ok) {
+        setResult({ ok: false, message: response.error });
+        return;
+      }
+      window.location.href = response.authorizationUrl;
+    } catch {
+      setResult({ ok: false, message: "NÃ£o foi possÃ­vel reiniciar a autorizaÃ§Ã£o." });
+    } finally {
+      setReconnecting(false);
+    }
+  };
+
   return (
     <main className="grid min-h-dvh place-items-center bg-background p-4">
       <section className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 text-center">
@@ -92,6 +110,15 @@ function YoutubeOAuthCallback() {
             >
               Voltar para Minhas contas
             </Link>
+            <button
+              type="button"
+              onClick={() => void reconnect()}
+              disabled={reconnecting}
+              className="ml-2 mt-5 inline-flex min-h-10 items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-medium text-foreground disabled:opacity-60"
+            >
+              {reconnecting && <Loader2 className="size-4 animate-spin" />}
+              {result.ok ? "Adicionar outro canal" : "Reconectar conta"}
+            </button>
           </>
         )}
       </section>

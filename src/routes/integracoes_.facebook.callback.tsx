@@ -3,7 +3,11 @@ import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, Facebook, Instagram, Loader2, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { facebookCallbackSearch } from "@/lib/facebook-callback";
-import { applyMetaAccountSelection, completeFacebookOAuth } from "@/lib/facebook-oauth.functions";
+import {
+  applyMetaAccountSelection,
+  beginFacebookOAuth,
+  completeFacebookOAuth,
+} from "@/lib/facebook-oauth.functions";
 
 export const Route = createFileRoute("/integracoes_/facebook/callback")({
   validateSearch: facebookCallbackSearch,
@@ -37,10 +41,12 @@ type CallbackResult = {
 
 function FacebookOAuthCallback() {
   const search = Route.useSearch();
+  const startOAuth = useServerFn(beginFacebookOAuth);
   const completeOAuth = useServerFn(completeFacebookOAuth);
   const applySelection = useServerFn(applyMetaAccountSelection);
   const [selected, setSelected] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const started = useRef(false);
   const [result, setResult] = useState<CallbackResult | null>(null);
@@ -131,6 +137,28 @@ function FacebookOAuthCallback() {
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const reconnect = async () => {
+    setReconnecting(true);
+    try {
+      const response = await startOAuth();
+      if (!response.ok) {
+        setResult((current) =>
+          current ? { ...current, warning: response.error } : { ok: false, message: response.error },
+        );
+        return;
+      }
+      window.location.href = response.authorizationUrl;
+    } catch {
+      setResult((current) =>
+        current
+          ? { ...current, warning: "NÃ£o foi possÃ­vel reiniciar a autorizaÃ§Ã£o." }
+          : { ok: false, message: "NÃ£o foi possÃ­vel reiniciar a autorizaÃ§Ã£o." },
+      );
+    } finally {
+      setReconnecting(false);
     }
   };
 
@@ -242,6 +270,17 @@ function FacebookOAuthCallback() {
             >
               {result.ok ? "Ver contas conectadas" : "Voltar e tentar novamente"}
             </Link>
+            {!confirmed && (
+              <button
+                type="button"
+                onClick={() => void reconnect()}
+                disabled={reconnecting}
+                className="ml-2 mt-5 inline-flex min-h-10 items-center gap-2 border border-border px-4 py-2 text-sm font-medium text-foreground disabled:opacity-60"
+              >
+                {reconnecting && <Loader2 className="size-4 animate-spin" />}
+                Reconectar conta
+              </button>
+            )}
             {confirmed && (
               <p className="mt-3 text-xs text-muted-foreground">
                 Seleção salva. Voltando para Minhas contas...

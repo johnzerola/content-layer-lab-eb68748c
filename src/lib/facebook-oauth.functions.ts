@@ -3,6 +3,7 @@ import { z } from "zod";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
+  assertCompleteFacebookPageDiscovery,
   diagnoseFacebookOAuth,
   exchangeFacebookAuthorizationCode,
   facebookAuthorizationUrl,
@@ -73,6 +74,7 @@ export const completeFacebookOAuth = createServerFn({ method: "POST" })
         accessToken: token.accessToken,
         authorizedPageIds: authorization.authorizedPageIds,
       });
+      assertCompleteFacebookPageDiscovery(authorization, discovery);
       if (discovery.pages.length === 0) {
         const selectedDetail =
           authorization.authorizedPageIds.length > 0

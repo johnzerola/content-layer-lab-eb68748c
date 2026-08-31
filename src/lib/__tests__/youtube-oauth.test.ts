@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { fetchYoutubeChannels, youtubeAuthorizationUrl } from "@/lib/youtube-oauth.server";
+import {
+  exchangeYoutubeAuthorizationCode,
+  fetchYoutubeChannels,
+  youtubeAuthorizationUrl,
+} from "@/lib/youtube-oauth.server";
 
 const environment = {
   YOUTUBE_CLIENT_ID: "google-client-id",
@@ -12,8 +16,57 @@ describe("YouTube OAuth multi-channel flow", () => {
     const url = new URL(youtubeAuthorizationUrl("user-1", environment));
     expect(url.searchParams.get("prompt")).toBe("consent select_account");
     expect(url.searchParams.get("access_type")).toBe("offline");
+    expect(url.searchParams.get("scope")?.split(" ")).toEqual([
+      "https://www.googleapis.com/auth/youtube.upload",
+      "https://www.googleapis.com/auth/youtube.readonly",
+      "https://www.googleapis.com/auth/youtube",
+    ]);
     expect(url.searchParams.has("include_granted_scopes")).toBe(false);
     expect(url.toString()).not.toContain("server-only-secret");
+  });
+
+  it("rejects the authorization if Google omits a required YouTube scope", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          access_token: "access-token",
+          refresh_token: "refresh-token",
+          expires_in: 3600,
+          scope: "https://www.googleapis.com/auth/youtube.readonly",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    await expect(
+      exchangeYoutubeAuthorizationCode({
+        code: "code",
+        environment,
+        fetch: request,
+      }),
+    ).rejects.toThrow("youtube.upload");
+  });
+
+  it("accepts Google's broad YouTube scope as full channel access", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          access_token: "access-token",
+          refresh_token: "refresh-token",
+          expires_in: 3600,
+          scope: "https://www.googleapis.com/auth/youtube",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    await expect(
+      exchangeYoutubeAuthorizationCode({
+        code: "code",
+        environment,
+        fetch: request,
+      }),
+    ).resolves.toMatchObject({ accessToken: "access-token", refreshToken: "refresh-token" });
   });
 
   it("keeps every distinct channel returned by the authorized identity", async () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  assertCompleteFacebookPageDiscovery,
   createFacebookOAuthState,
   diagnoseFacebookOAuth,
   exchangeFacebookAuthorizationCode,
@@ -49,7 +50,7 @@ describe("Facebook Login", () => {
       }),
     );
     expect(url.searchParams.get("scope")).toBe(
-      "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish",
+      "pages_show_list,pages_read_engagement,business_management,pages_manage_posts,instagram_basic,instagram_content_publish",
     );
     expect(url.searchParams.get("scope")).not.toContain("unknown_scope");
   });
@@ -60,13 +61,13 @@ describe("Facebook Login", () => {
         ...environment,
         META_LOGIN_MODE: "classic",
         META_LOGIN_SCOPES:
-          "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish",
+          "pages_show_list,pages_read_engagement,business_management,pages_manage_posts,instagram_basic,instagram_content_publish",
       }),
     );
     expect(url.searchParams.has("config_id")).toBe(false);
     expect(url.searchParams.has("override_default_response_type")).toBe(false);
     expect(url.searchParams.get("scope")).toBe(
-      "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish",
+      "pages_show_list,pages_read_engagement,business_management,pages_manage_posts,instagram_basic,instagram_content_publish",
     );
     expect(url.searchParams.get("auth_type")).toBe("rerequest");
   });
@@ -90,7 +91,7 @@ describe("Facebook Login", () => {
       }),
     );
     expect(url.searchParams.get("scope")).toBe(
-      "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish",
+      "pages_show_list,pages_read_engagement,business_management,pages_manage_posts,instagram_basic,instagram_content_publish",
     );
   });
 
@@ -105,6 +106,7 @@ describe("Facebook Login", () => {
     expect(url.searchParams.get("scope")?.split(",")).toEqual([
       "pages_show_list",
       "pages_read_engagement",
+      "business_management",
       "pages_manage_posts",
       "instagram_basic",
       "instagram_content_publish",
@@ -120,7 +122,7 @@ describe("Facebook Login", () => {
       }),
     );
     expect(url.searchParams.get("scope")).toBe(
-      "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish",
+      "pages_show_list,pages_read_engagement,business_management,pages_manage_posts,instagram_basic,instagram_content_publish",
     );
   });
 
@@ -137,6 +139,7 @@ describe("Facebook Login", () => {
       requestedScopes: [
         "pages_show_list",
         "pages_read_engagement",
+        "business_management",
         "pages_manage_posts",
         "instagram_basic",
         "instagram_content_publish",
@@ -152,7 +155,7 @@ describe("Facebook Login", () => {
       ...environment,
       META_LOGIN_MODE: "classic",
       META_LOGIN_SCOPES:
-        "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish",
+        "pages_show_list,pages_read_engagement,business_management,pages_manage_posts,instagram_basic,instagram_content_publish",
     });
     expect(diagnostics.mode).toBe("classic");
     expect(diagnostics.usesConfigId).toBe(false);
@@ -160,6 +163,7 @@ describe("Facebook Login", () => {
     expect(diagnostics.effectiveScopes).toEqual([
       "pages_show_list",
       "pages_read_engagement",
+      "business_management",
       "pages_manage_posts",
       "instagram_basic",
       "instagram_content_publish",
@@ -249,6 +253,7 @@ describe("Facebook Login", () => {
             scopes: [
               "pages_show_list",
               "pages_read_engagement",
+              "business_management",
               "pages_manage_posts",
               "instagram_basic",
               "instagram_content_publish",
@@ -280,6 +285,7 @@ describe("Facebook Login", () => {
             scopes: [
               "pages_show_list",
               "pages_read_engagement",
+              "business_management",
               "pages_manage_posts",
               "instagram_basic",
               "instagram_content_publish",
@@ -546,5 +552,37 @@ describe("Facebook Login", () => {
       unavailablePageIds: ["200"],
       diagnostics: expect.any(Array),
     });
+  });
+
+  it("blocks saving when Meta returns a partial Page authorization", () => {
+    expect(() =>
+      assertCompleteFacebookPageDiscovery(
+        {
+          grantedScopes: [
+            "pages_show_list",
+            "pages_read_engagement",
+            "business_management",
+            "pages_manage_posts",
+            "instagram_basic",
+            "instagram_content_publish",
+          ],
+          authorizedPageIds: ["100", "200"],
+          authorizedInstagramIds: [],
+        },
+        {
+          pages: [
+            {
+              pageId: "100",
+              name: "Disponivel",
+              pageAccessToken: "page-token",
+              instagram: null,
+            },
+          ],
+          authorizedPageIds: ["100", "200"],
+          unavailablePageIds: ["200"],
+          diagnostics: ["Pagina 200: sem access_token"],
+        },
+      ),
+    ).toThrow("Reconectar conta");
   });
 });

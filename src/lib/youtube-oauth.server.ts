@@ -19,6 +19,7 @@ export const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
 export const YOUTUBE_SCOPES = [
   "https://www.googleapis.com/auth/youtube.upload",
   "https://www.googleapis.com/auth/youtube.readonly",
+  "https://www.googleapis.com/auth/youtube",
 ];
 
 type YoutubeConfiguration = { clientId: string; clientSecret: string; redirectUri: string };
@@ -169,6 +170,18 @@ function tokensFromPayload(payload: Record<string, unknown>, now: number): Youtu
   };
 }
 
+function validateYoutubeTokenScopes(tokens: YoutubeTokens): void {
+  const granted = new Set(tokens.scope.split(/\s+/).filter(Boolean));
+  const hasFullYoutubeAccess = granted.has("https://www.googleapis.com/auth/youtube");
+  const missing = YOUTUBE_SCOPES.filter((scope) => !hasFullYoutubeAccess && !granted.has(scope));
+  if (missing.length > 0) {
+    throw new MetaLinkError(
+      "META_AUTH_INVALID",
+      `O Google nÃ£o concedeu todos os acessos do YouTube (${missing.join(", ")}). Clique em Reconectar conta e aprove todos os escopos.`,
+    );
+  }
+}
+
 async function requestTokens(
   body: URLSearchParams,
   request: typeof fetch,
@@ -207,6 +220,7 @@ export async function exchangeYoutubeAuthorizationCode(input: {
       "O Google não emitiu o token de longa duração. Revogue o acesso do app em myaccount.google.com/permissions e conecte novamente.",
     );
   }
+  validateYoutubeTokenScopes(tokens);
   return tokens;
 }
 
