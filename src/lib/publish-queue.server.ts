@@ -92,11 +92,17 @@ async function publishClaimedPost(post: ClaimedPost, deps: QueueDependencies): P
   }
 
   const selectedProvider = provider(connection?.provider ?? account.provider);
-  const providerAccessToken = selectedProvider === "meta" && connection && deps.loadProviderAccessToken
+  const needsProviderToken = selectedProvider === "meta" || selectedProvider === "youtube";
+  const providerAccessToken = needsProviderToken && connection && deps.loadProviderAccessToken
     ? await deps.loadProviderAccessToken(connection)
     : undefined;
-  if (selectedProvider === "meta" && deps.loadProviderAccessToken && !providerAccessToken) {
-    return failure("AUTH_INVALID", "A credencial da conexão Instagram não está disponível.");
+  if (needsProviderToken && deps.loadProviderAccessToken && !providerAccessToken) {
+    return failure(
+      "AUTH_INVALID",
+      selectedProvider === "youtube"
+        ? "A credencial do canal do YouTube não está disponível. Reconecte o canal."
+        : "A credencial da conexão Instagram não está disponível.",
+    );
   }
 
   let videoUrl: string;

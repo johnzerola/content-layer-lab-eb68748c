@@ -63,6 +63,23 @@ export const Route = createFileRoute("/api/public/hooks/publish-due")({
             return data;
           },
           loadProviderAccessToken: async (connection) => {
+            if (connection.provider === "youtube") {
+              const { data, error } = await supabaseAdmin
+                .from("social_connection_credentials")
+                .select("refresh_token_ciphertext")
+                .eq("connection_id", connection.id)
+                .maybeSingle();
+              if (error || !data?.refresh_token_ciphertext) return null;
+              const { decryptSocialToken } = await import("@/lib/social-credentials.server");
+              const { refreshYoutubeAccessToken } = await import("@/lib/youtube-oauth.server");
+              try {
+                const refreshToken = decryptSocialToken(data.refresh_token_ciphertext);
+                const refreshed = await refreshYoutubeAccessToken({ refreshToken });
+                return refreshed.accessToken;
+              } catch {
+                return null;
+              }
+            }
             if (connection.provider !== "meta") return null;
             const { data, error } = await supabaseAdmin
               .from("social_connection_credentials")
