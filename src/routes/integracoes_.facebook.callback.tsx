@@ -29,6 +29,8 @@ type DiscoveredAccount = {
   linkedPageName: string | null;
 };
 
+type UnavailablePage = { pageId: string; name: string };
+
 type CallbackResult = {
   ok: boolean;
   message: string;
@@ -37,7 +39,17 @@ type CallbackResult = {
   warning?: string | null;
   discovered?: DiscoveredAccount[];
   selectionToken?: string;
+  unavailablePages?: UnavailablePage[];
 };
+
+export const RECONNECT_GUIDE_STEPS = [
+  "Vá em facebook.com/settings?tab=business_tools",
+  "Encontre o app 'VaiViral' na lista e clique em 'Ver e editar'",
+  "Na tela de permissões, marque TODAS as páginas que deseja conectar",
+  "Clique em 'Salvar' no diálogo do Facebook",
+  "Se alguma página estiver em um Business Manager, vá em business.facebook.com/settings, encontre a página, clique em 'Apps' e adicione o app VaiViral com permissão de publicação",
+  "Confirme que você tem papel de Administrador ou Editor em cada página (não basta ser Analista)",
+] as const;
 
 function FacebookOAuthCallback() {
   const search = Route.useSearch();
@@ -75,7 +87,8 @@ function FacebookOAuthCallback() {
         }
         const facebook = response.summary.facebook;
         const instagram = response.summary.instagram;
-        const unavailable = response.summary.unavailablePageIds.length;
+        const unavailablePages = response.summary.unavailablePages ?? [];
+        const unavailable = unavailablePages.length;
         const discovered = response.candidates;
         setSelected(discovered.map((account) => account.key));
         setResult({
@@ -84,10 +97,11 @@ function FacebookOAuthCallback() {
           instagram,
           discovered,
           selectionToken: response.selectionToken,
+          unavailablePages,
           message: `${facebook.length} Página(s) e ${instagram.length} Instagram encontrado(s). Revise e salve os canais que devem aparecer no VaiViral.`,
           warning:
             unavailable > 0
-              ? `${unavailable} Página(s) selecionada(s) não liberaram token de publicação. Verifique o controle total dessas Páginas.`
+              ? `${unavailable} página(s) foram selecionadas no consentimento do Facebook, mas a Meta não liberou o token de publicação. Isso acontece quando você não é administrador da página, o app não foi adicionado às configurações avançadas da página, ou a página está em um Business Manager onde você não tem controle total. Veja abaixo como resolver.`
               : null,
         });
       })
@@ -262,6 +276,61 @@ function FacebookOAuthCallback() {
               <p className="mt-4 border border-amber-500/30 bg-amber-500/5 p-3 text-left text-xs text-amber-300">
                 {result.warning}
               </p>
+            )}
+
+            {(result.unavailablePages?.length ?? 0) > 0 && (
+              <details className="mt-4 border border-amber-500/30 bg-surface-2 p-3 text-left">
+                <summary className="cursor-pointer text-sm font-medium text-amber-300">
+                  Páginas que não puderam ser conectadas ({result.unavailablePages?.length})
+                </summary>
+                <ul className="mt-3 space-y-2">
+                  {result.unavailablePages?.map((page) => (
+                    <li
+                      key={page.pageId}
+                      className="flex items-start gap-2 border border-border/60 bg-surface p-2"
+                    >
+                      <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-400" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium">{page.name}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          ID {page.pageId}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+
+            {(result.unavailablePages?.length ?? 0) > 0 && (
+              <div className="mt-4 border border-border bg-surface-2 p-4 text-left">
+                <p className="text-sm font-medium">
+                  Como resolver e conectar todas as páginas
+                </p>
+                <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs text-muted-foreground">
+                  {RECONNECT_GUIDE_STEPS.map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ol>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void reconnect()}
+                    disabled={reconnecting}
+                    className="inline-flex min-h-10 items-center gap-2 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                  >
+                    {reconnecting && <Loader2 className="size-4 animate-spin" />}
+                    Reconectar com permissões completas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="min-h-10 border border-border px-4 py-2 text-sm"
+                  >
+                    Já corrigi, tentar novamente
+                  </button>
+                </div>
+              </div>
             )}
 
             <Link

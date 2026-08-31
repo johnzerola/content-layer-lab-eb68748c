@@ -8,6 +8,7 @@ import {
   exchangeFacebookAuthorizationCode,
   facebookAuthorizationUrl,
   fetchFacebookPages,
+  fetchUnavailablePageNames,
   validateFacebookAccessTokenScopes,
   verifyFacebookOAuthState,
 } from "@/lib/facebook-oauth.server";
@@ -94,6 +95,10 @@ export const completeFacebookOAuth = createServerFn({ method: "POST" })
         );
       }
 
+      const unavailablePages = await fetchUnavailablePageNames({
+        pageIds: discovery.unavailablePageIds,
+        accessToken: token.accessToken,
+      });
       const selection = createMetaSelection({
         userId: context.userId,
         pages: discovery.pages,
@@ -110,6 +115,7 @@ export const completeFacebookOAuth = createServerFn({ method: "POST" })
           ),
           selectedPageCount: discovery.authorizedPageIds.length,
           unavailablePageIds: discovery.unavailablePageIds,
+          unavailablePages,
           selectedInstagramCount: authorization.authorizedInstagramIds.length,
         },
       };
