@@ -65,7 +65,11 @@ export function createYoutubeOAuthState(
 ): string {
   const { clientSecret } = youtubeConfiguration(environment);
   const payload = Buffer.from(
-    JSON.stringify({ userId, expiresAt: now + OAUTH_TTL_MS, nonce: randomBytes(24).toString("base64url") }),
+    JSON.stringify({
+      userId,
+      expiresAt: now + OAUTH_TTL_MS,
+      nonce: randomBytes(24).toString("base64url"),
+    }),
   ).toString("base64url");
   return `${payload}.${signState(payload, clientSecret)}`;
 }
@@ -107,17 +111,18 @@ export function youtubeAuthorizationUrl(
   url.searchParams.set("redirect_uri", configuration.redirectUri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", YOUTUBE_SCOPES.join(" "));
-  // offline = emite refresh_token. select_account reabre o seletor para que o
-  // usuário possa autorizar outro canal/Brand Account sem substituir o atual.
+  // offline emite refresh_token. select_account reabre o seletor para conectar
+  // outro canal ou Conta de marca sem substituir os canais ja salvos.
   url.searchParams.set("access_type", "offline");
-  url.searchParams.set("prompt", "select_account consent");
-  url.searchParams.set("include_granted_scopes", "true");
+  url.searchParams.set("prompt", "consent select_account");
   url.searchParams.set("state", createYoutubeOAuthState(userId, environment));
   return url.toString();
 }
 
 function asObject(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function readString(value: unknown, key: string): string | null {
@@ -131,9 +136,11 @@ async function readTokenResponse(response: Response | null): Promise<Record<stri
   }
   const payload = asObject(await response.json().catch(() => null));
   if (!response.ok || !payload) {
-    const description =
-      readString(payload, "error_description") ?? readString(payload, "error");
-    throw new MetaLinkError("META_AUTH_INVALID", description || "A autorização do YouTube é inválida.");
+    const description = readString(payload, "error_description") ?? readString(payload, "error");
+    throw new MetaLinkError(
+      "META_AUTH_INVALID",
+      description || "A autorização do YouTube é inválida.",
+    );
   }
   return payload;
 }
@@ -156,7 +163,9 @@ function tokensFromPayload(payload: Record<string, unknown>, now: number): Youtu
     // No refresh só vem access_token; no exchange inicial o refresh_token é obrigatório.
     refreshToken: readString(payload, "refresh_token") ?? "",
     scope: readString(payload, "scope") ?? "",
-    expiresAt: new Date(now + (Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : 3600) * 1000),
+    expiresAt: new Date(
+      now + (Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : 3600) * 1000,
+    ),
   };
 }
 
@@ -236,10 +245,9 @@ function parseYoutubeChannel(value: unknown): YoutubeChannel | null {
   const channelId = readString(channel, "id");
   if (!channelId || !snippet) return null;
   const title = readString(snippet, "title") ?? "YouTube";
-  const handle = (readString(snippet, "customUrl") ?? title).replace(/^@/, "").slice(0, 60);
+  const handle = (readString(snippet, "customUrl") ?? channelId).replace(/^@/, "").slice(0, 60);
   const thumbnails = asObject(snippet["thumbnails"]);
-  const avatar =
-    asObject(thumbnails?.["default"]) ?? asObject(thumbnails?.["medium"]) ?? null;
+  const avatar = asObject(thumbnails?.["default"]) ?? asObject(thumbnails?.["medium"]) ?? null;
   return {
     channelId,
     title,
@@ -249,8 +257,9 @@ function parseYoutubeChannel(value: unknown): YoutubeChannel | null {
 }
 
 /**
- * Lista TODOS os canais da conta Google autorizada (canal principal + canais de
- * marca / brand accounts). `mine=true` devolve todos; paginamos até o fim.
+ * Lista os canais visiveis para a identidade escolhida no OAuth. Para muitas
+ * Contas de marca, o Google devolve somente o canal selecionado; por isso o app
+ * preserva conexoes existentes e permite repetir o OAuth para adicionar outro.
  */
 export async function fetchYoutubeChannels(input: {
   accessToken: string;
@@ -268,7 +277,10 @@ export async function fetchYoutubeChannels(input: {
       headers: { authorization: `Bearer ${input.accessToken}` },
     }).catch(() => null);
     if (!response || response.status >= 500) {
-      throw new MetaLinkError("META_TEMPORARY_ERROR", "O YouTube está temporariamente indisponível.");
+      throw new MetaLinkError(
+        "META_TEMPORARY_ERROR",
+        "O YouTube está temporariamente indisponível.",
+      );
     }
     const payload = asObject(await response.json().catch(() => null));
     const items = payload?.["items"];
@@ -323,7 +335,10 @@ export async function fetchYoutubeChannelById(input: {
   }
   const channel = parseYoutubeChannel(items[0]);
   if (!channel) {
-    throw new MetaLinkError("META_RESPONSE_INVALID", "O Google retornou dados inválidos para o canal.");
+    throw new MetaLinkError(
+      "META_RESPONSE_INVALID",
+      "O Google retornou dados inválidos para o canal.",
+    );
   }
   return channel;
 }

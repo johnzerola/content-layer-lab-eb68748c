@@ -3,7 +3,18 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CalendarClock, Facebook, Instagram, Loader2, Plus, Trash2, UploadCloud, X, Youtube, Video } from "lucide-react";
+import {
+  CalendarClock,
+  Facebook,
+  Instagram,
+  Loader2,
+  Plus,
+  Trash2,
+  UploadCloud,
+  X,
+  Youtube,
+  Video,
+} from "lucide-react";
 
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
@@ -22,6 +33,9 @@ import {
   removeAccount,
   reschedulePost,
   schedulePost,
+  socialAccountDetail,
+  socialAccountOptionLabel,
+  socialAccountTitle,
   uploadPostVideo,
   type PostKind,
   type ScheduledPost,
@@ -194,8 +208,8 @@ function AgendaPage() {
             Seus vídeos vão ao ar sozinhos
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Envie o MP4 pronto, escolha a conta, o formato e a hora. A publicacao automatica so
-            roda em contas conectadas por OAuth/API oficial; contas digitadas manualmente ficam como
+            Envie o MP4 pronto, escolha a conta, o formato e a hora. A publicacao automatica so roda
+            em contas conectadas por OAuth/API oficial; contas digitadas manualmente ficam como
             rascunho ate a conexao real ser configurada.
           </p>
         </section>
@@ -231,7 +245,6 @@ function AgendaPage() {
                   </Link>
                 </div>
 
-
                 <ul className="mt-3 flex flex-col gap-2">
                   {accounts.map((a) => (
                     <li
@@ -239,10 +252,23 @@ function AgendaPage() {
                       className="flex items-center gap-3 rounded-xl border border-border bg-surface-2 px-3 py-2.5"
                     >
                       <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-primary/35 bg-primary/12 text-primary">
-                        {a.platform === "youtube" ? <Youtube className="size-4" /> : a.platform === "tiktok" ? <Video className="size-4" /> : a.platform === "facebook" ? <Facebook className="size-4" /> : <Instagram className="size-4" />}
+                        {a.platform === "youtube" ? (
+                          <Youtube className="size-4" />
+                        ) : a.platform === "tiktok" ? (
+                          <Video className="size-4" />
+                        ) : a.platform === "facebook" ? (
+                          <Facebook className="size-4" />
+                        ) : (
+                          <Instagram className="size-4" />
+                        )}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">@{a.username}</span>
+                        <span className="block truncate text-sm font-medium">
+                          {socialAccountTitle(a)}
+                        </span>
+                        <span className="block truncate text-[11px] text-muted-foreground">
+                          {socialAccountDetail(a)}
+                        </span>
                         <span className="block truncate font-mono text-[10px] text-muted-foreground">
                           {a.status === "connected" || a.status === "conectado"
                             ? `conectada via ${a.provider}`
@@ -282,7 +308,6 @@ function AgendaPage() {
                   </Button>
                 </div>
 
-
                 <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-border bg-surface-2 px-3 py-4 text-sm text-muted-foreground transition hover:text-foreground">
                   <UploadCloud className="size-5 shrink-0" />
                   <span className="min-w-0 flex-1 truncate">
@@ -307,7 +332,7 @@ function AgendaPage() {
                       <option value="">— selecionar —</option>
                       {accounts.map((a) => (
                         <option key={a.id} value={a.id}>
-                          @{a.username}
+                          {socialAccountOptionLabel(a)}
                         </option>
                       ))}
                     </select>
@@ -357,8 +382,8 @@ function AgendaPage() {
                     className="mt-0.5 accent-[var(--primary)]"
                   />
                   <span>
-                    Confirmo que tenho direito de publicar este vídeo e autorizo o envio do arquivo à rede social
-                    escolhida no horário agendado.
+                    Confirmo que tenho direito de publicar este vídeo e autorizo o envio do arquivo
+                    à rede social escolhida no horário agendado.
                   </span>
                 </label>
 
@@ -434,7 +459,10 @@ function AgendaPage() {
                               <button
                                 onClick={async () => {
                                   try {
-                                    await reschedulePost(p.id, new Date(Date.now() + 5 * 60 * 1000));
+                                    await reschedulePost(
+                                      p.id,
+                                      new Date(Date.now() + 5 * 60 * 1000),
+                                    );
                                     toast.success("Publicação reenviada para a fila.");
                                     await refresh();
                                   } catch (e) {

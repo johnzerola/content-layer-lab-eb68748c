@@ -22,6 +22,8 @@ import {
   listAccounts,
   removeAccount,
   renameAccount,
+  socialAccountDetail,
+  socialAccountTitle,
   type SocialAccount,
 } from "@/lib/social";
 
@@ -316,7 +318,9 @@ function IntegrationsPage() {
           toast.error(response.error);
           return;
         }
-        toast.success(`Canal ${response.account.display_name ?? response.account.username} atualizado.`);
+        toast.success(
+          `Canal ${response.account.display_name ?? response.account.username} atualizado.`,
+        );
         reload();
       } catch {
         toast.error("Não foi possível atualizar o canal do YouTube.");
@@ -550,7 +554,7 @@ function AccountsColumn({
         )}
         {accounts.map((account) => {
           const connected = account.status === "conectado" && account.provider !== "pending";
-          const accountName = account.display_name || account.username;
+          const accountName = socialAccountTitle(account);
           return (
             <li
               key={account.id}
@@ -562,16 +566,16 @@ function AccountsColumn({
                 <TriangleAlert className="size-4 shrink-0 text-amber-400" />
               )}
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">
-                  {platform.platform === "instagram" ? "@" : ""}
-                  {platform.platform === "instagram" ? account.username : accountName}
-                </p>
+                <p className="truncate text-sm font-medium">{accountName}</p>
                 <p className="truncate text-xs text-muted-foreground">
                   {account.is_primary
                     ? "Conta principal"
                     : connected
                       ? "Pronta para publicar"
                       : "Reconexão necessária"}
+                </p>
+                <p className="truncate text-[11px] text-muted-foreground/80">
+                  {socialAccountDetail(account)}
                 </p>
               </div>
               <Button
@@ -658,7 +662,7 @@ function YoutubeChannels({
         )}
         {accounts.map((account) => {
           const connected = account.status === "conectado" && account.provider !== "pending";
-          const name = account.display_name || account.username;
+          const name = socialAccountTitle(account);
           const isEditing = editing === account.id;
           const isRefreshing = refreshing.has(account.id);
           const schedule = schedules[account.id];
@@ -707,6 +711,9 @@ function YoutubeChannels({
                 ) : (
                   <>
                     <p className="truncate text-sm font-medium">{name}</p>
+                    <p className="truncate text-[11px] text-muted-foreground/80">
+                      {socialAccountDetail(account)}
+                    </p>
                     <p className="truncate text-xs text-muted-foreground">
                       {account.is_primary ? "Canal principal · " : ""}
                       {isRefreshing

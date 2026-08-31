@@ -149,7 +149,7 @@ export async function persistFacebookPages(
           userId: input.userId,
           platform: "instagram",
           username: page.instagram.username,
-          displayName: page.name,
+          displayName: page.instagram.displayName || page.name,
           providerAccountId: page.instagram.id,
           // O token da Página publica em nome da conta IG Business vinculada.
           accessToken: page.pageAccessToken,

@@ -13,6 +13,7 @@ const pageSchema = z.object({
     .object({
       id: z.string().regex(/^\d+$/),
       username: z.string().min(1).max(100),
+      displayName: z.string().min(1).max(200).nullable().optional(),
     })
     .nullable(),
 });
@@ -60,7 +61,7 @@ export function metaSelectionCandidates(pages: FacebookPage[]): MetaSelectionCan
             platform: "instagram" as const,
             providerAccountId: page.instagram.id,
             username: page.instagram.username,
-            displayName: `@${page.instagram.username}`,
+            displayName: page.instagram.displayName || `@${page.instagram.username}`,
             linkedPageName: page.name,
           },
         ]

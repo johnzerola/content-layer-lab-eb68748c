@@ -78,7 +78,7 @@ function FacebookOAuthCallback() {
           instagram,
           discovered,
           selectionToken: response.selectionToken,
-          message: `${facebook.length} Página(s) e ${instagram.length} Instagram encontrado(s). Escolha os canais que deseja manter.`,
+          message: `${facebook.length} Página(s) e ${instagram.length} Instagram encontrado(s). Revise e salve os canais que devem aparecer no VaiViral.`,
           warning:
             unavailable > 0
               ? `${unavailable} Página(s) selecionada(s) não liberaram token de publicação. Verifique o controle total dessas Páginas.`
@@ -306,7 +306,7 @@ function CandidateGroup({
                 <span className="block truncate font-medium">{account.displayName}</span>
                 <span className="block truncate text-xs text-muted-foreground">
                   {account.linkedPageName
-                    ? `Vinculado a ${account.linkedPageName}`
+                    ? `Vinculado a ${account.linkedPageName} · ID ${account.providerAccountId}`
                     : `ID ${account.providerAccountId}`}
                 </span>
               </span>

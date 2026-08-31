@@ -6,10 +6,10 @@ import { z } from "zod";
 import { completeYoutubeOAuth } from "@/lib/youtube-oauth.functions";
 
 const callbackSearch = z.object({
-  code: z.string().optional(),
-  state: z.string().optional(),
-  error: z.string().optional(),
-  error_description: z.string().optional(),
+  code: z.coerce.string().optional(),
+  state: z.coerce.string().optional(),
+  error: z.coerce.string().optional(),
+  error_description: z.coerce.string().optional(),
 });
 
 export const Route = createFileRoute("/integracoes_/youtube/callback")({
@@ -18,7 +18,10 @@ export const Route = createFileRoute("/integracoes_/youtube/callback")({
   head: () => ({
     meta: [
       { title: "Conectando YouTube — VaiViral" },
-      { name: "description", content: "Conclusão da autorização do canal do YouTube para publicação automática." },
+      {
+        name: "description",
+        content: "Conclusão da autorização do canal do YouTube para publicação automática.",
+      },
       { property: "og:title", content: "Conectando YouTube — VaiViral" },
       { property: "og:description", content: "Conclusão da autorização do canal do YouTube." },
       { property: "og:type", content: "website" },
@@ -53,8 +56,10 @@ function YoutubeOAuthCallback() {
             ? {
                 ok: true,
                 message: `${response.accounts.length === 1 ? "Canal conectado" : "Canais conectados"}: ${response.accounts
-                  .map((account) => `@${account.username}`)
-                  .join(", ")}.`,
+                  .map((account) => account.display_name || `@${account.username}`)
+                  .join(
+                    ", ",
+                  )}. Para adicionar outro canal ou Conta de marca, volte e escolha Adicionar outro canal.`,
               }
             : { ok: false, message: response.error },
         );

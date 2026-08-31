@@ -32,6 +32,36 @@ export type SocialAccount = {
   updated_at?: string | null;
 };
 
+export function socialAccountTitle(account: SocialAccount): string {
+  if (account.platform === "instagram") return `@${account.username}`;
+  return account.display_name || account.username;
+}
+
+export function socialAccountOptionLabel(account: SocialAccount): string {
+  const title = socialAccountTitle(account);
+  const platform =
+    account.platform === "facebook"
+      ? "Facebook"
+      : account.platform === "instagram"
+        ? "Instagram"
+        : account.platform === "youtube"
+          ? "YouTube"
+          : account.platform;
+  const id = account.provider_account_id ? ` · ID ${account.provider_account_id}` : "";
+  return `${platform}: ${title}${id}`;
+}
+
+export function socialAccountDetail(account: SocialAccount): string {
+  const id = account.provider_account_id ? `ID ${account.provider_account_id}` : "sem ID oficial";
+  if (account.platform === "instagram") {
+    const linked = account.display_name ? ` · ${account.display_name}` : "";
+    return `Instagram profissional${linked} · ${id}`;
+  }
+  if (account.platform === "facebook") return `Página do Facebook · ${id}`;
+  if (account.platform === "youtube") return `Canal do YouTube · ${id}`;
+  return `${account.provider || "provedor"} · ${id}`;
+}
+
 export type MediaType = "video" | "image";
 
 export type ScheduledPost = {
@@ -110,7 +140,8 @@ export async function uploadPostMedia(file: File | Blob, fileName: string) {
   if (!user) throw new Error("Faça login para enviar o arquivo.");
   const safe = fileName.replace(/[^\w.-]+/g, "_");
   const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`;
-  const isImage = (file as File).type?.startsWith("image/") || /\.(jpe?g|png|webp)$/i.test(fileName);
+  const isImage =
+    (file as File).type?.startsWith("image/") || /\.(jpe?g|png|webp)$/i.test(fileName);
   const { error } = await supabase.storage.from("posts").upload(path, file, {
     contentType: (file as File).type || (isImage ? "image/jpeg" : "video/mp4"),
     upsert: false,
@@ -154,7 +185,9 @@ export async function schedulePost(p: NewPost) {
   if (accountError) throw accountError;
   const connected = account?.status === "connected" || account?.status === "conectado";
   if (!account || !connected || !account.provider_account_id || account.provider === "pending") {
-    throw new Error("Esta conta ainda nao tem conexao OAuth/API valida. Conecte pelo provedor oficial antes de agendar.");
+    throw new Error(
+      "Esta conta ainda nao tem conexao OAuth/API valida. Conecte pelo provedor oficial antes de agendar.",
+    );
   }
 
   // Validação por plataforma: evita agendar algo que o provedor recusaria.
@@ -202,7 +235,10 @@ export async function listPosts(limit = 200): Promise<ScheduledPost[]> {
 }
 
 export async function cancelPost(id: string) {
-  const { error } = await supabase.from("scheduled_posts").update({ status: "cancelado" }).eq("id", id);
+  const { error } = await supabase
+    .from("scheduled_posts")
+    .update({ status: "cancelado" })
+    .eq("id", id);
   if (error) throw error;
 }
 

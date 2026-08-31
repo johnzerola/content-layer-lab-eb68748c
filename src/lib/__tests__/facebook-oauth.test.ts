@@ -365,8 +365,80 @@ describe("Facebook Login", () => {
         },
       ],
       authorizedPageIds: [],
-      unavailablePageIds: [], diagnostics: [],
+      unavailablePageIds: [],
+      diagnostics: [],
     });
+  });
+
+  it("also discovers Instagram returned as connected_instagram_account", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              id: "page-2",
+              name: "Outra Página",
+              access_token: "page-token",
+              connected_instagram_account: {
+                id: "17841499999999999",
+                username: "outra.conta",
+                name: "Outra Conta",
+              },
+            },
+          ],
+        }),
+      ),
+    );
+
+    await expect(
+      fetchFacebookPages({ accessToken: "user-token", environment, fetch: request }),
+    ).resolves.toMatchObject({
+      pages: [
+        {
+          pageId: "page-2",
+          instagram: {
+            id: "17841499999999999",
+            username: "outra.conta",
+            displayName: "Outra Conta",
+          },
+        },
+      ],
+    });
+  });
+
+  it("falls back to official Page fields if Meta rejects the connected Instagram field", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: { message: "(#100) Tried accessing nonexisting field" },
+          }),
+          { status: 400, headers: { "content-type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: "page-1",
+                name: "Minha PÃ¡gina",
+                access_token: "page-token",
+                instagram_business_account: { id: "ig-1", username: "Minha.Conta" },
+              },
+            ],
+          }),
+        ),
+      );
+
+    await expect(
+      fetchFacebookPages({ accessToken: "user-token", environment, fetch: request }),
+    ).resolves.toMatchObject({
+      pages: [{ pageId: "page-1", instagram: { id: "ig-1", username: "minha.conta" } }],
+    });
+    expect(String(request.mock.calls[0]?.[0])).toContain("connected_instagram_account");
+    expect(String(request.mock.calls[1]?.[0])).not.toContain("connected_instagram_account");
   });
 
   it("recovers selected Pages omitted by /me/accounts using their granular IDs", async () => {
@@ -471,7 +543,8 @@ describe("Facebook Login", () => {
       }),
     ).resolves.toMatchObject({
       pages: [{ pageId: "100", name: "Disponível" }],
-      unavailablePageIds: ["200"], diagnostics: expect.any(Array),
+      unavailablePageIds: ["200"],
+      diagnostics: expect.any(Array),
     });
   });
 });

@@ -11,10 +11,7 @@ import {
   verifyYoutubeOAuthState,
 } from "@/lib/youtube-oauth.server";
 import { persistYoutubeAccount } from "@/lib/youtube-persistence.server";
-import {
-  syncSingleYoutubeChannel,
-  syncYoutubeChannelsForUser,
-} from "@/lib/youtube-sync.server";
+import { syncSingleYoutubeChannel, syncYoutubeChannelsForUser } from "@/lib/youtube-sync.server";
 
 function oauthError(error: unknown) {
   if (error instanceof MetaLinkError) {
@@ -56,7 +53,7 @@ export const completeYoutubeOAuth = createServerFn({ method: "POST" })
       }
       verifyYoutubeOAuthState(data.state, context.userId);
       const tokens = await exchangeYoutubeAuthorizationCode({ code: data.code });
-      // Importa todos os canais da conta Google (principal + canais de marca).
+      // Salva os canais visiveis para a identidade escolhida no OAuth.
       const channels = await fetchYoutubeChannels({ accessToken: tokens.accessToken });
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const accounts = [];

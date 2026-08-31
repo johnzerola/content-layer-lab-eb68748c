@@ -4,6 +4,10 @@ import { facebookGraphBase, metaGraphVersion } from "@/lib/meta.server";
 import { MetaLinkError } from "@/lib/social-linking.server";
 
 const OAUTH_TTL_MS = 10 * 60 * 1000;
+const FACEBOOK_PAGE_FIELDS =
+  "id,name,access_token,tasks,instagram_business_account{id,username,name},connected_instagram_account{id,username,name}";
+const FACEBOOK_PAGE_FIELDS_FALLBACK =
+  "id,name,access_token,tasks,instagram_business_account{id,username,name}";
 
 /**
  * Permissões mínimas do fluxo usado por este projeto.
@@ -510,7 +514,7 @@ export type FacebookPage = {
   pageId: string;
   name: string;
   pageAccessToken: string;
-  instagram: { id: string; username: string } | null;
+  instagram: { id: string; username: string; displayName?: string | null | undefined } | null;
 };
 
 export type FacebookTokenAuthorization = {
@@ -526,7 +530,6 @@ export type FacebookPageDiscovery = {
   /** Mensagens originais da Meta (sem tokens) para diagnosticar falhas de token. */
   diagnostics: string[];
 };
-
 
 function granularTargetIds(data: Record<string, unknown> | null, prefix: string): string[] {
   const rows = data?.["granular_scopes"];
@@ -552,14 +555,24 @@ function parseFacebookPage(value: unknown): FacebookPage | null {
   const name = readString(value, "name");
   const pageAccessToken = readString(value, "access_token");
   if (!pageId || !pageAccessToken) return null;
-  const igRaw = asObject(value)?.["instagram_business_account"];
+  const object = asObject(value);
+  const igRaw =
+    asObject(object?.["instagram_business_account"]) ??
+    asObject(object?.["connected_instagram_account"]);
   const igId = readString(igRaw, "id");
   const igUsername = readString(igRaw, "username");
+  const igName = readString(igRaw, "name");
   return {
     pageId,
     name: name || `Página ${pageId}`,
     pageAccessToken,
-    instagram: igId ? { id: igId, username: (igUsername ?? igId).toLowerCase() } : null,
+    instagram: igId
+      ? {
+          id: igId,
+          username: (igUsername ?? igId).toLowerCase(),
+          ...(igName ? { displayName: igName } : {}),
+        }
+      : null,
   };
 }
 
@@ -574,6 +587,28 @@ function graphRequest(
       authorization: `Bearer ${accessToken}`,
     },
   }).catch(() => null);
+}
+
+function isOptionalPageFieldError(error: MetaLinkError): boolean {
+  return /nonexisting field|unknown field|tried accessing/i.test(error.message);
+}
+
+async function graphPageJson(input: {
+  url: URL;
+  accessToken: string;
+  request: typeof fetch;
+  fallbackFields?: string;
+}): Promise<unknown> {
+  try {
+    return await readJson(await graphRequest(input.url, input.accessToken, input.request));
+  } catch (error) {
+    if (!(error instanceof MetaLinkError) || error.code !== "META_AUTH_INVALID") throw error;
+    if (!isOptionalPageFieldError(error)) throw error;
+    if (!input.fallbackFields) throw error;
+    const fallbackUrl = new URL(input.url);
+    fallbackUrl.searchParams.set("fields", input.fallbackFields);
+    return readJson(await graphRequest(fallbackUrl, input.accessToken, input.request));
+  }
 }
 
 /**
@@ -593,17 +628,19 @@ export async function fetchFacebookPages(input: {
     /^\d+$/.test(id),
   );
   const url = new URL(`${facebookGraphBase(environment)}/me/accounts`);
-  url.searchParams.set(
-    "fields",
-    "id,name,access_token,tasks,instagram_business_account{id,username}",
-  );
+  url.searchParams.set("fields", FACEBOOK_PAGE_FIELDS);
   url.searchParams.set("limit", "100");
   const pages = new Map<string, FacebookPage>();
   const seenCursors = new Set<string>();
   const diagnostics: string[] = [];
   const listedWithoutToken = new Set<string>();
   for (let pageNumber = 0; pageNumber < 100; pageNumber += 1) {
-    const payload = await readJson(await graphRequest(url, input.accessToken, request));
+    const payload = await graphPageJson({
+      url,
+      accessToken: input.accessToken,
+      request,
+      fallbackFields: FACEBOOK_PAGE_FIELDS_FALLBACK,
+    });
     const payloadObject = asObject(payload);
     const rows = payloadObject?.["data"];
     if (!Array.isArray(rows)) {
@@ -638,12 +675,14 @@ export async function fetchFacebookPages(input: {
   for (const pageId of missingIds) {
     if (pages.has(pageId)) continue;
     const pageUrl = new URL(`${facebookGraphBase(environment)}/${pageId}`);
-    pageUrl.searchParams.set(
-      "fields",
-      "id,name,access_token,tasks,instagram_business_account{id,username}",
-    );
+    pageUrl.searchParams.set("fields", FACEBOOK_PAGE_FIELDS);
     try {
-      const directPayload = await readJson(await graphRequest(pageUrl, input.accessToken, request));
+      const directPayload = await graphPageJson({
+        url: pageUrl,
+        accessToken: input.accessToken,
+        request,
+        fallbackFields: FACEBOOK_PAGE_FIELDS_FALLBACK,
+      });
       const page = parseFacebookPage(directPayload);
       if (page) {
         pages.set(page.pageId, page);
@@ -667,5 +706,4 @@ export async function fetchFacebookPages(input: {
     unavailablePageIds,
     diagnostics,
   };
-
 }

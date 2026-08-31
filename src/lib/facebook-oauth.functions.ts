@@ -82,9 +82,13 @@ export const completeFacebookOAuth = createServerFn({ method: "POST" })
           discovery.diagnostics.length > 0
             ? ` Detalhe da Meta: ${discovery.diagnostics.join(" ")}`
             : "";
+        const instagramDetail =
+          authorization.authorizedInstagramIds.length > 0
+            ? ` A Meta confirmou ${authorization.authorizedInstagramIds.length} Instagram, mas o Instagram só publica quando a Página vinculada também libera token.`
+            : "";
         throw new MetaLinkError(
           "META_ACCOUNT_MISMATCH",
-          `Nenhuma Página publicável foi devolvida.${selectedDetail}${diagnosticDetail} Confirme que você é administrador com controle total das Páginas no Gerenciador de Negócios e refaça o login.`,
+          `Nenhuma Página publicável foi devolvida.${selectedDetail}${instagramDetail}${diagnosticDetail} Clique em Editar configurações no diálogo da Meta, marque as Páginas vinculadas aos Instagrams desejados e confirme que você tem controle total dessas Páginas no Gerenciador de Negócios.`,
         );
       }
 
