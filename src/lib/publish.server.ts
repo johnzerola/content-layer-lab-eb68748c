@@ -13,11 +13,21 @@ export type PublishInput = {
   providerAccountId?: string | null;
   providerAccessToken?: string;
   idempotencyKey?: string;
+  /** Container Meta já criado numa tentativa anterior; evita duplicar a mídia. */
+  pendingContainerId?: string | null;
 };
 
 export type PublishResult =
   | { ok: true; permalink?: string; providerPostId?: string }
-  | { ok: false; error: string; code: PublishErrorCode; retryable: boolean };
+  | {
+      ok: false;
+      error: string;
+      code: PublishErrorCode;
+      retryable: boolean;
+      /** Container Meta em processamento que a próxima tentativa deve reaproveitar. */
+      pendingContainerId?: string;
+    };
+
 
 type JsonObject = Record<string, unknown>;
 
