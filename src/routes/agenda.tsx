@@ -43,6 +43,7 @@ import {
 } from "@/lib/social";
 
 import { beginInstagramOAuth } from "@/lib/meta-oauth.functions";
+import { publishPostNow } from "@/lib/publish.functions";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 
 export const Route = createFileRoute("/agenda")({
@@ -102,6 +103,48 @@ function AgendaPage() {
   const [when, setWhen] = useState(() => localInput(new Date(Date.now() + 60 * 60 * 1000)));
   const [consent, setConsent] = useState(false);
   const [sending, setSending] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+  const runPublishNow = useServerFn(publishPostNow);
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const selectedAccount = accounts.find((a) => a.id === accountId) ?? null;
+  const kindOptions = useMemo(() => {
+    const platform = selectedAccount?.platform;
+    if (platform === "youtube") {
+      return [
+        { value: "shorts", label: "Shorts (vertical)" },
+        { value: "feed", label: "Vídeo longo" },
+      ];
+    }
+    if (platform === "facebook") {
+      return [
+        { value: "reels", label: "Reels da Página" },
+        { value: "feed", label: "Vídeo no Feed" },
+      ];
+    }
+    return [
+      { value: "reels", label: "Reels" },
+      { value: "feed", label: "Feed" },
+      { value: "stories", label: "Stories" },
+    ];
+  }, [selectedAccount]);
+
+  useEffect(() => {
+    if (!kindOptions.some((o) => o.value === kind)) {
+      setKind(kindOptions[0]!.value as PostKind);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kindOptions]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -157,6 +200,25 @@ function AgendaPage() {
       toast.error(e instanceof Error ? e.message : "Não foi possível adicionar.");
     } finally {
       setLinkingAccount(false);
+    }
+  }
+
+  async function onPublishNow(postId: string) {
+    setPublishingId(postId);
+    try {
+      const result = await runPublishNow({ data: { postId } });
+      if (result.ok) {
+        toast.success(
+          result.permalink ? `Publicado: ${result.permalink}` : "Publicado com sucesso.",
+        );
+      } else {
+        toast.error(result.error);
+      }
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao publicar agora.");
+    } finally {
+      setPublishingId(null);
     }
   }
 
@@ -321,6 +383,17 @@ function AgendaPage() {
                   />
                 </label>
 
+                {previewUrl && (
+                  <div className="mt-3 overflow-hidden rounded-xl border border-border bg-black">
+                    <video
+                      src={previewUrl}
+                      controls
+                      playsInline
+                      className="mx-auto max-h-64 w-full object-contain"
+                    />
+                  </div>
+                )}
+
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <label className="flex flex-col gap-1.5">
                     <span className="mono-label">Conta</span>
@@ -345,10 +418,11 @@ function AgendaPage() {
                       onChange={(e) => setKind(e.target.value as PostKind)}
                       className="rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm outline-none"
                     >
-                      <option value="reels">Reels</option>
-                      <option value="feed">Feed</option>
-                      <option value="stories">Stories</option>
-                      <option value="shorts">Shorts</option>
+                      {kindOptions.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
                     </select>
                   </label>
                 </div>
@@ -455,6 +529,20 @@ function AgendaPage() {
                             </span>
                           </div>
                           <div className="mt-3 flex justify-end gap-2 border-t border-border/50 pt-2">
+                            {(p.status === "falhou" || p.status === "agendado") && (
+                              <button
+                                disabled={publishingId === p.id}
+                                onClick={() => void onPublishNow(p.id)}
+                                className="flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary hover:bg-primary/20 disabled:opacity-60"
+                              >
+                                {publishingId === p.id ? (
+                                  <Loader2 className="size-3 animate-spin" />
+                                ) : (
+                                  <UploadCloud className="size-3" />
+                                )}
+                                {publishingId === p.id ? "Publicando…" : "Publicar agora"}
+                              </button>
+                            )}
                             {p.status === "falhou" && (
                               <button
                                 onClick={async () => {
@@ -465,32 +553,17 @@ function AgendaPage() {
                                     );
                                     toast.success("Publicação reenviada para a fila.");
                                     await refresh();
-                                  } catch (e) {
+                                  } catch {
                                     toast.error("Falha ao re-agendar.");
                                   }
                                 }}
-                                className="flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary hover:bg-primary/20"
+                                className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground transition hover:text-foreground"
                               >
-                                Tentar agora
+                                re-agendar
                               </button>
                             )}
                             {p.status === "agendado" && (
                               <>
-                                <button
-                                  onClick={async () => {
-                                    try {
-                                      // Para publicação imediata, agendamos para o passado
-                                      await reschedulePost(p.id, new Date(Date.now() - 60000));
-                                      toast.success("Enviando para publicação imediata...");
-                                      await refresh();
-                                    } catch (e) {
-                                      toast.error("Falha ao forçar publicação.");
-                                    }
-                                  }}
-                                  className="flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary hover:bg-primary/20"
-                                >
-                                  Tentar agora
-                                </button>
                                 <button
                                   onClick={async () => {
                                     await cancelPost(p.id);

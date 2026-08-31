@@ -76,9 +76,7 @@ describe("publishing policy", () => {
     expect(canPublish("instagram", "reels")).toBe(true);
     expect(canPublish("instagram", "feed")).toBe(true);
     expect(canPublish("tiktok", "reels")).toBe(false);
-    expect(canPublish("youtube", "shorts")).toBe(true);
-    expect(canPublish("youtube", "feed")).toBe(true);
-    expect(canPublish("youtube", "stories")).toBe(false);
+    expect(canPublish("youtube", "reels")).toBe(false);
     expect(canPublish("facebook", "stories")).toBe(false);
   });
 
