@@ -237,8 +237,9 @@ describe("Meta Instagram Login publisher", () => {
       ok: false,
       code: "PROVIDER_TEMPORARY_ERROR",
       retryable: true,
+      pendingContainerId: "container-id",
     });
-    expect(fetchMock).toHaveBeenCalledTimes(21);
+    expect(fetchMock).toHaveBeenCalledTimes(41);
   });
 
   it.each([401, 403])(
