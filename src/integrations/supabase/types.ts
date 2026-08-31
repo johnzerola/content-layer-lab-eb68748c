@@ -406,6 +406,7 @@ export type Database = {
           media_type: string
           next_attempt_at: string | null
           permalink: string | null
+          provider_container_id: string | null
           provider_post_id: string | null
           published_at: string | null
           scheduled_at: string
@@ -430,6 +431,7 @@ export type Database = {
           media_type?: string
           next_attempt_at?: string | null
           permalink?: string | null
+          provider_container_id?: string | null
           provider_post_id?: string | null
           published_at?: string | null
           scheduled_at?: string
@@ -454,6 +456,7 @@ export type Database = {
           media_type?: string
           next_attempt_at?: string | null
           permalink?: string | null
+          provider_container_id?: string | null
           provider_post_id?: string | null
           published_at?: string | null
           scheduled_at?: string
