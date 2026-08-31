@@ -1,6 +1,8 @@
 import type { PostKind, PublishErrorCode, SocialProvider } from "@/lib/publishing";
 import { facebookGraphBase, globalMetaCredentials, metaGraphBase } from "@/lib/meta.server";
 
+const YOUTUBE_UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos";
+
 export type PublishInput = {
   kind: PostKind;
   caption: string;
@@ -62,6 +64,22 @@ function providerFailure(provider: string, status: number, payload: unknown): Pu
   return { ok: false, code: "PROVIDER_PERMANENT_ERROR", retryable: false, error: `${provider} [${status}]: ${detail}` };
 }
 
+function youtubePrivacyStatus(): "private" | "public" | "unlisted" {
+  const configured = process.env["YOUTUBE_PRIVACY_STATUS"]?.trim();
+  return configured === "private" || configured === "unlisted" || configured === "public"
+    ? configured
+    : "public";
+}
+
+function youtubeTitle(input: PublishInput): string {
+  const firstCaptionLine = input.caption
+    .split(/\r?\n/)
+    .map((line) => line.replace(/#[\p{L}\p{N}_-]+/gu, "").trim())
+    .find(Boolean);
+  const title = firstCaptionLine || input.username || "Video";
+  return title.replace(/\s+/g, " ").slice(0, 100);
+}
+
 export function activeProvider(requested?: SocialProvider): "ayrshare" | "meta" | "youtube" | "tiktok" | null {
   if (requested === "ayrshare") return process.env["AYRSHARE_API_KEY"] ? "ayrshare" : null;
   if (requested === "meta") return process.env["META_ACCESS_TOKEN"] && process.env["META_IG_USER_ID"] ? "meta" : null;
@@ -85,9 +103,10 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
     };
   }
 
-  const provider = input.provider === "meta" && input.providerAccessToken
-    ? "meta"
-    : activeProvider(input.provider);
+  const provider =
+    (input.provider === "meta" || input.provider === "youtube") && input.providerAccessToken
+      ? input.provider
+      : activeProvider(input.provider);
   if (!provider) {
     return {
       ok: false,
@@ -125,8 +144,102 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
   }
 
   if (input.platform === "facebook") return publishFacebookPage(input);
+  if (provider === "youtube") return publishYoutube(input);
   if (provider === "ayrshare") return publishAyrshare(input);
   return publishMeta(input);
+}
+
+async function publishYoutube(input: PublishInput): Promise<PublishResult> {
+  const token = input.providerAccessToken;
+  const channelId = input.providerAccountId;
+  if (!token || !channelId) {
+    return {
+      ok: false,
+      code: "AUTH_INVALID",
+      retryable: false,
+      error: "O canal do YouTube nao possui credencial conectada.",
+    };
+  }
+  if (input.mediaType === "image") {
+    return {
+      ok: false,
+      code: "MEDIA_INVALID",
+      retryable: false,
+      error: "YouTube aceita apenas video nesta fila.",
+    };
+  }
+
+  try {
+    const uploadUrl = new URL(YOUTUBE_UPLOAD_URL);
+    uploadUrl.searchParams.set("part", "snippet,status");
+    uploadUrl.searchParams.set("uploadType", "resumable");
+
+    const metadataResponse = await fetch(uploadUrl, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json; charset=UTF-8",
+        "x-upload-content-type": "video/mp4",
+      },
+      body: JSON.stringify({
+        snippet: {
+          title: youtubeTitle(input),
+          description: input.caption.slice(0, 5000),
+          categoryId: "22",
+        },
+        status: {
+          privacyStatus: youtubePrivacyStatus(),
+          selfDeclaredMadeForKids: false,
+        },
+      }),
+    });
+    const metadataPayload: unknown = await metadataResponse.json().catch(() => null);
+    const resumableUrl = metadataResponse.headers.get("location");
+    if (!metadataResponse.ok || !resumableUrl) {
+      return providerFailure("YouTube iniciar upload", metadataResponse.status, metadataPayload);
+    }
+
+    const mediaResponse = await fetch(input.videoUrl).catch(() => null);
+    if (!mediaResponse || !mediaResponse.ok) {
+      return {
+        ok: false,
+        code: "MEDIA_NOT_FOUND",
+        retryable: false,
+        error: "O arquivo de video nao esta disponivel para envio ao YouTube.",
+      };
+    }
+
+    const mediaBody = mediaResponse.body ?? await mediaResponse.arrayBuffer();
+    const uploadInit: RequestInit & { duplex?: "half" } = {
+      method: "PUT",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": mediaResponse.headers.get("content-type") ?? "video/mp4",
+      },
+      body: mediaBody,
+    };
+    if (mediaResponse.body) uploadInit.duplex = "half";
+
+    const uploadResponse = await fetch(resumableUrl, uploadInit);
+    const uploadPayload: unknown = await uploadResponse.json().catch(() => null);
+    const providerPostId = nestedString(uploadPayload, ["id"]);
+    if (!uploadResponse.ok || !providerPostId) {
+      return providerFailure("YouTube publicar", uploadResponse.status, uploadPayload);
+    }
+
+    return {
+      ok: true,
+      providerPostId,
+      permalink: `https://www.youtube.com/watch?v=${providerPostId}`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      code: "PROVIDER_TEMPORARY_ERROR",
+      retryable: true,
+      error: error instanceof Error ? error.message : "YouTube indisponivel.",
+    };
+  }
 }
 
 async function publishAyrshare(input: PublishInput): Promise<PublishResult> {

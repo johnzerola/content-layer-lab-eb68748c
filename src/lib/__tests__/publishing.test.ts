@@ -77,6 +77,8 @@ describe("publishing policy", () => {
     expect(canPublish("instagram", "feed")).toBe(true);
     expect(canPublish("tiktok", "reels")).toBe(false);
     expect(canPublish("youtube", "reels")).toBe(false);
+    expect(canPublish("youtube", "shorts")).toBe(true);
+    expect(canPublish("youtube", "feed")).toBe(true);
     expect(canPublish("facebook", "stories")).toBe(false);
   });
 
@@ -116,6 +118,60 @@ describe("publishing policy", () => {
       providerAccountId: "another-account",
     });
     expect(result).toMatchObject({ ok: false, code: "ACCOUNT_MISMATCH", retryable: false });
+  });
+});
+
+describe("YouTube publisher", () => {
+  it("uploads a scheduled video through YouTube Data API with the channel token", async () => {
+    process.env["YOUTUBE_PRIVACY_STATUS"] = "unlisted";
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 200,
+          headers: { location: "https://upload.youtube.test/resumable" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response("video-bytes", {
+          status: 200,
+          headers: { "content-type": "video/mp4" },
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse(200, { id: "yt-video-1" }));
+
+    await expect(
+      publish({
+        kind: "shorts",
+        caption: "Titulo do video\n#shorts",
+        videoUrl: "https://storage.example/fresh-signed-url",
+        username: "canal",
+        platform: "youtube",
+        provider: "youtube",
+        providerAccountId: "UC-1",
+        providerAccessToken: "youtube-access-token",
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      providerPostId: "yt-video-1",
+      permalink: "https://www.youtube.com/watch?v=yt-video-1",
+    });
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      "https://www.googleapis.com/upload/youtube/v3/videos?part=snippet%2Cstatus&uploadType=resumable",
+    );
+    expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(
+      "Bearer youtube-access-token",
+    );
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({
+      snippet: { title: "Titulo do video", description: "Titulo do video\n#shorts" },
+      status: { privacyStatus: "unlisted", selfDeclaredMadeForKids: false },
+    });
+    expect(String(fetchMock.mock.calls[1]?.[0])).toBe("https://storage.example/fresh-signed-url");
+    expect(String(fetchMock.mock.calls[2]?.[0])).toBe("https://upload.youtube.test/resumable");
+    expect(new Headers(fetchMock.mock.calls[2]?.[1]?.headers).get("authorization")).toBe(
+      "Bearer youtube-access-token",
+    );
   });
 });
 

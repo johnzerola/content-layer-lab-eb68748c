@@ -168,6 +168,39 @@ describe("publishing queue integration", () => {
     );
   });
 
+  it("publishes a due YouTube Short through the saved OAuth connection", async () => {
+    const fixture = dependencies([duePost({ kind: "shorts" })], { ok: true });
+    fixture.deps.loadAccount = async () => ({
+      id: "account-1",
+      user_id: "user-1",
+      platform: "youtube",
+      username: "canal",
+      provider: "youtube",
+      provider_account_id: "UC-saved",
+    });
+    fixture.deps.loadConnection = async () => ({
+      id: "connection-1",
+      provider: "youtube",
+      provider_account_id: "UC-saved",
+      status: "conectado",
+      expires_at: null,
+    });
+    fixture.deps.loadProviderAccessToken = async () => "youtube-access-token";
+
+    const summary = await runPublishQueue(fixture.deps, options);
+
+    expect(summary).toEqual({ processed: 1, published: 1, retrying: 0, failed: 0 });
+    expect(fixture.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "shorts",
+        platform: "youtube",
+        provider: "youtube",
+        providerAccountId: "UC-saved",
+        providerAccessToken: "youtube-access-token",
+      }),
+    );
+  });
+
   it("never lets a pending explicit connection fall through to a global provider", async () => {
     const fixture = dependencies([duePost()], { ok: true });
     fixture.deps.loadConnection = async () => ({

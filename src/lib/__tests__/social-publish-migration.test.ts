@@ -6,10 +6,15 @@ const migrationPath = resolve(
   process.cwd(),
   "supabase/migrations/20260813233000_social_publish_foundation.sql",
 );
+const publishCronMigrationPath = resolve(
+  process.cwd(),
+  "supabase/migrations/20260831193000_schedule_publish_due_cron.sql",
+);
 
 let migration = "";
 let normalizedMigration = "";
 let exhaustedUpdate = "";
+let publishCronMigration = "";
 
 beforeAll(async () => {
   migration = await readFile(migrationPath, "utf8");
@@ -18,6 +23,7 @@ beforeAll(async () => {
     migration.indexOf("-- Close exhausted queued rows"),
     migration.indexOf("RETURN QUERY"),
   );
+  publishCronMigration = await readFile(publishCronMigrationPath, "utf8");
 });
 function exhaustedWorkerShouldClose(input: {
   status: string;
@@ -79,5 +85,17 @@ describe("social publishing production migration", () => {
     );
     expect(migration).not.toContain("GRANT ALL ON public.social_connections");
     expect(migration).not.toContain("GRANT ALL ON public.social_oauth_states");
+  });
+
+  it("installs the server-side publish dispatcher without hardcoded secrets", () => {
+    expect(publishCronMigration).toContain("CREATE EXTENSION IF NOT EXISTS pg_net");
+    expect(publishCronMigration).toContain("CREATE EXTENSION IF NOT EXISTS pg_cron");
+    expect(publishCronMigration).toContain("publish-due-every-minute");
+    expect(publishCronMigration).toContain("* * * * *");
+    expect(publishCronMigration).toContain("/api/public/hooks/publish-due");
+    expect(publishCronMigration).toContain("publish_dispatch_url");
+    expect(publishCronMigration).toContain("publish_cron_secret");
+    expect(publishCronMigration).not.toContain("Bearer sk_");
+    expect(publishCronMigration).not.toContain("content-layer-lab.lovable.app");
   });
 });

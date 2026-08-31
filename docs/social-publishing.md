@@ -32,8 +32,11 @@ chamada manual com esse header. A resposta contém apenas contadores.
 ## Scheduler
 
 O Supabase hospedado suporta Cron (`pg_cron`), chamadas HTTP por `pg_net` e
-segredos criptografados no Vault. A ativação não está em migration porque URL e
-segredo variam por ambiente e nunca devem entrar no Git.
+segredos criptografados no Vault. A migration
+`20260831193000_schedule_publish_due_cron.sql` agenda a fila automaticamente a
+cada minuto quando os segredos `publish_dispatch_url` e `publish_cron_secret`
+existem no Vault. Ela não grava valores sensíveis no Git; o comando do Cron lê
+o Vault em cada execução.
 
 ### Ativação recomendada no Supabase
 
@@ -43,9 +46,9 @@ segredo variam por ambiente e nunca devem entrar no Git.
    - `publish_dispatch_url`: URL completa HTTPS terminando em
      `/api/public/hooks/publish-due`;
    - `publish_cron_secret`: exatamente o mesmo valor configurado na aplicação.
-3. Abra **Integrations → Cron → Create job**.
-4. Use o nome `publish-due-every-minute` e a expressão `* * * * *`.
-5. Escolha SQL snippet e salve exatamente:
+3. Aplique as migrations do projeto. O job `publish-due-every-minute` será
+   criado ou atualizado automaticamente.
+4. Para validar ou recriar manualmente, o SQL do job executado é:
 
 ```sql
 select net.http_post(
@@ -67,9 +70,10 @@ select net.http_post(
 ) as request_id;
 ```
 
-O intervalo recomendado é um minuto: mantém precisão suficiente para posts e
+O intervalo configurado é um minuto: mantém precisão suficiente para posts e
 permite que `next_attempt_at` seja reavaliado automaticamente sem chamadas
-excessivas.
+excessivas. O dispatcher publica Facebook Pages e YouTube usando as conexões
+OAuth salvas de cada canal.
 
 ### Validação
 
@@ -136,8 +140,8 @@ o fallback global, que existe apenas para registros legados `pending`.
 Uma conexão por conta pode selecionar `meta` ou `ayrshare`, mas credenciais por
 usuário só devem ser ativadas depois que o secret store estiver disponível.
 
-Facebook e Instagram usam OAuth oficial da Meta e adapters próprios de
-publicação. TikTok e YouTube continuam em preparação.
+Facebook, Instagram e YouTube usam OAuth oficial e adapters próprios de
+publicação. TikTok continua em preparação.
 
 ## OAuth Meta (Facebook e Instagram)
 
