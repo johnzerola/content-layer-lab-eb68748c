@@ -73,7 +73,7 @@ function failure(code: PublishErrorCode, error: string, retryable = false): Publ
   return { ok: false, code, error, retryable };
 }
 
-async function publishClaimedPost(post: ClaimedPost, deps: QueueDependencies): Promise<PublishResult> {
+export async function publishClaimedPost(post: ClaimedPost, deps: QueueDependencies): Promise<PublishResult> {
   if (!post.account_id) return failure("ACCOUNT_MISMATCH", "O agendamento não possui uma conta válida.");
   const account = await deps.loadAccount(post.account_id);
   if (!account || account.user_id !== post.user_id) {
