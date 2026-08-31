@@ -278,6 +278,61 @@ function FacebookOAuthCallback() {
               </p>
             )}
 
+            {(result.unavailablePages?.length ?? 0) > 0 && (
+              <details className="mt-4 border border-amber-500/30 bg-surface-2 p-3 text-left">
+                <summary className="cursor-pointer text-sm font-medium text-amber-300">
+                  Páginas que não puderam ser conectadas ({result.unavailablePages?.length})
+                </summary>
+                <ul className="mt-3 space-y-2">
+                  {result.unavailablePages?.map((page) => (
+                    <li
+                      key={page.pageId}
+                      className="flex items-start gap-2 border border-border/60 bg-surface p-2"
+                    >
+                      <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-400" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium">{page.name}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          ID {page.pageId}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+
+            {(result.unavailablePages?.length ?? 0) > 0 && (
+              <div className="mt-4 border border-border bg-surface-2 p-4 text-left">
+                <p className="text-sm font-medium">
+                  Como resolver e conectar todas as páginas
+                </p>
+                <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs text-muted-foreground">
+                  {RECONNECT_GUIDE_STEPS.map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ol>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void reconnect()}
+                    disabled={reconnecting}
+                    className="inline-flex min-h-10 items-center gap-2 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                  >
+                    {reconnecting && <Loader2 className="size-4 animate-spin" />}
+                    Reconectar com permissões completas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="min-h-10 border border-border px-4 py-2 text-sm"
+                  >
+                    Já corrigi, tentar novamente
+                  </button>
+                </div>
+              </div>
+            )}
+
             <Link
               to="/integracoes"
               className="mt-5 inline-flex min-h-10 items-center bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
