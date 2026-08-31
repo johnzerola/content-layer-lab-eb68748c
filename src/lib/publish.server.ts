@@ -152,10 +152,16 @@ async function publishAyrshare(input: PublishInput): Promise<PublishResult> {
   }
 }
 
+/**
+ * Publica no Instagram Business/Creator (Reels, Stories e Feed).
+ * Token da Página conectada -> graph.facebook.com (Page Access Token).
+ * Credencial global de Instagram Login -> graph.instagram.com (Bearer).
+ */
 async function publishMeta(input: PublishInput): Promise<PublishResult> {
   const credentials = globalMetaCredentials();
+  const usesPageToken = Boolean(input.providerAccessToken);
   const token = input.providerAccessToken ?? credentials?.accessToken;
-  const igId = input.providerAccessToken ? input.providerAccountId : credentials?.igUserId;
+  const igId = usesPageToken ? input.providerAccountId : credentials?.igUserId;
   if (!token || !igId) {
     return {
       ok: false,
@@ -164,14 +170,18 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
       error: "Credencial Meta nao configurada.",
     };
   }
-  const graphBase = metaGraphBase();
+  const graphBase = usesPageToken ? facebookGraphBase() : metaGraphBase();
   const accountBase = `${graphBase}/${igId}`;
-  const authorization = { authorization: `Bearer ${token}` };
+  const authorization: Record<string, string> = usesPageToken
+    ? {}
+    : { authorization: `Bearer ${token}` };
+  const withToken = (url: string) =>
+    usesPageToken ? `${url}${url.includes("?") ? "&" : "?"}access_token=${encodeURIComponent(token)}` : url;
 
   try {
     const isImage = input.mediaType === "image";
-    const mediaType = isImage ? (input.kind === "stories" ? "STORIES" : undefined) : input.kind === "stories" ? "STORIES" : "REELS";
-    const create = await fetch(`${accountBase}/media`, {
+    const mediaType = input.kind === "stories" ? "STORIES" : isImage ? undefined : "REELS";
+    const create = await fetch(withToken(`${accountBase}/media`), {
       method: "POST",
       headers: { "content-type": "application/json", ...authorization },
       body: JSON.stringify({
@@ -187,11 +197,10 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
       return providerFailure("Meta criar container", create.status, { detail: errorMsg });
     }
 
-
     let finished = isImage;
     for (let i = 0; !finished && i < 20; i++) {
       await new Promise((resolve) => setTimeout(resolve, 3000));
-      const statusResponse = await fetch(`${graphBase}/${creationId}?fields=status_code`, {
+      const statusResponse = await fetch(withToken(`${graphBase}/${creationId}?fields=status_code`), {
         headers: authorization,
       });
       const statusPayload: unknown = await statusResponse.json().catch(() => null);
@@ -214,7 +223,6 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
           error: errorMsg,
         };
       }
-
     }
     if (!finished) {
       return {
@@ -225,7 +233,7 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
       };
     }
 
-    const publishResponse = await fetch(`${accountBase}/media_publish`, {
+    const publishResponse = await fetch(withToken(`${accountBase}/media_publish`), {
       method: "POST",
       headers: { "content-type": "application/json", ...authorization },
       body: JSON.stringify({ creation_id: creationId }),
@@ -236,8 +244,9 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
       const errorMsg = nestedString(published, ["error", "message"]) || "erro ao publicar";
       return providerFailure("Meta publicar", publishResponse.status, { detail: errorMsg });
     }
-    return { ok: true, providerPostId };
 
+    const permalink = await instagramPermalink(graphBase, providerPostId, authorization, withToken);
+    return { ok: true, providerPostId, ...(permalink ? { permalink } : {}) };
   } catch (error) {
     return {
       ok: false,
@@ -247,6 +256,26 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
     };
   }
 }
+
+/** Busca o link público do post recém-criado; falha silenciosa não invalida a publicação. */
+async function instagramPermalink(
+  graphBase: string,
+  mediaId: string,
+  authorization: Record<string, string>,
+  withToken: (url: string) => string,
+): Promise<string | undefined> {
+  try {
+    const response = await fetch(withToken(`${graphBase}/${mediaId}?fields=permalink`), {
+      headers: authorization,
+    });
+    if (!response.ok) return undefined;
+    const payload: unknown = await response.json().catch(() => null);
+    return nestedString(payload, ["permalink"]);
+  } catch {
+    return undefined;
+  }
+}
+
 
 /** Publica em Página do Facebook: Reels (3 fases) ou vídeo no Feed. */
 async function publishFacebookPage(input: PublishInput): Promise<PublishResult> {
