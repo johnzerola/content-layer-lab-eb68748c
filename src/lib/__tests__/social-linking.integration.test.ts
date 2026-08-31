@@ -40,7 +40,10 @@ describe("authenticated Meta linking to scheduled publishing", () => {
       )
       .mockResolvedValueOnce(jsonResponse(200, { id: "container-id" }))
       .mockResolvedValueOnce(jsonResponse(200, { status_code: "FINISHED" }))
-      .mockResolvedValueOnce(jsonResponse(200, { id: "published-id" }));
+      .mockResolvedValueOnce(jsonResponse(200, { id: "published-id" }))
+      .mockResolvedValueOnce(
+        jsonResponse(200, { permalink: "https://www.instagram.com/reel/published-id/" }),
+      );
     vi.spyOn(globalThis, "setTimeout").mockImplementation((callback) => {
       if (typeof callback === "function") callback();
       return 0 as unknown as ReturnType<typeof setTimeout>;
@@ -114,6 +117,7 @@ describe("authenticated Meta linking to scheduled publishing", () => {
       "https://graph.instagram.com/v26.0/ig-validated/media",
       "https://graph.instagram.com/v26.0/container-id?fields=status_code",
       "https://graph.instagram.com/v26.0/ig-validated/media_publish",
+      "https://graph.instagram.com/v26.0/published-id?fields=permalink",
     ]);
   });
 
