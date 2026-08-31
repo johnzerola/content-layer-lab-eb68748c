@@ -729,3 +729,37 @@ export async function fetchFacebookPages(input: {
     diagnostics,
   };
 }
+
+export type UnavailableFacebookPage = { pageId: string; name: string };
+
+/**
+ * Resolve o nome público de Páginas que não liberaram token de publicação.
+ * Falhas individuais não interrompem o fluxo: o ID vira fallback do nome.
+ */
+export async function fetchUnavailablePageNames(input: {
+  pageIds: string[];
+  accessToken: string;
+  environment?: NodeJS.ProcessEnv;
+  fetch?: typeof fetch;
+}): Promise<UnavailableFacebookPage[]> {
+  const environment = input.environment ?? process.env;
+  const request = input.fetch ?? fetch;
+  const uniqueIds = [...new Set(input.pageIds)].filter((id) => /^\d+$/.test(id));
+  return Promise.all(
+    uniqueIds.map(async (pageId) => {
+      const url = new URL(`${facebookGraphBase(environment)}/${pageId}`);
+      url.searchParams.set("fields", "name");
+      try {
+        const response = await graphRequest(url, input.accessToken, request);
+        if (response?.ok) {
+          const payload: unknown = await response.json().catch(() => null);
+          const name = readString(payload, "name");
+          if (name) return { pageId, name };
+        }
+      } catch {
+        // Fallback abaixo: ID como nome.
+      }
+      return { pageId, name: `Página ${pageId}` };
+    }),
+  );
+}
