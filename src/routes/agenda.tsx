@@ -309,7 +309,7 @@ function AgendaPage() {
                       <option value="">— selecionar —</option>
                       {accounts.map((a) => (
                         <option key={a.id} value={a.id}>
-                          @{a.username}
+                          {a.display_name ? `${a.display_name} · ${a.platform}` : `@${a.username}`}
                         </option>
                       ))}
                     </select>
