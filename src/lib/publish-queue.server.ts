@@ -73,7 +73,7 @@ function failure(code: PublishErrorCode, error: string, retryable = false): Publ
   return { ok: false, code, error, retryable };
 }
 
-async function publishClaimedPost(post: ClaimedPost, deps: QueueDependencies): Promise<PublishResult> {
+export async function publishClaimedPost(post: ClaimedPost, deps: QueueDependencies): Promise<PublishResult> {
   if (!post.account_id) return failure("ACCOUNT_MISMATCH", "O agendamento não possui uma conta válida.");
   const account = await deps.loadAccount(post.account_id);
   if (!account || account.user_id !== post.user_id) {
@@ -92,11 +92,17 @@ async function publishClaimedPost(post: ClaimedPost, deps: QueueDependencies): P
   }
 
   const selectedProvider = provider(connection?.provider ?? account.provider);
-  const providerAccessToken = selectedProvider === "meta" && connection && deps.loadProviderAccessToken
+  const needsToken = selectedProvider === "meta" || selectedProvider === "youtube";
+  const providerAccessToken = needsToken && connection && deps.loadProviderAccessToken
     ? await deps.loadProviderAccessToken(connection)
     : undefined;
-  if (selectedProvider === "meta" && deps.loadProviderAccessToken && !providerAccessToken) {
-    return failure("AUTH_INVALID", "A credencial da conexão Instagram não está disponível.");
+  if (needsToken && deps.loadProviderAccessToken && !providerAccessToken) {
+    return failure(
+      "AUTH_INVALID",
+      selectedProvider === "youtube"
+        ? "A credencial do canal do YouTube não está disponível. Reconecte o canal."
+        : "A credencial da conexão Meta não está disponível. Reconecte a Página/Instagram.",
+    );
   }
 
   let videoUrl: string;
