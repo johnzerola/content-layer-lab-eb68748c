@@ -1,0 +1,1 @@
+ALTER TABLE public.scheduled_posts ADD COLUMN IF NOT EXISTS provider_container_id text;
