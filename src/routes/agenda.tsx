@@ -242,7 +242,9 @@ function AgendaPage() {
                         {a.platform === "youtube" ? <Youtube className="size-4" /> : a.platform === "tiktok" ? <Video className="size-4" /> : a.platform === "facebook" ? <Facebook className="size-4" /> : <Instagram className="size-4" />}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">@{a.username}</span>
+                        <span className="block truncate text-sm font-medium">
+                          {a.display_name || `@${a.username}`}
+                        </span>
                         <span className="block truncate font-mono text-[10px] text-muted-foreground">
                           {a.status === "connected" || a.status === "conectado"
                             ? `conectada via ${a.provider}`
