@@ -29,7 +29,7 @@ export async function persistYoutubeAccount(
   // não podem decidir se uma nova autorização substitui uma conexão existente.
   const { data: existing, error: lookupError } = await admin
     .from("social_accounts")
-    .select("id")
+    .select("id,display_name")
     .eq("user_id", input.userId)
     .eq("platform", "youtube")
     .eq("provider_account_id", input.channel.channelId)
@@ -39,8 +39,13 @@ export async function persistYoutubeAccount(
     throw new MetaLinkError("DATABASE_ERROR", "Não foi possível localizar o canal do YouTube.");
   }
 
+  // O apelido escolhido pelo usuário não pode ser sobrescrito pela sincronização.
+  const updateValues = existing?.display_name
+    ? { ...accountValues, display_name: existing.display_name as string }
+    : accountValues;
+
   const accountQuery = existing?.id
-    ? admin.from("social_accounts").update(accountValues).eq("id", existing.id)
+    ? admin.from("social_accounts").update(updateValues).eq("id", existing.id)
     : admin.from("social_accounts").insert(accountValues);
   const { data: account, error: accountError } = await accountQuery
     .select(ACCOUNT_SELECT)

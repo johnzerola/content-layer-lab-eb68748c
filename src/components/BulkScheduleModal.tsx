@@ -293,7 +293,7 @@ export function BulkScheduleModal({
                   <option value="">Selecione…</option>
                   {accounts.map((a) => (
                     <option key={a.id} value={a.id}>
-                      @{a.username} · {a.platform}
+                      {a.display_name || `@${a.username}`} · {a.platform}
                     </option>
                   ))}
                 </select>
