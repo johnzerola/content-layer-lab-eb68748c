@@ -103,6 +103,48 @@ function AgendaPage() {
   const [when, setWhen] = useState(() => localInput(new Date(Date.now() + 60 * 60 * 1000)));
   const [consent, setConsent] = useState(false);
   const [sending, setSending] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+  const runPublishNow = useServerFn(publishPostNow);
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const selectedAccount = accounts.find((a) => a.id === accountId) ?? null;
+  const kindOptions = useMemo(() => {
+    const platform = selectedAccount?.platform;
+    if (platform === "youtube") {
+      return [
+        { value: "shorts", label: "Shorts (vertical)" },
+        { value: "feed", label: "Vídeo longo" },
+      ];
+    }
+    if (platform === "facebook") {
+      return [
+        { value: "reels", label: "Reels da Página" },
+        { value: "feed", label: "Vídeo no Feed" },
+      ];
+    }
+    return [
+      { value: "reels", label: "Reels" },
+      { value: "feed", label: "Feed" },
+      { value: "stories", label: "Stories" },
+    ];
+  }, [selectedAccount]);
+
+  useEffect(() => {
+    if (!kindOptions.some((o) => o.value === kind)) {
+      setKind(kindOptions[0]!.value as PostKind);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kindOptions]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
