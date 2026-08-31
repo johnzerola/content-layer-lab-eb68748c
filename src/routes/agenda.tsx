@@ -399,10 +399,11 @@ function AgendaPage() {
                       onChange={(e) => setKind(e.target.value as PostKind)}
                       className="rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm outline-none"
                     >
-                      <option value="reels">Reels</option>
-                      <option value="feed">Feed</option>
-                      <option value="stories">Stories</option>
-                      <option value="shorts">Shorts</option>
+                      {kindOptions.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
                     </select>
                   </label>
                 </div>
