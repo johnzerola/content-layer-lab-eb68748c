@@ -4,17 +4,20 @@ import { useCallback, useEffect, useState } from "react";
 import {
   CheckCircle2,
   Clock3,
+  ExternalLink,
   Star,
   Facebook,
   HelpCircle,
   Instagram,
   Loader2,
+  LogOut,
   Pencil,
   RefreshCw,
   ShieldCheck,
   Settings2,
   Trash2,
   TriangleAlert,
+  UserRound,
   Youtube,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -80,6 +83,7 @@ export const Route = createFileRoute("/integracoes")({
 });
 
 type PlatformKey = "instagram" | "facebook" | "tiktok" | "youtube";
+type AccountSwitchProvider = "meta" | "youtube";
 
 const META_PLATFORMS: Array<{
   platform: "instagram" | "facebook";
@@ -125,6 +129,8 @@ function IntegrationsPage() {
   const [syncingMetaAccounts, setSyncingMetaAccounts] = useState(false);
   const [syncingYoutube, setSyncingYoutube] = useState(false);
   const [refreshingYoutube, setRefreshingYoutube] = useState<Set<string>>(new Set());
+  const [accountSwitchProvider, setAccountSwitchProvider] =
+    useState<AccountSwitchProvider | null>(null);
   const makePrimary = useServerFn(setPrimaryAccount);
   const [schedules, setSchedules] = useState<Record<string, SyncSchedule>>({});
 
@@ -344,6 +350,14 @@ function IntegrationsPage() {
     [refreshChannel, reload],
   );
 
+  const continueWithOtherAccount = useCallback(
+    async (provider: AccountSwitchProvider) => {
+      setAccountSwitchProvider(null);
+      await connect(provider === "meta" ? "facebook" : "youtube");
+    },
+    [connect],
+  );
+
   const facebookAccounts = accounts.filter((account) => account.platform === "facebook");
   const instagramAccounts = accounts.filter((account) => account.platform === "instagram");
   const youtubeAccounts = accounts.filter((account) => account.platform === "youtube");
@@ -402,6 +416,18 @@ function IntegrationsPage() {
                 )}
                 {hasMetaAccounts ? "Adicionar/selecionar canais Meta" : "Conectar Meta"}
               </Button>
+              {hasMetaAccounts && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={syncingMeta}
+                  onClick={() => setAccountSwitchProvider("meta")}
+                  className="min-h-10 shrink-0"
+                >
+                  <UserRound className="size-4" />
+                  Outro Facebook
+                </Button>
+              )}
               {hasYoutubeAccounts && (
                 <Button
                   type="button"
@@ -432,11 +458,32 @@ function IntegrationsPage() {
                 ) : (
                   <Youtube className="size-4" />
                 )}
-                {hasYoutubeAccounts ? "Adicionar outro canal" : "Conectar YouTube"}
+                {hasYoutubeAccounts ? "Adicionar outro Google/canal" : "Conectar YouTube"}
               </Button>
+              {hasYoutubeAccounts && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy === "youtube"}
+                  onClick={() => setAccountSwitchProvider("youtube")}
+                  className="min-h-10 shrink-0"
+                >
+                  <UserRound className="size-4" />
+                  Outro Google
+                </Button>
+              )}
             </div>
           )}
         </header>
+
+        <AccountSwitchDialog
+          provider={accountSwitchProvider}
+          busy={busy}
+          onOpenChange={(open) => {
+            if (!open) setAccountSwitchProvider(null);
+          }}
+          onContinue={continueWithOtherAccount}
+        />
 
         {user && <MetaDiagnosticsPanel />}
 
@@ -523,6 +570,81 @@ function IntegrationsPage() {
         </section>
       </main>
     </AppShell>
+  );
+}
+
+function AccountSwitchDialog({
+  provider,
+  busy,
+  onOpenChange,
+  onContinue,
+}: {
+  provider: AccountSwitchProvider | null;
+  busy: PlatformKey | null;
+  onOpenChange: (open: boolean) => void;
+  onContinue: (provider: AccountSwitchProvider) => Promise<void>;
+}) {
+  const isMeta = provider === "meta";
+  const activePlatform = isMeta ? "facebook" : "youtube";
+  const title = isMeta ? "Conectar outro Facebook" : "Conectar outro Google/YouTube";
+  const description = isMeta
+    ? "O Facebook usa a sessão aberta no navegador. Se a Jane estiver logada, saia dela ou use Entrar em outra conta antes de continuar."
+    : "O Google abrirá o seletor de conta e canal. Escolha o e-mail ou Conta de marca que deseja adicionar ao VaiViral.";
+  const steps = isMeta
+    ? [
+        "Abra o Facebook em outra aba e confirme se não está na Jane.",
+        "Se estiver na Jane, clique em Sair ou use Entrar em outra conta no diálogo da Meta.",
+        "Volte aqui e continue para autorizar as páginas e Instagrams do outro perfil.",
+      ]
+    : [
+        "Escolha o e-mail Google correto no seletor.",
+        "Depois escolha o canal ou Conta de marca do YouTube.",
+        "Autorize todos os escopos para o canal aparecer como conexão separada.",
+      ];
+
+  return (
+    <Dialog open={!!provider} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+          {steps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+        <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+          {isMeta && (
+            <>
+              <Button asChild variant="outline" size="sm">
+                <a href="https://www.facebook.com/logout.php" target="_blank" rel="noreferrer">
+                  <LogOut className="size-4" />
+                  Sair do Facebook
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <a href="https://www.facebook.com/" target="_blank" rel="noreferrer">
+                  <ExternalLink className="size-4" />
+                  Abrir Facebook
+                </a>
+              </Button>
+            </>
+          )}
+          <Button
+            type="button"
+            size="sm"
+            disabled={!provider || busy === activePlatform}
+            onClick={() => {
+              if (provider) void onContinue(provider);
+            }}
+          >
+            {busy === activePlatform && <Loader2 className="size-4 animate-spin" />}
+            Continuar OAuth
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
