@@ -38,6 +38,7 @@ import {
   syncYoutubeChannels,
 } from "@/lib/youtube-oauth.functions";
 import { setPrimaryAccount } from "@/lib/social-primary.functions";
+import { RECONNECT_GUIDE_STEPS } from "@/lib/meta-reconnect-guide";
 import {
   describeSchedule,
   listSyncSchedules,
@@ -455,6 +456,7 @@ function IntegrationsPage() {
                   divided={index > 0}
                   onPrimary={choosePrimary}
                   onRemove={disconnect}
+                  reconnectHelp
                 />
               ))}
             </div>
@@ -522,14 +524,20 @@ function AccountsColumn({
   divided,
   onPrimary,
   onRemove,
+  reconnectHelp = false,
 }: {
   platform: (typeof META_PLATFORMS)[number] | typeof YOUTUBE_PLATFORM;
   accounts: SocialAccount[];
   divided: boolean;
   onPrimary: (account: SocialAccount) => Promise<void>;
   onRemove: (account: SocialAccount) => Promise<void>;
+  reconnectHelp?: boolean;
 }) {
   const Icon = platform.icon;
+  const [guideOpen, setGuideOpen] = useState(false);
+  const hasDisconnected = accounts.some(
+    (account) => account.status !== "conectado" || account.provider === "pending",
+  );
   return (
     <div
       className={`min-w-0 p-4 sm:p-5 ${divided ? "border-t border-border md:border-l md:border-t-0" : ""}`}
@@ -605,6 +613,43 @@ function AccountsColumn({
           );
         })}
       </ul>
+      {reconnectHelp && hasDisconnected && (
+        <button
+          type="button"
+          onClick={() => setGuideOpen(true)}
+          className="mt-3 text-xs font-medium text-primary underline-offset-2 hover:underline"
+        >
+          Como reconectar
+        </button>
+      )}
+      {reconnectHelp && guideOpen && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Como reconectar"
+          onClick={() => setGuideOpen(false)}
+        >
+          <div
+            className="w-full max-w-md border border-border bg-surface p-5 text-left"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="text-sm font-semibold">Como resolver e conectar todas as páginas</p>
+            <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-xs text-muted-foreground">
+              {RECONNECT_GUIDE_STEPS.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+            <button
+              type="button"
+              onClick={() => setGuideOpen(false)}
+              className="mt-4 inline-flex min-h-10 items-center bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            >
+              Entendi
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
