@@ -66,7 +66,7 @@ export function planFromId(id: string | null | undefined): PlanDef {
 }
 
 /** E-mails que sempre enxergam o painel administrativo. */
-export const ADMIN_EMAILS = ["admin@vaiviral.com"];
+export const ADMIN_EMAILS = ["admin@vaiviral.com", "johnszerola@gmail.com"];
 
 export function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
