@@ -89,7 +89,9 @@ describe("Meta account selection", () => {
     ).toThrow(/outro usu.rio/);
     expect(() =>
       openMetaSelection({
-        selectionToken: `${selection.selectionToken.slice(0, -1)}x`,
+        selectionToken: `${
+          selection.selectionToken.startsWith("a") ? "b" : "a"
+        }${selection.selectionToken.slice(1)}`,
         userId: "user-1",
         now,
         environment,

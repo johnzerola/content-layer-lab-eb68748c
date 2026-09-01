@@ -196,7 +196,7 @@ function IntegrationsPage() {
         }
         // O mesmo Facebook Login autoriza a Página e a conta Instagram
         // profissional vinculada a ela.
-        const response = await startFacebook({ data: { forceClassic: true } });
+        const response = await startFacebook({ data: {} });
 
         if (!response.ok) {
           toast.error(response.error);
@@ -223,13 +223,6 @@ function IntegrationsPage() {
           response.diagnostics.requestedScopes.some((scope) => !sentScopes.includes(scope))
         ) {
           toast.error("A URL OAuth não contém todas as permissões obrigatórias.");
-          return;
-        }
-        if (
-          response.diagnostics.mode === "classic" &&
-          authorizationUrl.searchParams.has("config_id")
-        ) {
-          toast.error("O modo clássico não pode enviar config_id.");
           return;
         }
         window.location.href = response.authorizationUrl;

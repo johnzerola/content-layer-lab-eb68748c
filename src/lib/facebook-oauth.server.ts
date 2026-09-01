@@ -35,11 +35,12 @@ export function facebookScopes(_environment: NodeJS.ProcessEnv = process.env): s
 export type FacebookLoginMode = "classic" | "business";
 
 export function facebookLoginMode(environment: NodeJS.ProcessEnv = process.env): FacebookLoginMode {
-  // Business Login só é habilitado de forma explícita. Isso impede que um
-  // META_LOGIN_CONFIG_ID antigo reative silenciosamente permissões do caso de uso.
-  return environment["META_LOGIN_MODE"]?.trim().toLowerCase() === "business"
-    ? "business"
-    : "classic";
+  const configuredMode = environment["META_LOGIN_MODE"]?.trim().toLowerCase();
+  if (configuredMode === "classic") return "classic";
+  if (configuredMode === "business") return "business";
+  // Para apps publicados, a configuração do Login para Empresas é o fluxo
+  // esperado para usuários fora da equipe/admin. Se existir config_id, use-o.
+  return environment["META_LOGIN_CONFIG_ID"]?.trim() ? "business" : "classic";
 }
 
 type OAuthConfiguration = {
@@ -365,6 +366,7 @@ export function facebookAuthorizationUrl(
   url.searchParams.set("redirect_uri", configuration.redirectUri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("state", createFacebookOAuthState(userId, environment));
+  url.searchParams.set("auth_type", "rerequest");
   if (configuration.configId) {
     // No Login para Empresas, as permissões pertencem à configuração da Meta.
     url.searchParams.set("config_id", configuration.configId);
@@ -376,7 +378,6 @@ export function facebookAuthorizationUrl(
     // depois de uma tentativa anterior ter sido recusada.
     const scopes = facebookScopes(environment);
     url.searchParams.set("scope", scopes.join(","));
-    url.searchParams.set("auth_type", "rerequest");
     if (!scopes.includes("pages_read_engagement")) {
       throw new MetaLinkError(
         "SERVER_CONFIG_MISSING",

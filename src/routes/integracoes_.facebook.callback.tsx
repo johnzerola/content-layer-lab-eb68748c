@@ -159,7 +159,7 @@ function FacebookOAuthCallback() {
     }
   };
 
-  const reconnect = async (forceClassic = true) => {
+  const reconnect = async (forceClassic = false) => {
     setReconnecting(true);
     try {
       const response = await startOAuth({ data: { forceClassic } });
@@ -347,13 +347,13 @@ function FacebookOAuthCallback() {
             {!confirmed && !result.ok && (
               <button
                 type="button"
-                onClick={() => void reconnect(false)}
+                onClick={() => void reconnect(true)}
                 disabled={reconnecting}
                 className="ml-2 mt-5 inline-flex min-h-10 items-center gap-2 border border-primary/50 bg-primary/10 px-4 py-2 text-sm font-medium text-primary disabled:opacity-60"
-                title="Reabre o OAuth usando a configuracao empresarial da Meta"
+                title="Abre o OAuth classico com scopes explicitos como alternativa"
               >
                 {reconnecting && <Loader2 className="size-4 animate-spin" />}
-                Tentar Login empresarial
+                Tentar Login classico
               </button>
             )}
             {!confirmed && (

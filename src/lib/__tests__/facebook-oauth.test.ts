@@ -37,6 +37,7 @@ describe("Facebook Login", () => {
       "https://content-layer-lab.lovable.app/integracoes/facebook/callback",
     );
     expect(url.searchParams.get("response_type")).toBe("code");
+    expect(url.searchParams.get("auth_type")).toBe("rerequest");
     expect(url.searchParams.get("override_default_response_type")).toBe("true");
     expect(url.searchParams.has("scope")).toBe(false);
     expect(url.toString()).not.toContain("server-only-secret");
@@ -91,12 +92,12 @@ describe("Facebook Login", () => {
     expect(url.searchParams.get("auth_type")).toBe("rerequest");
   });
 
-  it("defaults to classic and ignores an old config id unless business is explicit", () => {
-    expect(facebookLoginMode(environment)).toBe("classic");
+  it("defaults to business when a login config exists and can be forced to classic", () => {
+    expect(facebookLoginMode(environment)).toBe("business");
+    expect(facebookOAuthConfiguration(environment).configId).toBe("2291311094966424");
+    expect(facebookLoginMode({ ...environment, META_LOGIN_MODE: "classic" })).toBe("classic");
     expect(
-      facebookOAuthConfiguration({
-        ...environment,
-      }).configId,
+      facebookOAuthConfiguration({ ...environment, META_LOGIN_MODE: "classic" }).configId,
     ).toBeNull();
   });
 
@@ -153,16 +154,9 @@ describe("Facebook Login", () => {
       graphVersion: "v26.0",
       redirectOrigin: "https://content-layer-lab.lovable.app",
       redirectPath: "/integracoes/facebook/callback",
-      mode: "classic",
-      usesConfigId: false,
-      requestedScopes: [
-        "pages_show_list",
-        "pages_read_engagement",
-        "business_management",
-        "pages_manage_posts",
-        "instagram_basic",
-        "instagram_content_publish",
-      ],
+      mode: "business",
+      usesConfigId: true,
+      requestedScopes: [],
     });
     expect(JSON.stringify(diagnostics)).not.toContain("37730893806558210");
     expect(JSON.stringify(diagnostics)).not.toContain("2291311094966424");
