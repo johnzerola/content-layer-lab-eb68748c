@@ -522,14 +522,20 @@ function AccountsColumn({
   divided,
   onPrimary,
   onRemove,
+  reconnectHelp = false,
 }: {
   platform: (typeof META_PLATFORMS)[number] | typeof YOUTUBE_PLATFORM;
   accounts: SocialAccount[];
   divided: boolean;
   onPrimary: (account: SocialAccount) => Promise<void>;
   onRemove: (account: SocialAccount) => Promise<void>;
+  reconnectHelp?: boolean;
 }) {
   const Icon = platform.icon;
+  const [guideOpen, setGuideOpen] = useState(false);
+  const hasDisconnected = accounts.some(
+    (account) => account.status !== "conectado" || account.provider === "pending",
+  );
   return (
     <div
       className={`min-w-0 p-4 sm:p-5 ${divided ? "border-t border-border md:border-l md:border-t-0" : ""}`}
