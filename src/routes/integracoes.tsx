@@ -44,6 +44,10 @@ import {
 import { setPrimaryAccount } from "@/lib/social-primary.functions";
 import { RECONNECT_GUIDE_STEPS } from "@/lib/meta-reconnect-guide";
 import {
+  YOUTUBE_RECONNECT_GUIDE_STEPS,
+  YOUTUBE_SINGLE_CHANNEL_NOTICE,
+} from "@/lib/youtube-reconnect-guide";
+import {
   describeSchedule,
   listSyncSchedules,
   setSyncSchedule,
@@ -458,7 +462,7 @@ function IntegrationsPage() {
                 ) : (
                   <Youtube className="size-4" />
                 )}
-                {hasYoutubeAccounts ? "Adicionar outro Google/canal" : "Conectar YouTube"}
+                {hasYoutubeAccounts ? "Adicionar canal/Conta de marca" : "Conectar YouTube"}
               </Button>
               {hasYoutubeAccounts && (
                 <Button
@@ -589,18 +593,14 @@ function AccountSwitchDialog({
   const title = isMeta ? "Conectar outro Facebook" : "Conectar outro Google/YouTube";
   const description = isMeta
     ? "O Facebook usa a sessão aberta no navegador. Se a Jane estiver logada, saia dela ou use Entrar em outra conta antes de continuar."
-    : "O Google abrirá o seletor de conta e canal. Escolha o e-mail ou Conta de marca que deseja adicionar ao VaiViral.";
+    : YOUTUBE_SINGLE_CHANNEL_NOTICE;
   const steps = isMeta
     ? [
         "Abra o Facebook em outra aba e confirme se não está na Jane.",
         "Se estiver na Jane, clique em Sair ou use Entrar em outra conta no diálogo da Meta.",
         "Volte aqui e continue para autorizar as páginas e Instagrams do outro perfil.",
       ]
-    : [
-        "Escolha o e-mail Google correto no seletor.",
-        "Depois escolha o canal ou Conta de marca do YouTube.",
-        "Autorize todos os escopos para o canal aparecer como conexão separada.",
-      ];
+    : YOUTUBE_RECONNECT_GUIDE_STEPS;
 
   return (
     <Dialog open={!!provider} onOpenChange={onOpenChange}>
@@ -627,6 +627,22 @@ function AccountSwitchDialog({
                 <a href="https://www.facebook.com/" target="_blank" rel="noreferrer">
                   <ExternalLink className="size-4" />
                   Abrir Facebook
+                </a>
+              </Button>
+            </>
+          )}
+          {!isMeta && (
+            <>
+              <Button asChild variant="outline" size="sm">
+                <a href="https://accounts.google.com/Logout" target="_blank" rel="noreferrer">
+                  <LogOut className="size-4" />
+                  Sair do Google
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <a href="https://www.youtube.com/account" target="_blank" rel="noreferrer">
+                  <ExternalLink className="size-4" />
+                  Ver canais
                 </a>
               </Button>
             </>
