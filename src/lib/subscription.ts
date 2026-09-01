@@ -120,7 +120,8 @@ export function useAccess(): AccessState {
       if (!alive) return;
       const admin =
         isAdminEmail(user.email) || (roles.data ?? []).some((r) => r.role === "admin");
-      setState({ ready: true, signedIn: true, sub, active: isActive(sub), isAdmin: admin });
+      // Admin nunca é bloqueado por plano/créditos.
+      setState({ ready: true, signedIn: true, sub, active: admin || isActive(sub), isAdmin: admin });
     };
 
     void load();
