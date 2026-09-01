@@ -74,6 +74,8 @@ export async function activatePlan(planId: PlanId): Promise<Subscription> {
 /** Consome créditos (planos ilimitados ignoram). Silencioso quando não há sessão. */
 export async function consumeCredits(amount = 1): Promise<void> {
   if (amount <= 0) return;
+  const user = await currentUser();
+  if (isAdminEmail(user?.email)) return; // admins usam o sistema sem limite
   const sub = await getOrCreateSubscription();
   if (!sub) return;
   if (planFromId(sub.plan).credits === null) return;
