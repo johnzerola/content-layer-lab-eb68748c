@@ -92,13 +92,18 @@ describe("Facebook Login", () => {
     expect(url.searchParams.get("auth_type")).toBe("rerequest");
   });
 
-  it("defaults to business when a login config exists and can be forced to classic", () => {
-    expect(facebookLoginMode(environment)).toBe("business");
-    expect(facebookOAuthConfiguration(environment).configId).toBe("2291311094966424");
-    expect(facebookLoginMode({ ...environment, META_LOGIN_MODE: "classic" })).toBe("classic");
+  it("defaults to classic even when a login config exists and can be forced to business", () => {
+    expect(facebookLoginMode(environment)).toBe("classic");
+    expect(facebookOAuthConfiguration(environment).configId).toBeNull();
+    expect(facebookLoginMode({ ...environment, META_LOGIN_MODE: "business" })).toBe("business");
     expect(
-      facebookOAuthConfiguration({ ...environment, META_LOGIN_MODE: "classic" }).configId,
-    ).toBeNull();
+      facebookOAuthConfiguration({ ...environment, META_LOGIN_MODE: "business" }).configId,
+    ).toBe("2291311094966424");
+    expect(
+      new URL(
+        facebookAuthorizationUrl("user-123", environment, { forceBusiness: true }),
+      ).searchParams.get("config_id"),
+    ).toBe("2291311094966424");
   });
 
   it("does not let an override remove scopes required by account discovery", () => {
@@ -154,9 +159,16 @@ describe("Facebook Login", () => {
       graphVersion: "v26.0",
       redirectOrigin: "https://content-layer-lab.lovable.app",
       redirectPath: "/integracoes/facebook/callback",
-      mode: "business",
-      usesConfigId: true,
-      requestedScopes: [],
+      mode: "classic",
+      usesConfigId: false,
+      requestedScopes: [
+        "pages_show_list",
+        "pages_read_engagement",
+        "business_management",
+        "pages_manage_posts",
+        "instagram_basic",
+        "instagram_content_publish",
+      ],
     });
     expect(JSON.stringify(diagnostics)).not.toContain("37730893806558210");
     expect(JSON.stringify(diagnostics)).not.toContain("2291311094966424");

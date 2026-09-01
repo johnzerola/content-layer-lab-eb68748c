@@ -38,9 +38,9 @@ export function facebookLoginMode(environment: NodeJS.ProcessEnv = process.env):
   const configuredMode = environment["META_LOGIN_MODE"]?.trim().toLowerCase();
   if (configuredMode === "classic") return "classic";
   if (configuredMode === "business") return "business";
-  // Para apps publicados, a configuração do Login para Empresas é o fluxo
-  // esperado para usuários fora da equipe/admin. Se existir config_id, use-o.
-  return environment["META_LOGIN_CONFIG_ID"]?.trim() ? "business" : "classic";
+  // O fluxo clássico é o caminho principal porque ele mostra a seleção granular
+  // de Páginas. Login para Empresas só entra quando configurado explicitamente.
+  return "classic";
 }
 
 type OAuthConfiguration = {
@@ -78,11 +78,12 @@ function callbackFromEnvironment(environment: NodeJS.ProcessEnv): string {
 
 export function facebookOAuthConfiguration(
   environment: NodeJS.ProcessEnv = process.env,
+  options: { loginMode?: FacebookLoginMode } = {},
 ): OAuthConfiguration {
   const appId = environment["META_APP_ID"]?.trim();
   const appSecret = environment["META_APP_SECRET"]?.trim();
   const redirectUri = callbackFromEnvironment(environment);
-  const mode = facebookLoginMode(environment);
+  const mode = options.loginMode ?? facebookLoginMode(environment);
   const rawConfigId = environment["META_LOGIN_CONFIG_ID"]?.trim();
   const configId = mode === "business" ? (rawConfigId ?? null) : null;
   if (!appId || !appSecret || !redirectUri) {
@@ -355,10 +356,13 @@ export function verifyFacebookOAuthState(
 export function facebookAuthorizationUrl(
   userId: string,
   environment: NodeJS.ProcessEnv = process.env,
-  options: { forceClassic?: boolean } = {},
+  options: { forceClassic?: boolean; forceBusiness?: boolean } = {},
 ): string {
-  const base = facebookOAuthConfiguration(environment);
-  const configuration = options.forceClassic ? { ...base, configId: null } : base;
+  const loginMode = options.forceBusiness ? "business" : options.forceClassic ? "classic" : null;
+  const configuration = facebookOAuthConfiguration(
+    environment,
+    loginMode ? { loginMode } : {},
+  );
   // O Login for Business deve usar a mesma versão configurada para as chamadas Graph.
   // Isso evita a Meta resolver o diálogo com uma versão padrão diferente da configuração.
   const url = new URL(`https://www.facebook.com/${metaGraphVersion(environment)}/dialog/oauth`);

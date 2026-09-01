@@ -25,6 +25,7 @@ export const beginFacebookOAuth = createServerFn({ method: "POST" })
     z
       .object({
         forceClassic: z.boolean().optional(),
+        forceBusiness: z.boolean().optional(),
       })
       .optional()
       .parse(data) ?? {},
@@ -32,19 +33,22 @@ export const beginFacebookOAuth = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     try {
       const forceClassic = data.forceClassic === true;
+      const forceBusiness = data.forceBusiness === true;
       const configuredDiagnostics = diagnoseFacebookOAuth();
       const authorizationUrl = facebookAuthorizationUrl(context.userId, process.env, {
         forceClassic,
+        forceBusiness,
       });
       const parsedUrl = new URL(authorizationUrl);
-      const diagnostics = forceClassic
-        ? ({
-            ...configuredDiagnostics,
-            mode: "classic",
-            usesConfigId: false,
-            requestedScopes: parsedUrl.searchParams.get("scope")?.split(",").filter(Boolean) ?? [],
-          } as const)
-        : configuredDiagnostics;
+      const usesConfigId = parsedUrl.searchParams.has("config_id");
+      const diagnostics = {
+        ...configuredDiagnostics,
+        mode: usesConfigId ? "business" : "classic",
+        usesConfigId,
+        requestedScopes: usesConfigId
+          ? []
+          : (parsedUrl.searchParams.get("scope")?.split(",").filter(Boolean) ?? []),
+      } as const;
       if (
         diagnostics.mode === "classic" &&
         parsedUrl.searchParams.get("scope") !== diagnostics.requestedScopes.join(",")

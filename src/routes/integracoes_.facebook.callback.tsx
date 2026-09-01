@@ -159,10 +159,15 @@ function FacebookOAuthCallback() {
     }
   };
 
-  const reconnect = async (forceClassic = false) => {
+  const reconnect = async (mode: "classic" | "business" = "classic") => {
     setReconnecting(true);
     try {
-      const response = await startOAuth({ data: { forceClassic } });
+      const response = await startOAuth({
+        data: {
+          forceClassic: mode === "classic",
+          forceBusiness: mode === "business",
+        },
+      });
       if (!response.ok) {
         setResult((current) =>
           current ? { ...current, warning: response.error } : { ok: false, message: response.error },
@@ -320,7 +325,7 @@ function FacebookOAuthCallback() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => void reconnect()}
+                    onClick={() => void reconnect("classic")}
                     disabled={reconnecting}
                     className="inline-flex min-h-10 items-center gap-2 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
                   >
@@ -347,19 +352,19 @@ function FacebookOAuthCallback() {
             {!confirmed && !result.ok && (
               <button
                 type="button"
-                onClick={() => void reconnect(true)}
+                onClick={() => void reconnect("business")}
                 disabled={reconnecting}
                 className="ml-2 mt-5 inline-flex min-h-10 items-center gap-2 border border-primary/50 bg-primary/10 px-4 py-2 text-sm font-medium text-primary disabled:opacity-60"
-                title="Abre o OAuth classico com scopes explicitos como alternativa"
+                title="Abre o Login para Empresas quando a configuracao Business da Meta estiver publicada"
               >
                 {reconnecting && <Loader2 className="size-4 animate-spin" />}
-                Tentar Login classico
+                Tentar Login empresarial
               </button>
             )}
             {!confirmed && (
               <button
                 type="button"
-                onClick={() => void reconnect()}
+                onClick={() => void reconnect("classic")}
                 disabled={reconnecting}
                 className="ml-2 mt-5 inline-flex min-h-10 items-center gap-2 border border-border px-4 py-2 text-sm font-medium text-foreground disabled:opacity-60"
               >
