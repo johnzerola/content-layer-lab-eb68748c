@@ -39,6 +39,7 @@ import {
   syncYoutubeChannels,
 } from "@/lib/youtube-oauth.functions";
 import { setPrimaryAccount } from "@/lib/social-primary.functions";
+import { RECONNECT_GUIDE_STEPS } from "@/lib/meta-reconnect-guide";
 import {
   describeSchedule,
   listSyncSchedules,
@@ -108,15 +109,6 @@ const YOUTUBE_PLATFORM = {
     "Vídeos longos e Shorts via YouTube Data API. Cada canal ou Conta de marca deve ser adicionado separadamente.",
   icon: Youtube,
 };
-
-const META_RECONNECT_STEPS = [
-  "Vá em facebook.com/settings?tab=business_tools",
-  "Encontre o app 'VaiViral' na lista e clique em 'Ver e editar'",
-  "Na tela de permissões, marque TODAS as páginas que deseja conectar",
-  "Clique em 'Salvar' no diálogo do Facebook",
-  "Se alguma página estiver em um Business Manager, vá em business.facebook.com/settings, encontre a página, clique em 'Apps' e adicione o app VaiViral com permissão de publicação",
-  "Confirme que você tem papel de Administrador ou Editor em cada página (não basta ser Analista)",
-] as const;
 
 function IntegrationsPage() {
   const [mode, setMode] = useState<AppMode>("external");
@@ -472,6 +464,7 @@ function IntegrationsPage() {
                   divided={index > 0}
                   onPrimary={choosePrimary}
                   onRemove={disconnect}
+                  reconnectHelp
                 />
               ))}
             </div>
@@ -539,16 +532,20 @@ function AccountsColumn({
   divided,
   onPrimary,
   onRemove,
+  reconnectHelp = false,
 }: {
   platform: (typeof META_PLATFORMS)[number] | typeof YOUTUBE_PLATFORM;
   accounts: SocialAccount[];
   divided: boolean;
   onPrimary: (account: SocialAccount) => Promise<void>;
   onRemove: (account: SocialAccount) => Promise<void>;
+  reconnectHelp?: boolean;
 }) {
   const Icon = platform.icon;
-  const isMetaPlatform = platform.platform === "facebook" || platform.platform === "instagram";
-  const [reconnectHelp, setReconnectHelp] = useState<SocialAccount | null>(null);
+  const [reconnectHelpAccount, setReconnectHelpAccount] = useState<SocialAccount | null>(null);
+  const hasDisconnected = accounts.some(
+    (account) => account.status !== "conectado" || account.provider === "pending",
+  );
   return (
     <div
       className={`min-w-0 p-4 sm:p-5 ${divided ? "border-t border-border md:border-l md:border-t-0" : ""}`}
@@ -596,12 +593,12 @@ function AccountsColumn({
                 <p className="truncate text-[11px] text-muted-foreground/80">
                   {socialAccountDetail(account)}
                 </p>
-                {!connected && isMetaPlatform && (
+                {!connected && reconnectHelp && (
                   <Button
                     type="button"
                     variant="link"
                     size="sm"
-                    onClick={() => setReconnectHelp(account)}
+                    onClick={() => setReconnectHelpAccount(account)}
                     className="mt-1 h-auto p-0 text-xs text-amber-300"
                   >
                     <HelpCircle className="size-3.5" />
@@ -637,9 +634,9 @@ function AccountsColumn({
         })}
       </ul>
       <MetaReconnectDialog
-        account={reconnectHelp}
+        account={reconnectHelp && hasDisconnected ? reconnectHelpAccount : null}
         onOpenChange={(open) => {
-          if (!open) setReconnectHelp(null);
+          if (!open) setReconnectHelpAccount(null);
         }}
       />
     </div>
@@ -664,7 +661,7 @@ function MetaReconnectDialog({
           </DialogDescription>
         </DialogHeader>
         <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
-          {META_RECONNECT_STEPS.map((step) => (
+          {RECONNECT_GUIDE_STEPS.map((step) => (
             <li key={step}>{step}</li>
           ))}
         </ol>
