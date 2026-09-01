@@ -3,7 +3,6 @@ import { z } from "zod";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
-  assertCompleteFacebookPageDiscovery,
   diagnoseFacebookOAuth,
   exchangeFacebookAuthorizationCode,
   facebookAuthorizationUrl,
@@ -95,7 +94,10 @@ export const completeFacebookOAuth = createServerFn({ method: "POST" })
         accessToken: token.accessToken,
         authorizedPageIds: authorization.authorizedPageIds,
       });
-      assertCompleteFacebookPageDiscovery(authorization, discovery);
+      const unavailablePages = await fetchUnavailablePageNames({
+        pageIds: discovery.unavailablePageIds,
+        accessToken: token.accessToken,
+      });
       if (discovery.pages.length === 0) {
         const selectedDetail =
           authorization.authorizedPageIds.length > 0
@@ -109,16 +111,15 @@ export const completeFacebookOAuth = createServerFn({ method: "POST" })
           authorization.authorizedInstagramIds.length > 0
             ? ` A Meta confirmou ${authorization.authorizedInstagramIds.length} Instagram, mas o Instagram só publica quando a Página vinculada também libera token.`
             : "";
-        throw new MetaLinkError(
-          "META_ACCOUNT_MISMATCH",
-          `Nenhuma Página publicável foi devolvida.${selectedDetail}${instagramDetail}${diagnosticDetail} Clique em Editar configurações no diálogo da Meta, marque as Páginas vinculadas aos Instagrams desejados e confirme que você tem controle total dessas Páginas no Gerenciador de Negócios.`,
-        );
+        return {
+          ok: false as const,
+          code: "META_ACCOUNT_MISMATCH" as const,
+          error: `Nenhuma Página publicável foi devolvida.${selectedDetail}${instagramDetail}${diagnosticDetail} Clique em Editar configurações no diálogo da Meta, marque as Páginas vinculadas aos Instagrams desejados e confirme que você tem controle total dessas Páginas no Gerenciador de Negócios.`,
+          unavailablePageIds: discovery.unavailablePageIds,
+          unavailablePages,
+        };
       }
 
-      const unavailablePages = await fetchUnavailablePageNames({
-        pageIds: discovery.unavailablePageIds,
-        accessToken: token.accessToken,
-      });
       const selection = createMetaSelection({
         userId: context.userId,
         pages: discovery.pages,

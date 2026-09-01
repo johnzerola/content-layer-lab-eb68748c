@@ -6,6 +6,7 @@ import {
   Clock3,
   Star,
   Facebook,
+  HelpCircle,
   Instagram,
   Loader2,
   Pencil,
@@ -47,6 +48,13 @@ import {
 } from "@/lib/sync-schedule";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { listJobs } from "@/lib/jobs";
 
 export const Route = createFileRoute("/integracoes")({
@@ -100,6 +108,15 @@ const YOUTUBE_PLATFORM = {
     "Vídeos longos e Shorts via YouTube Data API. Cada canal ou Conta de marca deve ser adicionado separadamente.",
   icon: Youtube,
 };
+
+const META_RECONNECT_STEPS = [
+  "Vá em facebook.com/settings?tab=business_tools",
+  "Encontre o app 'VaiViral' na lista e clique em 'Ver e editar'",
+  "Na tela de permissões, marque TODAS as páginas que deseja conectar",
+  "Clique em 'Salvar' no diálogo do Facebook",
+  "Se alguma página estiver em um Business Manager, vá em business.facebook.com/settings, encontre a página, clique em 'Apps' e adicione o app VaiViral com permissão de publicação",
+  "Confirme que você tem papel de Administrador ou Editor em cada página (não basta ser Analista)",
+] as const;
 
 function IntegrationsPage() {
   const [mode, setMode] = useState<AppMode>("external");
@@ -530,6 +547,8 @@ function AccountsColumn({
   onRemove: (account: SocialAccount) => Promise<void>;
 }) {
   const Icon = platform.icon;
+  const isMetaPlatform = platform.platform === "facebook" || platform.platform === "instagram";
+  const [reconnectHelp, setReconnectHelp] = useState<SocialAccount | null>(null);
   return (
     <div
       className={`min-w-0 p-4 sm:p-5 ${divided ? "border-t border-border md:border-l md:border-t-0" : ""}`}
@@ -577,6 +596,18 @@ function AccountsColumn({
                 <p className="truncate text-[11px] text-muted-foreground/80">
                   {socialAccountDetail(account)}
                 </p>
+                {!connected && isMetaPlatform && (
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    onClick={() => setReconnectHelp(account)}
+                    className="mt-1 h-auto p-0 text-xs text-amber-300"
+                  >
+                    <HelpCircle className="size-3.5" />
+                    Como reconectar
+                  </Button>
+                )}
               </div>
               <Button
                 type="button"
@@ -605,7 +636,56 @@ function AccountsColumn({
           );
         })}
       </ul>
+      <MetaReconnectDialog
+        account={reconnectHelp}
+        onOpenChange={(open) => {
+          if (!open) setReconnectHelp(null);
+        }}
+      />
     </div>
+  );
+}
+
+function MetaReconnectDialog({
+  account,
+  onOpenChange,
+}: {
+  account: SocialAccount | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const accountName = account ? socialAccountTitle(account) : "esta conta";
+  return (
+    <Dialog open={!!account} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Como reconectar</DialogTitle>
+          <DialogDescription>
+            Resolva as permissões da Meta para {accountName} e conecte novamente pelo VaiViral.
+          </DialogDescription>
+        </DialogHeader>
+        <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+          {META_RECONNECT_STEPS.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+        <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+          <Button asChild variant="outline" size="sm">
+            <a
+              href="https://www.facebook.com/settings?tab=business_tools"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Apps e sites
+            </a>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <a href="https://business.facebook.com/settings" target="_blank" rel="noreferrer">
+              Business Manager
+            </a>
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

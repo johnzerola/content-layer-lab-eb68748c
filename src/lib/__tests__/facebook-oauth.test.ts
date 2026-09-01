@@ -9,6 +9,7 @@ import {
   facebookLoginMode,
   facebookOAuthConfiguration,
   fetchFacebookPages,
+  fetchUnavailablePageNames,
   validateFacebookAccessTokenScopes,
   verifyFacebookOAuthState,
 } from "@/lib/facebook-oauth.server";
@@ -570,6 +571,33 @@ describe("Facebook Login", () => {
       unavailablePageIds: ["200"],
       diagnostics: expect.any(Array),
     });
+  });
+
+  it("resolves unavailable Page names and falls back to the Page ID", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "100", name: "Dino pizzaria" })))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: { message: "Unsupported get request" } }), {
+          status: 400,
+        }),
+      );
+
+    await expect(
+      fetchUnavailablePageNames({
+        pageIds: ["100", "200", "100", "not-a-page-id"],
+        accessToken: "user-token",
+        environment,
+        fetch: request,
+      }),
+    ).resolves.toEqual([
+      { pageId: "100", name: "Dino pizzaria" },
+      { pageId: "200", name: "Página 200" },
+    ]);
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(new URL(String(request.mock.calls[0]?.[0])).pathname).toBe("/v26.0/100");
+    expect(new URL(String(request.mock.calls[1]?.[0])).searchParams.get("fields")).toBe("name");
   });
 
   it("blocks saving when Meta returns a partial Page authorization", () => {

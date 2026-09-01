@@ -51,6 +51,12 @@ export const RECONNECT_GUIDE_STEPS = [
   "Confirme que você tem papel de Administrador ou Editor em cada página (não basta ser Analista)",
 ] as const;
 
+function unavailablePagesWarning(count: number): string | null {
+  return count > 0
+    ? `${count} página(s) foram selecionadas no consentimento do Facebook, mas a Meta não liberou o token de publicação. Isso acontece quando você não é administrador da página, o app não foi adicionado às configurações avançadas da página, ou a página está em um Business Manager onde você não tem controle total. Veja abaixo como resolver.`
+    : null;
+}
+
 function FacebookOAuthCallback() {
   const search = Route.useSearch();
   const startOAuth = useServerFn(beginFacebookOAuth);
@@ -82,7 +88,16 @@ function FacebookOAuthCallback() {
     void completeOAuth({ data: { code: search.code, state: search.state } })
       .then((response) => {
         if (!response.ok) {
-          setResult({ ok: false, message: response.error });
+          const unavailablePages =
+            "unavailablePages" in response && Array.isArray(response.unavailablePages)
+              ? response.unavailablePages
+              : [];
+          setResult({
+            ok: false,
+            message: response.error,
+            unavailablePages,
+            warning: unavailablePagesWarning(unavailablePages.length),
+          });
           return;
         }
         const facebook = response.summary.facebook;
@@ -99,10 +114,7 @@ function FacebookOAuthCallback() {
           selectionToken: response.selectionToken,
           unavailablePages,
           message: `${facebook.length} Página(s) e ${instagram.length} Instagram encontrado(s). Revise e salve os canais que devem aparecer no VaiViral.`,
-          warning:
-            unavailable > 0
-              ? `${unavailable} página(s) foram selecionadas no consentimento do Facebook, mas a Meta não liberou o token de publicação. Isso acontece quando você não é administrador da página, o app não foi adicionado às configurações avançadas da página, ou a página está em um Business Manager onde você não tem controle total. Veja abaixo como resolver.`
-              : null,
+          warning: unavailablePagesWarning(unavailable),
         });
       })
       .catch(() => setResult({ ok: false, message: "Não foi possível concluir a conexão." }));
