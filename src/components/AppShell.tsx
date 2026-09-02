@@ -348,11 +348,6 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             </p>
           </div>
         )}
-        {expanded && signedIn && sub && (
-          <span className="shrink-0 rounded-md border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--muted-2)]">
-            {plan.name}
-          </span>
-        )}
       </div>
     </div>
   );
