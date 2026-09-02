@@ -46,6 +46,26 @@ export const SOUND_CATEGORIES: SoundCategory[] = [
   { id: "memes", label: "Memes", kind: "sfx", query: "cartoon boing pop sound effect" },
 ];
 
+/** Galeria curada de trilhas livres (CC0 / domínio público) por clima. */
+export interface Cc0Mood {
+  id: string;
+  label: string;
+  hint: string;
+  query: string;
+  /** classes de gradiente para o card da galeria */
+  gradient: string;
+}
+
+export const CC0_MOODS: Cc0Mood[] = [
+  { id: "hype", label: "Hype", hint: "abertura forte", query: "energetic electronic music loop", gradient: "from-primary/70 to-fuchsia-500/40" },
+  { id: "chill", label: "Chill", hint: "vlog e bastidores", query: "lofi chill ambient music", gradient: "from-cyan-400/60 to-primary/40" },
+  { id: "epico", label: "Épico", hint: "storytelling", query: "cinematic epic orchestral music", gradient: "from-amber-400/60 to-rose-500/40" },
+  { id: "emocional", label: "Emocional", hint: "depoimentos", query: "emotional piano music", gradient: "from-sky-400/60 to-indigo-500/40" },
+  { id: "urbano", label: "Urbano", hint: "trap e beats", query: "hip hop trap beat loop", gradient: "from-emerald-400/60 to-teal-500/40" },
+  { id: "acustico", label: "Acústico", hint: "lifestyle", query: "acoustic guitar background music", gradient: "from-orange-400/60 to-yellow-500/40" },
+];
+
+
 interface CommonsPage {
   title: string;
   imageinfo?: { url: string; mime: string; size: number; descriptionurl?: string; extmetadata?: Record<string, { value?: string }> }[];
