@@ -1,4 +1,5 @@
 import { TRANSITIONS, type Transition, type TransitionKind } from "@/lib/preedit";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const DURATIONS: { value: number; label: string }[] = [
@@ -7,23 +8,31 @@ const DURATIONS: { value: number; label: string }[] = [
   { value: 0.8, label: "Suave" },
 ];
 
-/** Classe de prévia (hover) de cada transição na galeria. */
-const PREVIEW_CLASS: Record<string, string> = {
-  none: "opacity-40",
-  fade: "opacity-30 group-hover:opacity-100",
-  zoom: "scale-75 group-hover:scale-100",
-  "zoom-out": "scale-125 group-hover:scale-100",
-  "slide-up": "translate-y-3 group-hover:translate-y-0",
-  "slide-down": "-translate-y-3 group-hover:translate-y-0",
-  "slide-left": "-translate-x-3 group-hover:translate-x-0",
-  "slide-right": "translate-x-3 group-hover:translate-x-0",
-  whip: "translate-x-4 blur-[2px] group-hover:translate-x-0 group-hover:blur-0",
-  "whip-vertical": "translate-y-4 blur-[2px] group-hover:translate-y-0 group-hover:blur-0",
-  punch: "scale-90 group-hover:scale-110",
-  drift: "translate-x-2 translate-y-1 opacity-60 group-hover:translate-x-0 group-hover:translate-y-0 group-hover:opacity-100",
-  swing: "-rotate-6 group-hover:rotate-0",
-  flash: "opacity-10 group-hover:opacity-100",
+/** Keyframe em loop de cada transição na galeria (ver styles.css). */
+const PREVIEW_ANIM: Record<string, string> = {
+  none: "none",
+  fade: "tp-fade",
+  flash: "tp-flash",
+  zoom: "tp-zoom",
+  "zoom-out": "tp-zoomout",
+  punch: "tp-punch",
+  "slide-up": "tp-up",
+  "slide-down": "tp-down",
+  "slide-left": "tp-left",
+  "slide-right": "tp-right",
+  whip: "tp-whip",
+  "whip-vertical": "tp-whipv",
+  drift: "tp-drift",
+  swing: "tp-swing",
 };
+
+const CATEGORIES: { id: string; label: string; kinds: string[] }[] = [
+  { id: "todas", label: "Todas", kinds: [] },
+  { id: "basico", label: "Básicas", kinds: ["none", "fade", "flash"] },
+  { id: "camera", label: "Câmera", kinds: ["zoom", "zoom-out", "punch", "whip", "whip-vertical"] },
+  { id: "deslize", label: "Deslize", kinds: ["slide-up", "slide-down", "slide-left", "slide-right"] },
+  { id: "criativo", label: "Criativas", kinds: ["drift", "swing"] },
+];
 
 interface Props {
   value: Transition;
@@ -38,11 +47,33 @@ interface Props {
 
 /** Galeria de transições prontas com duração ajustável e prévia. */
 export function TransitionPicker({ value, onChange, label, onApplyAll, onPreview }: Props) {
+  const [category, setCategory] = useState("todas");
+  const cat = CATEGORIES.find((c) => c.id === category);
+  const visible = !cat || !cat.kinds.length ? TRANSITIONS : TRANSITIONS.filter((t) => cat.kinds.includes(t.id));
   return (
     <div className="space-y-2">
       {label && <span className="font-mono text-[11px] text-muted-foreground">{label}</span>}
+      <div className="flex flex-wrap gap-1">
+        {CATEGORIES.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => setCategory(c.id)}
+            aria-pressed={category === c.id}
+            className={cn(
+              "rounded-full border px-2 py-0.5 font-mono text-[10px] transition",
+              category === c.id
+                ? "border-primary text-primary"
+                : "border-border text-muted-foreground hover:border-primary/50",
+            )}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-3 gap-1.5">
-        {TRANSITIONS.map((tr) => {
+        {visible.map((tr) => {
           const active = value.kind === tr.id;
           return (
             <button
@@ -50,6 +81,7 @@ export function TransitionPicker({ value, onChange, label, onApplyAll, onPreview
               type="button"
               onClick={() => onChange({ ...value, kind: tr.id as TransitionKind })}
               aria-pressed={active}
+              title={`Transição ${tr.label} — passe o mouse para ver a prévia`}
               className={cn(
                 "group flex flex-col items-center gap-1 rounded-lg border px-2 py-2 transition",
                 active
@@ -57,12 +89,14 @@ export function TransitionPicker({ value, onChange, label, onApplyAll, onPreview
                   : "border-border text-muted-foreground hover:border-primary/50",
               )}
             >
-              <span className="relative h-6 w-full overflow-hidden rounded bg-surface-2">
+              <span className="relative block h-9 w-full overflow-hidden rounded bg-surface-2">
+                <span className="absolute inset-0 bg-gradient-to-br from-foreground/15 to-foreground/5" />
                 <span
                   className={cn(
-                    "absolute inset-0 bg-primary/40 transition-all duration-500 group-hover:duration-300",
-                    PREVIEW_CLASS[tr.id] ?? "opacity-60",
+                    "tp-anim absolute inset-0 bg-gradient-to-br from-primary/70 to-primary/25",
+                    active && "is-playing",
                   )}
+                  style={{ ["--tp-anim" as string]: PREVIEW_ANIM[tr.id] ?? "tp-fade" }}
                 />
               </span>
               <span className="font-mono text-[10px] leading-none">{tr.label}</span>

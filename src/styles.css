@@ -960,3 +960,35 @@
 @keyframes tpl-flip { from { opacity: 0; transform: perspective(600px) rotateY(70deg) } to { opacity: 1; transform: none } }
 @keyframes tpl-shake { 0%, 100% { transform: translateX(0) } 25% { transform: translateX(-4%) } 75% { transform: translateX(4%) } }
 @keyframes tpl-float { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-6%) } }
+
+/* --- Prévia animada das transições (galeria do editor) --- */
+.tp-anim {
+  animation-name: var(--tp-anim, none);
+  animation-duration: 1.15s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-iteration-count: infinite;
+  animation-play-state: paused;
+}
+.group:hover .tp-anim,
+.group:focus-visible .tp-anim,
+.tp-anim.is-playing {
+  animation-play-state: running;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tp-anim {
+    animation: none !important;
+  }
+}
+@keyframes tp-fade { 0%,10% { opacity: 0 } 60%,100% { opacity: 1 } }
+@keyframes tp-flash { 0% { opacity: 0; filter: brightness(3) } 20% { opacity: 1; filter: brightness(3) } 60%,100% { opacity: 1; filter: brightness(1) } }
+@keyframes tp-zoom { 0% { opacity: 0; transform: scale(0.55) } 60%,100% { opacity: 1; transform: scale(1) } }
+@keyframes tp-zoomout { 0% { opacity: 0; transform: scale(1.6) } 60%,100% { opacity: 1; transform: scale(1) } }
+@keyframes tp-punch { 0% { transform: scale(0.8) } 40% { transform: scale(1.12) } 70%,100% { transform: scale(1) } }
+@keyframes tp-up { 0% { transform: translateY(105%) } 60%,100% { transform: translateY(0) } }
+@keyframes tp-down { 0% { transform: translateY(-105%) } 60%,100% { transform: translateY(0) } }
+@keyframes tp-left { 0% { transform: translateX(-105%) } 60%,100% { transform: translateX(0) } }
+@keyframes tp-right { 0% { transform: translateX(105%) } 60%,100% { transform: translateX(0) } }
+@keyframes tp-whip { 0% { transform: translateX(90%); filter: blur(6px) } 55% { filter: blur(2px) } 75%,100% { transform: translateX(0); filter: blur(0) } }
+@keyframes tp-whipv { 0% { transform: translateY(90%); filter: blur(6px) } 55% { filter: blur(2px) } 75%,100% { transform: translateY(0); filter: blur(0) } }
+@keyframes tp-drift { 0% { opacity: 0; transform: translate(14%, 8%) scale(1.08) } 70%,100% { opacity: 1; transform: translate(0,0) scale(1) } }
+@keyframes tp-swing { 0% { opacity: 0; transform: rotate(-12deg) scale(0.9) } 65%,100% { opacity: 1; transform: rotate(0) scale(1) } }

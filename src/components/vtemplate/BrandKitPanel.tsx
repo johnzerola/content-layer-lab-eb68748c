@@ -33,12 +33,18 @@ export function BrandKitPanel({
   doc,
   onUpdateLayer,
   onSelectLogoLayer,
+  value,
+  onChange,
 }: {
   doc: TemplateDoc;
   onUpdateLayer: (id: string, patch: Partial<TemplateLayer>) => void;
   onSelectLogoLayer?: (src: string) => void;
+  /** kit persistido no projeto (quando ausente, usa o kit local do navegador) */
+  value?: BrandKit | undefined;
+  onChange?: ((kit: BrandKit) => void) | undefined;
 }) {
-  const [kit, setKit] = useState<BrandKit>(() => loadBrandKit());
+  const [local, setLocal] = useState<BrandKit>(() => value ?? loadBrandKit());
+  const kit = value ?? local;
   const [saved, setSaved] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -49,7 +55,12 @@ export function BrandKitPanel({
     return () => clearTimeout(t);
   }, [kit]);
 
-  const patch = (p: Partial<BrandKit>) => setKit((k) => ({ ...k, ...p }));
+  const patch = (p: Partial<BrandKit>) => {
+    const next = { ...kit, ...p };
+    setLocal(next);
+    onChange?.(next);
+  };
+
 
   const pickLogo = (file: File) => {
     const reader = new FileReader();

@@ -4,7 +4,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Download, Loader2, RefreshCw, Trash2, Wand2 } from "lucide-react";
+import { Download, Loader2, RefreshCw, Send, Trash2, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/base";
 import {
   cutAsSource,
@@ -20,14 +20,18 @@ import {
   type LibraryCut,
 } from "@/lib/editor/cuts.service";
 import { applyTemplateToVideo } from "@/lib/video-template/bindings";
+import { applyBrandKitToDoc, loadBrandKit } from "@/lib/brand-kit";
 import { listMyTemplates } from "@/lib/video-template/service";
 import { renderTemplateProject, templateRenderSupported } from "@/lib/editor/render-template";
 import type { VideoTemplateRecord } from "@/lib/video-template/types";
+import { BulkScheduleModal, type BulkScheduleItem } from "@/components/BulkScheduleModal";
+import { listAccounts, type SocialAccount } from "@/lib/social";
 
 interface RenderState {
   status: "idle" | "rendering" | "done" | "error";
   progress: number;
   url?: string;
+  file?: File;
   error?: string;
 }
 
@@ -52,6 +56,8 @@ export function CutLibrary({
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [sourcesTick, setSourcesTick] = useState(0);
+  const [accounts, setAccounts] = useState<SocialAccount[]>([]);
+  const [publishItem, setPublishItem] = useState<BulkScheduleItem | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async () => {
@@ -68,6 +74,10 @@ export function CutLibrary({
   useEffect(() => {
     void load();
   }, [load, refreshKey]);
+
+  useEffect(() => {
+    void listAccounts().then(setAccounts).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     void listMyTemplates()
@@ -118,7 +128,10 @@ export function CutLibrary({
     }
     setRenders((r) => ({ ...r, [cut.rowId]: { status: "rendering", progress: 0 } }));
     try {
-      const doc = applyTemplateToVideo(template.template_data, cutAsSource(cut, `cut://${cut.id}`));
+      const doc = applyBrandKitToDoc(
+        applyTemplateToVideo(template.template_data, cutAsSource(cut, `cut://${cut.id}`)),
+        loadBrandKit(),
+      );
       const blob = await renderTemplateProject({
         doc,
         file,
@@ -127,7 +140,10 @@ export function CutLibrary({
           setRenders((r) => ({ ...r, [cut.rowId]: { status: "rendering", progress: p } })),
       });
       const url = URL.createObjectURL(blob);
-      setRenders((r) => ({ ...r, [cut.rowId]: { status: "done", progress: 1, url } }));
+      const out = new File([blob], `${cut.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "corte"}.mp4`, {
+        type: "video/mp4",
+      });
+      setRenders((r) => ({ ...r, [cut.rowId]: { status: "done", progress: 1, url, file: out } }));
       toast.success(`“${cut.title}” renderizado.`);
     } catch (e) {
       setRenders((r) => ({
@@ -317,6 +333,22 @@ export function CutLibrary({
                         </>
                       )}
                     </Button>
+                    {state?.status === "done" && state.file && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPublishItem({
+                            file: state.file as File,
+                            ...(cut.caption ? { caption: cut.caption } : {}),
+                          })
+                        }
+                        className="grid size-11 place-items-center rounded-lg border border-primary/50 text-primary"
+                        aria-label={`Publicar ${cut.title}`}
+                        title="Publicar no Instagram, Facebook, YouTube ou TikTok"
+                      >
+                        <Send className="size-4" aria-hidden />
+                      </button>
+                    )}
                     {state?.status === "done" && state.url && (
                       <a
                         href={state.url}
@@ -342,6 +374,16 @@ export function CutLibrary({
           })}
         </ul>
       )}
+
+      <BulkScheduleModal
+        open={!!publishItem}
+        onClose={() => setPublishItem(null)}
+        accounts={accounts}
+        items={publishItem ? [publishItem] : []}
+        hideFilePicker
+        subtitle="Publique este corte renderizado na conta conectada."
+        onDone={() => setPublishItem(null)}
+      />
     </section>
   );
 }

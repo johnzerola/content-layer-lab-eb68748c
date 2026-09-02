@@ -31,6 +31,7 @@ import { useEditorHistory } from "@/components/editor/useEditorHistory";
 import { openProjectForVideo, saveEditorProject } from "@/lib/editor/project.service";
 import { previewUrl, type EditorProjectDoc } from "@/lib/editor/project";
 import { defaultEditorAudio } from "@/lib/editor/audio";
+import { applyBrandKitToDoc } from "@/lib/brand-kit";
 import { defaultPreEdit, type PreEdit } from "@/lib/preedit";
 import { ensureTranscript, saveTranscript } from "@/lib/editor/transcript.service";
 import { emptyTranscript, removedRanges, silenceRanges, type TranscriptDoc } from "@/lib/editor/transcript";
@@ -232,7 +233,11 @@ function EditorPage() {
         coverUrl: doc.media.posterUrl,
         duration: doc.media.duration,
       });
-      patchDoc({ composition, templateId: template.id }, "aplicar-template");
+      const kit = doc.brandKit;
+      patchDoc(
+        { composition: kit ? applyBrandKitToDoc(composition, kit) : composition, templateId: template.id },
+        "aplicar-template",
+      );
     },
     [doc, patchDoc],
   );
@@ -545,7 +550,19 @@ function EditorPage() {
                 onUpdate={(patch) => selectedLayer && updateLayer(selectedLayer.id, patch)}
               />
             )}
-            {tool === "brand" && <BrandKitPanel doc={doc.composition} onUpdateLayer={updateLayer} />}
+            {tool === "brand" && (
+              <BrandKitPanel
+                doc={doc.composition}
+                onUpdateLayer={updateLayer}
+                value={doc.brandKit}
+                onChange={(kit) =>
+                  patchDoc(
+                    { brandKit: kit, composition: applyBrandKitToDoc(doc.composition, kit) },
+                    "brand-kit",
+                  )
+                }
+              />
+            )}
             {tool === "legendas" && (
               <CaptionStylePanel
                 presetId={doc.captionPresetId}
