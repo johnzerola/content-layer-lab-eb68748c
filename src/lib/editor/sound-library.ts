@@ -209,9 +209,14 @@ export async function loadSoundGallery(kind: SoundKind): Promise<SoundAsset[]> {
   const pack = SOUND_PACKS.find((p) => p.kind === kind);
   if (!pack) return [];
 
-  const results = await Promise.allSettled(
-    pack.queries.map((q) => searchFreeSounds(q, kind, 30)),
-  );
+  /** cada consulta tem prazo próprio: uma lenta não segura a galeria inteira */
+  const withTimeout = (q: string) =>
+    Promise.race([
+      searchFreeSounds(q, kind, 30),
+      new Promise<SoundAsset[]>((resolve) => setTimeout(() => resolve([]), 8000)),
+    ]);
+
+  const results = await Promise.allSettled(pack.queries.map(withTimeout));
 
   const seen = new Set<string>();
   const list: SoundAsset[] = [];
@@ -228,3 +233,4 @@ export async function loadSoundGallery(kind: SoundKind): Promise<SoundAsset[]> {
   galleryCache.set(kind, list);
   return list;
 }
+
