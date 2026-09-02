@@ -13,9 +13,15 @@ import { STYLE_FONTS, STYLE_PALETTES } from "@/components/editor/StylesPanel";
 import { READY_TEMPLATES } from "@/lib/editor/template-presets";
 import { DEFAULT_ANIM_IDENTITY, loadAnimIdentity, saveAnimIdentity, type AnimIdentity } from "@/lib/editor/animation-library";
 import { DEFAULT_BRAND_KIT, loadBrandKit, type BrandKit } from "@/lib/brand-kit";
+import { TransitionPicker } from "@/components/editor/TransitionPicker";
+import { listMyTemplates, listPublicTemplates } from "@/lib/video-template/service";
+import type { VideoTemplateRecord } from "@/lib/video-template/types";
+import type { Transition } from "@/lib/preedit";
 import {
   deleteStylePreset,
   setPendingLayout,
+  setPendingTemplate,
+  setPendingTransition,
   listStylePresets,
   saveStylePreset,
   setPendingStyle,
@@ -71,7 +77,9 @@ function fromTemplate(id: string): Omit<SavedStylePreset, "id" | "createdAt"> | 
 
 function EstilosPage() {
   const [mine, setMine] = useState<SavedStylePreset[]>([]);
-  const [tab, setTab] = useState<"layouts" | "prontos" | "meus" | "paletas" | "tipografia">("layouts");
+  const [tab, setTab] = useState<"layouts" | "templates" | "transicoes" | "prontos" | "meus" | "paletas" | "tipografia">("layouts");
+  const [videoTemplates, setVideoTemplates] = useState<VideoTemplateRecord[]>([]);
+  const [trans, setTrans] = useState<Transition>({ kind: "fade", dur: 0.4 });
   const [identity, setIdentity] = useState<AnimIdentity>(DEFAULT_ANIM_IDENTITY);
   const [brand, setBrand] = useState<BrandKit>(DEFAULT_BRAND_KIT);
   const [query, setQuery] = useState("");
@@ -80,6 +88,15 @@ function EstilosPage() {
     setMine(listStylePresets());
     setIdentity(loadAnimIdentity());
     setBrand(loadBrandKit());
+    void (async () => {
+      try {
+        const [mineT, publicT] = await Promise.all([listMyTemplates(), listPublicTemplates()]);
+        const seen = new Set<string>();
+        setVideoTemplates([...mineT, ...publicT].filter((t) => !seen.has(t.id) && seen.add(t.id)));
+      } catch {
+        /* sem templates salvos ainda */
+      }
+    })();
   }, []);
 
   const ready = useMemo(
@@ -115,7 +132,7 @@ function EstilosPage() {
         </header>
 
         <div className="flex flex-wrap items-center gap-2">
-          {(["layouts", "prontos", "meus", "paletas", "tipografia"] as const).map((t) => (
+          {(["layouts", "templates", "transicoes", "prontos", "meus", "paletas", "tipografia"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -124,10 +141,91 @@ function EstilosPage() {
                 tab === t ? "border-primary bg-primary/15" : "border-border/60 text-muted-foreground"
               }`}
             >
-              {t === "meus" ? `Meus estilos (${mine.length})` : t}
+              {t === "meus"
+                ? `Meus estilos (${mine.length})`
+                : t === "templates"
+                  ? `Templates de vídeo (${videoTemplates.length})`
+                  : t === "transicoes"
+                    ? "Transições"
+                    : t}
             </button>
           ))}
-          {tab === "prontos" && (
+          {tab === "templates" && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Seus templates de vídeo salvos e os públicos do sistema. Aplicar leva as camadas para o próximo projeto
+              aberto no editor profissional.
+            </p>
+            {!videoTemplates.length && (
+              <div className="rounded-2xl border border-dashed border-border/60 p-8 text-center text-sm text-muted-foreground">
+                Nenhum template de vídeo salvo ainda —{" "}
+                <Link to="/templates" className="underline">
+                  crie um template
+                </Link>
+                .
+              </div>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {videoTemplates.map((t) => (
+                <article key={t.id} className="glass overflow-hidden rounded-2xl border border-border/60">
+                  <div className="flex h-24 items-center justify-center bg-muted/40 px-3 text-center text-xs text-muted-foreground">
+                    {t.template_data?.layers?.length ?? 0} camadas · {t.aspect_ratio}
+                  </div>
+                  <div className="space-y-2 p-3">
+                    <p className="truncate text-sm font-medium">{t.name}</p>
+                    <p className="line-clamp-2 text-[11px] text-muted-foreground">{t.description ?? "Sem descrição"}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPendingTemplate(t.id);
+                        toast.success(`Template “${t.name}” pronto — abra um projeto no editor.`);
+                      }}
+                      className="interactive w-full rounded-lg bg-primary/20 px-2 py-1.5 text-xs"
+                    >
+                      Aplicar no editor
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tab === "transicoes" && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Escolha a transição padrão dos seus cortes. Ela entra na abertura, no fechamento e — se quiser — em todas
+              as emendas entre trechos do próximo projeto aberto.
+            </p>
+            <div className="glass rounded-2xl border border-border/60 p-4">
+              <TransitionPicker value={trans} onChange={setTrans} label="Transição dos cortes" />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingTransition({ kind: trans.kind, dur: trans.dur, applyAll: true });
+                  toast.success("Transição pronta — abra um projeto para aplicar em todos os cortes.");
+                }}
+                className="interactive rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground"
+              >
+                Aplicar em todos os cortes
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingTransition({ kind: trans.kind, dur: trans.dur, applyAll: false });
+                  toast.success("Transição pronta — entrará na abertura e no fecho do próximo projeto.");
+                }}
+                className="interactive rounded-lg border border-border/60 px-4 py-2 text-sm"
+              >
+                Só abertura e fecho
+              </button>
+            </div>
+          </div>
+        )}
+
+        {tab === "prontos" && (
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
