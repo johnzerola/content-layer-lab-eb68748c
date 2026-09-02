@@ -12,6 +12,7 @@ import {
   composeTransitions,
   cropRect,
   cropAt,
+  hasGrade,
   isFullCrop,
   preEditFilter,
   rectForCrop,
@@ -489,6 +490,89 @@ function getNoiseTile() {
   return c;
 }
 
+/** tiles de grão sorteados: alternam por quadro pra o granulado "andar" como filme */
+let grainTiles: HTMLCanvasElement[] | null = null;
+function getGrainTile(i: number) {
+  if (!grainTiles) {
+    grainTiles = Array.from({ length: 4 }, () => {
+      const c = makeCanvas(160, 160);
+      const cx = c.getContext("2d")!;
+      const img = cx.createImageData(160, 160);
+      for (let p = 0; p < img.data.length; p += 4) {
+        const v = Math.random() < 0.5 ? 90 + Math.random() * 40 : 130 + Math.random() * 50;
+        img.data[p] = img.data[p + 1] = img.data[p + 2] = v;
+        img.data[p + 3] = 255;
+      }
+      cx.putImageData(img, 0, 0);
+      return c;
+    });
+  }
+  return grainTiles[Math.abs(i) % grainTiles.length]!;
+}
+
+/** Estilo de edição aplicado sobre o vídeo já desenhado (dentro da caixa). */
+function paintGrade(
+  ctx: CanvasRenderingContext2D,
+  box: { x: number; y: number; w: number; h: number },
+  pre: PreEdit | null | undefined,
+  time: number,
+) {
+  if (!pre || !hasGrade(pre)) return;
+  const temp = pre.temp ?? 0;
+  const fade = pre.fade ?? 0;
+  const vig = pre.vignette ?? 0;
+  const grain = pre.grain ?? 0;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(box.x, box.y, box.w, box.h);
+  ctx.clip();
+
+  if (temp) {
+    ctx.globalCompositeOperation = "soft-light";
+    ctx.globalAlpha = Math.min(0.6, Math.abs(temp) * 0.6);
+    ctx.fillStyle = temp > 0 ? "#ff9a3c" : "#3ca6ff";
+    ctx.fillRect(box.x, box.y, box.w, box.h);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+  }
+
+  if (fade > 0) {
+    ctx.globalAlpha = Math.min(0.28, fade * 0.28);
+    ctx.fillStyle = "#b9c2cc";
+    ctx.fillRect(box.x, box.y, box.w, box.h);
+    ctx.globalAlpha = 1;
+  }
+
+  if (grain > 0) {
+    const tile = getGrainTile(Math.floor(time * 12));
+    const pat = ctx.createPattern(tile, "repeat");
+    if (pat) {
+      ctx.globalCompositeOperation = "overlay";
+      ctx.globalAlpha = Math.min(0.5, grain * 0.5);
+      ctx.fillStyle = pat;
+      ctx.fillRect(box.x, box.y, box.w, box.h);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  if (vig > 0) {
+    const cx = box.x + box.w / 2;
+    const cy = box.y + box.h / 2;
+    const r = Math.hypot(box.w, box.h) / 2;
+    const g = ctx.createRadialGradient(cx, cy, r * 0.35, cx, cy, r);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(1, `rgba(0,0,0,${Math.min(0.85, vig * 0.85).toFixed(3)})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(box.x, box.y, box.w, box.h);
+  }
+
+  ctx.restore();
+}
+
+
+
 export interface DrawOpts {
   mirror?: boolean;
   offsetX?: number;
@@ -792,6 +876,9 @@ function drawVideoLayer(
       dest = paint(box, useContain ? "contain" : "cover");
     }
     ctx.filter = "none";
+
+    // estilo de edição: temperatura, preto lavado, vinheta e granulado
+    paintGrade(ctx, { x: v.x, y: v.y, w: v.w, h: v.h }, pre, opts?.time ?? 0);
 
     if (opts?.noise) {
       ctx.globalAlpha = Math.min(0.12, opts.noise);

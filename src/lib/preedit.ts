@@ -81,6 +81,16 @@ export interface PreEdit {
   grayscale: number;
   /** px */
   blur: number;
+  /** temperatura de cor: -1 (frio/azulado) a 1 (quente/dourado) */
+  temp?: number;
+  /** vinheta escura nas bordas: 0..1 */
+  vignette?: number;
+  /** granulado de filme (pontinhos): 0..1 */
+  grain?: number;
+  /** preto lavado / névoa de filme: 0..1 */
+  fade?: number;
+  /** id do estilo de edição aplicado (só informativo) */
+  look?: string;
   /** 0..150 (%) */
   voiceLevel?: number;
   /** 0..150 (%) */
@@ -113,6 +123,10 @@ export function defaultPreEdit(): PreEdit {
     sepia: 0,
     grayscale: 0,
     blur: 0,
+    temp: 0,
+    vignette: 0,
+    grain: 0,
+    fade: 0,
     voiceLevel: 100,
     musicLevel: 100,
   };
@@ -214,8 +228,15 @@ export function hasPreEdit(p?: PreEdit | null) {
     p.hue !== 0 ||
     p.sepia > 0 ||
     p.grayscale > 0 ||
-    p.blur > 0
+    p.blur > 0 ||
+    hasGrade(p)
   );
+}
+
+/** true quando o estilo de edição (vinheta, grão, fade, temperatura) muda o quadro. */
+export function hasGrade(p?: PreEdit | null) {
+  if (!p) return false;
+  return Boolean((p.temp ?? 0) || (p.vignette ?? 0) > 0 || (p.grain ?? 0) > 0 || (p.fade ?? 0) > 0);
 }
 
 /** Filtro CSS/canvas combinando a pré-edição com o ajuste anti-duplicidade. */
