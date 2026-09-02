@@ -3,6 +3,8 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Layers,
   Scissors,
+  FolderKanban,
+  Scissors,
   Eraser,
   Library,
   Cloud,
