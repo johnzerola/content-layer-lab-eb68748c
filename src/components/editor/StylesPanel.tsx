@@ -3,11 +3,17 @@
  * animação + transição), paletas e tipografia. Só apresentação — reaproveita
  * os presets de legenda e de transição que já existem.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CaptionStylePanel } from "@/components/editor/CaptionStylePanel";
 import { CAPTION_PRESETS, type CaptionPreset } from "@/lib/editor/caption-styles";
 import { STYLE_TEMPLATES, type StyleTemplate } from "@/lib/editor/style-templates";
 import { TRANSITIONS, type TransitionKind } from "@/lib/preedit";
+import {
+  deleteStylePreset,
+  listStylePresets,
+  saveStylePreset,
+  type SavedStylePreset,
+} from "@/lib/editor/style-presets";
 import type { CaptionLayerStyle } from "@/lib/video-template/types";
 
 export interface StylePalette {
@@ -63,11 +69,31 @@ interface Props {
   onStyleChange: (patch: Partial<CaptionLayerStyle>) => void;
   /** aplica também a transição do template completo */
   onApplyTransition?: ((kind: TransitionKind) => void) | undefined;
+  /** animação atual da legenda, salva junto com o estilo */
+  animation?: import("@/lib/editor/caption-styles").CaptionAnimation;
+  /** transição atual do corte, salva junto com o estilo */
+  transition?: TransitionKind;
+  /** carrega um estilo salvo por completo (cores, fonte, animação e transição) */
+  onApplySaved?: ((preset: SavedStylePreset) => void) | undefined;
 }
 
-export function StylesPanel({ presetId, style, onApplyPreset, onStyleChange, onApplyTransition }: Props) {
-  const [section, setSection] = useState<"templates" | "estilos" | "cores" | "tipografia" | "efeitos">("templates");
+export function StylesPanel({
+  presetId,
+  style,
+  onApplyPreset,
+  onStyleChange,
+  onApplyTransition,
+  animation = "pop",
+  transition = "fade",
+  onApplySaved,
+}: Props) {
+  const [section, setSection] = useState<"templates" | "meus" | "estilos" | "cores" | "tipografia" | "efeitos">(
+    "templates",
+  );
   const [appliedId, setAppliedId] = useState<string | null>(null);
+  const [saved, setSaved] = useState<SavedStylePreset[]>([]);
+
+  useEffect(() => setSaved(listStylePresets()), []);
 
   /** Um clique configura cores, tipografia, animação da legenda e transição. */
   const applyTemplate = (t: StyleTemplate) => {
@@ -89,7 +115,7 @@ export function StylesPanel({ presetId, style, onApplyPreset, onStyleChange, onA
   return (
     <div className="flex h-full flex-col gap-3 overflow-hidden">
       <div className="flex rounded-lg border border-border/60 p-0.5 text-[11px]">
-        {(["templates", "estilos", "cores", "tipografia", "efeitos"] as const).map((s) => (
+        {(["templates", "meus", "estilos", "cores", "tipografia", "efeitos"] as const).map((s) => (
           <button
             key={s}
             type="button"
@@ -100,6 +126,62 @@ export function StylesPanel({ presetId, style, onApplyPreset, onStyleChange, onA
           </button>
         ))}
       </div>
+
+      {section === "meus" && (
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+          <button
+            type="button"
+            onClick={() => {
+              saveStylePreset({ name: `Estilo ${new Date().toLocaleDateString("pt-BR")}`, presetId, style, animation, transition });
+              setSaved(listStylePresets());
+            }}
+            className="w-full rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground"
+          >
+            Salvar estilo atual
+          </button>
+          {!saved.length && (
+            <p className="text-[11px] text-muted-foreground">
+              Nenhum estilo salvo. Salve o atual acima ou monte a sua biblioteca na tela Estilos.
+            </p>
+          )}
+          {saved.map((p) => (
+            <div key={p.id} className="flex items-center gap-2 rounded-lg border border-border/60 p-2">
+              <span
+                className="grid h-9 w-9 place-items-center rounded text-[10px] font-black"
+                style={{ background: p.style.strokeColor, color: p.style.highlightColor }}
+              >
+                Aa
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium">{p.name}</p>
+                <p className="truncate text-[10px] text-muted-foreground">
+                  {p.style.fontFamily.split(",")[0]} · {p.animation} · {p.transition}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onApplySaved?.(p);
+                  setAppliedId(p.id);
+                }}
+                className="rounded-md bg-primary/20 px-2 py-1 text-[11px]"
+              >
+                Aplicar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  deleteStylePreset(p.id);
+                  setSaved(listStylePresets());
+                }}
+                className="rounded-md border border-border/60 px-1.5 py-1 text-[11px] text-muted-foreground"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {section === "efeitos" && (
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
