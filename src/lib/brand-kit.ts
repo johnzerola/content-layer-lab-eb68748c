@@ -55,10 +55,9 @@ export function saveBrandKit(kit: BrandKit): void {
 }
 
 /** Aplica cores, fontes e logo da marca em todas as camadas compatíveis de um TemplateDoc. */
-export function applyBrandKitToDoc<
-  T extends { layers: Array<Record<string, unknown>> },
->(doc: T, kit: BrandKit): T {
-  const layers = doc.layers.map((layer) => {
+export function applyBrandKitToDoc<T extends { layers: readonly unknown[] }>(doc: T, kit: BrandKit): T {
+  const layers = doc.layers.map((raw) => {
+    const layer = raw as Record<string, unknown>;
     switch (layer["type"]) {
       case "text":
         return { ...layer, fontFamily: kit.headingFont, color: kit.text };
