@@ -369,7 +369,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           </div>
         </header>
 
-        <div className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-5 sm:px-6">
+        <div className="app-main mx-auto w-full max-w-[1440px] flex-1 px-4 py-5 sm:px-6">
           {mode === "external" || onFixedRoute ? null : (
             <section
               key={current.id}
