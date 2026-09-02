@@ -1,5 +1,6 @@
 /** Painel de propriedades da camada selecionada + filtros e animações. */
-import { Button, Input, Label } from "@/components/ui/base";
+import { Button, Input } from "@/components/ui/base";
+import { Label } from "@/components/ui/label";
 import {
   ANIMATION_CATEGORIES,
   ANIMATION_PRESETS,
