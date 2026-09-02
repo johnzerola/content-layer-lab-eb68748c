@@ -487,14 +487,28 @@ function AgendaPage() {
               </section>
             </div>
 
-            {/* fila */}
-            <section className="rounded-2xl border border-border/70 bg-surface/60 p-5">
+            {/* calendário + fila */}
+            <div className="flex flex-col gap-6">
+              <ScheduleCalendar
+                posts={posts}
+                selectedDay={selectedDay}
+                onSelectDay={setSelectedDay}
+              />
+
+              <section className="rounded-2xl border border-border/70 bg-surface/60 p-5">
               <div className="flex items-center justify-between pb-3">
-                <p className="mono-label">Fila</p>
-                {loading && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
+                <p className="mono-label">
+                  Fila{selectedDay ? " · dia selecionado" : ""}
+                </p>
+                {loading && (
+                  <Loader2
+                    className="size-4 animate-spin text-muted-foreground"
+                    aria-label="Carregando agenda"
+                  />
+                )}
               </div>
 
-              {!posts.length && (
+              {!visiblePosts.length && (
                 <p className="rounded-xl border border-dashed border-border px-3 py-10 text-center text-[12px] text-muted-foreground">
                   nada agendado ainda
                 </p>
