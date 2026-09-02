@@ -140,7 +140,12 @@ export async function updateTemplate(
     update["canvas_height"] = patch.doc.canvas.height;
     if (patch.name === undefined) update["name"] = patch.doc.name;
   }
-  const { data, error } = await supabase.from(TABLE).update(update).eq("id", id).select("*").single();
+  const { data, error } = await supabase
+    .from(TABLE)
+    .update(update as never)
+    .eq("id", id)
+    .select("*")
+    .single();
   if (error) throw error;
   const rec = toRecord(data as Row);
   if (patch.bumpVersion) {
