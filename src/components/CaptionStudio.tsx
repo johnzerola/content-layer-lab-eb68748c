@@ -83,7 +83,7 @@ function Range({
   );
 }
 
-export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props) {
+export function CaptionStudio({ style, onChange, cues, fonts, onAddFont, hidePreview }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const visible = useInView(canvasRef);
   const [playing, setPlaying] = useState(true);
@@ -131,8 +131,8 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
 
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
-      <div className="space-y-2">
+    <div className={hidePreview ? "grid gap-4" : "grid gap-4 lg:grid-cols-[240px_1fr]"}>
+      <div className={hidePreview ? "hidden" : "space-y-2"}>
         <div className="relative overflow-hidden rounded-xl border border-border bg-black">
           <canvas ref={canvasRef} width={324} height={576} className="w-full" />
           <button
