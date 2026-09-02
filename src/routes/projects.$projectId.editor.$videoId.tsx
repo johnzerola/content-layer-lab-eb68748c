@@ -545,7 +545,19 @@ function EditorPage() {
                 onUpdate={(patch) => selectedLayer && updateLayer(selectedLayer.id, patch)}
               />
             )}
-            {tool === "brand" && <BrandKitPanel doc={doc.composition} onUpdateLayer={updateLayer} />}
+            {tool === "brand" && (
+              <BrandKitPanel
+                doc={doc.composition}
+                onUpdateLayer={updateLayer}
+                value={doc.brandKit}
+                onChange={(kit) =>
+                  patchDoc(
+                    { brandKit: kit, composition: applyBrandKitToDoc(doc.composition, kit) },
+                    "brand-kit",
+                  )
+                }
+              />
+            )}
             {tool === "legendas" && (
               <CaptionStylePanel
                 presetId={doc.captionPresetId}
