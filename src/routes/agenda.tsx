@@ -106,6 +106,7 @@ function AgendaPage() {
   const [sending, setSending] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const runPublishNow = useServerFn(publishPostNow);
 
   useEffect(() => {
