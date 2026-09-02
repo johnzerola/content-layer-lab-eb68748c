@@ -793,6 +793,9 @@ function drawVideoLayer(
     }
     ctx.filter = "none";
 
+    // estilo de edição: temperatura, preto lavado, vinheta e granulado
+    paintGrade(ctx, { x: v.x, y: v.y, w: v.w, h: v.h }, pre, opts?.time ?? 0);
+
     if (opts?.noise) {
       ctx.globalAlpha = Math.min(0.12, opts.noise);
       ctx.globalCompositeOperation = "overlay";
