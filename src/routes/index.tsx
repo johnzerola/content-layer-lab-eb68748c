@@ -2041,7 +2041,12 @@ function Home() {
               <p className="text-[12px] text-muted-foreground">
                 v{active.version ?? 1}
                 {templates.some((t) => t.id === active.id) ? "" : " · não salvo"}
-                {savedFlash && <span className="ml-2 text-primary">â— salvo</span>}
+                {savedFlash && (
+                  <span className="pop-in ml-2 inline-flex items-center gap-1 text-primary">
+                    <span className="inline-block size-1.5 rounded-full bg-primary" /> salvo
+                  </span>
+                )}
+
               </p>
             </div>
             {autoScheduleConfig && (
