@@ -16,6 +16,7 @@ import { Route as ArmazenamentoRouteImport } from './routes/armazenamento'
 import { Route as BibliotecaRouteImport } from './routes/biblioteca'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as ContaRouteImport } from './routes/conta'
+import { Route as ContasRouteImport } from './routes/contas'
 import { Route as CortesRouteImport } from './routes/cortes'
 import { Route as EditorRouteImport } from './routes/editor'
 import { Route as EstilosRouteImport } from './routes/estilos'
@@ -89,6 +90,11 @@ const CheckoutRoute = CheckoutRouteImport.update({
 const ContaRoute = ContaRouteImport.update({
   id: '/conta',
   path: '/conta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContasRoute = ContasRouteImport.update({
+  id: '/contas',
+  path: '/contas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CortesRoute = CortesRouteImport.update({
@@ -309,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/biblioteca': typeof BibliotecaRoute
   '/checkout': typeof CheckoutRoute
   '/conta': typeof ContaRoute
+  '/contas': typeof ContasRoute
   '/cortes': typeof CortesRoute
   '/editor': typeof EditorRoute
   '/estilos': typeof EstilosRoute
@@ -357,6 +364,7 @@ export interface FileRoutesByTo {
   '/biblioteca': typeof BibliotecaRoute
   '/checkout': typeof CheckoutRoute
   '/conta': typeof ContaRoute
+  '/contas': typeof ContasRoute
   '/cortes': typeof CortesRoute
   '/editor': typeof EditorRoute
   '/estilos': typeof EstilosRoute
@@ -406,6 +414,7 @@ export interface FileRoutesById {
   '/biblioteca': typeof BibliotecaRoute
   '/checkout': typeof CheckoutRoute
   '/conta': typeof ContaRoute
+  '/contas': typeof ContasRoute
   '/cortes': typeof CortesRoute
   '/editor': typeof EditorRoute
   '/estilos': typeof EstilosRoute
@@ -456,6 +465,7 @@ export interface FileRouteTypes {
     | '/biblioteca'
     | '/checkout'
     | '/conta'
+    | '/contas'
     | '/cortes'
     | '/editor'
     | '/estilos'
@@ -504,6 +514,7 @@ export interface FileRouteTypes {
     | '/biblioteca'
     | '/checkout'
     | '/conta'
+    | '/contas'
     | '/cortes'
     | '/editor'
     | '/estilos'
@@ -552,6 +563,7 @@ export interface FileRouteTypes {
     | '/biblioteca'
     | '/checkout'
     | '/conta'
+    | '/contas'
     | '/cortes'
     | '/editor'
     | '/estilos'
@@ -601,6 +613,7 @@ export interface RootRouteChildren {
   BibliotecaRoute: typeof BibliotecaRoute
   CheckoutRoute: typeof CheckoutRoute
   ContaRoute: typeof ContaRoute
+  ContasRoute: typeof ContasRoute
   CortesRoute: typeof CortesRoute
   EditorRoute: typeof EditorRoute
   EstilosRoute: typeof EstilosRoute
@@ -691,6 +704,13 @@ declare module '@tanstack/react-router' {
       path: '/conta'
       fullPath: '/conta'
       preLoaderRoute: typeof ContaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contas': {
+      id: '/contas'
+      path: '/contas'
+      fullPath: '/contas'
+      preLoaderRoute: typeof ContasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cortes': {
@@ -977,6 +997,7 @@ const rootRouteChildren: RootRouteChildren = {
   BibliotecaRoute: BibliotecaRoute,
   CheckoutRoute: CheckoutRoute,
   ContaRoute: ContaRoute,
+  ContasRoute: ContasRoute,
   CortesRoute: CortesRoute,
   EditorRoute: EditorRoute,
   EstilosRoute: EstilosRoute,
