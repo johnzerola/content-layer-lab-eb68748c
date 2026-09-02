@@ -23,7 +23,7 @@ const shape = z.object({
       palette: z.array(hex).default([]),
       tone: z.string().default(""),
     })
-    .default({}),
+    .default(() => ({}) as never),
   captions: z
     .object({
       preset: z.string().default("capcut"),
@@ -34,7 +34,7 @@ const shape = z.object({
       uppercase: z.boolean().default(true),
       reason: z.string().default(""),
     })
-    .default({}),
+    .default(() => ({}) as never),
   layout: z
     .enum(["auto", "fill", "fit", "blur", "split", "trio", "spotlight", "centered", "horizontal"])
     .default("auto"),
@@ -70,7 +70,7 @@ const shape = z.object({
       regions: z.array(z.string()).default([]),
       reason: z.string().default(""),
     })
-    .default({}),
+    .default(() => ({}) as never),
 });
 
 export type AiTemplatePlan = z.infer<typeof shape>;
