@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Copy, Download, History, RotateCcw, Trash2, Upload, X, Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { STARTER_PRESETS } from "@/lib/presets";
+import { STARTER_PRESETS, type PresetCategory } from "@/lib/presets";
+import { PresetThumb } from "@/components/PresetThumb";
 import {
   deleteTemplate,
   duplicateTemplate,
@@ -23,6 +24,16 @@ interface Props {
 
 }
 
+const CATEGORIES: ("Todos" | PresetCategory)[] = [
+  "Todos",
+  "Fofoca",
+  "Notícia",
+  "Podcast",
+  "Viral",
+  "UGC",
+  "Minimal",
+];
+
 const fmt = (ts?: number) =>
   ts ? new Date(ts).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—";
 
@@ -33,6 +44,16 @@ export function TemplateLibrary({ templates, activeId, onClose, onChangeList, on
   const [draftName, setDraftName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [category, setCategory] = useState<"Todos" | PresetCategory>("Todos");
+
+  const thumbs = useMemo(
+    () => Object.fromEntries(STARTER_PRESETS.map((p) => [p.id, p.build()])),
+    [],
+  );
+  const visiblePresets = useMemo(
+    () => STARTER_PRESETS.filter((p) => category === "Todos" || p.category === category),
+    [category],
+  );
 
   useEffect(() => {
     setVersions(openHistory ? loadVersions(openHistory) : []);
