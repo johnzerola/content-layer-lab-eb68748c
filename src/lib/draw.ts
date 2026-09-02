@@ -772,13 +772,12 @@ function drawVideoLayer(
         bc = bc && bc.width === bw && bc.height === bh ? bc : makeCanvas(bw, bh);
         const bctx = bc.getContext("2d") as CanvasRenderingContext2D | null;
         if (!bctx) {
-          paint(target, "cover", full, { blur: blurPx, dim: dimPx, useOffset: false });
+          paint(target, "cover", full, { blur: blurPx, dim: dimPx, useOffset: false, raw: true });
           return;
         }
         bctx.clearRect(0, 0, bw, bh);
-        bctx.filter =
-          ((baseFilter === "none" ? "" : baseFilter) +
-            ` blur(${Math.max(1, blurPx * scale).toFixed(2)}px)`).trim();
+        // fundo sem os ajustes de cor — eles valem só para a área do vídeo
+        bctx.filter = `blur(${Math.max(1, blurPx * scale).toFixed(2)}px)`;
         const fit = Math.max(bw / full.ew, bh / full.eh) * zoom;
         const dw = full.ew * fit;
         const dh = full.eh * fit;
