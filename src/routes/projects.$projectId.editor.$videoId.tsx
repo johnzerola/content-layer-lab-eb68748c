@@ -53,7 +53,7 @@ import { previewUrl, type EditorProjectDoc } from "@/lib/editor/project";
 import { defaultEditorAudio } from "@/lib/editor/audio";
 import { generateCaptions } from "@/lib/captions";
 import { refineTranscriptWords } from "@/lib/transcribe.functions";
-import { applyBrandKitToDoc } from "@/lib/brand-kit";
+import { applyBrandKitToDoc, DEFAULT_BRAND_KIT, type BrandKit } from "@/lib/brand-kit";
 import { defaultPreEdit, TRANSITIONS, type PreEdit } from "@/lib/preedit";
 import { ensureTranscript, saveTranscript } from "@/lib/editor/transcript.service";
 import { emptyTranscript, removedRanges, silenceRanges, transcriptFromCues, type TranscriptDoc } from "@/lib/editor/transcript";
