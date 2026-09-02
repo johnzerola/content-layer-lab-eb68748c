@@ -133,7 +133,7 @@ export function TemplateLibrary({ templates, activeId, onClose, onChangeList, on
                           autoFocus
                           value={draftName}
                           onChange={(e) => setDraftName(e.target.value)}
-                          className="w-full rounded-lg border border-input bg-background px-2 py-1 text-sm"
+                          className="field text-sm"
                         />
                         <button
                           className="rounded-md border border-border p-1.5 hover:border-primary"

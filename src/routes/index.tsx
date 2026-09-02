@@ -2041,7 +2041,12 @@ function Home() {
               <p className="text-[12px] text-muted-foreground">
                 v{active.version ?? 1}
                 {templates.some((t) => t.id === active.id) ? "" : " · não salvo"}
-                {savedFlash && <span className="ml-2 text-primary">â— salvo</span>}
+                {savedFlash && (
+                  <span className="pop-in ml-2 inline-flex items-center gap-1 text-primary">
+                    <span className="inline-block size-1.5 rounded-full bg-primary" /> salvo
+                  </span>
+                )}
+
               </p>
             </div>
             {autoScheduleConfig && (
@@ -2313,7 +2318,7 @@ function Home() {
                     )}
                     <div className="space-y-2 pt-1">
                       <input
-                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                        className="field text-sm"
                         placeholder="Nome do arquivo de saída (opcional)"
                         value={selected.outName ?? ""}
                         onChange={(e) =>
@@ -2326,7 +2331,7 @@ function Home() {
                       />
                       {mode === "lote" && (
                         <input
-                          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                          className="field text-sm"
                           placeholder="Headline só deste vídeo (opcional)"
                           value={selected.headline}
                           onChange={(e) =>
@@ -3282,7 +3287,7 @@ function Home() {
                   <p className="mono-label">Nome dos arquivos</p>
                   <div className="flex flex-wrap items-center gap-2">
                     <input
-                      className="min-w-0 flex-1 rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs"
+                      className="field min-w-0 flex-1 text-xs"
                       value={namePattern}
                       onChange={(e) => setNamePattern(e.target.value)}
                       placeholder="{nome}-{indice}"
@@ -3322,7 +3327,7 @@ function Home() {
                 <div className="mb-3 space-y-3 rounded-xl border border-primary/40 bg-surface-2 p-3">
                   <p className="mono-label">Headlines do lote</p>
                   <textarea
-                    className="h-20 w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs"
+                    className="field h-20 text-xs"
                     placeholder={"Banco de variações — uma headline por linha"}
                     value={headlineBank}
                     onChange={(e) => setHeadlineBank(e.target.value)}
@@ -3390,7 +3395,7 @@ function Home() {
                           </label>
                           {editing && (
                             <input
-                              className="w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs"
+                              className="field text-xs"
                               placeholder="headline deste vídeo"
                               value={it.headline}
                               onChange={(e) =>

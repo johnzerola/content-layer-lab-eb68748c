@@ -261,6 +261,59 @@
   font-size: 0.75rem;
 }
 
+/* botão discreto de ação secundária dentro de painéis */
+@utility btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background-color: var(--surface-2);
+  color: var(--muted-foreground);
+  font-weight: 500;
+  &:hover {
+    background-color: var(--surface-3);
+    border-color: var(--border-hover);
+    color: var(--color-foreground);
+  }
+}
+
+/* campo de texto padrão em painéis (input / textarea nativos) */
+@utility field {
+  width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-input);
+  background-color: var(--background-2);
+  padding: 8px 10px;
+  color: var(--color-foreground);
+  transition:
+    border-color var(--dur-fast) var(--ease-out-expo),
+    box-shadow var(--dur-fast) var(--ease-out-expo);
+  &::placeholder {
+    color: var(--muted-2);
+  }
+  &:hover {
+    border-color: var(--border-hover);
+  }
+  &:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--primary-subtle);
+  }
+}
+
+/* estado ativo do dropzone de importação */
+@utility drop-active {
+  border-color: var(--color-primary) !important;
+  background-color: var(--primary-subtle);
+  box-shadow: 0 0 0 4px var(--primary-subtle);
+}
+
+
+
 @keyframes vv-rise {
   from {
     opacity: 0;
