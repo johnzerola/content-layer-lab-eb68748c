@@ -27,7 +27,10 @@ import {
   CloudCog,
   LayoutTemplate,
   CopyPlus,
+  CheckCircle2,
+  Users,
 } from "lucide-react";
+
 import { QuickPreviewModal } from "@/components/QuickPreviewModal";
 import { CaptionWorkbench } from "@/components/CaptionWorkbench";
 import { PLATFORM_UI_OPTIONS, type PlatformUI } from "@/components/PlatformUIOverlay";
@@ -2704,22 +2707,97 @@ function Home() {
                 {user ? <CloudRenderPanel tool={mode} /> : null}
 
 
-                {/* pipeline: leitura rápida do estado do lote */}
-                {items.length > 0 && (
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {[
-                      { label: "Na fila", value: items.filter((i) => i.status === "na fila").length, tone: "text-muted-foreground" },
-                      { label: "Processando", value: items.filter((i) => i.status === "processando").length, tone: "text-primary" },
-                      { label: "Prontos", value: readyCount, tone: "text-success" },
-                      { label: "Erros", value: items.filter((i) => i.status === "erro").length, tone: "text-destructive" },
-                    ].map((s) => (
-                      <div key={s.label} className="rounded-xl border border-border bg-surface-2 px-3 py-2">
-                        <p className={`font-display text-xl leading-none ${s.tone}`}>{s.value}</p>
-                        <p className="mono-label mt-1">{s.label}</p>
+                {/* painel: cards de leitura rápida em vez de lista corrida */}
+                {items.length > 0 && (() => {
+                  const queued = items.filter((i) => i.status === "na fila").length;
+                  const processing = items.filter((i) => i.status === "processando").length;
+                  const failed = items.filter((i) => i.status === "erro").length;
+                  const total = Math.max(1, items.length);
+                  const pct = Math.round((readyCount / total) * 100);
+                  return (
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      <div className="panel rise-in space-y-3 p-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="mono-label">Lote atual</p>
+                          <span className="mono-label text-muted-foreground">{items.length} vídeos</span>
+                        </div>
+                        <div className="flex items-end gap-2">
+                          <span className="font-display text-3xl leading-none text-gradient">{pct}%</span>
+                          <span className="mb-0.5 text-[12px] text-muted-foreground">concluído</span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
+                          <div
+                            className="h-full rounded-full bg-primary transition-[width] duration-500 ease-out"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { label: "Na fila", value: queued, tone: "text-muted-foreground" },
+                            { label: "Processando", value: processing, tone: "text-primary" },
+                            { label: "Erros", value: failed, tone: "text-destructive" },
+                          ].map((s) => (
+                            <div key={s.label} className="rounded-lg border border-border bg-surface-2 px-2.5 py-2">
+                              <p className={`font-display text-lg leading-none ${s.tone}`}>{s.value}</p>
+                              <p className="mono-label mt-1">{s.label}</p>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+
+                      <div className="panel rise-in space-y-3 p-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="mono-label">Publicações prontas</p>
+                          <CheckCircle2 className="size-4 text-success" />
+                        </div>
+                        <p className="font-display text-3xl leading-none text-success">{readyCount}</p>
+                        <p className="text-[12px] text-muted-foreground">
+                          arquivos exportados nesta sessão, prontos para baixar ou agendar
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void downloadZipAll()}
+                            disabled={readyCount === 0 || zipping}
+                          >
+                            <FileArchive className="size-4" /> Baixar ZIP
+                          </Button>
+                          <Button
+                            size="sm"
+                            disabled={readyCount === 0}
+                            onClick={() => setScheduleOpen(true)}
+                          >
+                            <CalendarClock className="size-4" /> Agendar
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="panel rise-in space-y-3 p-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="mono-label">Perfis e destinos</p>
+                          <Users className="size-4 text-primary" />
+                        </div>
+                        <p className="text-[12px] text-muted-foreground">
+                          gerencie páginas, contas do Instagram e canais conectados, veja status de
+                          token e o próximo agendamento.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Link to="/perfis" className="btn-ghost interactive text-[13px]">
+                            Ver perfis
+                          </Link>
+                          <Link to="/agenda" className="btn-ghost interactive text-[13px]">
+                            Abrir agenda
+                          </Link>
+                          <Link to="/biblioteca" className="btn-ghost interactive text-[13px]">
+                            Biblioteca
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
 
                 {/* progresso do lote: fonte única (mesmo estado do dock global) */}
                 {(running || batchItems.length > 0) && <BatchProgressCard />}
