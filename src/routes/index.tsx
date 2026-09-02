@@ -56,6 +56,7 @@ import { ClipStudio } from "@/components/ClipStudio";
 import { VideoStudio } from "@/components/VideoStudio";
 import { AuthGate } from "@/components/AuthGate";
 import { AISuggestPanel } from "@/components/AISuggestPanel";
+import { AITemplateStudio } from "@/components/AITemplateStudio";
 import { applyLook } from "@/lib/looks";
 
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
@@ -82,6 +83,7 @@ import {
   PLATFORM_PRESETS,
   RATIO_PRESETS,
   makeCleanupRegion,
+  CLEANUP_PRESETS,
   type CleanupRegion,
   type Template,
 } from "@/lib/template";
