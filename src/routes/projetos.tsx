@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { RequireAuth } from "@/components/RequireAuth";
+import { SavedProjects } from "@/components/editor/SavedProjects";
 import { Button } from "@/components/ui/base";
 import { attachInstanceProject, deleteInstance, listInstances, updateInstance } from "@/lib/video-template/service";
 import { createEditorProject } from "@/lib/editor/project";

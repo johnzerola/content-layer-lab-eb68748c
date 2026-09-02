@@ -49,7 +49,7 @@ export function SavedProjects() {
     let matched = 0;
     for (const file of Array.from(files)) {
       for (const p of items) {
-        if (p.doc.media?.name === file.name || p.doc.title === file.name) {
+        if (p.doc.title === file.name || p.name === file.name) {
           registerSourceFile(p.doc.videoId, file);
           matched++;
           break;
