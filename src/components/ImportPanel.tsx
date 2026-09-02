@@ -101,16 +101,17 @@ export function ImportPanel({
         <div className="mx-auto mt-6 max-w-xl border-t border-border pt-5">
           <p className="mono-label">ou cole o link do vídeo</p>
           <div className="mt-2 flex gap-2">
-            <input
+            <Input
               value={linkUrl}
               onChange={(e) => onLinkUrl(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && onImportLink()}
               placeholder={flow.linkPlaceholder}
-              className="flex-1 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs outline-none focus:border-primary"
+              className="flex-1 text-xs"
+              aria-label="Link do vídeo"
             />
-            <Button onClick={onImportLink} disabled={linkBusy || !linkUrl.trim()}>
-              <LinkIcon className="mr-1 size-4" />
-              {linkBusy ? "baixando..." : "Importar"}
+            <Button onClick={onImportLink} loading={linkBusy} disabled={!linkUrl.trim()}>
+              {!linkBusy && <LinkIcon className="size-4" />}
+              {linkBusy ? "Baixando…" : "Importar"}
             </Button>
           </div>
           <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
