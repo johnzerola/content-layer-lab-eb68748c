@@ -74,7 +74,7 @@ function applyOwner(userId: string | null) {
 
   const switchingRealAccounts = current !== null && current !== "anon" && current !== next;
   if (!switchingRealAccounts) {
-    // Primeiro acesso, login a partir de visitante ou logout: preserva o lote local.
+    // Primeiro acesso ou login a partir de visitante: preserva o lote local.
     writeOwner(next);
     return;
   }
