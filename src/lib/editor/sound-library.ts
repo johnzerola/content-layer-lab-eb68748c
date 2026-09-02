@@ -16,10 +16,14 @@ export interface SoundAsset {
   kind: SoundKind;
   /** categoria do acervo (id) */
   category: string;
+  /** rótulo legível do pacote/categoria de origem */
+  categoryLabel?: string;
   /** tamanho aproximado em MB */
   sizeMb: number;
   /** crédito obrigatório da licença livre */
   attribution: string;
+  /** licença declarada (CC0, CC BY-SA 4.0, Public domain...) */
+  license: string;
   pageUrl: string;
 }
 
@@ -38,13 +42,63 @@ export const SOUND_CATEGORIES: SoundCategory[] = [
   { id: "beats", label: "Beats", kind: "music", query: "drum loop beat" },
   { id: "piano", label: "Piano", kind: "music", query: "piano solo music" },
   { id: "acustico", label: "Acústico", kind: "music", query: "acoustic guitar music" },
+  { id: "sintetizador", label: "Synthwave", kind: "music", query: "synthesizer electronic loop" },
+  { id: "jazz", label: "Jazz / Soul", kind: "music", query: "jazz instrumental music" },
+  { id: "rock", label: "Rock", kind: "music", query: "rock guitar instrumental" },
+  { id: "classica", label: "Clássica", kind: "music", query: "classical orchestra recording" },
+  { id: "percussao", label: "Percussão", kind: "music", query: "percussion drums rhythm loop" },
+  { id: "ambiente", label: "Ambiente", kind: "music", query: "ambient drone soundscape" },
   { id: "transicao", label: "Transições", kind: "sfx", query: "whoosh swoosh transition" },
   { id: "impacto", label: "Impactos", kind: "sfx", query: "impact hit boom sound" },
   { id: "ui", label: "Cliques / UI", kind: "sfx", query: "click beep notification sound" },
   { id: "plateia", label: "Plateia", kind: "sfx", query: "applause crowd laugh" },
   { id: "natureza", label: "Natureza", kind: "sfx", query: "rain wind birds ambience" },
   { id: "memes", label: "Memes", kind: "sfx", query: "cartoon boing pop sound effect" },
+  { id: "cidade", label: "Cidade", kind: "sfx", query: "city traffic street ambience" },
+  { id: "animais", label: "Animais", kind: "sfx", query: "animal sound dog cat bird" },
+  { id: "alarmes", label: "Alarmes", kind: "sfx", query: "alarm siren bell sound" },
+  { id: "aguas", label: "Água", kind: "sfx", query: "water river ocean waves sound" },
+  { id: "passos", label: "Passos / Foley", kind: "sfx", query: "footsteps door foley sound" },
+  { id: "risadas", label: "Vozes", kind: "sfx", query: "human voice shout laugh sample" },
 ];
+
+/**
+ * Pacotes da GALERIA PRONTA: várias consultas combinadas em uma lista única
+ * com 100+ músicas e efeitos livres, cada item com autor e licença.
+ */
+export const SOUND_PACKS: { id: string; label: string; kind: SoundKind; queries: string[] }[] = [
+  {
+    id: "trilhas",
+    label: "Trilhas prontas",
+    kind: "music",
+    queries: [
+      "upbeat electronic music loop",
+      "cinematic epic orchestral music",
+      "ambient chill music loop",
+      "piano solo music",
+      "acoustic guitar music",
+      "jazz instrumental music",
+      "synthesizer music loop",
+      "drum beat loop",
+    ],
+  },
+  {
+    id: "efeitos",
+    label: "Efeitos prontos",
+    kind: "sfx",
+    queries: [
+      "whoosh transition sound",
+      "impact boom sound effect",
+      "click beep interface sound",
+      "applause crowd sound",
+      "rain wind ambience sound",
+      "cartoon pop boing sound",
+      "door footsteps foley sound",
+      "bell alarm sound effect",
+    ],
+  },
+];
+
 
 /** Galeria curada de trilhas livres (CC0 / domínio público) por clima. */
 export interface Cc0Mood {
