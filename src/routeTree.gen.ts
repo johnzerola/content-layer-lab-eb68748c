@@ -49,6 +49,7 @@ import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/publi
 import { Route as ApiPublicHooksSyncSocialRouteImport } from './routes/api/public/hooks/sync-social'
 import { Route as ApiPublicMetaDataDeletionRouteImport } from './routes/api/public/meta.data-deletion'
 import { Route as ApiPublicMetaDeauthorizeRouteImport } from './routes/api/public/meta.deauthorize'
+import { Route as ProjectsProjectIdEditorVideoIdRouteImport } from './routes/projects.$projectId.editor.$videoId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -263,6 +264,12 @@ const ApiPublicMetaDeauthorizeRoute =
     path: '/api/public/meta/deauthorize',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ProjectsProjectIdEditorVideoIdRoute =
+  ProjectsProjectIdEditorVideoIdRouteImport.update({
+    id: '/projects/$projectId/editor/$videoId',
+    path: '/projects/$projectId/editor/$videoId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -305,6 +312,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/sync-social': typeof ApiPublicHooksSyncSocialRoute
   '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
   '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
+  '/projects/$projectId/editor/$videoId': typeof ProjectsProjectIdEditorVideoIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -347,6 +355,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/sync-social': typeof ApiPublicHooksSyncSocialRoute
   '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
   '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
+  '/projects/$projectId/editor/$videoId': typeof ProjectsProjectIdEditorVideoIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -390,6 +399,7 @@ export interface FileRoutesById {
   '/api/public/hooks/sync-social': typeof ApiPublicHooksSyncSocialRoute
   '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
   '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
+  '/projects/$projectId/editor/$videoId': typeof ProjectsProjectIdEditorVideoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -434,6 +444,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/sync-social'
     | '/api/public/meta/data-deletion'
     | '/api/public/meta/deauthorize'
+    | '/projects/$projectId/editor/$videoId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -476,6 +487,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/sync-social'
     | '/api/public/meta/data-deletion'
     | '/api/public/meta/deauthorize'
+    | '/projects/$projectId/editor/$videoId'
   id:
     | '__root__'
     | '/'
@@ -518,6 +530,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/sync-social'
     | '/api/public/meta/data-deletion'
     | '/api/public/meta/deauthorize'
+    | '/projects/$projectId/editor/$videoId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -559,6 +572,7 @@ export interface RootRouteChildren {
   ApiPublicHooksSyncSocialRoute: typeof ApiPublicHooksSyncSocialRoute
   ApiPublicMetaDataDeletionRoute: typeof ApiPublicMetaDataDeletionRoute
   ApiPublicMetaDeauthorizeRoute: typeof ApiPublicMetaDeauthorizeRoute
+  ProjectsProjectIdEditorVideoIdRoute: typeof ProjectsProjectIdEditorVideoIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -843,6 +857,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMetaDeauthorizeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/projects/$projectId/editor/$videoId': {
+      id: '/projects/$projectId/editor/$videoId'
+      path: '/projects/$projectId/editor/$videoId'
+      fullPath: '/projects/$projectId/editor/$videoId'
+      preLoaderRoute: typeof ProjectsProjectIdEditorVideoIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -900,6 +921,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksSyncSocialRoute: ApiPublicHooksSyncSocialRoute,
   ApiPublicMetaDataDeletionRoute: ApiPublicMetaDataDeletionRoute,
   ApiPublicMetaDeauthorizeRoute: ApiPublicMetaDeauthorizeRoute,
+  ProjectsProjectIdEditorVideoIdRoute: ProjectsProjectIdEditorVideoIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
