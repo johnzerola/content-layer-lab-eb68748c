@@ -797,6 +797,17 @@ function EditorPage() {
         initialTemplateId={doc.templateId}
         targets={[{ videoId: doc.videoId, cutId: doc.cutId, title: doc.title, videoUrl: doc.media.originalUrl }]}
       />
+
+      <BulkScheduleModal
+        open={publishOpen}
+        onClose={() => setPublishOpen(false)}
+        accounts={accounts}
+        items={rendered ? [{ file: rendered, caption: doc.hook || doc.title }] : []}
+        hideFilePicker
+        subtitle="Publique este corte renderizado sem sair do editor."
+        onDone={() => setPublishOpen(false)}
+      />
+
     </div>
   );
 }
