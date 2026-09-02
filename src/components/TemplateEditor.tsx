@@ -383,20 +383,23 @@ export function TemplateEditor({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 sm:p-6">
-      <div className="panel flex h-full w-full max-w-6xl flex-col overflow-hidden">
-        <header className="flex items-start justify-between border-b border-border p-5">
-          <div>
-            <h2 className="text-lg font-semibold">Personalizar template</h2>
-            <p className="text-sm text-muted-foreground">
-              Ajuste textos, cores e elementos. Preview atualiza em tempo real.
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/85 p-2 backdrop-blur-md sm:p-6">
+      <div className="panel glass pop-in flex h-full w-full max-w-7xl flex-col overflow-hidden">
+        <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b border-border px-5 py-4">
+          <div className="min-w-0">
+            <p className="mono-label text-primary">Editor visual</p>
+            <h2 className="truncate font-display text-xl font-semibold tracking-tight">
+              {t.name || "Personalizar template"}
+            </h2>
+            <p className="truncate text-[12px] text-muted-foreground">
+              Ajuste textos, cores e elementos — o preview atualiza em tempo real.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
             <button
               onClick={undo}
               disabled={!past.current.length}
-              className="rounded-md border border-border p-2 disabled:opacity-40 hover:border-primary"
+              className="btn-ghost interactive size-9 justify-center disabled:opacity-40"
               title="Desfazer (Ctrl+Z)"
             >
               <Undo2 className="size-4" />
@@ -404,32 +407,37 @@ export function TemplateEditor({
             <button
               onClick={redo}
               disabled={!future.current.length}
-              className="rounded-md border border-border p-2 disabled:opacity-40 hover:border-primary"
+              className="btn-ghost interactive size-9 justify-center disabled:opacity-40"
               title="Refazer (Ctrl+Shift+Z)"
             >
               <Redo2 className="size-4" />
             </button>
             <button
               onClick={() => setSnap((s) => !s)}
-              className={`rounded-md border p-2 ${snap ? "border-primary text-primary" : "border-border"}`}
+              className={`btn-ghost interactive size-9 justify-center ${snap ? "bg-primary/15 text-primary" : ""}`}
               title="Snap e guias de alinhamento (segure Alt para ignorar)"
             >
               <Magnet className="size-4" />
             </button>
             <button
               onClick={() => setDebug((d) => !d)}
-              className={`rounded-md border p-2 ${debug ? "border-primary text-primary" : "border-border"}`}
+              className={`btn-ghost interactive size-9 justify-center ${debug ? "bg-primary/15 text-primary" : ""}`}
               title="Modo de depuração: grade, safe areas e bounding boxes"
             >
               <Bug className="size-4" />
             </button>
-            <button onClick={onCancel} className="rounded-md p-2 hover:bg-surface-2" aria-label="Fechar">
+            <button
+              onClick={onCancel}
+              className="btn-ghost interactive size-9 justify-center"
+              aria-label="Fechar"
+            >
               <X className="size-4" />
             </button>
           </div>
         </header>
 
-        <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto p-5 lg:grid-cols-[1fr_400px]">
+        <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto p-5 lg:grid-cols-[minmax(0,1fr)_400px]">
+
           <div className="space-y-3">
             <TemplateCanvas
               template={t}
