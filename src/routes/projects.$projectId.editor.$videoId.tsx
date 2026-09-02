@@ -22,7 +22,13 @@ import { StylesPanel } from "@/components/editor/StylesPanel";
 import { KeyframePanel } from "@/components/editor/KeyframePanel";
 import { READY_TEMPLATES } from "@/lib/editor/template-presets";
 import { loadAnimIdentity } from "@/lib/editor/animation-library";
-import { takePendingLayout, takePendingStyle, type SavedStylePreset } from "@/lib/editor/style-presets";
+import {
+  takePendingLayout,
+  takePendingStyle,
+  takePendingTemplate,
+  takePendingTransition,
+  type SavedStylePreset,
+} from "@/lib/editor/style-presets";
 import { TimelinePro } from "@/components/editor/TimelinePro";
 import { BatchApplyModal } from "@/components/editor/BatchApplyModal";
 import { TransitionPicker } from "@/components/editor/TransitionPicker";
@@ -386,6 +392,48 @@ function EditorPage() {
     );
     toast.success(`Layout “${ready.label}” aplicado.`);
   }, [addLayers, doc]);
+
+  /** template de vídeo salvo escolhido em /estilos (tabela video_templates) */
+  const pendingTemplateApplied = useRef(false);
+  useEffect(() => {
+    if (pendingTemplateApplied.current || !doc) return;
+    const id = takePendingTemplate();
+    if (!id) return;
+    pendingTemplateApplied.current = true;
+    void (async () => {
+      try {
+        const { getTemplate } = await import("@/lib/video-template/service");
+        const record = await getTemplate(id);
+        const layers = record?.template_data?.layers ?? [];
+        if (!layers.length) return;
+        addLayers(layers as TemplateLayer[], `template-${id}`);
+        toast.success(`Template “${record?.name ?? "salvo"}” aplicado.`);
+      } catch {
+        toast.error("Não foi possível aplicar o template salvo.");
+      }
+    })();
+  }, [addLayers, doc]);
+
+  /** transição padrão escolhida em /estilos, incluindo as emendas entre cortes */
+  const pendingTransApplied = useRef(false);
+  useEffect(() => {
+    if (pendingTransApplied.current || !doc) return;
+    const t = takePendingTransition();
+    if (!t) return;
+    pendingTransApplied.current = true;
+    const value = { kind: t.kind as PreEdit["transIn"]["kind"], dur: t.dur };
+    const current = doc.preedit ?? defaultPreEdit();
+    const joins = Math.max((current.segments?.length ?? 0) - 1, 0);
+    patchPre(
+      {
+        transIn: value,
+        transOut: value,
+        ...(t.applyAll ? { transitions: Array.from({ length: joins }, () => ({ ...value })) } : {}),
+      },
+      "transicao-padrao",
+    );
+    toast.success("Transição aplicada aos cortes.");
+  }, [doc, patchPre]);
 
 
 
