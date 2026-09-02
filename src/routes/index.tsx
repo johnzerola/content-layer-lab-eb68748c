@@ -511,6 +511,14 @@ function Home() {
   const [detectMsg, setDetectMsg] = useState<string | undefined>(undefined);
   const [suggestions, setSuggestions] = useState<CleanupRegion[]>([]);
   const [compare, setCompare] = useState(false);
+  /** grade de interface (TikTok/IG/Shorts) sobre a prévia — só visual, não exporta */
+  const [uiGrid, setUiGrid] = useState<PlatformUI | "off">(() => {
+    try {
+      return (localStorage.getItem("vv_ui_grid") as PlatformUI | "off") || "off";
+    } catch {
+      return "off";
+    }
+  });
   /** mini editor de enquadramento direto na prévia */
   const [cropTune, setCropTune] = useState(false);
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
