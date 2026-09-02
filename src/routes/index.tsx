@@ -2332,7 +2332,7 @@ function Home() {
             onSelect={setSelectedId}
             onEdit={(id) => {
               setSelectedId(id);
-              setStudioId(id);
+              openProEditor(id);
             }}
             onProcess={(ids) => void processAll(ids)}
             onTogglePause={togglePause}
@@ -3824,11 +3824,11 @@ function Home() {
                     <span
                       role="button"
                       tabIndex={0}
-                      title="Editar vídeo (cortar, enquadrar, cor)"
+                      title="Abrir no editor profissional"
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedId(it.id);
-                        setStudioId(it.id);
+                        openProEditor(it.id);
                       }}
                       className={`rounded-md border p-1.5 hover:border-primary ${
                         hasPreEdit(it.preEdit) || it.clip
