@@ -287,18 +287,43 @@ function EstilosPage() {
                 <article key={t.id} className="glass overflow-hidden rounded-2xl border border-border/60">
                   <div
                     className="relative flex h-28 items-center justify-center px-3 text-center"
-                    style={{ background: t.swatch[0], color: t.swatch[1] }}
+                    style={{
+                      background: t.palette?.background ?? t.swatch[1],
+                      color: t.palette?.text ?? "#fff",
+                      fontFamily: t.palette?.headingFont ?? brand.headingFont,
+                    }}
                   >
+                    <span
+                      className="absolute left-0 top-0 h-1.5 w-full"
+                      style={{ background: t.palette?.primary ?? t.swatch[0] }}
+                    />
                     <span className="text-sm font-black uppercase leading-tight">{t.label}</span>
                     <span className="absolute bottom-1 right-2 text-[10px] opacity-80">@{identity.handle}</span>
                   </div>
                   <div className="space-y-2 p-3">
                     <p className="text-[11px] text-muted-foreground">{t.hint}</p>
+                    <div className="flex items-center gap-1.5">
+                      {[t.palette?.primary, t.palette?.secondary, t.palette?.text, t.palette?.background]
+                        .filter(Boolean)
+                        .map((c, i) => (
+                          <span
+                            key={`${t.id}-c${i}`}
+                            className="h-3.5 w-3.5 rounded-full border border-border/60"
+                            style={{ background: c as string }}
+                          />
+                        ))}
+                      <span className="ml-auto truncate font-mono text-[10px] text-muted-foreground">
+                        {t.palette?.headingFont ?? brand.headingFont}
+                      </span>
+                    </div>
+                    <p className="font-mono text-[10px] text-muted-foreground">
+                      transição {t.transition?.kind ?? "fade"} · {(t.transition?.dur ?? 0.4).toFixed(2)}s
+                    </p>
                     <button
                       type="button"
                       onClick={() => {
                         setPendingLayout(t.id);
-                        toast.success(`Layout “${t.label}” pronto — abra um projeto no editor.`);
+                        toast.success(`Layout “${t.label}” pronto — paleta, fontes e transição vão junto.`);
                       }}
                       className="interactive w-full rounded-lg bg-primary/20 px-2 py-1.5 text-xs"
                     >
