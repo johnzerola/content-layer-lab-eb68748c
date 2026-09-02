@@ -161,7 +161,7 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime }: Pr
       </section>
 
       <section className="rounded-xl border border-border/60 p-2.5">
-        <p className="mb-2 font-mono text-[11px] uppercase text-muted-foreground">Música de fundo</p>
+        <p className="mb-2 font-mono text-[11px] uppercase text-muted-foreground">Música, efeitos e voz</p>
         <div className="flex flex-wrap gap-1.5">
           <button
             type="button"
@@ -193,6 +193,23 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime }: Pr
             e.target.value = "";
           }}
         />
+        <div className="mt-2">
+          <SoundLibrary
+            onAdd={(asset) =>
+              addClip(
+                createAudioClip({
+                  kind: asset.kind === "sfx" ? "sfx" : "music",
+                  name: asset.name,
+                  url: asset.url,
+                  startTime: asset.kind === "sfx" ? currentTime : 0,
+                  volume: asset.kind === "sfx" ? 1 : 0.6,
+                  fadeIn: asset.kind === "sfx" ? 0 : 0.5,
+                  fadeOut: asset.kind === "sfx" ? 0 : 0.8,
+                }),
+              )
+            }
+          />
+        </div>
         <div className="mt-2 grid gap-1.5">
           {STOCK_MUSIC.map((m) => (
             <button
@@ -208,6 +225,7 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime }: Pr
           ))}
         </div>
       </section>
+
 
       <section className="rounded-xl border border-border/60 p-2.5">
         <p className="mb-2 font-mono text-[11px] uppercase text-muted-foreground">Narração por IA</p>
