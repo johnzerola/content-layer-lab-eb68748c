@@ -299,6 +299,8 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           }}
         />
         {routeLink("/templates", "Templates de vídeo", Layers, expanded, close)}
+        {routeLink("/cortes", "Cortes", Scissors, expanded, close)}
+        {routeLink("/projetos", "Projetos", FolderKanban, expanded, close)}
         {routeLink("/biblioteca", "Resultados", History, expanded, close)}
         {routeLink("/armazenamento", "Armazenamento", HardDrive, expanded, close)}
         <NavItem
