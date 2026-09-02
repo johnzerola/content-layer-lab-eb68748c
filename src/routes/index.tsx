@@ -1,4 +1,4 @@
-﻿import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+﻿import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Upload,
@@ -55,7 +55,6 @@ import {
 import { ClipStudio } from "@/components/ClipStudio";
 import { VideoStudio } from "@/components/VideoStudio";
 import { AuthGate } from "@/components/AuthGate";
-import { AISuggestPanel } from "@/components/AISuggestPanel";
 import { AITemplateStudio } from "@/components/AITemplateStudio";
 import { applyLook } from "@/lib/looks";
 
@@ -107,6 +106,7 @@ import { detectNiche, mergeTagWeights, nicheContext } from "@/lib/viral-library"
 import { getClipFeedback } from "@/lib/clip-feedback";
 import { cuesToSentences, speechKeepSegments, zoomKeys, type Sentence } from "@/lib/transcript-clips";
 import { resolveVideoLink } from "@/lib/import.functions";
+import { registerSourceFile } from "@/lib/editor/cuts";
 import {
   downloadAsZip,
   formatBytes,
