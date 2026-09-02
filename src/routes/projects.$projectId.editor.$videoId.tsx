@@ -389,7 +389,7 @@ function EditorPage() {
     pendingLayoutApplied.current = true;
     const ident = loadAnimIdentity();
     // o layout traz paleta e tipografia próprias: entram no Brand Kit do projeto
-    const kit = { ...doc.brandKit, ...(ready.palette ?? {}) };
+    const kit: BrandKit = { ...DEFAULT_BRAND_KIT, ...(doc.brandKit ?? {}), ...(ready.palette ?? {}) };
     addLayers(
       ready.build(doc.composition.layers, { handle: ident.handle, name: ident.name, role: ident.role }, kit),
       `template-${ready.id}`,
