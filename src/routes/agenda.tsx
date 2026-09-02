@@ -20,6 +20,7 @@ import { AppShell, type AppMode } from "@/components/AppShell";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
 import { BulkScheduleModal } from "@/components/BulkScheduleModal";
+import { ScheduleCalendar } from "@/components/ScheduleCalendar";
 import { Button } from "@/components/ui/button";
 import { listJobs } from "@/lib/jobs";
 import type { Template } from "@/lib/template";
