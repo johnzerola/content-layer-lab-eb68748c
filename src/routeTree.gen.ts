@@ -26,6 +26,7 @@ import { Route as McpRouteImport } from './routes/mcp'
 import { Route as MetricasRouteImport } from './routes/metricas'
 import { Route as PerfisRouteImport } from './routes/perfis'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
+import { Route as ProjetosRouteImport } from './routes/projetos'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as VendasRouteImport } from './routes/vendas'
@@ -135,6 +136,11 @@ const PerfisRoute = PerfisRouteImport.update({
 const PrivacidadeRoute = PrivacidadeRouteImport.update({
   id: '/privacidade',
   path: '/privacidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjetosRoute = ProjetosRouteImport.update({
+  id: '/projetos',
+  path: '/projetos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TemplatesRoute = TemplatesRouteImport.update({
@@ -295,6 +301,7 @@ export interface FileRoutesByFullPath {
   '/metricas': typeof MetricasRoute
   '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/projetos': typeof ProjetosRoute
   '/templates': typeof TemplatesRouteWithChildren
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
@@ -339,6 +346,7 @@ export interface FileRoutesByTo {
   '/metricas': typeof MetricasRoute
   '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/projetos': typeof ProjetosRoute
   '/templates': typeof TemplatesRouteWithChildren
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
@@ -384,6 +392,7 @@ export interface FileRoutesById {
   '/metricas': typeof MetricasRoute
   '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/projetos': typeof ProjetosRoute
   '/templates': typeof TemplatesRouteWithChildren
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
@@ -430,6 +439,7 @@ export interface FileRouteTypes {
     | '/metricas'
     | '/perfis'
     | '/privacidade'
+    | '/projetos'
     | '/templates'
     | '/termos'
     | '/vendas'
@@ -474,6 +484,7 @@ export interface FileRouteTypes {
     | '/metricas'
     | '/perfis'
     | '/privacidade'
+    | '/projetos'
     | '/templates'
     | '/termos'
     | '/vendas'
@@ -518,6 +529,7 @@ export interface FileRouteTypes {
     | '/metricas'
     | '/perfis'
     | '/privacidade'
+    | '/projetos'
     | '/templates'
     | '/termos'
     | '/vendas'
@@ -563,6 +575,7 @@ export interface RootRouteChildren {
   MetricasRoute: typeof MetricasRoute
   PerfisRoute: typeof PerfisRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
+  ProjetosRoute: typeof ProjetosRoute
   TemplatesRoute: typeof TemplatesRouteWithChildren
   TermosRoute: typeof TermosRoute
   VendasRoute: typeof VendasRoute
@@ -707,6 +720,13 @@ declare module '@tanstack/react-router' {
       path: '/privacidade'
       fullPath: '/privacidade'
       preLoaderRoute: typeof PrivacidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projetos': {
+      id: '/projetos'
+      path: '/projetos'
+      fullPath: '/projetos'
+      preLoaderRoute: typeof ProjetosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/templates': {
@@ -919,6 +939,7 @@ const rootRouteChildren: RootRouteChildren = {
   MetricasRoute: MetricasRoute,
   PerfisRoute: PerfisRoute,
   PrivacidadeRoute: PrivacidadeRoute,
+  ProjetosRoute: ProjetosRoute,
   TemplatesRoute: TemplatesRouteWithChildren,
   TermosRoute: TermosRoute,
   VendasRoute: VendasRoute,
