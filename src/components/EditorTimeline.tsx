@@ -721,8 +721,11 @@ export function EditorTimeline({
           )}
 
           {/* playhead */}
-          <div className="pointer-events-none absolute inset-y-0 z-20 w-px bg-destructive" style={{ left: time * pps }}>
-            <span className="absolute -left-[5px] top-0 size-2.5 rounded-full bg-destructive" />
+          <div
+            className="aurora-playhead pointer-events-none absolute inset-y-0 z-20 w-[2px] rounded-full"
+            style={{ left: time * pps }}
+          >
+            <span className="progress-light absolute -left-[5px] top-0 size-2.5 rounded-full bg-primary" />
           </div>
         </div>
       </div>

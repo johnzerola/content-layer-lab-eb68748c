@@ -175,13 +175,13 @@ function NavItem({
       {...rest}
     >
       <span className="relative flex shrink-0 items-center">
-        {active && (
-          <span
-            aria-hidden
-            className="absolute -left-2.5 h-4 w-[2px] rounded-full bg-primary"
-            style={{ display: open ? "block" : "none" }}
-          />
-        )}
+        <span
+          aria-hidden
+          className={`aurora-rail aurora-slider absolute -left-2.5 w-[2px] rounded-full ${
+            active ? "h-4 opacity-100" : "h-1 opacity-0"
+          }`}
+          style={{ display: open ? "block" : "none" }}
+        />
         <Icon className={`size-[17px] ${active ? "text-primary" : ""}`} />
       </span>
       {open && (
