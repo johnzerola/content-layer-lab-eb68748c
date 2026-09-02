@@ -39,30 +39,42 @@ export function ImportPanel({
         e.preventDefault();
         onFiles(e.dataTransfer.files);
       }}
-      className="panel border-dashed p-10 text-center"
+      className="panel rise-in border-dashed p-10 text-center transition-colors duration-[var(--dur-fast)] hover:border-[var(--border-hover)] hover:bg-surface-2/40"
     >
-      <div className="mx-auto grid size-12 place-items-center rounded-xl bg-accent">
+      <div className="mx-auto grid size-12 place-items-center rounded-xl bg-[var(--primary-subtle)] ring-1 ring-[var(--primary-subtle)]">
         <Upload className="size-5 text-primary" />
       </div>
-      <p className="mt-4 text-lg font-semibold">
+      <p className="mt-4 font-display text-lg font-semibold">
         <span className="step-num mr-2">{flow.step}</span>
         {flow.title}
       </p>
       <p className="mt-1 text-xs text-muted-foreground">{flow.hint}</p>
       {count > 0 && (
-        <p className="mt-1 text-[12px] text-primary">
+        <p className="pop-in mt-2 inline-block rounded-md border border-border bg-surface-2 px-2 py-0.5 text-xs text-primary">
           {count} vídeo(s) na fila do {FLOWS[mode].brand}
         </p>
       )}
 
       <div className="mt-5 flex justify-center gap-2">
-        <Button variant="outline" onClick={() => inputRef.current?.click()}>
-          {flow.filesLabel}
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="outline" onClick={() => inputRef.current?.click()}>
+              <Upload className="size-4" />
+              {flow.filesLabel}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Ou arraste e solte os arquivos aqui</TooltipContent>
+        </Tooltip>
         {flow.folder && (
-          <Button variant="outline" onClick={() => folderRef.current?.click()}>
-            Selecionar pasta
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" onClick={() => folderRef.current?.click()}>
+                <FolderOpen className="size-4" />
+                Selecionar pasta
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Importa todos os vídeos da pasta de uma vez</TooltipContent>
+          </Tooltip>
         )}
       </div>
       <input
