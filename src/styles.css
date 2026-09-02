@@ -304,6 +304,43 @@
   letter-spacing: -0.011em;
 }
 
+/* título editorial (serifa alta) — inspirado em capas de revista */
+@utility title-editorial {
+  font-family: var(--font-editorial);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.04;
+  font-size: clamp(1.75rem, 1.1rem + 2.2vw, 3rem);
+  color: var(--color-foreground);
+  text-wrap: balance;
+}
+
+/* palavra de destaque dentro do título editorial */
+@utility title-em {
+  font-family: var(--font-editorial);
+  font-style: italic;
+  background: linear-gradient(
+    100deg,
+    color-mix(in oklab, var(--color-primary) 92%, white),
+    color-mix(in oklab, var(--color-foreground) 78%, var(--color-primary))
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* linha de contexto acima do título: 01 / SEÇÃO */
+@utility eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
 @utility step-num {
   font-family: var(--font-mono);
   color: var(--color-primary);
