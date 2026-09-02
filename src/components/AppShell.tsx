@@ -2,7 +2,6 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Layers,
-  Scissors,
   FolderKanban,
   Scissors,
   Eraser,
