@@ -2276,8 +2276,9 @@ function Home() {
         )}
 
         {mode !== "clip" && items.length > 0 && (
-          <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
-            <section className="panel space-y-4 p-5">
+          <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_420px]">
+            <section className="panel rise-in space-y-4 p-4 sm:p-5">
+
               <div>
                 <p className="text-lg font-semibold">
                   <span className="step-num mr-2">03</span>Preview & ajuste individual
@@ -2762,7 +2763,7 @@ function Home() {
                   const total = Math.max(1, items.length);
                   const pct = Math.round((readyCount / total) * 100);
                   return (
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="stack-in grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                       <div className="panel rise-in space-y-3 p-4">
                         <div className="flex items-center justify-between gap-2">
                           <p className="mono-label">Lote atual</p>
@@ -3395,7 +3396,7 @@ function Home() {
               </div>
             </section>
 
-            <section className="panel flex max-h-[70vh] flex-col p-5">
+            <section className="panel rise-in flex max-h-[calc(100dvh-9rem)] flex-col p-5 lg:sticky lg:top-4">
               <div className="mb-3 flex items-center justify-between">
                 <p className="font-semibold">Vídeos ({items.length})</p>
                 <button
