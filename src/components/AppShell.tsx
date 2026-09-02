@@ -404,7 +404,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             ].includes(window.location.pathname)) ? null : (
             <section
               key={current.id}
-              className="mb-6 overflow-hidden rounded-2xl border border-border/70 bg-[var(--gradient-surface)] p-5 shadow-[var(--shadow-panel)] sm:p-6"
+              className="rise-in mb-6 overflow-hidden rounded-2xl border border-border/70 bg-[var(--gradient-surface)] p-5 shadow-[var(--shadow-panel)] sm:p-6"
             >
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
