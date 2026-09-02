@@ -1,12 +1,18 @@
 /**
  * Acervo de músicas e efeitos livres com prévia e carregamento sob demanda.
- * Só busca a lista quando a categoria é aberta e só baixa o arquivo quando o
- * usuário toca a prévia ou adiciona o som na trilha.
+ * Dois modos: GALERIA PRONTA (100+ itens combinando vários pacotes, com autor
+ * e licença) e BUSCA por categoria. Nada é baixado antes da prévia ou do uso.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Music, Pause, Play, Plus, Search, Waves } from "lucide-react";
-import { CC0_MOODS, SOUND_CATEGORIES, searchFreeSounds, type SoundAsset, type SoundKind } from "@/lib/editor/sound-library";
-
+import {
+  CC0_MOODS,
+  SOUND_CATEGORIES,
+  loadSoundGallery,
+  searchFreeSounds,
+  type SoundAsset,
+  type SoundKind,
+} from "@/lib/editor/sound-library";
 
 interface Props {
   /** adiciona o som na trilha de áudio do editor */
@@ -15,10 +21,12 @@ interface Props {
 
 export function SoundLibrary({ onAdd }: Props) {
   const [kind, setKind] = useState<SoundKind>("music");
+  const [mode, setMode] = useState<"galeria" | "busca">("galeria");
   const categories = useMemo(() => SOUND_CATEGORIES.filter((c) => c.kind === kind), [kind]);
   const [categoryId, setCategoryId] = useState(categories[0]!.id);
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<SoundAsset[]>([]);
+  const [gallery, setGallery] = useState<Record<string, SoundAsset[]>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
@@ -30,7 +38,9 @@ export function SoundLibrary({ onAdd }: Props) {
     setCategoryId(categories[0]!.id);
   }, [categories]);
 
+  /** Busca por categoria (modo busca). */
   useEffect(() => {
+    if (mode !== "busca") return;
     let alive = true;
     const term = query.trim() || category.query;
     setLoading(true);
@@ -51,7 +61,28 @@ export function SoundLibrary({ onAdd }: Props) {
       alive = false;
       clearTimeout(timer);
     };
-  }, [category, kind, query]);
+  }, [category, kind, query, mode]);
+
+  /** Galeria pronta: carrega uma vez por tipo. */
+  useEffect(() => {
+    if (mode !== "galeria" || gallery[kind]) return;
+    let alive = true;
+    setLoading(true);
+    setError(null);
+    loadSoundGallery(kind)
+      .then((list) => {
+        if (alive) setGallery((g) => ({ ...g, [kind]: list }));
+      })
+      .catch((e: unknown) => {
+        if (alive) setError(e instanceof Error ? e.message : "falha ao carregar a galeria");
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [mode, kind, gallery]);
 
   useEffect(() => {
     return () => {
@@ -83,6 +114,12 @@ export function SoundLibrary({ onAdd }: Props) {
     setPlaying(asset.id);
   };
 
+  const term = query.trim().toLowerCase();
+  const galleryItems = (gallery[kind] ?? []).filter(
+    (a) => !term || a.name.toLowerCase().includes(term) || a.attribution.toLowerCase().includes(term),
+  );
+  const visible = mode === "galeria" ? galleryItems : items;
+
   return (
     <div className="space-y-2">
       <div className="flex rounded-lg border border-border/60 p-0.5 text-xs">
@@ -101,56 +138,71 @@ export function SoundLibrary({ onAdd }: Props) {
         ))}
       </div>
 
+      <div className="flex rounded-lg border border-border/60 p-0.5 text-[11px]">
+        {(["galeria", "busca"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setMode(m)}
+            className={`flex-1 rounded-md px-2 py-1 ${mode === m ? "bg-primary/20 text-foreground" : "text-muted-foreground"}`}
+          >
+            {m === "galeria" ? "Galeria pronta" : "Buscar no acervo"}
+          </button>
+        ))}
+      </div>
+
       <div className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-card/60 px-2">
         <Search className="h-3.5 w-3.5 text-muted-foreground" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={`Buscar em ${category.label.toLowerCase()}...`}
+          placeholder={mode === "galeria" ? "Filtrar a galeria..." : `Buscar em ${category.label.toLowerCase()}...`}
           aria-label="Buscar no acervo de áudio"
           className="w-full bg-transparent py-1.5 text-xs outline-none"
         />
       </div>
 
-      {kind === "music" && (
-        <div className="grid grid-cols-3 gap-1.5">
-          {CC0_MOODS.map((m) => {
-            const active = query === m.query;
-            return (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => setQuery(active ? "" : m.query)}
-                className={`rounded-lg bg-gradient-to-br ${m.gradient} p-2 text-left transition-transform hover:scale-[1.02] ${
-                  active ? "ring-2 ring-primary" : ""
-                }`}
-              >
-                <span className="block text-[11px] font-semibold text-foreground">{m.label}</span>
-                <span className="block truncate text-[10px] text-foreground/70">{m.hint}</span>
-              </button>
-            );
-          })}
+      {mode === "busca" && (
+        <div className="flex flex-wrap gap-1">
+          {categories.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => {
+                setQuery("");
+                setCategoryId(c.id);
+              }}
+              className={`rounded-full border px-2 py-0.5 text-[11px] ${
+                c.id === categoryId && !query ? "border-primary bg-primary/20" : "border-border/60 text-muted-foreground"
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1">
+      {mode === "busca" && kind === "music" && (
+        <div className="grid grid-cols-3 gap-1.5">
+          {CC0_MOODS.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setQuery(m.query)}
+              className={`rounded-lg bg-gradient-to-br ${m.gradient} p-2 text-left text-[11px] text-foreground`}
+            >
+              <span className="block font-medium">{m.label}</span>
+              <span className="block text-[9px] opacity-80">{m.hint}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
-        {categories.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            onClick={() => {
-              setQuery("");
-              setCategoryId(c.id);
-            }}
-            className={`rounded-full border px-2 py-0.5 text-[11px] ${
-              c.id === categoryId && !query ? "border-primary bg-primary/20" : "border-border/60 text-muted-foreground"
-            }`}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
+      {mode === "galeria" && !loading && (
+        <p className="font-mono text-[10px] uppercase text-muted-foreground">
+          {galleryItems.length} sons livres prontos para usar
+        </p>
+      )}
 
       {error && <p className="text-[11px] text-destructive">{error}</p>}
 
@@ -160,10 +212,10 @@ export function SoundLibrary({ onAdd }: Props) {
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> carregando acervo livre...
           </p>
         )}
-        {!loading && !items.length && !error && (
+        {!loading && !visible.length && !error && (
           <p className="py-3 text-[11px] text-muted-foreground">Nada encontrado. Tente outra busca.</p>
         )}
-        {items.map((asset) => (
+        {visible.map((asset) => (
           <div
             key={asset.id}
             className="flex items-center gap-2 rounded-lg border border-border/50 px-2 py-1.5 hover:border-primary/50"
@@ -181,6 +233,14 @@ export function SoundLibrary({ onAdd }: Props) {
               <span className="block truncate font-mono text-[10px] text-muted-foreground">
                 {asset.sizeMb}MB · {asset.attribution}
               </span>
+              <a
+                href={asset.pageUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-0.5 inline-block rounded border border-border/60 px-1 text-[9px] text-muted-foreground hover:border-primary/60"
+              >
+                {asset.license}
+              </a>
             </span>
             <button
               type="button"
@@ -194,7 +254,8 @@ export function SoundLibrary({ onAdd }: Props) {
         ))}
       </div>
       <p className="text-[10px] leading-snug text-muted-foreground">
-        Acervo livre (Creative Commons / domínio público) do Wikimedia Commons. Mantenha o crédito ao publicar.
+        Acervo livre (Creative Commons / domínio público) do Wikimedia Commons. Mantenha o crédito de autor e licença ao
+        publicar.
       </p>
     </div>
   );
