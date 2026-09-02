@@ -174,6 +174,7 @@ function NavItem({
   hint,
   icon: Icon,
   badge,
+  routeTo,
   ...rest
 }: {
   open: boolean;
@@ -182,19 +183,15 @@ function NavItem({
   hint?: string | undefined;
   icon: typeof Layers;
   badge?: ReactNode | undefined;
+  routeTo?: "/" | undefined;
 } & React.ComponentProps<"button">) {
-  return (
-    <button
-      type="button"
-      title={label}
-      aria-current={active ? "page" : undefined}
-      className={`group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-150 ${
+  const className = `group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-150 ${
         active
           ? "bg-surface-2 text-foreground"
           : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-      } ${open ? "" : "justify-center px-0"}`}
-      {...rest}
-    >
+      } ${open ? "" : "justify-center px-0"}`;
+  const content = (
+    <>
       <span className="relative flex shrink-0 items-center">
         <span
           aria-hidden
@@ -216,6 +213,33 @@ function NavItem({
         </span>
       )}
       {open && badge}
+    </>
+  );
+
+  if (routeTo) {
+    return (
+      <Link
+        to={routeTo}
+        title={label}
+        aria-current={active ? "page" : undefined}
+        className={className}
+        preload="intent"
+        onClick={rest.onClick}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-current={active ? "page" : undefined}
+      className={className}
+      {...rest}
+    >
+      {content}
     </button>
   );
 }
@@ -316,8 +340,10 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             label={m.brand}
             hint={expanded ? m.hint : undefined}
             icon={m.icon}
+            routeTo={onFixedRoute ? "/" : undefined}
             onClick={() => {
-              openTool(m.id);
+              if (onFixedRoute) markPendingShellMode(m.id);
+              else openTool(m.id);
               close?.();
             }}
             badge={
