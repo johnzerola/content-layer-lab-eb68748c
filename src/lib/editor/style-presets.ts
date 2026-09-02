@@ -98,3 +98,49 @@ export function takePendingLayout(): string | null {
   if (id) localStorage.removeItem(PENDING_LAYOUT);
   return id;
 }
+
+const PENDING_TEMPLATE = "vaiviral.template.pending";
+const PENDING_TRANSITION = "vaiviral.transition.pending";
+
+/** Template de vídeo salvo (tabela video_templates) escolhido em /estilos. */
+export function setPendingTemplate(templateId: string) {
+  try {
+    localStorage.setItem(PENDING_TEMPLATE, templateId);
+  } catch {
+    /* ignora */
+  }
+}
+
+export function takePendingTemplate(): string | null {
+  if (typeof localStorage === "undefined") return null;
+  const id = localStorage.getItem(PENDING_TEMPLATE);
+  if (id) localStorage.removeItem(PENDING_TEMPLATE);
+  return id;
+}
+
+export interface PendingTransition {
+  kind: string;
+  dur: number;
+  /** aplica também nas emendas entre cortes */
+  applyAll: boolean;
+}
+
+export function setPendingTransition(t: PendingTransition) {
+  try {
+    localStorage.setItem(PENDING_TRANSITION, JSON.stringify(t));
+  } catch {
+    /* ignora */
+  }
+}
+
+export function takePendingTransition(): PendingTransition | null {
+  if (typeof localStorage === "undefined") return null;
+  const raw = localStorage.getItem(PENDING_TRANSITION);
+  if (!raw) return null;
+  localStorage.removeItem(PENDING_TRANSITION);
+  try {
+    return JSON.parse(raw) as PendingTransition;
+  } catch {
+    return null;
+  }
+}
