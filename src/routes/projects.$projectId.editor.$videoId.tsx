@@ -338,6 +338,35 @@ function EditorPage() {
     return created;
   }, [addLayers, doc]);
 
+  /** Carrega um estilo salvo (cores, fonte e transição) sobre a legenda atual. */
+  const applySavedStyle = useCallback(
+    (preset: SavedStylePreset) => {
+      patchDoc({ captionPresetId: preset.presetId }, "estilo-salvo");
+      const target = ensureCaptionLayer();
+      if (target) {
+        updateLayer(target.id, { presetId: preset.presetId, style: preset.style } as Partial<TemplateLayer>);
+      }
+      patchPre(
+        { transIn: { ...pre.transIn, kind: preset.transition }, transOut: { ...pre.transOut, kind: preset.transition } },
+        "estilo-salvo",
+      );
+      toast.success(`Estilo “${preset.name}” aplicado.`);
+    },
+    [ensureCaptionLayer, patchDoc, patchPre, pre.transIn, pre.transOut, updateLayer],
+  );
+
+  /** estilo escolhido na tela /estilos entra assim que o projeto abre */
+  const pendingApplied = useRef(false);
+  useEffect(() => {
+    if (pendingApplied.current || !doc) return;
+    const pending = takePendingStyle();
+    if (!pending) return;
+    pendingApplied.current = true;
+    applySavedStyle(pending);
+  }, [applySavedStyle, doc]);
+
+
+
   /** Traduz para pt-BR e pontua a transcrição mantendo o tempo por palavra. */
   const refineTranscript = useCallback(
     async (base: TranscriptDoc): Promise<TranscriptDoc> => {
