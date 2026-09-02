@@ -40,7 +40,7 @@ export function ViralLibrary({ nicheId, onNiche, onUsePattern, detectedId }: Pro
         <div>
           <p className="mono-label">Biblioteca viral</p>
           <p className="text-lg font-semibold">Contexto de melhores momentos</p>
-          <p className="font-mono text-[11px] text-muted-foreground">
+          <p className="text-[12px] text-muted-foreground">
             {total.toLocaleString("pt-BR")} padrões de lives, podcasts, resumos de filmes e mais —
             usados para pontuar o que costuma viralizar em cada formato
           </p>
@@ -57,7 +57,7 @@ export function ViralLibrary({ nicheId, onNiche, onUsePattern, detectedId }: Pro
             onNiche(null);
             setPage(0);
           }}
-          className={`rounded-full border px-3 py-1 font-mono text-[11px] transition ${
+          className={`rounded-full border px-3 py-1 text-[12px] transition ${
             !nicheId
               ? "border-primary bg-primary text-primary-foreground"
               : "border-border bg-surface-2 text-muted-foreground hover:text-foreground"
@@ -72,7 +72,7 @@ export function ViralLibrary({ nicheId, onNiche, onUsePattern, detectedId }: Pro
               onNiche(n.id);
               setPage(0);
             }}
-            className={`rounded-full border px-3 py-1 font-mono text-[11px] transition ${
+            className={`rounded-full border px-3 py-1 text-[12px] transition ${
               nicheId === n.id
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-surface-2 text-muted-foreground hover:text-foreground"
@@ -84,7 +84,7 @@ export function ViralLibrary({ nicheId, onNiche, onUsePattern, detectedId }: Pro
       </div>
 
       {active && (
-        <p className="mt-3 rounded-lg border border-border bg-surface-2 p-3 font-mono text-[11px] text-muted-foreground">
+        <p className="mt-3 rounded-lg border border-border bg-surface-2 p-3 text-[12px] text-muted-foreground">
           <Sparkles className="mr-1 inline size-3 text-primary" />
           {!nicheId && detected ? "detectado pela IA · " : ""}
           {active.blurb} · duração ideal {active.minLen}–{active.maxLen}s ·{" "}
@@ -115,14 +115,14 @@ export function ViralLibrary({ nicheId, onNiche, onUsePattern, detectedId }: Pro
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="mono-label">{p.nicheLabel}</span>
-                  <span className="font-mono text-[11px] text-primary">score {p.score}</span>
+                  <span className="text-[12px] text-primary">score {p.score}</span>
                 </div>
                 <p className="mt-1 font-medium leading-snug">{p.hook}</p>
-                <p className="font-mono text-[11px] text-muted-foreground">
+                <p className="text-[12px] text-muted-foreground">
                   {p.topic} — {p.payoff}
                 </p>
                 <div className="mt-2 flex items-center justify-between gap-2">
-                  <span className="font-mono text-[11px] text-muted-foreground">
+                  <span className="text-[12px] text-muted-foreground">
                     ~{p.seconds}s · {p.hashtags.slice(0, 3).join(" ")}
                   </span>
                   <Button
@@ -139,7 +139,7 @@ export function ViralLibrary({ nicheId, onNiche, onUsePattern, detectedId }: Pro
               </article>
             ))}
             {!results.length && (
-              <p className="font-mono text-[11px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 nenhum padrão para essa busca.
               </p>
             )}
@@ -154,7 +154,7 @@ export function ViralLibrary({ nicheId, onNiche, onUsePattern, detectedId }: Pro
             >
               anterior
             </Button>
-            <span className="font-mono text-[11px] text-muted-foreground">página {page + 1}</span>
+            <span className="text-[12px] text-muted-foreground">página {page + 1}</span>
             <Button
               variant="outline"
               size="sm"

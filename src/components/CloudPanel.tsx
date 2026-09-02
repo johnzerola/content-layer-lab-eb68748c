@@ -150,7 +150,7 @@ export function CloudPanel({ templates, onClose, onChangeList, mode, buildSnapsh
         ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2">
-              <span className="truncate font-mono text-[11px] text-muted-foreground">{user.email}</span>
+              <span className="truncate text-[12px] text-muted-foreground">{user.email}</span>
               <Button variant="outline" size="sm" disabled={busy} onClick={() => void run(signOut)}>
                 <LogOut className="size-4" /> Sair
               </Button>
@@ -210,12 +210,12 @@ export function CloudPanel({ templates, onClose, onChangeList, mode, buildSnapsh
                 </Button>
               </div>
               {projects.length === 0 ? (
-                <p className="font-mono text-[11px] text-muted-foreground">Nenhum projeto salvo ainda.</p>
+                <p className="text-[12px] text-muted-foreground">Nenhum projeto salvo ainda.</p>
               ) : (
                 <ul className="max-h-40 space-y-1 overflow-auto">
                   {projects.map((p) => (
                     <li key={p.id} className="flex items-center justify-between gap-2 rounded-md bg-background px-2 py-1">
-                      <span className="min-w-0 truncate font-mono text-[10px] text-muted-foreground">
+                      <span className="min-w-0 truncate text-[11px] text-muted-foreground">
                         [{p.mode}] {p.name} · {p.data?.items?.length ?? 0} vídeo(s) ·{" "}
                         {new Date(p.updated_at).toLocaleDateString("pt-BR")}
                       </span>
@@ -258,11 +258,11 @@ export function CloudPanel({ templates, onClose, onChangeList, mode, buildSnapsh
                 <FileDown className="size-3" /> Arquivos exportados
               </p>
               {exportsList.length === 0 ? (
-                <p className="font-mono text-[11px] text-muted-foreground">Nenhuma exportação registrada.</p>
+                <p className="text-[12px] text-muted-foreground">Nenhuma exportação registrada.</p>
               ) : (
                 <ul className="max-h-40 space-y-1 overflow-auto">
                   {exportsList.map((e) => (
-                    <li key={e.id} className="truncate font-mono text-[10px] text-muted-foreground">
+                    <li key={e.id} className="truncate text-[11px] text-muted-foreground">
                       {new Date(e.created_at).toLocaleDateString("pt-BR")} · [{e.mode}] {e.file_name} ·{" "}
                       {(Number(e.bytes) / 1e6).toFixed(1)} MB
                     </li>
@@ -276,11 +276,11 @@ export function CloudPanel({ templates, onClose, onChangeList, mode, buildSnapsh
                 <History className="size-3" /> Últimos lotes
               </p>
               {batches.length === 0 ? (
-                <p className="font-mono text-[11px] text-muted-foreground">Nenhum lote registrado ainda.</p>
+                <p className="text-[12px] text-muted-foreground">Nenhum lote registrado ainda.</p>
               ) : (
                 <ul className="max-h-48 space-y-1 overflow-auto">
                   {batches.map((b) => (
-                    <li key={b.id} className="font-mono text-[10px] text-muted-foreground">
+                    <li key={b.id} className="text-[11px] text-muted-foreground">
                       {new Date(b.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })} ·{" "}
                       {b.mode} · {b.videos} vídeo(s) · {b.ok} ok / {b.failed} erro · {b.seconds}s
                     </li>

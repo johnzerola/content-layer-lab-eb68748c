@@ -75,7 +75,7 @@ export function TemplateLibrary({ templates, activeId, onClose, onChangeList, on
           }}
         />
 
-        {error && <p className="mb-3 font-mono text-xs text-destructive">{error}</p>}
+        {error && <p className="mb-3 text-xs text-destructive">{error}</p>}
 
         <div className="mb-5">
           <div className="mb-2 flex items-center gap-2">
@@ -92,7 +92,7 @@ export function TemplateLibrary({ templates, activeId, onClose, onChangeList, on
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">{p.name}</p>
                     <span
-                      className="mt-1 inline-block rounded-full px-2 py-0.5 font-mono text-[10px]"
+                      className="mt-1 inline-block rounded-full px-2 py-0.5 text-[11px]"
                       style={{ color: p.accent, border: `1px solid ${p.accent}55` }}
                     >
                       {p.tag}
@@ -154,10 +154,10 @@ export function TemplateLibrary({ templates, activeId, onClose, onChangeList, on
                         }}
                       >
                         {t.name}
-                        {t.id === activeId && <span className="ml-2 font-mono text-[10px] text-primary">● ativo</span>}
+                        {t.id === activeId && <span className="ml-2 text-[11px] text-primary">● ativo</span>}
                       </button>
                     )}
-                    <p className="font-mono text-[11px] text-muted-foreground">
+                    <p className="text-[12px] text-muted-foreground">
                       v{t.version ?? 1} · {fmt(t.updatedAt)}
                     </p>
                   </div>
@@ -200,7 +200,7 @@ export function TemplateLibrary({ templates, activeId, onClose, onChangeList, on
                   <div className="mt-3 space-y-1.5 border-t border-border pt-3">
                     <p className="mono-label">Versões</p>
                     {versions.length === 0 && (
-                      <p className="font-mono text-[11px] text-muted-foreground">sem histórico ainda</p>
+                      <p className="text-[12px] text-muted-foreground">sem histórico ainda</p>
                     )}
                     {versions.map((v) => (
                       <div key={v.version} className="flex items-center justify-between gap-2 text-xs">

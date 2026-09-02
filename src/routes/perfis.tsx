@@ -83,13 +83,13 @@ function ProfileCard({ p }: { p: ProfileStats }) {
         )}
         <div className="min-w-0 flex-1">
           <CardTitle className="truncate text-base">{p.displayName || p.username}</CardTitle>
-          <CardDescription className="truncate font-mono text-[11px]">
+          <CardDescription className="truncate text-[12px]">
             {label} · @{p.username}
             {p.isPrimary ? " · principal" : ""}
           </CardDescription>
         </div>
         <span
-          className={`shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10px] ${
+          className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] ${
             healthy
               ? "border-primary/40 bg-primary/10 text-primary"
               : "border-destructive/40 bg-destructive/10 text-destructive"
@@ -109,12 +109,12 @@ function ProfileCard({ p }: { p: ProfileStats }) {
           ].map((s) => (
             <div key={s.k} className="rounded-lg border border-border bg-surface-2 p-2">
               <p className="font-display text-lg font-bold">{s.v}</p>
-              <p className="font-mono text-[10px] text-muted-foreground">{s.k}</p>
+              <p className="text-[11px] text-muted-foreground">{s.k}</p>
             </div>
           ))}
         </div>
 
-        <div className="space-y-1.5 font-mono text-[11px]">
+        <div className="space-y-1.5 text-[12px]">
           <p className="flex items-center gap-2 text-muted-foreground">
             <CalendarClock className="size-3.5 shrink-0" />
             {p.nextScheduledAt ? (
@@ -165,7 +165,7 @@ function ProfileCard({ p }: { p: ProfileStats }) {
             {p.byKind.map((k) => (
               <span
                 key={k.kind}
-                className="rounded-full border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
+                className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground"
               >
                 {(KIND_LABEL[k.kind] ?? k.kind)}: {k.count}
               </span>
@@ -217,7 +217,7 @@ function ProfilesPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="font-display text-2xl font-bold">Perfis Meta</h1>
-            <p className="font-mono text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Páginas, Instagram e canais conectados — status de publicação e próximo agendamento.
             </p>
           </div>
@@ -241,14 +241,14 @@ function ProfilesPage() {
             <Card key={s.k}>
               <CardContent className="p-4">
                 <p className="font-display text-2xl font-bold">{s.v}</p>
-                <p className="font-mono text-[10px] text-muted-foreground">{s.k}</p>
+                <p className="text-[11px] text-muted-foreground">{s.k}</p>
               </CardContent>
             </Card>
           ))}
         </div>
 
         {isLoading ? (
-          <p className="font-mono text-xs text-muted-foreground">Carregando perfis…</p>
+          <p className="text-xs text-muted-foreground">Carregando perfis…</p>
         ) : profiles.length === 0 ? (
           <Card>
             <CardContent className="space-y-3 p-8 text-center">
