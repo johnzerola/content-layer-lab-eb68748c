@@ -171,6 +171,7 @@ export function EditorCanvas({
   snap = true,
   interactive = true,
   animPreview,
+  bare,
 }: {
   doc: TemplateDoc;
   selectedId: string | null;
@@ -181,9 +182,12 @@ export function EditorCanvas({
   showSafeArea?: boolean;
   snap?: boolean;
   interactive?: boolean;
+  /** remove o preenchimento/sombra para sobrepor exatamente uma mídia atrás */
+  bare?: boolean;
   /** dispara a prévia da animação de uma camada: { key, layerId, slot } */
   animPreview?: { key: number; layerId: string; slot: "animationIn" | "animationOut" | "animationLoop" } | null;
 }) {
+
   const wrapRef = useRef<HTMLDivElement>(null);
   const [guides, setGuides] = useState<{ axis: "x" | "y"; pos: number }[]>([]);
 
