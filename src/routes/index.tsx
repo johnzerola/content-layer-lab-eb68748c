@@ -3651,7 +3651,7 @@ function Home() {
         />
       )}
 
-      {capEditorItem?.captions?.length && (
+      {!!capEditorItem?.captions?.length && (
         <CaptionWorkbench
           file={capEditorItem.file}
           cues={capEditorItem.captions}
