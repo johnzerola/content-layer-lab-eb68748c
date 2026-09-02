@@ -15,7 +15,7 @@ import {
 import { TEMPLATE_CATEGORIES } from "@/lib/video-template/factory";
 import type { VideoTemplateRecord } from "@/lib/video-template/types";
 
-export const Route = createFileRoute("/templates")({
+export const Route = createFileRoute("/templates/")({
   head: () => ({
     meta: [
       { title: "Templates de vídeo — VaiViral" },
