@@ -155,7 +155,7 @@ describe("publishing queue integration", () => {
       status: "conectado",
       expires_at: null,
     });
-    fixture.deps.loadProviderAccessToken = async () => "per-account-token";
+    fixture.deps.loadProviderAccessToken = async () => ({ accessToken: "per-account-token", tokenKind: "facebook_page" });
 
     await runPublishQueue(fixture.deps, options);
 
@@ -185,7 +185,7 @@ describe("publishing queue integration", () => {
       status: "conectado",
       expires_at: null,
     });
-    fixture.deps.loadProviderAccessToken = async () => "youtube-access-token";
+    fixture.deps.loadProviderAccessToken = async () => ({ accessToken: "youtube-access-token" });
 
     const summary = await runPublishQueue(fixture.deps, options);
 

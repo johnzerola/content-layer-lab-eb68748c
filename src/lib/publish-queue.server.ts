@@ -53,7 +53,7 @@ export type QueueDependencies = {
   claim: (lockId: string, limit: number, lockTimeoutSeconds: number, maxAttempts: number) => Promise<ClaimedPost[]>;
   loadAccount: (accountId: string) => Promise<PublishingAccount | null>;
   loadConnection: (accountId: string, userId: string) => Promise<PublishingConnection | null>;
-  loadProviderAccessToken?: (connection: PublishingConnection) => Promise<string | null>;
+  loadProviderAccessToken?: (connection: PublishingConnection) => Promise<ProviderCredential | null>;
   /** Container Meta pendente de uma tentativa anterior, para não reenviar o vídeo. */
   loadPendingContainerId?: (postId: string) => Promise<string | null>;
   createSignedUrl: (videoPath: string, expiresInSeconds: number) => Promise<string>;
@@ -65,6 +65,12 @@ export type QueueDependencies = {
 };
 
 export type QueueResult = { processed: number; published: number; retrying: number; failed: number };
+
+/** Credencial resolvida da conexão; tokenKind distingue Login do Instagram de token de Página do Facebook. */
+export type ProviderCredential = {
+  accessToken: string;
+  tokenKind?: "instagram_login" | "facebook_page";
+};
 
 function provider(value: string): SocialProvider {
   return value === "ayrshare" || value === "meta" || value === "tiktok" || value === "youtube"
@@ -96,9 +102,10 @@ export async function publishClaimedPost(post: ClaimedPost, deps: QueueDependenc
 
   const selectedProvider = provider(connection?.provider ?? account.provider);
   const needsToken = selectedProvider === "meta" || selectedProvider === "youtube";
-  const providerAccessToken = needsToken && connection && deps.loadProviderAccessToken
+  const credential = needsToken && connection && deps.loadProviderAccessToken
     ? await deps.loadProviderAccessToken(connection)
     : undefined;
+  const providerAccessToken = credential?.accessToken;
   if (needsToken && deps.loadProviderAccessToken && !providerAccessToken) {
     return failure(
       "AUTH_INVALID",
@@ -137,6 +144,7 @@ export async function publishClaimedPost(post: ClaimedPost, deps: QueueDependenc
     provider: selectedProvider,
     providerAccountId: connection?.provider_account_id ?? account.provider_account_id,
     ...(providerAccessToken ? { providerAccessToken } : {}),
+    ...(credential?.tokenKind ? { metaTokenKind: credential.tokenKind } : {}),
     idempotencyKey: post.id,
     ...(pendingContainerId ? { pendingContainerId } : {}),
   });

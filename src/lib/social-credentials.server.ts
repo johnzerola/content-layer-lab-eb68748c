@@ -50,6 +50,8 @@ export function decryptSocialToken(
 export async function resolveMetaAccessToken(input: {
   ciphertext: string;
   expiresAt: string;
+  /** "instagram_login" permite refresh via ig_refresh_token; tokens de Página do Facebook não têm refresh server-side. */
+  tokenKind?: string | null;
   environment?: NodeJS.ProcessEnv;
   fetch?: typeof fetch;
   now?: Date;
@@ -61,6 +63,8 @@ export async function resolveMetaAccessToken(input: {
     throw new MetaLinkError("META_AUTH_INVALID", "A conexão Instagram expirou.");
   }
   const accessToken = decryptSocialToken(input.ciphertext, input.environment);
+  // Tokens de Página do Facebook não passam pelo ig_refresh_token (endpoint do Instagram Login).
+  if (input.tokenKind !== "instagram_login") return accessToken;
   const refreshThreshold = 7 * 24 * 60 * 60 * 1000;
   if (expiresAt.getTime() - now.getTime() > refreshThreshold) return accessToken;
 
