@@ -22,6 +22,7 @@ import {
 } from "@/lib/editor/cuts";
 import { publishCuts } from "@/lib/editor/cuts.service";
 import { AiCutSuggestions } from "@/components/cuts/AiCutSuggestions";
+import { LinkImport } from "@/components/editor/LinkImport";
 import { nicheContext, NICHES } from "@/lib/viral-library";
 import { markPendingTool } from "@/lib/handoff";
 import { createInstance, listMyTemplates, updateInstance } from "@/lib/video-template/service";

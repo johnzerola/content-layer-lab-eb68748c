@@ -1,8 +1,7 @@
 /** Carrega a mídia do editor por arquivo local ou por link (mesmo fluxo do ViralBatch). */
 import { useRef, useState } from "react";
-import { Link2, Upload } from "lucide-react";
-import { toast } from "sonner";
-import { resolveVideoLink } from "@/lib/import.functions";
+import { Upload } from "lucide-react";
+import { LinkImport } from "@/components/editor/LinkImport";
 import { registerSourceFile } from "@/lib/editor/cuts";
 
 export interface MediaSourceBarProps {
@@ -12,8 +11,6 @@ export interface MediaSourceBarProps {
 }
 
 export function MediaSourceBar({ videoId, hasMedia, onLoaded }: MediaSourceBarProps) {
-  const [url, setUrl] = useState("");
-  const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -21,38 +18,6 @@ export function MediaSourceBar({ videoId, hasMedia, onLoaded }: MediaSourceBarPr
     registerSourceFile(videoId, file);
     onLoaded(file, URL.createObjectURL(file));
     setMsg(`mídia carregada: ${file.name}`);
-  };
-
-  /** Baixa o vídeo pelo servidor e usa o arquivo direto no editor. */
-  const importFromLink = async () => {
-    const target = url.trim();
-    if (!target || busy) return;
-    setBusy(true);
-    setMsg("procurando o vídeo...");
-    try {
-      const res = await resolveVideoLink({ data: { url: target } });
-      if (!res.ok || !res.videoUrl || !res.proxyUrl) {
-        setMsg(res.message ?? "não encontrei o vídeo nesse link");
-        return;
-      }
-      setMsg(`baixando de ${res.source ?? "origem"}...`);
-      const dl = await fetch(res.proxyUrl);
-      if (!dl.ok) {
-        setMsg("a origem bloqueou o download desse arquivo");
-        return;
-      }
-      const blob = await dl.blob();
-      const ext = res.ext ?? "mp4";
-      const base = (res.title ?? "video").replace(/[^\w\-. ]+/g, "").trim().slice(0, 60) || "video";
-      accept(new File([blob], `${base}.${ext}`, { type: blob.type || "video/mp4" }));
-      setUrl("");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "falha ao importar o link";
-      setMsg(message);
-      toast.error(message);
-    } finally {
-      setBusy(false);
-    }
   };
 
   return (
@@ -75,8 +40,8 @@ export function MediaSourceBar({ videoId, hasMedia, onLoaded }: MediaSourceBarPr
       >
         <Upload className="h-3.5 w-3.5" /> {hasMedia ? "Trocar mídia" : "Carregar vídeo"}
       </button>
-      <div className="flex items-center gap-1">
-        <Link2 className="h-3.5 w-3.5 text-muted-foreground" />
+      <LinkImport onFile={accept} placeholder="Colar link do vídeo (tiktok, instagram, youtube, url direta)" />
+      <div className="hidden">
         <input
           value={url}
           onChange={(e) => setUrl(e.target.value)}
