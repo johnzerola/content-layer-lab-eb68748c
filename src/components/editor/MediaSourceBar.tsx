@@ -41,26 +41,6 @@ export function MediaSourceBar({ videoId, hasMedia, onLoaded }: MediaSourceBarPr
         <Upload className="h-3.5 w-3.5" /> {hasMedia ? "Trocar mídia" : "Carregar vídeo"}
       </button>
       <LinkImport onFile={accept} placeholder="Colar link do vídeo (tiktok, instagram, youtube, url direta)" />
-      <div className="hidden">
-        <input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void importFromLink();
-          }}
-          placeholder="Colar link do vídeo (tiktok, instagram, youtube, url direta)"
-          aria-label="Link do vídeo"
-          className="w-64 rounded-md border border-border/60 bg-card/60 px-2 py-1 text-xs"
-        />
-        <button
-          type="button"
-          onClick={() => void importFromLink()}
-          disabled={busy || !url.trim()}
-          className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground disabled:opacity-50"
-        >
-          {busy ? "Baixando..." : "Baixar"}
-        </button>
-      </div>
       {msg && <span className="text-[11px] text-muted-foreground">{msg}</span>}
     </div>
   );
