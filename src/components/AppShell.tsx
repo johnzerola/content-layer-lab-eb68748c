@@ -336,7 +336,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
   );
 
   return (
-    <TooltipProvider delayDuration={200}>
+    <TooltipProvider delayDuration={350}>
     <div className={`theme-${mode} flex min-h-dvh w-full aurora-bg`}>
       <aside
         className={`sticky top-0 hidden h-dvh shrink-0 flex-col overflow-y-auto border-r border-border bg-[var(--background-2)] transition-[width] duration-[220ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] md:flex ${
@@ -478,7 +478,10 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           )}
 
 
-          {isAdmin ? children : <PlanGate>{children}</PlanGate>}
+          {/* 23 · só o conteúdo principal transita; o shell fica imóvel */}
+          <div key={pathname} className="page-in">
+            {isAdmin ? children : <PlanGate>{children}</PlanGate>}
+          </div>
         </div>
       </div>
     </div>
