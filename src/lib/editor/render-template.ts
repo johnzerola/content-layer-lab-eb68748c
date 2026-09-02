@@ -10,8 +10,21 @@ import { renderAudioTrack } from "@/lib/audio-track";
 import { cleanMp4Metadata } from "@/lib/mp4meta";
 import { bgSleep } from "@/lib/keepalive";
 import {
+  composeTransitions,
+  cropRect,
+  keptSegments,
+  preEditFilter,
+  segmentTransitionAt,
+  segmentsDuration,
+  srcTimeAt,
+  transitionAt,
+  type PreEdit,
+  type TransitionState,
+} from "@/lib/preedit";
+import {
   ASPECT_SIZES,
   NEUTRAL_FILTER,
+  type AnimationSpec,
   type FilterValues,
   type TemplateDoc,
   type TemplateLayer,
@@ -26,10 +39,13 @@ export interface TemplateRenderOptions {
   doc: TemplateDoc;
   file: File;
   cut?: TemplateRenderCut | null;
+  /** pré-edição: trechos, keyframes de enquadramento, transições e cor */
+  preedit?: PreEdit | null;
   fps?: number;
   onProgress?: (p: number) => void;
   signal?: AbortSignal | undefined;
 }
+
 
 export function templateRenderSupported(): boolean {
   return (
@@ -60,6 +76,85 @@ function activeAt(layer: TemplateLayer, t: number): boolean {
   if (layer.endTime != null && t > layer.endTime) return false;
   return true;
 }
+
+const EASE: Record<string, (k: number) => number> = {
+  linear: (k) => k,
+  easeIn: (k) => k * k,
+  easeOut: (k) => 1 - Math.pow(1 - k, 3),
+  easeInOut: (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2),
+};
+
+interface AnimState {
+  alpha: number;
+  scale: number;
+  dx: number;
+  dy: number;
+  rotate: number;
+}
+
+const NEUTRAL_ANIM: AnimState = { alpha: 1, scale: 1, dx: 0, dy: 0, rotate: 0 };
+
+/** Estado visual de uma animação (entrada/saída/loop) em `k` de 0 a 1. */
+function animState(spec: AnimationSpec | null | undefined, k: number, outward: boolean, loop = false): AnimState {
+  if (!spec || !spec.type || spec.type === "none") return NEUTRAL_ANIM;
+  const e = (EASE[spec.easing] ?? EASE["easeOut"]!)(Math.min(1, Math.max(0, k)));
+  const inv = 1 - e;
+  const dir = outward ? -1 : 1;
+  switch (spec.type) {
+    case "fadeIn":
+      return { ...NEUTRAL_ANIM, alpha: e };
+    case "slideUp":
+      return { ...NEUTRAL_ANIM, alpha: e, dy: dir * inv * 0.25 };
+    case "slideDown":
+      return { ...NEUTRAL_ANIM, alpha: e, dy: -dir * inv * 0.25 };
+    case "slideLeft":
+      return { ...NEUTRAL_ANIM, alpha: e, dx: dir * inv * 0.25 };
+    case "slideRight":
+      return { ...NEUTRAL_ANIM, alpha: e, dx: -dir * inv * 0.25 };
+    case "scaleIn":
+    case "zoom":
+      return { ...NEUTRAL_ANIM, alpha: e, scale: 0.7 + e * 0.3 };
+    case "pop":
+      return { ...NEUTRAL_ANIM, alpha: e, scale: 0.6 + Math.sin(e * Math.PI * 0.5) * 0.45 };
+    case "bounce":
+      return { ...NEUTRAL_ANIM, alpha: e, dy: -Math.abs(Math.sin(inv * Math.PI * 2)) * 0.06 };
+    case "pulse":
+      return loop
+        ? { ...NEUTRAL_ANIM, scale: 1 + Math.sin(k * Math.PI * 2) * 0.05 }
+        : { ...NEUTRAL_ANIM, alpha: e, scale: 0.95 + e * 0.05 };
+    case "shake":
+      return { ...NEUTRAL_ANIM, dx: Math.sin(k * Math.PI * 8) * 0.01 };
+    case "float":
+      return { ...NEUTRAL_ANIM, dy: Math.sin(k * Math.PI * 2) * 0.02 };
+    case "spin":
+      return { ...NEUTRAL_ANIM, rotate: k * 360 };
+    default:
+      return { ...NEUTRAL_ANIM, alpha: e };
+  }
+}
+
+/** Junta entrada, saída e loop de uma camada no instante `t`. */
+function layerAnim(layer: TemplateLayer, t: number): AnimState {
+  const local = t - layer.startTime;
+  let s: AnimState = NEUTRAL_ANIM;
+  const inSpec = layer.animationIn;
+  if (inSpec && inSpec.duration > 0) {
+    const k = (local - (inSpec.delay || 0)) / inSpec.duration;
+    if (k < 1) s = animState(inSpec, Math.max(0, k), false);
+  }
+  const outSpec = layer.animationOut;
+  if (outSpec && outSpec.duration > 0 && layer.endTime != null) {
+    const left = layer.endTime - t;
+    if (left < outSpec.duration) s = animState(outSpec, Math.max(0, left) / outSpec.duration, true);
+  }
+  const loopSpec = layer.animationLoop;
+  if (loopSpec && loopSpec.duration > 0) {
+    const l = animState(loopSpec, (local % loopSpec.duration) / loopSpec.duration, false, true);
+    s = { alpha: s.alpha * l.alpha, scale: s.scale * l.scale, dx: s.dx + l.dx, dy: s.dy + l.dy, rotate: s.rotate + l.rotate };
+  }
+  return s;
+}
+
 
 function drawFit(
   ctx: CanvasRenderingContext2D,
@@ -207,6 +302,13 @@ function captionCues(doc: TemplateDoc): CaptionCueLike[] {
   );
 }
 
+export interface SourceCrop {
+  sx: number;
+  sy: number;
+  sw: number;
+  sh: number;
+}
+
 /** Desenha um frame completo do template no tempo `t` (em segundos do corte). */
 export function drawTemplateFrame(
   ctx: CanvasRenderingContext2D,
@@ -215,6 +317,9 @@ export function drawTemplateFrame(
   video: HTMLVideoElement | null,
   images: Map<string, HTMLImageElement>,
   cues: CaptionCueLike[] = [],
+  crop: SourceCrop | null = null,
+  /** correção de cor da pré-edição, aplicada só ao vídeo */
+  grade = "none",
 ) {
   const W = ctx.canvas.width;
   const H = ctx.canvas.height;
@@ -231,12 +336,19 @@ export function drawTemplateFrame(
     const w = (layer.width / 100) * W;
     const h = (layer.height / 100) * H;
 
+    const a = layerAnim(layer, t);
     ctx.save();
-    ctx.globalAlpha = Math.max(0, Math.min(1, layer.opacity));
-    ctx.filter = filterCss(layer.filter ?? doc.filter);
-    if (layer.rotation) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, layer.opacity * a.alpha));
+    const base = filterCss(layer.filter ?? doc.filter);
+    ctx.filter =
+      layer.type === "video" && grade && grade !== "none"
+        ? [base === "none" ? "" : base, grade].filter(Boolean).join(" ")
+        : base;
+    if (a.dx || a.dy) ctx.translate(a.dx * W, a.dy * H);
+    if (a.scale !== 1 || a.rotate || layer.rotation) {
       ctx.translate(x + w / 2, y + h / 2);
-      ctx.rotate((layer.rotation * Math.PI) / 180);
+      if (layer.rotation || a.rotate) ctx.rotate(((layer.rotation + a.rotate) * Math.PI) / 180);
+      if (a.scale !== 1) ctx.scale(a.scale, a.scale);
       ctx.translate(-(x + w / 2), -(y + h / 2));
     }
 
@@ -245,9 +357,18 @@ export function drawTemplateFrame(
       ctx.beginPath();
       ctx.roundRect(x, y, w, h, layer.mask === "circle" ? Math.min(w, h) / 2 : layer.radius || 0);
       ctx.clip();
-      drawFit(ctx, video, video.videoWidth, video.videoHeight, x, y, w, h, layer.fit);
+      if (crop) {
+        const scale =
+          layer.fit === "contain" ? Math.min(w / crop.sw, h / crop.sh) : Math.max(w / crop.sw, h / crop.sh);
+        const dw = layer.fit === "fill" ? w : crop.sw * scale;
+        const dh = layer.fit === "fill" ? h : crop.sh * scale;
+        ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+      } else {
+        drawFit(ctx, video, video.videoWidth, video.videoHeight, x, y, w, h, layer.fit);
+      }
       ctx.restore();
     } else if (layer.type === "image" && layer.src) {
+
       const img = images.get(layer.src);
       if (img) {
         ctx.save();
@@ -336,7 +457,10 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
 
     const start = Math.max(0, Math.min(opts.cut?.start ?? 0, Math.max(0, video.duration - 0.4)));
     const end = Math.min(video.duration || start + 1, opts.cut?.end ?? video.duration);
-    const dur = Math.max(0.4, end - start);
+    const pre = opts.preedit ?? null;
+    /** Trechos mantidos: o export segue exatamente os cortes da timeline. */
+    const segs = keptSegments(pre, { start, end }, video.duration);
+    const dur = Math.max(0.4, segs.length ? segmentsDuration(segs) : end - start);
     const totalFrames = Math.max(1, Math.round(dur * fps));
 
     const images = new Map<string, HTMLImageElement>();
@@ -345,8 +469,9 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
       if (img) images.set(src, img);
     }
 
-    const audio = await renderAudioTrack(file, [{ start, end }], 1, 0, 0).catch(() => null);
+    const audio = await renderAudioTrack(file, segs.length ? segs : [{ start, end }], 1, 0, 0).catch(() => null);
     const audioCodec = audio ? await pickAudioCodec(audio.channels, audio.sampleRate) : null;
+
 
     const muxer = new Muxer({
       target: new ArrayBufferTarget(),
@@ -391,8 +516,33 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
       if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
       if (encoderError) throw encoderError;
       const tOut = i / fps;
-      await seekTo(start + tOut);
-      drawTemplateFrame(ctx, doc, tOut, video, images, cues);
+      // tempo no vídeo original respeitando os trechos mantidos
+      const tSrc = segs.length ? srcTimeAt(segs, tOut) : start + tOut;
+      await seekTo(tSrc);
+
+      // recorte/zoom vindo dos keyframes de enquadramento
+      const rect = pre ? cropRect(pre, video.videoWidth, video.videoHeight, tSrc) : null;
+      const crop = rect ? { sx: rect.sx, sy: rect.sy, sw: rect.sw, sh: rect.sh } : null;
+
+      // transições de abertura/saída + emendas entre trechos
+      const tr: TransitionState = composeTransitions(
+        transitionAt(pre, tSrc, { start, end }),
+        segmentTransitionAt(pre, tSrc, { start, end }, video.duration),
+      );
+
+      ctx.save();
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = Math.max(0, Math.min(1, tr.alpha));
+      if (tr.scale !== 1 || tr.dx || tr.dy) {
+        ctx.translate(W / 2 + tr.dx * W, H / 2 + tr.dy * H);
+        ctx.scale(tr.scale, tr.scale);
+        ctx.translate(-W / 2, -H / 2);
+      }
+      const grade = pre ? preEditFilter(pre) : "none";
+      drawTemplateFrame(ctx, doc, tOut, video, images, cues, crop, grade);
+      ctx.restore();
+
       const frame = new VideoFrame(canvas, { timestamp: i * frameDur, duration: frameDur });
       encoder.encode(frame, { keyFrame: i % (fps * 2) === 0 });
       frame.close();
@@ -402,6 +552,7 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
 
     await encoder.flush();
     encoder.close();
+
 
     if (audio && audioCodec && typeof window.AudioEncoder !== "undefined") {
       const { rendered, channels, sampleRate } = audio;

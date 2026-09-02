@@ -22,6 +22,7 @@ import { StylesPanel } from "@/components/editor/StylesPanel";
 import { KeyframePanel } from "@/components/editor/KeyframePanel";
 import { READY_TEMPLATES } from "@/lib/editor/template-presets";
 import { loadAnimIdentity } from "@/lib/editor/animation-library";
+import { takePendingStyle, type SavedStylePreset } from "@/lib/editor/style-presets";
 import { TimelinePro } from "@/components/editor/TimelinePro";
 import { BatchApplyModal } from "@/components/editor/BatchApplyModal";
 import { TransitionPicker } from "@/components/editor/TransitionPicker";
@@ -246,7 +247,10 @@ function EditorPage() {
         toast.error("Carregue o vídeo de origem na barra de mídia para renderizar.");
         return;
       }
-      const seg = doc.preedit?.segments?.[0] ?? null;
+      // com vários trechos, a pré-edição define os cortes; com um só, ele vira a janela
+      const segList = doc.preedit?.segments ?? [];
+      const seg = segList.length === 1 ? segList[0]! : null;
+
       setRendering(true);
       setRenderPct(0);
       try {
@@ -254,8 +258,10 @@ function EditorPage() {
           doc: doc.composition,
           file,
           cut: seg ? { start: seg.start, end: seg.end } : null,
+          preedit: doc.preedit ?? null,
           onProgress: setRenderPct,
         });
+
         const out = new File(
           [blob],
           `${(doc.title || "corte").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.mp4`,
@@ -332,6 +338,39 @@ function EditorPage() {
     setSelectedId(created.id);
     return created;
   }, [addLayers, doc]);
+
+  /** Carrega um estilo salvo (cores, fonte e transição) sobre a legenda atual. */
+  const applySavedStyle = useCallback(
+    (preset: SavedStylePreset) => {
+      patchDoc({ captionPresetId: preset.presetId }, "estilo-salvo");
+      const target = ensureCaptionLayer();
+      if (target) {
+        updateLayer(target.id, { presetId: preset.presetId, style: preset.style } as Partial<TemplateLayer>);
+      }
+      const current = doc?.preedit ?? defaultPreEdit();
+      patchPre(
+        {
+          transIn: { ...current.transIn, kind: preset.transition },
+          transOut: { ...current.transOut, kind: preset.transition },
+        },
+        "estilo-salvo",
+      );
+      toast.success(`Estilo “${preset.name}” aplicado.`);
+    },
+    [doc, ensureCaptionLayer, patchDoc, patchPre, updateLayer],
+  );
+
+  /** estilo escolhido na tela /estilos entra assim que o projeto abre */
+  const pendingApplied = useRef(false);
+  useEffect(() => {
+    if (pendingApplied.current || !doc) return;
+    const pending = takePendingStyle();
+    if (!pending) return;
+    pendingApplied.current = true;
+    applySavedStyle(pending);
+  }, [applySavedStyle, doc]);
+
+
 
   /** Traduz para pt-BR e pontua a transcrição mantendo o tempo por palavra. */
   const refineTranscript = useCallback(
@@ -675,6 +714,8 @@ function EditorPage() {
                     "template-estilo",
                   )
                 }
+                transition={pre.transIn.kind}
+                onApplySaved={applySavedStyle}
               />
             )}
           </div>
@@ -843,6 +884,8 @@ function EditorPage() {
                     "template-estilo",
                   )
                 }
+                transition={pre.transIn.kind}
+                onApplySaved={applySavedStyle}
               />
             )}
             {tool === "animacao" && (
