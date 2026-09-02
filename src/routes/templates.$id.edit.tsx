@@ -8,6 +8,7 @@ import { EditorCanvas } from "@/components/vtemplate/EditorCanvas";
 import { EditorToolbar } from "@/components/vtemplate/EditorToolbar";
 import { LayerPanel } from "@/components/vtemplate/LayerPanel";
 import { PropertiesPanel } from "@/components/vtemplate/PropertiesPanel";
+import { TemplateCopyPanel } from "@/components/vtemplate/TemplateCopyPanel";
 import { getTemplate, updateTemplate } from "@/lib/video-template/service";
 import { useTemplateAutosave, useTemplateEditor } from "@/lib/video-template/store";
 import type { TemplateDoc, VideoTemplateRecord } from "@/lib/video-template/types";
@@ -202,10 +203,24 @@ function Editor({ record }: { record: VideoTemplateRecord }) {
                   onReorder={ed.reorder}
                 />
               ) : (
-                <PropertiesPanel layer={ed.selected} onUpdate={(p) => ed.selected && ed.updateLayer(ed.selected.id, p)} />
+                <>
+                  <TemplateCopyPanel
+                    doc={ed.doc}
+                    selected={ed.selected}
+                    onAddLayers={ed.addLayers}
+                    onUpdateLayer={ed.updateLayer}
+                  />
+                  <PropertiesPanel layer={ed.selected} onUpdate={(p) => ed.selected && ed.updateLayer(ed.selected.id, p)} />
+                </>
               )}
             </div>
             <div className="hidden lg:block">
+              <TemplateCopyPanel
+                doc={ed.doc}
+                selected={ed.selected}
+                onAddLayers={ed.addLayers}
+                onUpdateLayer={ed.updateLayer}
+              />
               <PropertiesPanel layer={ed.selected} onUpdate={(p) => ed.selected && ed.updateLayer(ed.selected.id, p)} />
             </div>
           </aside>
