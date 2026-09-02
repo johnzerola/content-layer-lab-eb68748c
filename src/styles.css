@@ -885,3 +885,60 @@
   }
 }
 
+
+/* ——— animações de legenda (prévia dos presets e overlay do editor) ——— */
+@keyframes cap-pop {
+  0% { transform: scale(0.72); opacity: 0.35; }
+  55% { transform: scale(1.16); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes cap-scale {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+@keyframes cap-bounce {
+  0% { transform: translateY(18%) scale(0.85); }
+  45% { transform: translateY(-14%) scale(1.12); }
+  70% { transform: translateY(4%) scale(0.98); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes cap-fade {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes cap-slide {
+  0% { transform: translateX(-24%); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes cap-glow {
+  0%, 100% { filter: drop-shadow(0 0 2px currentColor); }
+  50% { filter: drop-shadow(0 0 14px currentColor); }
+}
+@keyframes cap-shake {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  25% { transform: translateX(-3%) rotate(-1.5deg); }
+  75% { transform: translateX(3%) rotate(1.5deg); }
+}
+@keyframes cap-wave {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-16%); }
+}
+@keyframes cap-typewriter {
+  0% { clip-path: inset(0 100% 0 0); }
+  100% { clip-path: inset(0 0 0 0); }
+}
+
+.cap-anim-pop { animation: cap-pop 1.1s ease-out infinite; }
+.cap-anim-scale { animation: cap-scale 1.4s ease-in-out infinite; }
+.cap-anim-bounce { animation: cap-bounce 1.2s cubic-bezier(0.32, 1.5, 0.5, 1) infinite; }
+.cap-anim-fade { animation: cap-fade 1.4s ease-in-out infinite alternate; }
+.cap-anim-slide { animation: cap-slide 1.3s ease-out infinite; }
+.cap-anim-glow { animation: cap-glow 1.6s ease-in-out infinite; }
+.cap-anim-shake { animation: cap-shake 0.6s ease-in-out infinite; }
+.cap-anim-wave { animation: cap-wave 1.2s ease-in-out infinite; }
+.cap-anim-typewriter { animation: cap-typewriter 1.6s steps(12, end) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  [class*="cap-anim-"] { animation: none !important; }
+}
