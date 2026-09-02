@@ -55,6 +55,9 @@ import {
 import { ClipStudio } from "@/components/ClipStudio";
 import { VideoStudio } from "@/components/VideoStudio";
 import { AuthGate } from "@/components/AuthGate";
+import { AISuggestPanel } from "@/components/AISuggestPanel";
+import { applyLook } from "@/lib/looks";
+
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
 import { AutoScheduleModal } from "@/components/AutoScheduleModal";
@@ -2283,7 +2286,51 @@ function Home() {
                   Reposicione o enquadramento quando o corte automático errar.
                 </p>
               </div>
+              {selected && mode !== "limpar-ia" && (
+                <AuthGate>
+                  <AISuggestPanel
+                    captions={selected.captions}
+                    duration={selected.clip ? selected.clip.end - selected.clip.start : selected.duration}
+                    onHeadline={(text) =>
+                      setItems((p) =>
+                        p.map((x) => (x.id === selected.id ? { ...x, headline: text } : x)),
+                      )
+                    }
+                    onHeadlineBank={(lines) => setHeadlineBank(lines.join("\n"))}
+                    onCut={(cut) =>
+                      setItems((p) =>
+                        p.map((x) =>
+                          x.id === selected.id
+                            ? {
+                                ...x,
+                                clip: { start: cut.start, end: cut.end },
+                                clipTitle: cut.title || x.clipTitle,
+                                clipReason: cut.reason || x.clipReason,
+                              }
+                            : x,
+                        ),
+                      )
+                    }
+                    onLook={(lookId) =>
+                      setItems((p) =>
+                        p.map((x) =>
+                          x.id === selected.id
+                            ? {
+                                ...x,
+                                preEdit: {
+                                  ...(x.preEdit ?? defaultPreEdit()),
+                                  ...applyLook(lookId),
+                                },
+                              }
+                            : x,
+                        ),
+                      )
+                    }
+                  />
+                </AuthGate>
+              )}
               {mode === "limpar-ia" && selected ? (
+
                 <AuthGate>
                   <CleanerIAStudio
                     item={{

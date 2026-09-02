@@ -300,7 +300,7 @@ function AgendaPage() {
                   </div>
                   <Link
                     to="/integracoes"
-                    className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground"
+                    className="interactive flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground"
                   >
                     <Plus className="size-4" />
                     Add
@@ -464,7 +464,7 @@ function AgendaPage() {
                 <button
                   onClick={onSchedule}
                   disabled={sending}
-                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                  className="interactive mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
                 >
                   {sending ? (
                     <Loader2 className="size-4 animate-spin" />
