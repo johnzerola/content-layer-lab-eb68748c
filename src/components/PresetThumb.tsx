@@ -37,7 +37,7 @@ export function PresetThumb({ template, width = 150 }: { template: Template; wid
       </div>
     );
 
-    const imgNode = (l: { x: number; y: number; w: number; h: number; src?: string; round?: boolean; opacity?: number }, key: string) =>
+    const imgNode = (l: { x: number; y: number; w: number; h: number; src?: string | null; round?: boolean; opacity?: number }, key: string) =>
       l.src ? (
         <img
           key={key}
