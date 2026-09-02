@@ -44,10 +44,12 @@ import { Route as IntegracoesInstagramCallbackRouteImport } from './routes/integ
 import { Route as IntegracoesTiktokCallbackRouteImport } from './routes/integracoes_.tiktok.callback'
 import { Route as IntegracoesYoutubeCallbackRouteImport } from './routes/integracoes_.youtube.callback'
 import { Route as TemplatesIdEditRouteImport } from './routes/templates.$id.edit'
+import { Route as ApiPublicHooksProcessBatchRouteImport } from './routes/api/public/hooks/process-batch'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
 import { Route as ApiPublicHooksSyncSocialRouteImport } from './routes/api/public/hooks/sync-social'
 import { Route as ApiPublicMetaDataDeletionRouteImport } from './routes/api/public/meta.data-deletion'
 import { Route as ApiPublicMetaDeauthorizeRouteImport } from './routes/api/public/meta.deauthorize'
+import { Route as ProjectsProjectIdEditorVideoIdRouteImport } from './routes/projects.$projectId.editor.$videoId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -232,6 +234,12 @@ const TemplatesIdEditRoute = TemplatesIdEditRouteImport.update({
   path: '/$id/edit',
   getParentRoute: () => TemplatesRoute,
 } as any)
+const ApiPublicHooksProcessBatchRoute =
+  ApiPublicHooksProcessBatchRouteImport.update({
+    id: '/api/public/hooks/process-batch',
+    path: '/api/public/hooks/process-batch',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksPublishDueRoute =
   ApiPublicHooksPublishDueRouteImport.update({
     id: '/api/public/hooks/publish-due',
@@ -254,6 +262,12 @@ const ApiPublicMetaDeauthorizeRoute =
   ApiPublicMetaDeauthorizeRouteImport.update({
     id: '/api/public/meta/deauthorize',
     path: '/api/public/meta/deauthorize',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ProjectsProjectIdEditorVideoIdRoute =
+  ProjectsProjectIdEditorVideoIdRouteImport.update({
+    id: '/projects/$projectId/editor/$videoId',
+    path: '/projects/$projectId/editor/$videoId',
     getParentRoute: () => rootRouteImport,
   } as any)
 
@@ -293,10 +307,12 @@ export interface FileRoutesByFullPath {
   '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/integracoes/youtube/callback': typeof IntegracoesYoutubeCallbackRoute
   '/templates/$id/edit': typeof TemplatesIdEditRoute
+  '/api/public/hooks/process-batch': typeof ApiPublicHooksProcessBatchRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/hooks/sync-social': typeof ApiPublicHooksSyncSocialRoute
   '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
   '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
+  '/projects/$projectId/editor/$videoId': typeof ProjectsProjectIdEditorVideoIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -334,10 +350,12 @@ export interface FileRoutesByTo {
   '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/integracoes/youtube/callback': typeof IntegracoesYoutubeCallbackRoute
   '/templates/$id/edit': typeof TemplatesIdEditRoute
+  '/api/public/hooks/process-batch': typeof ApiPublicHooksProcessBatchRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/hooks/sync-social': typeof ApiPublicHooksSyncSocialRoute
   '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
   '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
+  '/projects/$projectId/editor/$videoId': typeof ProjectsProjectIdEditorVideoIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -376,10 +394,12 @@ export interface FileRoutesById {
   '/integracoes_/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/integracoes_/youtube/callback': typeof IntegracoesYoutubeCallbackRoute
   '/templates/$id/edit': typeof TemplatesIdEditRoute
+  '/api/public/hooks/process-batch': typeof ApiPublicHooksProcessBatchRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/hooks/sync-social': typeof ApiPublicHooksSyncSocialRoute
   '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
   '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
+  '/projects/$projectId/editor/$videoId': typeof ProjectsProjectIdEditorVideoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -419,10 +439,12 @@ export interface FileRouteTypes {
     | '/integracoes/tiktok/callback'
     | '/integracoes/youtube/callback'
     | '/templates/$id/edit'
+    | '/api/public/hooks/process-batch'
     | '/api/public/hooks/publish-due'
     | '/api/public/hooks/sync-social'
     | '/api/public/meta/data-deletion'
     | '/api/public/meta/deauthorize'
+    | '/projects/$projectId/editor/$videoId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -460,10 +482,12 @@ export interface FileRouteTypes {
     | '/integracoes/tiktok/callback'
     | '/integracoes/youtube/callback'
     | '/templates/$id/edit'
+    | '/api/public/hooks/process-batch'
     | '/api/public/hooks/publish-due'
     | '/api/public/hooks/sync-social'
     | '/api/public/meta/data-deletion'
     | '/api/public/meta/deauthorize'
+    | '/projects/$projectId/editor/$videoId'
   id:
     | '__root__'
     | '/'
@@ -501,10 +525,12 @@ export interface FileRouteTypes {
     | '/integracoes_/tiktok/callback'
     | '/integracoes_/youtube/callback'
     | '/templates/$id/edit'
+    | '/api/public/hooks/process-batch'
     | '/api/public/hooks/publish-due'
     | '/api/public/hooks/sync-social'
     | '/api/public/meta/data-deletion'
     | '/api/public/meta/deauthorize'
+    | '/projects/$projectId/editor/$videoId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -541,10 +567,12 @@ export interface RootRouteChildren {
   IntegracoesInstagramCallbackRoute: typeof IntegracoesInstagramCallbackRoute
   IntegracoesTiktokCallbackRoute: typeof IntegracoesTiktokCallbackRoute
   IntegracoesYoutubeCallbackRoute: typeof IntegracoesYoutubeCallbackRoute
+  ApiPublicHooksProcessBatchRoute: typeof ApiPublicHooksProcessBatchRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
   ApiPublicHooksSyncSocialRoute: typeof ApiPublicHooksSyncSocialRoute
   ApiPublicMetaDataDeletionRoute: typeof ApiPublicMetaDataDeletionRoute
   ApiPublicMetaDeauthorizeRoute: typeof ApiPublicMetaDeauthorizeRoute
+  ProjectsProjectIdEditorVideoIdRoute: typeof ProjectsProjectIdEditorVideoIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -794,6 +822,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TemplatesIdEditRouteImport
       parentRoute: typeof TemplatesRoute
     }
+    '/api/public/hooks/process-batch': {
+      id: '/api/public/hooks/process-batch'
+      path: '/api/public/hooks/process-batch'
+      fullPath: '/api/public/hooks/process-batch'
+      preLoaderRoute: typeof ApiPublicHooksProcessBatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/publish-due': {
       id: '/api/public/hooks/publish-due'
       path: '/api/public/hooks/publish-due'
@@ -820,6 +855,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/meta/deauthorize'
       fullPath: '/api/public/meta/deauthorize'
       preLoaderRoute: typeof ApiPublicMetaDeauthorizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects/$projectId/editor/$videoId': {
+      id: '/projects/$projectId/editor/$videoId'
+      path: '/projects/$projectId/editor/$videoId'
+      fullPath: '/projects/$projectId/editor/$videoId'
+      preLoaderRoute: typeof ProjectsProjectIdEditorVideoIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -874,10 +916,12 @@ const rootRouteChildren: RootRouteChildren = {
   IntegracoesInstagramCallbackRoute: IntegracoesInstagramCallbackRoute,
   IntegracoesTiktokCallbackRoute: IntegracoesTiktokCallbackRoute,
   IntegracoesYoutubeCallbackRoute: IntegracoesYoutubeCallbackRoute,
+  ApiPublicHooksProcessBatchRoute: ApiPublicHooksProcessBatchRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
   ApiPublicHooksSyncSocialRoute: ApiPublicHooksSyncSocialRoute,
   ApiPublicMetaDataDeletionRoute: ApiPublicMetaDataDeletionRoute,
   ApiPublicMetaDeauthorizeRoute: ApiPublicMetaDeauthorizeRoute,
+  ProjectsProjectIdEditorVideoIdRoute: ProjectsProjectIdEditorVideoIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
