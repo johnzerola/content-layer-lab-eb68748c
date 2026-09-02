@@ -315,7 +315,7 @@ function EditorPage() {
   const selectedLayer = doc.composition.layers.find((l) => l.id === selectedId) ?? null;
   const scriptText = transcript.words
     .filter((w) => !w.removed)
-    .map((w) => w.text)
+    .map((w) => w.word)
     .join(" ");
 
   return (
