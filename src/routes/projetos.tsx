@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { RequireAuth } from "@/components/RequireAuth";
+import { SavedProjects } from "@/components/editor/SavedProjects";
 import { Button } from "@/components/ui/base";
 import { attachInstanceProject, deleteInstance, listInstances, updateInstance } from "@/lib/video-template/service";
 import { createEditorProject } from "@/lib/editor/project";
@@ -44,6 +45,7 @@ function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [renders, setRenders] = useState<Record<string, RenderState>>({});
   const [busy, setBusy] = useState(false);
+  const [view, setView] = useState<"templates" | "salvos">("templates");
   const [opening, setOpening] = useState<string | null>(null);
   const navigate = useNavigate();
   const abortRef = useRef<AbortController | null>(null);
@@ -211,6 +213,25 @@ function ProjectsPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:p-8">
+      <div className="flex gap-2">
+        {(["templates", "salvos"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setView(t)}
+            className={`interactive rounded-full px-3 py-1.5 text-xs capitalize ${
+              view === t ? "bg-primary text-primary-foreground" : "border border-border/60"
+            }`}
+          >
+            {t === "templates" ? "Projetos de template" : "Cortes salvos"}
+          </button>
+        ))}
+      </div>
+
+      {view === "salvos" ? (
+        <SavedProjects />
+      ) : (
+      <>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="mono-label">Etapa 3 · Projetos</p>
@@ -332,6 +353,8 @@ function ProjectsPage() {
           );
         })}
       </div>
+      </>
+      )}
     </div>
   );
 }

@@ -22,7 +22,7 @@ import { StylesPanel } from "@/components/editor/StylesPanel";
 import { KeyframePanel } from "@/components/editor/KeyframePanel";
 import { READY_TEMPLATES } from "@/lib/editor/template-presets";
 import { loadAnimIdentity } from "@/lib/editor/animation-library";
-import { takePendingStyle, type SavedStylePreset } from "@/lib/editor/style-presets";
+import { takePendingLayout, takePendingStyle, type SavedStylePreset } from "@/lib/editor/style-presets";
 import { TimelinePro } from "@/components/editor/TimelinePro";
 import { BatchApplyModal } from "@/components/editor/BatchApplyModal";
 import { TransitionPicker } from "@/components/editor/TransitionPicker";
@@ -369,6 +369,23 @@ function EditorPage() {
     pendingApplied.current = true;
     applySavedStyle(pending);
   }, [applySavedStyle, doc]);
+
+  /** layout pronto escolhido em /estilos entra com marca e @perfil */
+  const pendingLayoutApplied = useRef(false);
+  useEffect(() => {
+    if (pendingLayoutApplied.current || !doc) return;
+    const id = takePendingLayout();
+    if (!id) return;
+    const ready = READY_TEMPLATES.find((t) => t.id === id);
+    if (!ready) return;
+    pendingLayoutApplied.current = true;
+    const ident = loadAnimIdentity();
+    addLayers(
+      ready.build(doc.composition.layers, { handle: ident.handle, name: ident.name, role: ident.role }, doc.brandKit),
+      `template-${ready.id}`,
+    );
+    toast.success(`Layout “${ready.label}” aplicado.`);
+  }, [addLayers, doc]);
 
 
 
@@ -965,7 +982,14 @@ function EditorPage() {
                         type="button"
                         onClick={() => {
                           const id = loadAnimIdentity();
-                          addLayers(t.build(doc.composition.layers, { handle: id.handle, name: id.name }), `template-${t.id}`);
+                          addLayers(
+                            t.build(
+                              doc.composition.layers,
+                              { handle: id.handle, name: id.name, role: id.role },
+                              doc.brandKit,
+                            ),
+                            `template-${t.id}`,
+                          );
                           toast.success(`Template “${t.label}” aplicado.`);
                         }}
                         className="overflow-hidden rounded-xl border border-border/60 text-left hover:border-primary/60"
