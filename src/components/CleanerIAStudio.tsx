@@ -974,7 +974,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                   void cleanupRemoteJob({ data: { id } });
                 }, 15000);
               }}
-              className="block w-full rounded-lg bg-primary py-2 text-center text-sm font-semibold text-primary-foreground"
+              className="interactive block w-full rounded-lg bg-primary py-2 text-center text-sm font-semibold text-primary-foreground"
             >
               Baixar vídeo limpo
             </a>
