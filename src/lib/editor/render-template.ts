@@ -510,8 +510,34 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
       if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
       if (encoderError) throw encoderError;
       const tOut = i / fps;
-      await seekTo(start + tOut);
-      drawTemplateFrame(ctx, doc, tOut, video, images, cues);
+      // tempo no vídeo original respeitando os trechos mantidos
+      const tSrc = segs.length ? srcTimeAt(segs, tOut) : start + tOut;
+      await seekTo(tSrc);
+
+      // recorte/zoom vindo dos keyframes de enquadramento
+      const rect = pre ? cropRect(pre, video.videoWidth, video.videoHeight, tSrc) : null;
+      const crop = rect ? { sx: rect.sx, sy: rect.sy, sw: rect.sw, sh: rect.sh } : null;
+
+      // transições de abertura/saída + emendas entre trechos
+      const tr: TransitionState = composeTransitions(
+        transitionAt(pre, tSrc, { start, end }),
+        segmentTransitionAt(pre, tSrc, { start, end }, video.duration),
+      );
+
+      ctx.save();
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = Math.max(0, Math.min(1, tr.alpha));
+      if (tr.scale !== 1 || tr.dx || tr.dy) {
+        ctx.translate(W / 2 + tr.dx * W, H / 2 + tr.dy * H);
+        ctx.scale(tr.scale, tr.scale);
+        ctx.translate(-W / 2, -H / 2);
+      }
+      const grade = pre ? preEditFilter(pre) : "none";
+      ctx.filter = grade && grade !== "none" ? grade : "none";
+      drawTemplateFrame(ctx, doc, tOut, video, images, cues, crop);
+      ctx.restore();
+
       const frame = new VideoFrame(canvas, { timestamp: i * frameDur, duration: frameDur });
       encoder.encode(frame, { keyFrame: i % (fps * 2) === 0 });
       frame.close();
@@ -521,6 +547,7 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
 
     await encoder.flush();
     encoder.close();
+
 
     if (audio && audioCodec && typeof window.AudioEncoder !== "undefined") {
       const { rendered, channels, sampleRate } = audio;
