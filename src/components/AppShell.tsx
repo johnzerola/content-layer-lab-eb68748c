@@ -273,6 +273,14 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             {open && "Agenda"}
           </Link>
           <Link
+            to="/perfis"
+            title="Perfis Meta — páginas, Instagram e canais"
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+          >
+            <Users className="size-[18px] shrink-0" />
+            {open && "Perfis"}
+          </Link>
+          <Link
             to="/integracoes"
             title="Configurações e integrações"
             className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
