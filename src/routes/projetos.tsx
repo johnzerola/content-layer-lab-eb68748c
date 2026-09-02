@@ -1,10 +1,12 @@
 /** Projetos de template: lista, edição e renderização real em MP4 1080x1920. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { RequireAuth } from "@/components/RequireAuth";
 import { Button } from "@/components/ui/base";
-import { deleteInstance, listInstances, updateInstance } from "@/lib/video-template/service";
+import { attachInstanceProject, deleteInstance, listInstances, updateInstance } from "@/lib/video-template/service";
+import { createEditorProject } from "@/lib/editor/project";
+import { createEditorProjectRecord, getEditorProject } from "@/lib/editor/project.service";
 import { renderTemplateProject, templateRenderSupported } from "@/lib/editor/render-template";
 import { getSourceFile, readCutBinding, registerSourceFile } from "@/lib/editor/cuts";
 import type { TemplateInstanceRecord } from "@/lib/video-template/types";
@@ -42,6 +44,8 @@ function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [renders, setRenders] = useState<Record<string, RenderState>>({});
   const [busy, setBusy] = useState(false);
+  const [opening, setOpening] = useState<string | null>(null);
+  const navigate = useNavigate();
   const abortRef = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
@@ -155,6 +159,49 @@ function ProjectsPage() {
     if (!n) toast.info("Nenhum vídeo renderizado ainda.");
   };
 
+  /**
+   * Abre o projeto de edição da instância. Se ainda não existir um projeto
+   * vinculado, cria um já preenchido com as camadas do template e o corte —
+   * assim o editor nunca abre em branco e o vínculo fica salvo para reabrir.
+   */
+  const openEditor = async (item: TemplateInstanceRecord) => {
+    setOpening(item.id);
+    try {
+      const videoId = item.video_id ?? item.id;
+      if (item.project_id) {
+        const existing = await getEditorProject(item.project_id);
+        if (existing) {
+          await navigate({
+            to: "/projects/$projectId/editor/$videoId",
+            params: { projectId: item.project_id, videoId },
+          });
+          return;
+        }
+      }
+      const cut = readCutBinding(item.instance_data.settings);
+      const base = createEditorProject(videoId, { title: item.label ?? item.instance_data.name });
+      const doc = {
+        ...base,
+        cutId: item.cut_id ?? cut?.cutId ?? null,
+        templateId: item.template_id,
+        templateInstanceId: item.id,
+        composition: item.instance_data,
+        media: { ...base.media, duration: cut ? Math.max(0, cut.end - cut.start) : base.media.duration },
+      };
+      const record = await createEditorProjectRecord(doc);
+      await attachInstanceProject(item.id, record.id);
+      setItems((list) => list.map((it) => (it.id === item.id ? { ...it, project_id: record.id } : it)));
+      await navigate({
+        to: "/projects/$projectId/editor/$videoId",
+        params: { projectId: record.id, videoId },
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível abrir o editor deste projeto.");
+    } finally {
+      setOpening(null);
+    }
+  };
+
   const rename = async (item: TemplateInstanceRecord) => {
     const name = window.prompt("Nome do projeto", item.instance_data.name);
     if (!name) return;
@@ -242,14 +289,14 @@ function ProjectsPage() {
                 <video src={state.url} controls className="max-h-56 w-full rounded-lg bg-black object-contain" />
               )}
               <div className="flex flex-wrap gap-2 text-xs">
-                {item.video_id && item.project_id !== null ? null : null}
-                <Link
-                  to="/projects/$projectId/editor/$videoId"
-                  params={{ projectId: item.project_id ?? "novo", videoId: item.video_id ?? item.id }}
-                  className="rounded-lg border border-border/60 px-2.5 py-1.5"
+                <button
+                  type="button"
+                  className="rounded-lg border border-border/60 px-2.5 py-1.5 disabled:opacity-50"
+                  disabled={opening === item.id}
+                  onClick={() => void openEditor(item)}
                 >
-                  Editar
-                </Link>
+                  {opening === item.id ? "Abrindo…" : "Editar"}
+                </button>
                 <button
                   type="button"
                   className="rounded-lg bg-primary px-2.5 py-1.5 text-primary-foreground disabled:opacity-50"

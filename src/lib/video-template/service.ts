@@ -254,6 +254,13 @@ export async function updateInstance(id: string, doc: TemplateDoc): Promise<void
   if (error) throw error;
 }
 
+/** Vincula a instância ao projeto de edição criado para ela. */
+export async function attachInstanceProject(id: string, projectId: string): Promise<void> {
+  const { error } = await supabase.from(INSTANCES).update({ project_id: projectId }).eq("id", id);
+  if (error) throw error;
+}
+
+
 /** Remove o vínculo com o template, mantendo as camadas como projeto normal. */
 export async function detachInstance(id: string): Promise<void> {
   const { error } = await supabase.from(INSTANCES).update({ template_id: null }).eq("id", id);

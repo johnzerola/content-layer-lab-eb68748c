@@ -59,19 +59,31 @@ function writeOwner(id: string) {
   }
 }
 
-/** Aplica o dono atual; recarrega apenas quando havia dados de outra conta. */
+/**
+ * Aplica o dono atual.
+ *
+ * O trabalho feito antes do login (dono "anon") é adotado pela conta que entrar:
+ * nada é apagado nessa transição. Só limpamos quando o workspace pertencia a
+ * outra conta real — aí sim os dados não são de quem está entrando agora.
+ */
 function applyOwner(userId: string | null) {
   if (typeof window === "undefined") return;
   const next = userId ?? "anon";
   const current = readOwner();
   if (current === next) return;
 
+  const switchingRealAccounts = current !== null && current !== "anon" && current !== next;
+  if (!switchingRealAccounts) {
+    // Primeiro acesso ou login a partir de visitante: preserva o lote local.
+    writeOwner(next);
+    return;
+  }
+
   const wiped = clearLocalWorkspace();
   writeOwner(next);
-
-  // Só recarrega quando de fato havia trabalho de outra conta em memória.
-  if (wiped && current !== null) window.location.reload();
+  if (wiped) window.location.reload();
 }
+
 
 /**
  * Liga o escopo por conta. Chamar uma única vez na raiz do app.
