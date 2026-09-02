@@ -2933,18 +2933,38 @@ function Home() {
                     )}
 
                     {!!selected.captions?.length && (
-                      <div className="mt-3 border-t border-border pt-3">
-                        <p className="mono-label mb-2">Timeline · ajuste palavra por palavra</p>
-                        <CaptionTimeline
-                          file={selected.file}
-                          cues={selected.captions}
-                          onChange={(cues) =>
-                            setItems((p) =>
-                              p.map((x) => (x.id === selected.id ? { ...x, captions: cues } : x)),
-                            )
-                          }
-                        />
+                      <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 p-2.5">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-mono text-[11px] text-primary">
+                            Editor de legendas · prévia grande, correção de texto e sincronia
+                          </p>
+                          <p className="font-mono text-[10px] text-muted-foreground">
+                            arraste a legenda na tela, corrija erros e alinhe com a fala.
+                          </p>
+                        </div>
+                        <Button size="sm" onClick={() => setCapEditor(selected.id)}>
+                          <Captions className="mr-1 size-4" /> Abrir editor
+                        </Button>
                       </div>
+                    )}
+
+                    {!!selected.captions?.length && (
+                      <details className="mt-3 border-t border-border pt-3">
+                        <summary className="mono-label cursor-pointer">
+                          Timeline avançada · ajuste palavra por palavra
+                        </summary>
+                        <div className="mt-2">
+                          <CaptionTimeline
+                            file={selected.file}
+                            cues={selected.captions}
+                            onChange={(cues) =>
+                              setItems((p) =>
+                                p.map((x) => (x.id === selected.id ? { ...x, captions: cues } : x)),
+                              )
+                            }
+                          />
+                        </div>
+                      </details>
                     )}
 
                     <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
