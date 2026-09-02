@@ -18,8 +18,20 @@ interface Props {
   onSplit: () => void;
   /** Move/redimensiona a camada na timeline (arraste do clipe ou das bordas). */
   onTrim?: (id: string, startTime: number, endTime: number) => void;
-  /** Faixa base do vídeo importado (só apresentação). */
+  /** Faixa base do vídeo importado. */
   media?: { name: string; segments: TimeRange[] } | null;
+  /** corta o vídeo na agulha (playhead), criando dois trechos */
+  onSplitMedia?: (() => void) | undefined;
+  /** arrasta as bordas de um trecho do vídeo */
+  onTrimSegment?: ((index: number, start: number, end: number) => void) | undefined;
+  /** clique na emenda entre dois trechos: escolher a transição */
+  onSegmentTransition?: ((index: number) => void) | undefined;
+  /** rótulo da transição de cada emenda (índice i = entre trecho i e i+1) */
+  segmentTransitions?: string[];
+  /** keyframes de enquadramento (segundos) mostrados na régua */
+  keyframes?: number[];
+  /** adiciona keyframe no tempo atual */
+  onAddKeyframe?: (() => void) | undefined;
 }
 
 
@@ -141,6 +153,12 @@ export function TimelinePro({
   onSplit,
   onTrim,
   media,
+  onSplitMedia,
+  onTrimSegment,
+  onSegmentTransition,
+  segmentTransitions = [],
+  keyframes = [],
+  onAddKeyframe,
 }: Props) {
 
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -165,8 +183,28 @@ export function TimelinePro({
         <span className="font-mono">{fmt(currentTime)}</span>
         <span className="text-muted-foreground">/ {fmt(duration)}</span>
         <button type="button" onClick={onSplit} className="rounded-md border border-border/60 px-2 py-1">
-          Dividir no playhead
+          Dividir camada
         </button>
+        {onSplitMedia && (
+          <button
+            type="button"
+            onClick={onSplitMedia}
+            className="rounded-md border border-primary/60 px-2 py-1 text-primary"
+            title="Corta o vídeo exatamente na agulha"
+          >
+            ✂ Cortar vídeo na agulha
+          </button>
+        )}
+        {onAddKeyframe && (
+          <button
+            type="button"
+            onClick={onAddKeyframe}
+            className="rounded-md border border-border/60 px-2 py-1"
+            title="Grava o enquadramento atual como keyframe"
+          >
+            ◆ Keyframe
+          </button>
+        )}
         <div className="ml-auto flex items-center gap-2">
           <span className="text-muted-foreground">Zoom</span>
           <input
@@ -196,6 +234,19 @@ export function TimelinePro({
                 {fmt((duration * i) / ticks)}
               </span>
             ))}
+            {keyframes.map((t, i) => (
+              <button
+                key={`k${i}`}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSeek(t);
+                }}
+                aria-label={`Ir para o keyframe ${fmt(t)}`}
+                className="absolute bottom-0 h-2 w-2 -translate-x-1/2 rotate-45 bg-amber-400"
+                style={{ left: `${duration ? (t / duration) * 100 : 0}%` }}
+              />
+            ))}
           </div>
 
           <div className="relative" ref={trackRef} onPointerDown={(e) => seekFromEvent(e.clientX)}>
@@ -219,18 +270,72 @@ export function TimelinePro({
                   <span className="truncate">vídeo</span>
                 </div>
                 <div className="absolute inset-y-0 left-28 right-0">
-                  {(media.segments.length ? media.segments : [{ start: 0, end: duration }]).map((s, i) => (
-                    <div
-                      key={i}
-                      className="absolute top-1 h-7 truncate rounded-md border border-primary/40 bg-primary/30 px-3 text-[11px] leading-7"
-                      style={{
-                        left: `${duration ? (s.start / duration) * 100 : 0}%`,
-                        width: `${duration ? Math.max(1, ((s.end - s.start) / duration) * 100) : 100}%`,
-                      }}
-                    >
-                      {media.name}
-                    </div>
-                  ))}
+                  {(media.segments.length ? media.segments : [{ start: 0, end: duration }]).map((s, i, arr) => {
+                    const left = duration ? (s.start / duration) * 100 : 0;
+                    const width = duration ? Math.max(1, ((s.end - s.start) / duration) * 100) : 100;
+                    const dragEdge = (edge: "start" | "end") => (ev: React.PointerEvent) => {
+                      if (!onTrimSegment || !duration || !media.segments.length) return;
+                      ev.stopPropagation();
+                      ev.preventDefault();
+                      const rail = (ev.currentTarget as HTMLElement).parentElement?.parentElement;
+                      const railWidth = rail?.getBoundingClientRect().width ?? 1;
+                      const originX = ev.clientX;
+                      const s0 = s.start;
+                      const e0 = s.end;
+                      const move = (m: PointerEvent) => {
+                        const delta = ((m.clientX - originX) / railWidth) * duration;
+                        if (edge === "start") {
+                          onTrimSegment(i, Math.min(Math.max(0, s0 + delta), e0 - 0.2), e0);
+                        } else {
+                          onTrimSegment(i, s0, Math.max(Math.min(duration, e0 + delta), s0 + 0.2));
+                        }
+                      };
+                      const up = () => {
+                        window.removeEventListener("pointermove", move);
+                        window.removeEventListener("pointerup", up);
+                      };
+                      window.addEventListener("pointermove", move);
+                      window.addEventListener("pointerup", up);
+                    };
+                    return (
+                      <div key={i} className="contents">
+                        <div
+                          className="absolute top-1 h-7 truncate rounded-md border border-primary/40 bg-primary/30 px-3 text-[11px] leading-7"
+                          style={{ left: `${left}%`, width: `${width}%` }}
+                        >
+                          {media.name}
+                          {onTrimSegment && media.segments.length > 0 && (
+                            <>
+                              <span
+                                role="presentation"
+                                onPointerDown={dragEdge("start")}
+                                className="absolute inset-y-0 left-0 w-2 cursor-ew-resize rounded-l-md bg-white/25"
+                              />
+                              <span
+                                role="presentation"
+                                onPointerDown={dragEdge("end")}
+                                className="absolute inset-y-0 right-0 w-2 cursor-ew-resize rounded-r-md bg-white/25"
+                              />
+                            </>
+                          )}
+                        </div>
+                        {i < arr.length - 1 && onSegmentTransition && (
+                          <button
+                            type="button"
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              onSegmentTransition(i);
+                            }}
+                            title="Transição desta emenda"
+                            className="absolute top-0 z-30 -translate-x-1/2 rounded-full border border-amber-400/70 bg-background px-1.5 text-[9px] font-medium text-amber-300"
+                            style={{ left: `${duration ? (s.end / duration) * 100 : 0}%` }}
+                          >
+                            {segmentTransitions[i] ?? "⇄"}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

@@ -8,6 +8,7 @@ import {
   Music4,
   Palette,
   Scissors,
+  Diamond,
   Shuffle,
   Sliders,
   Sparkles,
@@ -17,8 +18,10 @@ import {
 } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { TranscriptPanel } from "@/components/editor/TranscriptPanel";
-import { CaptionStylePanel } from "@/components/editor/CaptionStylePanel";
 import { StylesPanel } from "@/components/editor/StylesPanel";
+import { KeyframePanel } from "@/components/editor/KeyframePanel";
+import { READY_TEMPLATES } from "@/lib/editor/template-presets";
+import { loadAnimIdentity } from "@/lib/editor/animation-library";
 import { TimelinePro } from "@/components/editor/TimelinePro";
 import { BatchApplyModal } from "@/components/editor/BatchApplyModal";
 import { TransitionPicker } from "@/components/editor/TransitionPicker";
@@ -43,7 +46,7 @@ import { defaultEditorAudio } from "@/lib/editor/audio";
 import { generateCaptions } from "@/lib/captions";
 import { refineTranscriptWords } from "@/lib/transcribe.functions";
 import { applyBrandKitToDoc } from "@/lib/brand-kit";
-import { defaultPreEdit, type PreEdit } from "@/lib/preedit";
+import { defaultPreEdit, TRANSITIONS, type PreEdit } from "@/lib/preedit";
 import { ensureTranscript, saveTranscript } from "@/lib/editor/transcript.service";
 import { emptyTranscript, removedRanges, silenceRanges, transcriptFromCues, type TranscriptDoc } from "@/lib/editor/transcript";
 import { findCaptionPreset } from "@/lib/editor/caption-styles";
@@ -84,12 +87,12 @@ type ToolId =
   | "corte"
   | "enquadrar"
   | "transicoes"
+  | "keyframes"
   | "layout"
   | "ajustes"
   | "animacao"
   | "texto"
   | "estilos"
-  | "legendas"
   | "audio"
   | "titulos"
   | "templates"
@@ -103,6 +106,7 @@ const TOOL_GROUPS: { title: string; tools: { id: ToolId; label: string; icon: ty
       { id: "corte", label: "Corte", icon: Scissors },
       { id: "enquadrar", label: "Enquadrar", icon: Crop },
       { id: "transicoes", label: "Transições", icon: Shuffle },
+      { id: "keyframes", label: "Keyframes", icon: Diamond },
     ],
   },
   {
@@ -121,7 +125,6 @@ const TOOL_GROUPS: { title: string; tools: { id: ToolId; label: string; icon: ty
     tools: [
       { id: "texto", label: "Texto", icon: Type },
       { id: "audio", label: "Áudio", icon: Music4 },
-      { id: "legendas", label: "Legendas", icon: Palette },
       { id: "titulos", label: "Títulos", icon: Type },
       { id: "camada", label: "Camada", icon: Sparkles },
     ],
@@ -135,6 +138,8 @@ function EditorPage() {
   const [templates, setTemplates] = useState<VideoTemplateRecord[]>([]);
   const [leftTab, setLeftTab] = useState<"texto" | "estilos">("texto");
   const [tool, setTool] = useState<ToolId>("corte");
+  const [joinIndex, setJoinIndex] = useState<number | null>(null);
+  const [templateTab, setTemplateTab] = useState<"prontos" | "meus">("prontos");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -761,6 +766,20 @@ function EditorPage() {
             )}
             {tool === "transicoes" && (
               <div className="space-y-4">
+                {joinIndex !== null && (pre.segments?.length ?? 0) > joinIndex + 1 && (
+                  <div className="rounded-xl border border-amber-400/40 p-2">
+                    <TransitionPicker
+                      value={pre.transitions?.[joinIndex] ?? { kind: "fade", dur: 0.4 }}
+                      onChange={(t) => {
+                        const list = [...(pre.transitions ?? [])];
+                        list[joinIndex] = t;
+                        patchPre({ transitions: list }, "transicao-emenda");
+                      }}
+                      label={`Emenda ${joinIndex + 1}`}
+                      onPreview={() => seek(pre.segments[joinIndex]?.end ?? 0)}
+                    />
+                  </div>
+                )}
                 <TransitionPicker
                   value={pre.transIn}
                   onChange={(t) => patchPre({ transIn: t }, "transicao-entrada")}
@@ -774,6 +793,15 @@ function EditorPage() {
                   onPreview={() => seek(Math.max(0, duration - (pre.transOut.dur || 0.5)))}
                 />
               </div>
+            )}
+            {tool === "keyframes" && (
+              <KeyframePanel
+                preedit={pre}
+                onChange={patchPre}
+                duration={duration}
+                currentTime={currentTime}
+                onSeek={seek}
+              />
             )}
             {tool === "layout" && <LayoutPanel preedit={pre} onChange={patchPre} />}
             {tool === "ajustes" && <GradePanel preedit={pre} onChange={patchPre} />}
@@ -855,22 +883,6 @@ function EditorPage() {
                 }
               />
             )}
-            {tool === "legendas" && (
-              <CaptionStylePanel
-                presetId={doc.captionPresetId}
-                style={captionLayer?.style ?? captionPreset.style}
-                onApplyPreset={(preset) => {
-                  patchDoc({ captionPresetId: preset.id }, "preset-legenda");
-                  const target = captionLayer ?? ensureCaptionLayer();
-                  if (target) updateLayer(target.id, { presetId: preset.id, style: preset.style } as Partial<TemplateLayer>);
-                }}
-                onStyleChange={(patch) => {
-                  const target = captionLayer ?? ensureCaptionLayer();
-                  if (!target) return;
-                  updateLayer(target.id, { style: { ...target.style, ...patch } } as Partial<TemplateLayer>);
-                }}
-              />
-            )}
             {tool === "audio" && (
               <AudioPanel
                 audio={doc.audio ?? defaultEditorAudio()}
@@ -888,39 +900,82 @@ function EditorPage() {
               />
             )}
             {tool === "templates" && (
-              <div className="space-y-2">
-                {!templates.length && (
-                  <p className="text-xs text-muted-foreground">
-                    Você ainda não criou templates.{" "}
-                    <Link to="/templates" className="underline">
-                      Criar agora
-                    </Link>
-                  </p>
-                )}
-                {templates.map((t) => (
-                  <div key={t.id} className="rounded-xl border border-border/60 p-2">
-                    <p className="text-sm font-medium">{t.name}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {t.aspect_ratio} · {t.template_data.layers.length} camadas
-                    </p>
-                    <div className="mt-2 flex gap-2">
+              <div className="space-y-3">
+                <div className="flex rounded-lg border border-border/60 p-0.5 text-xs">
+                  {(["prontos", "meus"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTemplateTab(t)}
+                      className={`flex-1 rounded-md px-2 py-1 ${templateTab === t ? "bg-primary/20" : "text-muted-foreground"}`}
+                    >
+                      {t === "prontos" ? "Prontos" : "Meus templates"}
+                    </button>
+                  ))}
+                </div>
+
+                {templateTab === "prontos" ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {READY_TEMPLATES.map((t) => (
                       <button
+                        key={t.id}
                         type="button"
-                        onClick={() => applyTemplate(t)}
-                        className="rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground"
+                        onClick={() => {
+                          const id = loadAnimIdentity();
+                          addLayers(t.build(doc.composition.layers, { handle: id.handle, name: id.name }), `template-${t.id}`);
+                          toast.success(`Template “${t.label}” aplicado.`);
+                        }}
+                        className="overflow-hidden rounded-xl border border-border/60 text-left hover:border-primary/60"
                       >
-                        Aplicar
+                        <span
+                          className="flex h-16 items-center justify-center text-[11px] font-black uppercase"
+                          style={{ background: t.swatch[0], color: t.swatch[1] }}
+                        >
+                          {t.label}
+                        </span>
+                        <span className="block px-2 py-1.5">
+                          <span className="block text-xs font-medium">{t.label}</span>
+                          <span className="block text-[10px] text-muted-foreground">{t.hint}</span>
+                        </span>
                       </button>
-                      <Link
-                        to="/templates/$id/edit"
-                        params={{ id: t.id }}
-                        className="rounded-md border border-border/60 px-2 py-1 text-xs"
-                      >
-                        Editar template
-                      </Link>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <div className="space-y-2">
+                    {!templates.length && (
+                      <p className="text-xs text-muted-foreground">
+                        Você ainda não salvou templates.{" "}
+                        <Link to="/templates" className="underline">
+                          Criar agora
+                        </Link>
+                      </p>
+                    )}
+                    {templates.map((t) => (
+                      <div key={t.id} className="rounded-xl border border-border/60 p-2">
+                        <p className="text-sm font-medium">{t.name}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {t.aspect_ratio} · {t.template_data.layers.length} camadas
+                        </p>
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => applyTemplate(t)}
+                            className="rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground"
+                          >
+                            Aplicar
+                          </button>
+                          <Link
+                            to="/templates/$id/edit"
+                            params={{ id: t.id }}
+                            className="rounded-md border border-border/60 px-2 py-1 text-xs"
+                          >
+                            Editar template
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -972,6 +1027,40 @@ function EditorPage() {
           onZoom={(z) => patchDoc({ timelineZoom: z }, "zoom")}
           onTrim={(id, startTime, endTime) => updateLayer(id, { startTime, endTime })}
           media={src ? { name: "vídeo", segments: pre.segments ?? [] } : null}
+          keyframes={(pre.keys ?? []).map((k) => k.t)}
+          onAddKeyframe={() => {
+            setTool("keyframes");
+            const keys = [...(pre.keys ?? [])].filter((k) => Math.abs(k.t - currentTime) > 0.05);
+            keys.push({ t: Number(currentTime.toFixed(2)), crop: pre.crop ?? { x: 0, y: 0, w: 1, h: 1 } });
+            patchPre({ keys: keys.sort((a, b) => a.t - b.t) }, "keyframe");
+          }}
+          segmentTransitions={(pre.segments ?? []).slice(0, -1).map(
+            (_, i) => TRANSITIONS.find((t) => t.id === (pre.transitions?.[i]?.kind ?? "none"))?.label ?? "⇄",
+          )}
+          onSegmentTransition={(i) => {
+            setJoinIndex(i);
+            setTool("transicoes");
+          }}
+          onTrimSegment={(i, start, end) => {
+            const segs = [...(pre.segments ?? [])];
+            if (!segs[i]) return;
+            segs[i] = { start, end };
+            patchPre({ segments: segs }, "ajustar-trecho");
+          }}
+          onSplitMedia={() => {
+            const segs = pre.segments?.length ? [...pre.segments] : [{ start: 0, end: duration }];
+            const i = segs.findIndex((sg) => currentTime > sg.start + 0.1 && currentTime < sg.end - 0.1);
+            if (i < 0) {
+              toast.info("Posicione a agulha dentro de um trecho do vídeo para cortar.");
+              return;
+            }
+            const seg = segs[i]!;
+            segs.splice(i, 1, { start: seg.start, end: currentTime }, { start: currentTime, end: seg.end });
+            const trans = [...(pre.transitions ?? [])];
+            trans.splice(i, 0, { kind: "fade", dur: 0.4 });
+            patchPre({ segments: segs, transitions: trans }, "cortar-video");
+            toast.success("Vídeo cortado na agulha. Clique na emenda para escolher a transição.");
+          }}
 
           onToggleVisible={(id) => {
             const layer = doc.composition.layers.find((l) => l.id === id);
