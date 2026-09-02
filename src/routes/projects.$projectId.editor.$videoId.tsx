@@ -36,7 +36,10 @@ export const Route = createFileRoute("/projects/$projectId/editor/$videoId")({
     ],
   }),
   component: () => (
-    <RequireAuth>
+    <RequireAuth
+      title="Editor de vídeo"
+      description="Entre na sua conta para editar cortes, legendas e templates."
+    >
       <EditorPage />
     </RequireAuth>
   ),
