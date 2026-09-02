@@ -618,8 +618,38 @@ function EditorPage() {
 
       </div>
 
+      {/* TRILHA DE ÁUDIO */}
+      {!!(doc.audio?.tracks.length) && (
+        <div className="shrink-0 border-t border-border/60 px-3 py-2">
+          <div className="relative h-7 overflow-hidden rounded-lg bg-card/50">
+            {doc.audio.tracks.map((c) => {
+              const total = Math.max(1, duration);
+              const width = ((c.duration || Math.max(2, total - c.startTime)) / total) * 100;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    setTool("mixagem");
+                    seek(c.startTime);
+                  }}
+                  title={`${c.name} · ${c.kind}`}
+                  className={`absolute top-1 h-5 truncate rounded px-2 text-[10px] ${
+                    c.kind === "voice" ? "bg-cyan-500/30 text-cyan-100" : "bg-primary/30 text-primary-foreground"
+                  }`}
+                  style={{ left: `${(c.startTime / total) * 100}%`, width: `${Math.min(100, width)}%` }}
+                >
+                  {c.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* TIMELINE */}
       <div className="h-56 shrink-0">
+
         <TimelinePro
           duration={duration}
           currentTime={currentTime}
