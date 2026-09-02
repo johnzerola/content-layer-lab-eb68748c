@@ -6,7 +6,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/AppShell";
+import { RequireAuth } from "@/components/RequireAuth";
 import { CAPTION_PRESETS } from "@/lib/editor/caption-styles";
 import { STYLE_TEMPLATES } from "@/lib/editor/style-templates";
 import { STYLE_FONTS, STYLE_PALETTES } from "@/components/editor/StylesPanel";
@@ -36,7 +36,11 @@ export const Route = createFileRoute("/estilos")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: EstilosPage,
+  component: () => (
+    <RequireAuth title="Estilos" description="Entre na sua conta para salvar e reutilizar estilos.">
+      <EstilosPage />
+    </RequireAuth>
+  ),
 });
 
 /** Converte um estilo pronto da galeria em preset salvável. */
@@ -86,7 +90,7 @@ function EstilosPage() {
   };
 
   return (
-    <AppShell>
+    <>
       <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8">
         <header className="space-y-2">
           <p className="mono-label">Biblioteca</p>
@@ -251,6 +255,6 @@ function EstilosPage() {
           </div>
         )}
       </div>
-    </AppShell>
+    </>
   );
 }
