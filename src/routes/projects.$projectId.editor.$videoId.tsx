@@ -22,6 +22,7 @@ import { StylesPanel } from "@/components/editor/StylesPanel";
 import { KeyframePanel } from "@/components/editor/KeyframePanel";
 import { READY_TEMPLATES } from "@/lib/editor/template-presets";
 import { loadAnimIdentity } from "@/lib/editor/animation-library";
+import { takePendingStyle, type SavedStylePreset } from "@/lib/editor/style-presets";
 import { TimelinePro } from "@/components/editor/TimelinePro";
 import { BatchApplyModal } from "@/components/editor/BatchApplyModal";
 import { TransitionPicker } from "@/components/editor/TransitionPicker";
