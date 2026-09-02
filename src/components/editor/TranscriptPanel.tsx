@@ -28,6 +28,10 @@ interface Props {
   onSeek: (time: number) => void;
   cutOnRemove: boolean;
   onCutOnRemoveChange: (value: boolean) => void;
+  onGenerate?: (() => void) | undefined;
+  generating?: boolean | undefined;
+  generateProgress?: string | undefined;
+  hasMedia?: boolean | undefined;
 }
 
 const WordChip = memo(function WordChip({
@@ -86,7 +90,18 @@ const WordChip = memo(function WordChip({
   );
 });
 
-export function TranscriptPanel({ doc, onChange, currentTime, onSeek, cutOnRemove, onCutOnRemoveChange }: Props) {
+export function TranscriptPanel({
+  doc,
+  onChange,
+  currentTime,
+  onSeek,
+  cutOnRemove,
+  onCutOnRemoveChange,
+  onGenerate,
+  generating = false,
+  generateProgress,
+  hasMedia = false,
+}: Props) {
   const [mode, setMode] = useState<"paragrafo" | "palavra">("paragrafo");
   const [search, setSearch] = useState("");
   const [hitIndex, setHitIndex] = useState(0);
@@ -244,9 +259,21 @@ export function TranscriptPanel({ doc, onChange, currentTime, onSeek, cutOnRemov
 
       <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border/50 bg-card/40 p-3">
         {!doc.words.length && (
-          <p className="text-sm text-muted-foreground">
-            Nenhuma transcrição ainda. Gere a transcrição do vídeo para editar por texto.
-          </p>
+          <div className="flex min-h-44 flex-col items-center justify-center px-3 text-center">
+            <p className="text-sm font-medium text-foreground">Transforme a fala em roteiro editável</p>
+            <p className="mt-1 max-w-56 text-xs leading-relaxed text-muted-foreground">
+              A transcrição permite buscar, substituir e cortar o vídeo palavra por palavra.
+            </p>
+            <button
+              type="button"
+              onClick={onGenerate}
+              disabled={!hasMedia || generating || !onGenerate}
+              className="mt-3 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {generating ? generateProgress || "Transcrevendo…" : "Gerar transcrição"}
+            </button>
+            {!hasMedia && <p className="mt-2 text-[11px] text-muted-foreground">Carregue um vídeo primeiro.</p>}
+          </div>
         )}
 
         {mode === "palavra"
