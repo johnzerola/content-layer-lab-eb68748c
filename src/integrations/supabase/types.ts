@@ -1068,6 +1068,54 @@ export type Database = {
         }
         Relationships: []
       }
+      video_cuts: {
+        Row: {
+          caption: string | null
+          created_at: string
+          cut_key: string
+          end_sec: number
+          id: string
+          score: number
+          source_id: string
+          source_name: string
+          start_sec: number
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          cut_key: string
+          end_sec?: number
+          id?: string
+          score?: number
+          source_id: string
+          source_name: string
+          start_sec?: number
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          cut_key?: string
+          end_sec?: number
+          id?: string
+          score?: number
+          source_id?: string
+          source_name?: string
+          start_sec?: number
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       video_templates: {
         Row: {
           aspect_ratio: string
