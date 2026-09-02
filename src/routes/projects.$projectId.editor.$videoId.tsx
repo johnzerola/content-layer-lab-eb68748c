@@ -388,12 +388,19 @@ function EditorPage() {
     if (!ready) return;
     pendingLayoutApplied.current = true;
     const ident = loadAnimIdentity();
+    // o layout traz paleta e tipografia próprias: entram no Brand Kit do projeto
+    const kit = { ...doc.brandKit, ...(ready.palette ?? {}) };
     addLayers(
-      ready.build(doc.composition.layers, { handle: ident.handle, name: ident.name, role: ident.role }, doc.brandKit),
+      ready.build(doc.composition.layers, { handle: ident.handle, name: ident.name, role: ident.role }, kit),
       `template-${ready.id}`,
     );
-    toast.success(`Layout “${ready.label}” aplicado.`);
-  }, [addLayers, doc]);
+    patchDoc({ brandKit: kit }, `paleta-${ready.id}`);
+    if (ready.transition) {
+      const tr = { kind: ready.transition.kind as PreEdit["transIn"]["kind"], dur: ready.transition.dur };
+      patchPre({ transIn: tr, transOut: tr }, `transicao-${ready.id}`);
+    }
+    toast.success(`Layout “${ready.label}” aplicado com paleta, fontes e transição.`);
+  }, [addLayers, doc, patchDoc, patchPre]);
 
   /** template de vídeo salvo escolhido em /estilos (tabela video_templates) */
   const pendingTemplateApplied = useRef(false);
