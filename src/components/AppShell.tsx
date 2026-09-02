@@ -20,11 +20,14 @@ import {
   Shield,
   Images,
   Users,
+  Menu,
+  X,
 } from "lucide-react";
 
 import { TooltipProvider } from "@/components/ui/base";
 import { PlanGate } from "@/components/PlanGate";
 import { GlobalActionBar } from "@/components/GlobalActionBar";
+import { ProcessSteps } from "@/components/ProcessSteps";
 import { useAccess } from "@/lib/subscription";
 import { planFromId } from "@/lib/plan";
 
@@ -198,6 +201,7 @@ function NavItem({
 
 export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, children }: Props) {
   const [open, setOpen] = useState(true);
+  const [mobileNav, setMobileNav] = useState(false);
   const [user, setUser] = useState<any>(null);
   const { signedIn, sub, isAdmin } = useAccess();
   const plan = planFromId(sub?.plan);
@@ -408,7 +412,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
               <GlobalActionBar className="max-w-md" />
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <div className="flex rounded-lg border border-border bg-surface p-0.5 md:hidden">
+              <div className="hidden rounded-lg border border-border bg-surface p-0.5 sm:flex md:hidden">
                 {MODES.filter((m) => m.id !== "external").map((m) => (
                   <button
                     key={m.id}
