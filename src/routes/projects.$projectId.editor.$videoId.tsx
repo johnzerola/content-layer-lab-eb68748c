@@ -8,6 +8,7 @@ import {
   Music4,
   Palette,
   Scissors,
+  Diamond,
   Shuffle,
   Sliders,
   Sparkles,
@@ -17,8 +18,10 @@ import {
 } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { TranscriptPanel } from "@/components/editor/TranscriptPanel";
-import { CaptionStylePanel } from "@/components/editor/CaptionStylePanel";
 import { StylesPanel } from "@/components/editor/StylesPanel";
+import { KeyframePanel } from "@/components/editor/KeyframePanel";
+import { READY_TEMPLATES } from "@/lib/editor/template-presets";
+import { loadAnimIdentity } from "@/lib/editor/animation-library";
 import { TimelinePro } from "@/components/editor/TimelinePro";
 import { BatchApplyModal } from "@/components/editor/BatchApplyModal";
 import { TransitionPicker } from "@/components/editor/TransitionPicker";
@@ -43,7 +46,7 @@ import { defaultEditorAudio } from "@/lib/editor/audio";
 import { generateCaptions } from "@/lib/captions";
 import { refineTranscriptWords } from "@/lib/transcribe.functions";
 import { applyBrandKitToDoc } from "@/lib/brand-kit";
-import { defaultPreEdit, type PreEdit } from "@/lib/preedit";
+import { defaultPreEdit, TRANSITIONS, type PreEdit } from "@/lib/preedit";
 import { ensureTranscript, saveTranscript } from "@/lib/editor/transcript.service";
 import { emptyTranscript, removedRanges, silenceRanges, transcriptFromCues, type TranscriptDoc } from "@/lib/editor/transcript";
 import { findCaptionPreset } from "@/lib/editor/caption-styles";
@@ -84,12 +87,12 @@ type ToolId =
   | "corte"
   | "enquadrar"
   | "transicoes"
+  | "keyframes"
   | "layout"
   | "ajustes"
   | "animacao"
   | "texto"
   | "estilos"
-  | "legendas"
   | "audio"
   | "titulos"
   | "templates"
@@ -103,6 +106,7 @@ const TOOL_GROUPS: { title: string; tools: { id: ToolId; label: string; icon: ty
       { id: "corte", label: "Corte", icon: Scissors },
       { id: "enquadrar", label: "Enquadrar", icon: Crop },
       { id: "transicoes", label: "Transições", icon: Shuffle },
+      { id: "keyframes", label: "Keyframes", icon: Diamond },
     ],
   },
   {
@@ -121,7 +125,6 @@ const TOOL_GROUPS: { title: string; tools: { id: ToolId; label: string; icon: ty
     tools: [
       { id: "texto", label: "Texto", icon: Type },
       { id: "audio", label: "Áudio", icon: Music4 },
-      { id: "legendas", label: "Legendas", icon: Palette },
       { id: "titulos", label: "Títulos", icon: Type },
       { id: "camada", label: "Camada", icon: Sparkles },
     ],
@@ -135,6 +138,8 @@ function EditorPage() {
   const [templates, setTemplates] = useState<VideoTemplateRecord[]>([]);
   const [leftTab, setLeftTab] = useState<"texto" | "estilos">("texto");
   const [tool, setTool] = useState<ToolId>("corte");
+  const [joinIndex, setJoinIndex] = useState<number | null>(null);
+  const [templateTab, setTemplateTab] = useState<"prontos" | "meus">("prontos");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -853,22 +858,6 @@ function EditorPage() {
                     "brand-kit",
                   )
                 }
-              />
-            )}
-            {tool === "legendas" && (
-              <CaptionStylePanel
-                presetId={doc.captionPresetId}
-                style={captionLayer?.style ?? captionPreset.style}
-                onApplyPreset={(preset) => {
-                  patchDoc({ captionPresetId: preset.id }, "preset-legenda");
-                  const target = captionLayer ?? ensureCaptionLayer();
-                  if (target) updateLayer(target.id, { presetId: preset.id, style: preset.style } as Partial<TemplateLayer>);
-                }}
-                onStyleChange={(patch) => {
-                  const target = captionLayer ?? ensureCaptionLayer();
-                  if (!target) return;
-                  updateLayer(target.id, { style: { ...target.style, ...patch } } as Partial<TemplateLayer>);
-                }}
               />
             )}
             {tool === "audio" && (
