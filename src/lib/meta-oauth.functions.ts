@@ -30,6 +30,21 @@ export const beginInstagramOAuth = createServerFn({ method: "POST" })
     }
   });
 
+/** Diagnóstico do Login direto do Instagram (somente admin). */
+export const diagnoseInstagramIntegration = createServerFn({ method: "POST" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) {
+      return { ok: false as const, error: "Apenas administradores podem ver o diagnóstico." };
+    }
+    const { instagramConfigChecklist } = await import("@/lib/meta-oauth.server");
+    return { ok: true as const, check: instagramConfigChecklist() };
+  });
+
 export const completeInstagramOAuth = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .validator((data: unknown) =>

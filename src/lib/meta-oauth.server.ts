@@ -7,7 +7,7 @@ const INSTAGRAM_AUTH_URL = "https://api.instagram.com/oauth/authorize";
 const INSTAGRAM_TOKEN_URL = "https://api.instagram.com/oauth/access_token";
 const INSTAGRAM_LONG_TOKEN_URL = "https://graph.instagram.com/access_token";
 const INSTAGRAM_REFRESH_TOKEN_URL = "https://graph.instagram.com/refresh_access_token";
-const INSTAGRAM_SCOPES = [
+export const INSTAGRAM_SCOPES = [
   "instagram_business_basic",
   "instagram_business_content_publish",
 ];
@@ -28,9 +28,7 @@ function base64Url(value: string | Buffer): string {
   return Buffer.from(value).toString("base64url");
 }
 
-function oauthConfiguration(environment: NodeJS.ProcessEnv = process.env): OAuthConfiguration {
-  const appId = environment["INSTAGRAM_APP_ID"]?.trim();
-  const appSecret = environment["INSTAGRAM_APP_SECRET"]?.trim();
+function callbackFromEnvironment(environment: NodeJS.ProcessEnv): string {
   const explicitRedirect =
     environment["INSTAGRAM_REDIRECT_URI"]?.trim() ||
     environment["META_INSTAGRAM_REDIRECT_URI"]?.trim() ||
@@ -39,7 +37,13 @@ function oauthConfiguration(environment: NodeJS.ProcessEnv = process.env): OAuth
       "/integracoes/instagram/callback",
     );
   const siteUrl = environment["PUBLIC_SITE_URL"]?.trim().replace(/\/$/, "");
-  const redirectUri = explicitRedirect || (siteUrl ? `${siteUrl}/integracoes/instagram/callback` : "");
+  return explicitRedirect || (siteUrl ? `${siteUrl}/integracoes/instagram/callback` : "");
+}
+
+function oauthConfiguration(environment: NodeJS.ProcessEnv = process.env): OAuthConfiguration {
+  const appId = environment["INSTAGRAM_APP_ID"]?.trim();
+  const appSecret = environment["INSTAGRAM_APP_SECRET"]?.trim();
+  const redirectUri = callbackFromEnvironment(environment);
 
   if (!appId || !appSecret || !redirectUri) {
     throw new MetaLinkError(
@@ -48,6 +52,72 @@ function oauthConfiguration(environment: NodeJS.ProcessEnv = process.env): OAuth
     );
   }
   return { appId, appSecret, redirectUri };
+}
+
+export type InstagramConfigCheck = {
+  appId: string | null;
+  authEndpoint: string;
+  redirectUri: string | null;
+  siteUrl: string | null;
+  requiredScopes: string[];
+  authorizationUrl: string | null;
+  issues: string[];
+};
+
+export function instagramConfigChecklist(
+  environment: NodeJS.ProcessEnv = process.env,
+): InstagramConfigCheck {
+  const issues: string[] = [];
+  const appId = environment["INSTAGRAM_APP_ID"]?.trim() ?? null;
+  const appSecret = environment["INSTAGRAM_APP_SECRET"]?.trim() ?? null;
+  const redirectUri = callbackFromEnvironment(environment) || null;
+  const siteUrl = environment["PUBLIC_SITE_URL"]?.trim().replace(/\/$/, "") ?? null;
+
+  if (!appId) issues.push("INSTAGRAM_APP_ID não está definido no Lovable.");
+  else if (!/^\d+$/.test(appId)) issues.push("INSTAGRAM_APP_ID deve conter apenas números.");
+  if (!appSecret) issues.push("INSTAGRAM_APP_SECRET não está definido no Lovable.");
+  if (!redirectUri) {
+    issues.push("Defina INSTAGRAM_REDIRECT_URI ou PUBLIC_SITE_URL no Lovable.");
+  } else {
+    try {
+      const callback = new URL(redirectUri);
+      if (callback.protocol !== "https:") issues.push("INSTAGRAM_REDIRECT_URI precisa usar HTTPS.");
+      if (callback.pathname !== "/integracoes/instagram/callback") {
+        issues.push("INSTAGRAM_REDIRECT_URI precisa terminar em /integracoes/instagram/callback.");
+      }
+      if (callback.search || callback.hash) {
+        issues.push("INSTAGRAM_REDIRECT_URI não pode ter query string nem hash.");
+      }
+      if (siteUrl && callback.origin !== siteUrl) {
+        issues.push(
+          `INSTAGRAM_REDIRECT_URI (${callback.origin}) não bate com PUBLIC_SITE_URL (${siteUrl}).`,
+        );
+      }
+    } catch {
+      issues.push("INSTAGRAM_REDIRECT_URI é inválida.");
+    }
+  }
+
+  let authorizationUrl: string | null = null;
+  if (issues.length === 0) {
+    try {
+      const preview = new URL(instagramAuthorizationUrl("diagnostico", environment));
+      preview.searchParams.set("state", "<gerado por usuário>");
+      authorizationUrl = preview.toString();
+    } catch {
+      authorizationUrl = null;
+    }
+  }
+
+  return {
+    appId,
+    authEndpoint: INSTAGRAM_AUTH_URL,
+    redirectUri,
+    siteUrl,
+    requiredScopes: [...INSTAGRAM_SCOPES],
+    authorizationUrl,
+    issues,
+  };
 }
 
 function signState(payload: string, secret: string): string {

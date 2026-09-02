@@ -4,6 +4,7 @@ import {
   exchangeInstagramAuthorizationCode,
   exchangeLongLivedInstagramToken,
   fetchOAuthInstagramIdentity,
+  instagramConfigChecklist,
   instagramAuthorizationUrl,
   verifyInstagramOAuthState,
   refreshLongLivedInstagramToken,
@@ -43,6 +44,30 @@ describe("Instagram OAuth", () => {
     expect(url.searchParams.get("redirect_uri")).toBe(
       "https://app.example/integracoes/instagram/callback",
     );
+  });
+
+  it("reports the Lovable and Meta settings needed for direct Instagram login", () => {
+    const check = instagramConfigChecklist({
+      ...environment,
+      INSTAGRAM_APP_ID: "1057465633312906",
+    });
+    expect(check.issues).toEqual([]);
+    expect(check.authEndpoint).toBe("https://api.instagram.com/oauth/authorize");
+    expect(check.redirectUri).toBe("https://app.example/integracoes/instagram/callback");
+    expect(check.requiredScopes).toEqual([
+      "instagram_business_basic",
+      "instagram_business_content_publish",
+    ]);
+    expect(check.authorizationUrl).toContain("client_id=1057465633312906");
+  });
+
+  it("flags missing direct Instagram credentials for Lovable", () => {
+    const check = instagramConfigChecklist({
+      PUBLIC_SITE_URL: "https://app.example",
+    } as NodeJS.ProcessEnv);
+    expect(check.issues).toContain("INSTAGRAM_APP_ID não está definido no Lovable.");
+    expect(check.issues).toContain("INSTAGRAM_APP_SECRET não está definido no Lovable.");
+    expect(check.redirectUri).toBe("https://app.example/integracoes/instagram/callback");
   });
 
   it("binds state to the authenticated user and expiry", () => {

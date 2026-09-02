@@ -36,7 +36,7 @@ import {
   diagnoseFacebookIntegration,
   syncMetaAccounts,
 } from "@/lib/facebook-oauth.functions";
-import { beginInstagramOAuth } from "@/lib/meta-oauth.functions";
+import { beginInstagramOAuth, diagnoseInstagramIntegration } from "@/lib/meta-oauth.functions";
 import {
   beginYoutubeOAuth,
   refreshYoutubeChannel,
@@ -1075,28 +1075,46 @@ type MetaCheck = {
   loginConfiguration: { checked: boolean; ok: boolean; detail: string };
 };
 
+type InstagramCheck = {
+  appId: string | null;
+  authEndpoint: string;
+  redirectUri: string | null;
+  siteUrl: string | null;
+  requiredScopes: string[];
+  authorizationUrl: string | null;
+  issues: string[];
+};
+
 function MetaDiagnosticsPanel() {
   const runDiagnosis = useServerFn(diagnoseFacebookIntegration);
+  const runInstagramDiagnosis = useServerFn(diagnoseInstagramIntegration);
   const [state, setState] = useState<
     | { status: "idle" }
     | { status: "loading" }
     | { status: "denied" }
-    | { status: "ready"; check: MetaCheck }
+    | { status: "ready"; check: MetaCheck; instagram: InstagramCheck }
   >({ status: "idle" });
 
   const run = useCallback(async () => {
     setState({ status: "loading" });
     try {
-      const response = await runDiagnosis();
+      const [response, instagramResponse] = await Promise.all([
+        runDiagnosis(),
+        runInstagramDiagnosis(),
+      ]);
       setState(
-        response.ok
-          ? { status: "ready", check: response.check as MetaCheck }
+        response.ok && instagramResponse.ok
+          ? {
+              status: "ready",
+              check: response.check as MetaCheck,
+              instagram: instagramResponse.check as InstagramCheck,
+            }
           : { status: "denied" },
       );
     } catch {
       setState({ status: "denied" });
     }
-  }, [runDiagnosis]);
+  }, [runDiagnosis, runInstagramDiagnosis]);
 
   return (
     <section className="mb-6 rounded-lg border border-border/70 bg-surface/60 p-5">
@@ -1212,9 +1230,73 @@ function MetaDiagnosticsPanel() {
               )}
             </ul>
           </div>
+
+          <InstagramOAuthChecklist check={state.instagram} />
         </div>
       )}
     </section>
+  );
+}
+
+function InstagramOAuthChecklist({ check }: { check: InstagramCheck }) {
+  return (
+    <div className="rounded-lg border border-border bg-surface-2 p-3 text-xs text-muted-foreground">
+      <div className="flex items-start gap-2">
+        <Instagram className="mt-0.5 size-4 shrink-0 text-primary" />
+        <div>
+          <p className="font-medium text-foreground">Checklist Instagram + Lovable</p>
+          <p className="mt-1">
+            Use este bloco quando o login abrir apenas o feed do Instagram ou não voltar para o
+            VaiViral.
+          </p>
+        </div>
+      </div>
+
+      <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+        <Row label="Endpoint OAuth esperado" value={check.authEndpoint} />
+        <Row label="Instagram App ID" value={check.appId ?? "não definido"} />
+        <Row label="URL de retorno Instagram" value={check.redirectUri ?? "não definida"} />
+        <Row label="Scopes Instagram" value={check.requiredScopes.join(",")} />
+      </dl>
+
+      {check.issues.length > 0 ? (
+        <ul className="mt-3 space-y-1 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-amber-300">
+          {check.issues.map((issue) => (
+            <li key={issue}>• {issue}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 text-emerald-400">Configuração do Instagram completa no servidor.</p>
+      )}
+
+      <div className="mt-3 rounded-lg border border-border bg-background/40 p-3">
+        <p className="font-medium text-foreground">Variáveis no Lovable Cloud</p>
+        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-background p-3 font-mono text-[11px] text-muted-foreground">
+{`INSTAGRAM_APP_ID=ID do app Instagram
+INSTAGRAM_APP_SECRET=secret do app Instagram
+INSTAGRAM_REDIRECT_URI=${check.redirectUri ?? "https://content-layer-lab.lovable.app/integracoes/instagram/callback"}`}
+        </pre>
+      </div>
+
+      <div className="mt-3">
+        <p className="font-medium text-foreground">Conferir na Meta</p>
+        <ul className="mt-1 space-y-1">
+          <li>• API do Instagram: adicione o mesmo redirect URI em URLs de redirecionamento OAuth.</li>
+          <li>• Permissões: instagram_business_basic e instagram_business_content_publish.</li>
+          <li>• O app precisa estar publicado quando outras contas forem conectar.</li>
+          <li>
+            • Se a conta Instagram pertence a uma Página do Facebook, ela precisa estar profissional
+            e vinculada corretamente nessa Página.
+          </li>
+        </ul>
+      </div>
+
+      {check.authorizationUrl && (
+        <p className="mt-3 break-all rounded-lg border border-border bg-background/40 p-3">
+          {check.authorizationUrl}
+        </p>
+      )}
+    </div>
   );
 }
 
