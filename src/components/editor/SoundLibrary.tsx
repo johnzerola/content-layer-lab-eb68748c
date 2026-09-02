@@ -112,7 +112,29 @@ export function SoundLibrary({ onAdd }: Props) {
         />
       </div>
 
+      {kind === "music" && (
+        <div className="grid grid-cols-3 gap-1.5">
+          {CC0_MOODS.map((m) => {
+            const active = query === m.query;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setQuery(active ? "" : m.query)}
+                className={`rounded-lg bg-gradient-to-br ${m.gradient} p-2 text-left transition-transform hover:scale-[1.02] ${
+                  active ? "ring-2 ring-primary" : ""
+                }`}
+              >
+                <span className="block text-[11px] font-semibold text-foreground">{m.label}</span>
+                <span className="block truncate text-[10px] text-foreground/70">{m.hint}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-1">
+
         {categories.map((c) => (
           <button
             key={c.id}
