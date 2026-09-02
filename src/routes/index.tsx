@@ -2276,8 +2276,9 @@ function Home() {
         )}
 
         {mode !== "clip" && items.length > 0 && (
-          <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
-            <section className="panel space-y-4 p-5">
+          <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_420px]">
+            <section className="panel rise-in space-y-4 p-4 sm:p-5">
+
               <div>
                 <p className="text-lg font-semibold">
                   <span className="step-num mr-2">03</span>Preview & ajuste individual
