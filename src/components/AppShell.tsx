@@ -33,7 +33,7 @@ import { GlobalActionBar } from "@/components/GlobalActionBar";
 import { ProcessSteps } from "@/components/ProcessSteps";
 import { useAccess } from "@/lib/subscription";
 import { planFromId } from "@/lib/plan";
-import { markPendingShellMode } from "@/lib/handoff";
+import { markPendingShellMode, type ShellMode } from "@/lib/handoff";
 
 export type AppMode = "lote" | "clip" | "limpar" | "limpar-ia" | "external";
 
@@ -224,7 +224,7 @@ function NavItem({
         aria-current={active ? "page" : undefined}
         className={className}
         preload="intent"
-        onClick={rest.onClick}
+        onClick={(event) => rest.onClick?.(event as unknown as React.MouseEvent<HTMLButtonElement>)}
       >
         {content}
       </Link>
@@ -342,7 +342,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             icon={m.icon}
             routeTo={onFixedRoute ? "/" : undefined}
             onClick={() => {
-              if (onFixedRoute) markPendingShellMode(m.id);
+              if (onFixedRoute) markPendingShellMode(m.id as ShellMode);
               else openTool(m.id);
               close?.();
             }}
