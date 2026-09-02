@@ -5,7 +5,8 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Music, Pause, Play, Plus, Search, Waves } from "lucide-react";
-import { SOUND_CATEGORIES, searchFreeSounds, type SoundAsset, type SoundKind } from "@/lib/editor/sound-library";
+import { CC0_MOODS, SOUND_CATEGORIES, searchFreeSounds, type SoundAsset, type SoundKind } from "@/lib/editor/sound-library";
+
 
 interface Props {
   /** adiciona o som na trilha de áudio do editor */
