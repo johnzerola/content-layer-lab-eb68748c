@@ -246,7 +246,10 @@ function EditorPage() {
         toast.error("Carregue o vídeo de origem na barra de mídia para renderizar.");
         return;
       }
-      const seg = doc.preedit?.segments?.[0] ?? null;
+      // com vários trechos, a pré-edição define os cortes; com um só, ele vira a janela
+      const segList = doc.preedit?.segments ?? [];
+      const seg = segList.length === 1 ? segList[0]! : null;
+
       setRendering(true);
       setRenderPct(0);
       try {
