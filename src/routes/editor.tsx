@@ -4,6 +4,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Mic, Play, Sparkles, Square, Video as VideoIcon } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
+import { RouteShell } from "@/components/RouteShell";
 import { SavedProjects } from "@/components/editor/SavedProjects";
 import { registerSourceFile } from "@/lib/editor/cuts";
 import { createEditorProject } from "@/lib/editor/project";
@@ -31,9 +32,11 @@ export const Route = createFileRoute("/editor")({
     ],
   }),
   component: () => (
-    <RequireAuth title="Editor profissional" description="Entre na sua conta para abrir o editor.">
-      <EditorLauncher />
-    </RequireAuth>
+    <RouteShell>
+      <RequireAuth title="Editor profissional" description="Entre na sua conta para abrir o editor.">
+        <EditorLauncher />
+      </RequireAuth>
+    </RouteShell>
   ),
 });
 

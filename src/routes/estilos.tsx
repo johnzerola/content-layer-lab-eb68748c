@@ -7,6 +7,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { RequireAuth } from "@/components/RequireAuth";
+import { RouteShell } from "@/components/RouteShell";
 import { CAPTION_PRESETS } from "@/lib/editor/caption-styles";
 import { STYLE_TEMPLATES } from "@/lib/editor/style-templates";
 import { STYLE_FONTS, STYLE_PALETTES } from "@/components/editor/StylesPanel";
@@ -47,9 +48,11 @@ export const Route = createFileRoute("/estilos")({
     ],
   }),
   component: () => (
-    <RequireAuth title="Estilos" description="Entre na sua conta para salvar e reutilizar estilos.">
-      <EstilosPage />
-    </RequireAuth>
+    <RouteShell>
+      <RequireAuth title="Estilos" description="Entre na sua conta para salvar e reutilizar estilos.">
+        <EstilosPage />
+      </RequireAuth>
+    </RouteShell>
   ),
 });
 

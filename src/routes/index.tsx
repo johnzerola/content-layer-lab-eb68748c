@@ -64,7 +64,7 @@ import { AutoScheduleModal } from "@/components/AutoScheduleModal";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
 import { failJob, finishJob, setJobCancel, setJobRetry, startJob, updateJob } from "@/lib/jobs";
 import { undoable } from "@/lib/undo";
-import { takeHandoffItems, takePendingTool, type HandoffItem, type HandoffTool } from "@/lib/handoff";
+import { takeHandoffItems, takePendingShellMode, takePendingTool, type HandoffItem, type HandoffTool } from "@/lib/handoff";
 
 import {
   applyRatio,
@@ -792,8 +792,13 @@ function Home() {
 
   /** Recebe vídeos enviados por outra ferramenta (ex.: Monitora Live) sem reimportar. */
   useEffect(() => {
+    const shellMode = takePendingShellMode();
     const pending = takePendingTool();
-    const tool: HandoffTool = pending ?? "lote";
+    const tool: HandoffTool = pending ?? (shellMode === "limpar-ia" ? "lote" : shellMode) ?? "lote";
+    if (shellMode) {
+      modeRef.current = shellMode;
+      setMode(shellMode);
+    }
     const handoff = takeHandoffItems(tool);
     if (handoff.length) {
       modeRef.current = tool;

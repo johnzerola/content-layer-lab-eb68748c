@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Camera, CircleStop, Mic, Pause, Play, RefreshCcw, Video, VideoOff } from "lucide-react";
 import { toast } from "sonner";
 import { RequireAuth } from "@/components/RequireAuth";
+import { RouteShell } from "@/components/RouteShell";
 import { Button } from "@/components/ui/button";
 import { registerSourceFile } from "@/lib/editor/cuts";
 import { createEditorProject } from "@/lib/editor/project";
@@ -20,9 +21,11 @@ export const Route = createFileRoute("/estudio")({
     ],
   }),
   component: () => (
-    <RequireAuth title="Estúdio" description="Entre na sua conta para gravar um novo corte.">
-      <StudioPage />
-    </RequireAuth>
+    <RouteShell>
+      <RequireAuth title="Estúdio" description="Entre na sua conta para gravar um novo corte.">
+        <StudioPage />
+      </RequireAuth>
+    </RouteShell>
   ),
 });
 
@@ -204,7 +207,7 @@ function StudioPage() {
   const microphones = devices.filter((device) => device.kind === "audioinput");
 
   return (
-    <main className="min-h-dvh bg-background text-foreground">
+    <main className="min-h-[calc(100dvh-4rem)] bg-background text-foreground">
       <header className="flex min-h-16 items-center justify-between border-b border-border px-5">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-wide text-primary">VaiViral Studio</p>
