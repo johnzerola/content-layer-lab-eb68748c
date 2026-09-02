@@ -1656,6 +1656,42 @@ export function VideoStudio({
                 <Field label={`Desfoque · ${pre.blur.toFixed(1)}px`}>
                   <Slider value={[pre.blur]} min={0} max={8} step={0.1} onValueChange={([v]) => set({ blur: v ?? 0 }, "cor")} />
                 </Field>
+                <Field label={`Temperatura · ${(pre.temp ?? 0) > 0 ? "quente" : (pre.temp ?? 0) < 0 ? "frio" : "neutro"} ${Math.round((pre.temp ?? 0) * 100)}`}>
+                  <Slider
+                    value={[pre.temp ?? 0]}
+                    min={-1}
+                    max={1}
+                    step={0.01}
+                    onValueChange={([v]) => set({ temp: v ?? 0 }, "temperatura")}
+                  />
+                </Field>
+                <Field label={`Vinheta · ${Math.round((pre.vignette ?? 0) * 100)}%`}>
+                  <Slider
+                    value={[pre.vignette ?? 0]}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onValueChange={([v]) => set({ vignette: v ?? 0 }, "vinheta")}
+                  />
+                </Field>
+                <Field label={`Granulado (pontinhos) · ${Math.round((pre.grain ?? 0) * 100)}%`}>
+                  <Slider
+                    value={[pre.grain ?? 0]}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onValueChange={([v]) => set({ grain: v ?? 0 }, "granulado")}
+                  />
+                </Field>
+                <Field label={`Preto lavado (fade) · ${Math.round((pre.fade ?? 0) * 100)}%`}>
+                  <Slider
+                    value={[pre.fade ?? 0]}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onValueChange={([v]) => set({ fade: v ?? 0 }, "fade")}
+                  />
+                </Field>
                 </div>
                 )}
               </div>
