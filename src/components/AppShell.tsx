@@ -473,6 +473,11 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             </section>
           )}
 
+          {mode === "external" || onFixedRoute ? null : (
+            <ProcessSteps current={count > 0 ? 1 : 0} className="rise-in mb-5" />
+          )}
+
+
           {isAdmin ? children : <PlanGate>{children}</PlanGate>}
         </div>
       </div>
