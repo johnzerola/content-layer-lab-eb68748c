@@ -41,6 +41,7 @@ import { openProjectForVideo, saveEditorProject } from "@/lib/editor/project.ser
 import { previewUrl, type EditorProjectDoc } from "@/lib/editor/project";
 import { defaultEditorAudio } from "@/lib/editor/audio";
 import { generateCaptions } from "@/lib/captions";
+import { refineTranscriptWords } from "@/lib/transcribe.functions";
 import { applyBrandKitToDoc } from "@/lib/brand-kit";
 import { defaultPreEdit, type PreEdit } from "@/lib/preedit";
 import { ensureTranscript, saveTranscript } from "@/lib/editor/transcript.service";
@@ -645,6 +646,7 @@ function EditorPage() {
                 generating={transcribing}
                 generateProgress={transcribeProgress}
                 hasMedia={Boolean(src)}
+                onRefine={() => void translateTranscript()}
               />
             ) : (
               <StylesPanel

@@ -32,6 +32,8 @@ interface Props {
   generating?: boolean | undefined;
   generateProgress?: string | undefined;
   hasMedia?: boolean | undefined;
+  /** traduz para português e pontua a transcrição já existente */
+  onRefine?: (() => void) | undefined;
 }
 
 const WordChip = memo(function WordChip({
@@ -101,6 +103,7 @@ export function TranscriptPanel({
   generating = false,
   generateProgress,
   hasMedia = false,
+  onRefine,
 }: Props) {
   const [mode, setMode] = useState<"paragrafo" | "palavra">("paragrafo");
   const [search, setSearch] = useState("");
