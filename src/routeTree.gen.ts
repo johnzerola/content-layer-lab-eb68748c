@@ -23,6 +23,7 @@ import { Route as LimparIaRouteImport } from './routes/limpar-ia'
 import { Route as LiveRouteImport } from './routes/live'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as MetricasRouteImport } from './routes/metricas'
+import { Route as PerfisRouteImport } from './routes/perfis'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as VendasRouteImport } from './routes/vendas'
@@ -113,6 +114,11 @@ const McpRoute = McpRouteImport.update({
 const MetricasRoute = MetricasRouteImport.update({
   id: '/metricas',
   path: '/metricas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PerfisRoute = PerfisRouteImport.update({
+  id: '/perfis',
+  path: '/perfis',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacidadeRoute = PrivacidadeRouteImport.update({
@@ -248,6 +254,7 @@ export interface FileRoutesByFullPath {
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
   '/metricas': typeof MetricasRoute
+  '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
@@ -285,6 +292,7 @@ export interface FileRoutesByTo {
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
   '/metricas': typeof MetricasRoute
+  '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
@@ -323,6 +331,7 @@ export interface FileRoutesById {
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
   '/metricas': typeof MetricasRoute
+  '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
@@ -362,6 +371,7 @@ export interface FileRouteTypes {
     | '/live'
     | '/mcp'
     | '/metricas'
+    | '/perfis'
     | '/privacidade'
     | '/termos'
     | '/vendas'
@@ -399,6 +409,7 @@ export interface FileRouteTypes {
     | '/live'
     | '/mcp'
     | '/metricas'
+    | '/perfis'
     | '/privacidade'
     | '/termos'
     | '/vendas'
@@ -436,6 +447,7 @@ export interface FileRouteTypes {
     | '/live'
     | '/mcp'
     | '/metricas'
+    | '/perfis'
     | '/privacidade'
     | '/termos'
     | '/vendas'
@@ -474,6 +486,7 @@ export interface RootRouteChildren {
   LiveRoute: typeof LiveRoute
   McpRoute: typeof McpRoute
   MetricasRoute: typeof MetricasRoute
+  PerfisRoute: typeof PerfisRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   TermosRoute: typeof TermosRoute
   VendasRoute: typeof VendasRoute
@@ -595,6 +608,13 @@ declare module '@tanstack/react-router' {
       path: '/metricas'
       fullPath: '/metricas'
       preLoaderRoute: typeof MetricasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/perfis': {
+      id: '/perfis'
+      path: '/perfis'
+      fullPath: '/perfis'
+      preLoaderRoute: typeof PerfisRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacidade': {
@@ -762,6 +782,7 @@ const rootRouteChildren: RootRouteChildren = {
   LiveRoute: LiveRoute,
   McpRoute: McpRoute,
   MetricasRoute: MetricasRoute,
+  PerfisRoute: PerfisRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   TermosRoute: TermosRoute,
   VendasRoute: VendasRoute,
