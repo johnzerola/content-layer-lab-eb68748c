@@ -102,7 +102,7 @@ export async function searchFreeSounds(
   for (const page of pages) {
     const info = page.imageinfo?.[0];
     if (!info) continue;
-    if (!/^audio\/(mpeg|ogg|wav|x-wav|flac|mp4)/.test(info.mime)) continue;
+    if (!/^(audio\/(mpeg|ogg|wav|x-wav|flac|mp4)|application\/ogg)/.test(info.mime)) continue;
     if (info.size > maxSize) continue;
     const url = info.url.split("?")[0] ?? info.url;
     assets.push({
