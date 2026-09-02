@@ -25,6 +25,7 @@ import { AudioPanel } from "@/components/editor/AudioPanel";
 import { CutPanel, FramePanel, GradePanel, LayoutPanel, TitlesPanel } from "@/components/editor/ToolPanels";
 import { EditorCanvas } from "@/components/vtemplate/EditorCanvas";
 import { AnimationPanel } from "@/components/vtemplate/AnimationPanel";
+import { AnimationLibrary } from "@/components/editor/AnimationLibrary";
 import { BrandKitPanel } from "@/components/vtemplate/BrandKitPanel";
 import { PropertiesPanel } from "@/components/vtemplate/PropertiesPanel";
 import { useEditorHistory } from "@/components/editor/useEditorHistory";
@@ -218,6 +219,20 @@ function EditorPage() {
               }
             : d,
         `layer:${id}`,
+      );
+    },
+    [history],
+  );
+
+  /** adiciona camadas prontas (biblioteca de animações) à composição */
+  const addLayers = useCallback(
+    (newLayers: TemplateLayer[], label = "adicionar-camadas") => {
+      history.set(
+        (d) =>
+          d
+            ? { ...d, composition: { ...d.composition, layers: [...d.composition.layers, ...newLayers] } }
+            : d,
+        label,
       );
     },
     [history],
@@ -534,16 +549,25 @@ function EditorPage() {
             )}
             {tool === "layout" && <LayoutPanel preedit={pre} onChange={patchPre} />}
             {tool === "ajustes" && <GradePanel preedit={pre} onChange={patchPre} />}
-            {tool === "animacao" &&
-              (selectedLayer ? (
-                <AnimationPanel
-                  layer={selectedLayer}
-                  onUpdate={(patch) => updateLayer(selectedLayer.id, patch)}
-                  onPreview={() => setPlaying(true)}
+            {tool === "animacao" && (
+              <div className="space-y-4">
+                {selectedLayer ? (
+                  <AnimationPanel
+                    layer={selectedLayer}
+                    onUpdate={(patch) => updateLayer(selectedLayer.id, patch)}
+                    onPreview={() => setPlaying(true)}
+                  />
+                ) : (
+                  <p className="rounded-lg border border-border/60 bg-card/40 p-2 text-xs text-muted-foreground">
+                    Selecione uma camada para ajustar duração, início, velocidade e direção — ou escolha uma animação pronta abaixo.
+                  </p>
+                )}
+                <AnimationLibrary
+                  layers={doc.composition.layers}
+                  onAddLayers={(ls, label) => addLayers(ls, label)}
                 />
-              ) : (
-                <p className="text-xs text-muted-foreground">Selecione uma camada no palco ou na timeline para animar.</p>
-              ))}
+              </div>
+            )}
             {tool === "camada" && (
               <PropertiesPanel
                 layer={selectedLayer}
