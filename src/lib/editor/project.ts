@@ -5,6 +5,8 @@
  */
 import { createTemplateDoc } from "@/lib/video-template/factory";
 import type { AspectRatio, TemplateDoc } from "@/lib/video-template/types";
+import { defaultPreEdit, type PreEdit } from "@/lib/preedit";
+import { defaultEditorAudio, type EditorAudio } from "./audio";
 import type { TimeRange } from "./transcript";
 
 export const EDITOR_PROJECT_MODE = "video-editor";
@@ -38,6 +40,10 @@ export interface EditorProjectDoc {
   templateInstanceId: string | null;
   composition: TemplateDoc;
   timelineZoom: number;
+  /** pré-edição do vídeo de origem (corte, enquadramento, cor, layout) */
+  preedit?: PreEdit;
+  /** trilha de áudio: música, narração, ducking */
+  audio?: EditorAudio;
 }
 
 export function createEditorProject(
@@ -70,6 +76,8 @@ export function createEditorProject(
     templateId: null,
     templateInstanceId: null,
     composition: createTemplateDoc(title, aspectRatio),
+    preedit: defaultPreEdit(),
+    audio: defaultEditorAudio(),
     timelineZoom: 1,
   };
 }
