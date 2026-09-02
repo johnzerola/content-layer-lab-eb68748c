@@ -171,7 +171,7 @@ export async function searchFreeSounds(
   const json = (await res.json()) as { query?: { pages?: Record<string, CommonsPage> } };
   const pages = Object.values(json.query?.pages ?? {});
 
-  const maxSize = kind === "sfx" ? 3_000_000 : 12_000_000;
+  const maxSize = kind === "sfx" ? 6_000_000 : 25_000_000;
   const assets: SoundAsset[] = [];
   for (const page of pages) {
     const info = page.imageinfo?.[0];
