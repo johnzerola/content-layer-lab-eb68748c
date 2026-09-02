@@ -49,7 +49,7 @@ export function BatchProgressDock() {
         ) : (
           <Loader2 className="size-4 animate-spin text-primary" />
         )}
-        <span className="font-mono text-[11px]">
+        <span className="text-[12px]">
           {p.label ?? "Processando"} · {p.done}/{p.total} ({pct}%)
           {p.paused ? " · pausado" : ""}
         </span>
@@ -70,7 +70,7 @@ export function BatchProgressDock() {
           </button>
           <Link
             to="/"
-            className="rounded-md border border-border px-2 py-1 font-mono text-[10px] hover:border-primary hover:text-primary"
+            className="rounded-md border border-border px-2 py-1 text-[11px] hover:border-primary hover:text-primary"
           >
             ver lote
           </Link>
@@ -79,7 +79,7 @@ export function BatchProgressDock() {
       <div className="mt-2 h-1 overflow-hidden rounded-full bg-border">
         <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] text-muted-foreground">
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
         <span>restam {p.paused ? "—" : measuring ? "calculando…" : `~${formatEta(eta)}`}</span>
         {!measuring && <span>{formatSpeed(perItemSec)}</span>}
         {p.itemFps > 0 && <span>{p.itemFps.toFixed(0)} fps</span>}

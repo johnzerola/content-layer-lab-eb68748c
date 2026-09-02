@@ -1271,7 +1271,7 @@ function InstagramOAuthChecklist({ check }: { check: InstagramCheck }) {
 
       <div className="mt-3 rounded-lg border border-border bg-background/40 p-3">
         <p className="font-medium text-foreground">Variáveis no Lovable Cloud</p>
-        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-background p-3 font-mono text-[11px] text-muted-foreground">
+        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-background p-3 text-[12px] text-muted-foreground">
 {`INSTAGRAM_APP_ID=ID do app Instagram
 INSTAGRAM_APP_SECRET=secret do app Instagram
 INSTAGRAM_REDIRECT_URI=${check.redirectUri ?? "https://content-layer-lab.lovable.app/integracoes/instagram/callback"}`}

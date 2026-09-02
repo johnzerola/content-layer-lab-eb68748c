@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Layers,
   Scissors,
@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { PlanGate } from "@/components/PlanGate";
+import { GlobalActionBar } from "@/components/GlobalActionBar";
 import { useAccess } from "@/lib/subscription";
 import { planFromId } from "@/lib/plan";
 
@@ -117,6 +118,19 @@ const MODES: ModeDef[] = [
   },
 ];
 
+/** rotas fixas fora do estúdio — quando ativas, as ferramentas não ficam destacadas */
+const ROUTE_PATHS = [
+  "/live",
+  "/biblioteca",
+  "/agenda",
+  "/perfis",
+  "/integracoes",
+  "/armazenamento",
+  "/metricas",
+  "/admin",
+  "/fotos",
+] as const;
+
 interface Props {
   mode: AppMode;
   onMode: (m: AppMode) => void;
@@ -128,11 +142,66 @@ interface Props {
   children: ReactNode;
 }
 
+function NavItem({
+  open,
+  active,
+  label,
+  hint,
+  icon: Icon,
+  badge,
+  ...rest
+}: {
+  open: boolean;
+  active?: boolean | undefined;
+  label: string;
+  hint?: string | undefined;
+  icon: typeof Layers;
+  badge?: ReactNode | undefined;
+} & React.ComponentProps<"button">) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-current={active ? "page" : undefined}
+      className={`group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-150 ${
+        active
+          ? "bg-surface-2 text-foreground"
+          : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+      } ${open ? "" : "justify-center px-0"}`}
+      {...rest}
+    >
+      <span className="relative flex shrink-0 items-center">
+        {active && (
+          <span
+            aria-hidden
+            className="absolute -left-2.5 h-4 w-[2px] rounded-full bg-primary"
+            style={{ display: open ? "block" : "none" }}
+          />
+        )}
+        <Icon className={`size-[17px] ${active ? "text-primary" : ""}`} />
+      </span>
+      {open && (
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-medium leading-tight">{label}</span>
+          {hint && (
+            <span className="block truncate text-[11px] leading-tight text-[var(--muted-2)]">
+              {hint}
+            </span>
+          )}
+        </span>
+      )}
+      {open && badge}
+    </button>
+  );
+}
+
 export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, children }: Props) {
   const [open, setOpen] = useState(true);
   const [user, setUser] = useState<any>(null);
   const { signedIn, sub, isAdmin } = useAccess();
   const plan = planFromId(sub?.plan);
+  const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const onFixedRoute = ROUTE_PATHS.some((p) => pathname.startsWith(p));
 
   useEffect(() => {
     import("@/lib/cloud").then(({ currentUser, onAuth }) => {
@@ -150,191 +219,104 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
     root.classList.add(`theme-${mode}`);
   }, [mode]);
 
+  const routeLink = (to: string, label: string, Icon: typeof Layers) => (
+    <Link
+      key={to}
+      to={to as any}
+      title={label}
+      aria-current={pathname.startsWith(to) ? "page" : undefined}
+      className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors duration-150 ${
+        pathname.startsWith(to)
+          ? "bg-surface-2 text-foreground"
+          : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+      } ${open ? "" : "justify-center px-0"}`}
+    >
+      <Icon
+        className={`size-[17px] shrink-0 ${pathname.startsWith(to) ? "text-primary" : ""}`}
+      />
+      {open && <span className="truncate">{label}</span>}
+    </Link>
+  );
+
   return (
     <div className={`theme-${mode} flex min-h-dvh w-full aurora-bg`}>
       <aside
-        className={`sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-border/60 bg-surface/50 backdrop-blur-xl transition-[width] duration-300 md:flex ${
-          open ? "w-[16.5rem]" : "w-[4.5rem]"
+        className={`sticky top-0 hidden h-dvh shrink-0 flex-col overflow-y-auto border-r border-border bg-[var(--background-2)] transition-[width] duration-[220ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] md:flex ${
+          open ? "w-[244px]" : "w-[68px]"
         }`}
       >
-        <div className="flex items-center gap-3 px-4 py-5">
-          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary font-display text-sm font-bold text-primary-foreground shadow-[var(--shadow-glow)]">
+        <div className={`flex items-center gap-2.5 px-4 py-4 ${open ? "" : "justify-center px-0"}`}>
+          <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary font-display text-[13px] font-semibold text-primary-foreground">
             {current.mark}
           </div>
           {open && (
             <div className="min-w-0">
-              <p className="truncate font-display text-base font-bold tracking-tight text-foreground">
+              <p className="truncate font-display text-[15px] font-semibold tracking-tight text-foreground">
                 {current.brand}
               </p>
-              <p className="truncate font-mono text-[10px] text-muted-foreground">
-                {current.tagline}
-              </p>
+              <p className="truncate text-[11px] text-[var(--muted-2)]">{current.tagline}</p>
             </div>
           )}
         </div>
 
-        <nav className="flex flex-col gap-1 px-3">
-          {open && <p className="mono-label px-2 pb-2 pt-3">Ferramentas</p>}
-          {MODES.filter((m) => m.id !== "external").map((m) => {
-            const active = m.id === mode;
-            const isExternal = [
-              "/live",
-              "/biblioteca",
-              "/agenda",
-              "/integracoes",
-              "/armazenamento",
-              "/metricas",
-              "/admin",
-            ].some(
-              (path) => typeof window !== "undefined" && window.location.pathname.startsWith(path),
-            );
-
-            // Se estiver em uma rota externa/fixa, desativa o destaque visual das ferramentas de lote
-            const visuallyActive = active && !isExternal;
-            return (
-              <button
-                key={m.id}
-                onClick={() => onMode(m.id)}
-                title={m.brand}
-                aria-current={active ? "page" : undefined}
-                className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
-                  visuallyActive
-                    ? "bg-accent text-accent-foreground ring-1 ring-primary/30"
-                    : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-                }`}
-              >
-                <span
-                  className={`grid size-7 shrink-0 place-items-center rounded-lg border transition ${
-                    visuallyActive
-                      ? "border-primary/40 bg-primary/15 text-primary"
-                      : "border-border bg-surface-2 text-muted-foreground group-hover:text-foreground"
-                  }`}
-                >
-                  <m.icon className="size-[15px]" />
-                </span>
-                {open && (
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{m.brand}</span>
-                    <span className="block truncate font-mono text-[10px] opacity-70">
-                      {m.hint}
-                    </span>
-                  </span>
-                )}
-                {open && (counts?.[m.id] ?? 0) > 0 && (
-                  <span className="shrink-0 rounded-full border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+        <nav className="flex flex-col gap-0.5 px-3">
+          {open && <p className="mono-label px-2.5 pb-1.5 pt-2">Criar</p>}
+          {MODES.filter((m) => m.id !== "external").map((m) => (
+            <NavItem
+              key={m.id}
+              open={open}
+              active={m.id === mode && !onFixedRoute}
+              label={m.brand}
+              hint={open ? m.hint : undefined}
+              icon={m.icon}
+              onClick={() => onMode(m.id)}
+              badge={
+                (counts?.[m.id] ?? 0) > 0 ? (
+                  <span className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
                     {counts?.[m.id]}
                   </span>
-                )}
-              </button>
-            );
-          })}
+                ) : undefined
+              }
+            />
+          ))}
+          {routeLink("/fotos", "FotoViral", Images)}
         </nav>
 
-        <div className="mt-6 flex flex-col gap-1 px-3">
-          {open && <p className="mono-label px-2 pb-2">Biblioteca</p>}
-          <button
-            onClick={onLibrary}
-            title="Biblioteca de templates"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <Library className="size-[18px] shrink-0" />
-            {open && "Templates"}
-          </button>
-          <Link
-            to="/fotos"
-            title="FotoViral — fotos em lote"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <Images className="size-[18px] shrink-0" />
-            {open && "FotoViral"}
-          </Link>
-          <Link
-            to="/live"
-            title="Monitora Live"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <Radio className="size-[18px] shrink-0" />
-            {open && "Monitora Live"}
-          </Link>
+        <div className="mt-4 flex flex-col gap-0.5 px-3">
+          {open && <p className="mono-label px-2.5 pb-1.5">Produção</p>}
+          <NavItem open={open} label="Templates" icon={Library} onClick={onLibrary} />
+          {routeLink("/biblioteca", "Resultados", History)}
+          {routeLink("/armazenamento", "Armazenamento", HardDrive)}
+          <NavItem open={open} label="Nuvem" icon={Cloud} onClick={onCloud} />
+        </div>
 
-          <Link
-            to="/biblioteca"
-            title="Biblioteca de Resultados"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <History className="size-[18px] shrink-0" />
-            {open && "Resultados"}
-          </Link>
-          <Link
-            to="/agenda"
-            title="Agenda de postagens"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <CalendarClock className="size-[18px] shrink-0" />
-            {open && "Agenda"}
-          </Link>
-          <Link
-            to="/perfis"
-            title="Perfis Meta — páginas, Instagram e canais"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <Users className="size-[18px] shrink-0" />
-            {open && "Perfis"}
-          </Link>
-          <Link
-            to="/integracoes"
-            title="Configurações e integrações"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <Settings2 className="size-[18px] shrink-0" />
-            {open && "Integrações"}
-          </Link>
-          <Link
-            to="/armazenamento"
-            title="Armazenamento e versões"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <HardDrive className="size-[18px] shrink-0" />
-            {open && "Armazenamento"}
-          </Link>
-          <Link
-            to={"/metricas" as any}
-            title="Métricas de performance"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <BarChart3 className="size-[18px] shrink-0" />
-            {open && "Métricas"}
-          </Link>
-          {isAdmin && (
-            <Link
-              to="/admin"
-              title="Painel Administrativo"
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-            >
-              <Shield className="size-[18px] shrink-0" />
-              {open && "Admin"}
-            </Link>
-          )}
-          <button
-            onClick={onCloud}
-            title="Nuvem"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <Cloud className="size-[18px] shrink-0" />
-            {open && "Nuvem"}
-          </button>
+        <div className="mt-4 flex flex-col gap-0.5 px-3">
+          {open && <p className="mono-label px-2.5 pb-1.5">Distribuição</p>}
+          {routeLink("/agenda", "Agenda", CalendarClock)}
+          {routeLink("/perfis", "Perfis", Users)}
+          {routeLink("/live", "Monitora Live", Radio)}
+          {routeLink("/metricas", "Métricas", BarChart3)}
+        </div>
+
+        <div className="mt-4 flex flex-col gap-0.5 px-3">
+          {open && <p className="mono-label px-2.5 pb-1.5">Workspace</p>}
+          {routeLink("/integracoes", "Integrações", Settings2)}
+          {isAdmin && routeLink("/admin", "Admin", Shield)}
         </div>
 
         <div className="mt-auto p-3">
           <button
             onClick={() => setOpen((v) => !v)}
             aria-label={open ? "Recolher menu" : "Expandir menu"}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+            aria-expanded={open}
+            className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground ${
+              open ? "" : "justify-center px-0"
+            }`}
           >
             {open ? (
-              <PanelLeftClose className="size-[18px]" />
+              <PanelLeftClose className="size-[17px]" />
             ) : (
-              <PanelLeftOpen className="size-[18px]" />
+              <PanelLeftOpen className="size-[17px]" />
             )}
             {open && "Recolher"}
           </button>
@@ -342,30 +324,23 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/55">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 py-3 sm:gap-4 sm:px-6">
+        <header className="sticky top-0 z-[20] border-b border-border bg-[color-mix(in_srgb,var(--background)_88%,transparent)] backdrop-blur-md">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 sm:px-6">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-primary/35 bg-primary/12 text-primary md:hidden">
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-primary md:hidden">
                 <current.icon className="size-4" />
               </span>
-              <div className="min-w-0">
-                <h1 className="truncate font-display text-lg font-bold tracking-tight">
-                  {current.brand}
-                </h1>
-                <p className="truncate font-mono text-[11px] text-muted-foreground">
-                  {current.hint}
-                </p>
-              </div>
+              <GlobalActionBar className="max-w-md" />
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <div className="flex rounded-xl border border-border bg-surface-2 p-0.5 md:hidden">
+              <div className="flex rounded-lg border border-border bg-surface p-0.5 md:hidden">
                 {MODES.filter((m) => m.id !== "external").map((m) => (
                   <button
                     key={m.id}
                     onClick={() => onMode(m.id)}
                     aria-label={m.brand}
-                    className={`grid size-9 place-items-center rounded-lg transition ${
-                      m.id === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                    className={`grid size-9 place-items-center rounded-md transition ${
+                      m.id === mode ? "bg-surface-3 text-primary" : "text-muted-foreground"
                     }`}
                   >
                     <m.icon className="size-4" />
@@ -377,61 +352,44 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
                   to="/checkout"
                   search={{ plano: plan.id }}
                   title="Plano e créditos"
-                  className="hidden rounded-full border border-border bg-surface-2 px-3 py-1.5 font-mono text-[11px] text-muted-foreground transition hover:text-foreground sm:inline-flex"
+                  className="hidden items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[12px] text-muted-foreground transition hover:border-[var(--border-hover)] hover:text-foreground sm:inline-flex"
                 >
-                  {plan.name}
-                  {plan.credits === null ? " · ilimitado" : ` · ${sub.credits} créditos`}
+                  <span className="text-foreground">{plan.name}</span>
+                  <span className="text-[var(--muted-2)]">·</span>
+                  {plan.credits === null ? "ilimitado" : `${sub.credits} créditos`}
                 </Link>
               )}
-              <span className="hidden rounded-full border border-primary/35 bg-accent px-3 py-1.5 font-mono text-[11px] text-accent-foreground sm:inline-flex">
-                ● {count} vídeo{count === 1 ? "" : "s"}
+              <span className="hidden items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[12px] text-muted-foreground sm:inline-flex">
+                <span className="size-1.5 rounded-full bg-success" aria-hidden />
+                {count} vídeo{count === 1 ? "" : "s"}
               </span>
             </div>
           </div>
         </header>
 
-        <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
-          {mode === "external" ||
-          (typeof window !== "undefined" &&
-            [
-              "/live",
-              "/biblioteca",
-              "/agenda",
-              "/integracoes",
-              "/armazenamento",
-              "/metricas",
-              "/admin",
-            ].includes(window.location.pathname)) ? null : (
+        <div className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-5 sm:px-6">
+          {mode === "external" || onFixedRoute ? null : (
             <section
               key={current.id}
-              className="rise-in mb-6 overflow-hidden rounded-2xl border border-border/70 bg-[var(--gradient-surface)] p-5 shadow-[var(--shadow-panel)] sm:p-6"
+              className="rise-in mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4"
             >
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <p className="mono-label flex items-center gap-2 text-primary">
-                    <current.badge className="size-3.5" />
-                    ferramenta independente
-                  </p>
-                  <h2 className="mt-2 font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                    {current.headline}
-                  </h2>
-                  <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                    {current.description}
-                  </p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {current.chips.map((c) => (
-                      <span
-                        key={c}
-                        className="rounded-full border border-border bg-surface-2 px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground"
-                      >
-                        {c}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="grid size-16 shrink-0 place-items-center rounded-2xl border border-primary/30 bg-primary/12 text-primary shadow-[var(--shadow-glow)]">
-                  <current.icon className="size-7" />
-                </div>
+              <div className="min-w-0">
+                <h2 className="font-display text-lg font-semibold tracking-tight text-foreground">
+                  {current.headline}
+                </h2>
+                <p className="mt-0.5 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
+                  {current.description}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {current.chips.slice(0, 3).map((c) => (
+                  <span
+                    key={c}
+                    className="rounded-md border border-border bg-surface px-2 py-1 text-[11px] text-[var(--muted-2)]"
+                  >
+                    {c}
+                  </span>
+                ))}
               </div>
             </section>
           )}

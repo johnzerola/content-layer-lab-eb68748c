@@ -331,7 +331,7 @@ function AgendaPage() {
                         <span className="block truncate text-[11px] text-muted-foreground">
                           {socialAccountDetail(a)}
                         </span>
-                        <span className="block truncate font-mono text-[10px] text-muted-foreground">
+                        <span className="block truncate text-[11px] text-muted-foreground">
                           {a.status === "connected" || a.status === "conectado"
                             ? `conectada via ${a.provider}`
                             : a.status === "aguardando provedor"
@@ -353,7 +353,7 @@ function AgendaPage() {
                     </li>
                   ))}
                   {!accounts.length && (
-                    <li className="rounded-xl border border-dashed border-border px-3 py-6 text-center font-mono text-[11px] text-muted-foreground">
+                    <li className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-[12px] text-muted-foreground">
                       nenhuma conta ainda
                     </li>
                   )}
@@ -484,7 +484,7 @@ function AgendaPage() {
               </div>
 
               {!posts.length && (
-                <p className="rounded-xl border border-dashed border-border px-3 py-10 text-center font-mono text-[11px] text-muted-foreground">
+                <p className="rounded-xl border border-dashed border-border px-3 py-10 text-center text-[12px] text-muted-foreground">
                   nada agendado ainda
                 </p>
               )}
@@ -497,7 +497,7 @@ function AgendaPage() {
                       {list.map((p) => (
                         <li key={p.id} className="rounded-xl border border-border bg-surface-2 p-3">
                           <div className="flex items-start gap-3">
-                            <span className="shrink-0 rounded-lg border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground">
+                            <span className="shrink-0 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground">
                               {new Date(p.scheduled_at).toLocaleTimeString("pt-BR", {
                                 hour: "2-digit",
                                 minute: "2-digit",
@@ -514,14 +514,14 @@ function AgendaPage() {
                               )}
                               {p.error && (
                                 <div className="mt-2 rounded-lg border border-red-500/20 bg-red-500/5 p-2">
-                                  <p className="font-mono text-[10px] leading-tight text-red-400">
+                                  <p className="text-[11px] leading-tight text-red-400">
                                     ERRO: {p.error}
                                   </p>
                                 </div>
                               )}
                             </div>
                             <span
-                              className={`shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10px] ${
+                              className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] ${
                                 STATUS_STYLE[p.status] ?? "border-border text-muted-foreground"
                               }`}
                             >
@@ -557,7 +557,7 @@ function AgendaPage() {
                                     toast.error("Falha ao re-agendar.");
                                   }
                                 }}
-                                className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground transition hover:text-foreground"
+                                className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
                               >
                                 re-agendar
                               </button>
@@ -569,7 +569,7 @@ function AgendaPage() {
                                     await cancelPost(p.id);
                                     await refresh();
                                   }}
-                                  className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground transition hover:text-foreground"
+                                  className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
                                 >
                                   <X className="size-3" /> cancelar
                                 </button>
@@ -580,7 +580,7 @@ function AgendaPage() {
                                 await deletePost(p.id);
                                 await refresh();
                               }}
-                              className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground transition hover:text-red-400"
+                              className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground transition hover:text-red-400"
                             >
                               <Trash2 className="size-3" /> excluir
                             </button>

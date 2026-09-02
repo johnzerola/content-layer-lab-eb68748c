@@ -64,7 +64,7 @@ function ScoreRing({ value }: { value: number }) {
           strokeDashoffset={c * (1 - value / 100)}
         />
       </svg>
-      <span className={`font-mono text-[11px] font-bold ${tone}`}>{value}</span>
+      <span className={`text-[12px] font-bold ${tone}`}>{value}</span>
     </span>
   );
 }
@@ -301,12 +301,12 @@ function LivePage() {
             <h1 className="truncate font-display text-lg font-bold tracking-tight">
               Monitora Live
             </h1>
-            <p className="truncate font-mono text-[11px] text-muted-foreground">
+            <p className="truncate text-[12px] text-muted-foreground">
               cortes automaticos de X, Kick, TikTok e HLS
             </p>
           </div>
           <span
-            className={`rounded-full border px-3 py-1 font-mono text-[11px] ${statusChip[status]}`}
+            className={`rounded-full border px-3 py-1 text-[12px] ${statusChip[status]}`}
           >
             {status}
           </span>
@@ -321,7 +321,7 @@ function LivePage() {
               className="aspect-video w-full bg-black"
             />
             <div className="flex flex-wrap items-center gap-2 border-t border-border/70 px-4 py-3">
-              <span className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-2 text-[12px] text-muted-foreground">
                 <Radio className="size-3.5" />
                 {info?.title ??
                   (info?.handle
@@ -348,7 +348,7 @@ function LivePage() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 className="font-display text-base font-bold">Cortes ({clips.length})</h2>
-                <p className="font-mono text-[11px] text-muted-foreground">
+                <p className="text-[12px] text-muted-foreground">
                   {recommendedClips.length} recomendado(s), ordenados por potencial
                 </p>
               </div>
@@ -400,7 +400,7 @@ function LivePage() {
                     <ScoreRing value={c.score} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{c.title}</p>
-                      <p className="font-mono text-[11px] text-muted-foreground">
+                      <p className="text-[12px] text-muted-foreground">
                         {fmt(c.at)} ·{" "}
                         {Math.round((c.trim?.end ?? c.duration) - (c.trim?.start ?? 0))}s úteis
                       </p>
@@ -412,7 +412,7 @@ function LivePage() {
                       {c.tags.map((tag) => (
                         <span
                           key={tag}
-                          className="rounded-full border border-border px-2 py-0.5 font-mono text-[9px] text-muted-foreground"
+                          className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground"
                         >
                           {tag}
                         </span>
@@ -519,11 +519,11 @@ function LivePage() {
             <div className="grid grid-cols-2 gap-2 text-center">
               <div className="rounded-xl border border-border bg-surface-2 p-2">
                 <span className="block text-lg font-bold text-primary">{postStats.published}</span>
-                <span className="font-mono text-[9px] uppercase text-muted-foreground">feitas</span>
+                <span className="text-[11px] uppercase text-muted-foreground">feitas</span>
               </div>
               <div className="rounded-xl border border-border bg-surface-2 p-2">
                 <span className="block text-lg font-bold text-amber-400">{postStats.pending}</span>
-                <span className="font-mono text-[9px] uppercase text-muted-foreground">aguardando</span>
+                <span className="text-[11px] uppercase text-muted-foreground">aguardando</span>
               </div>
             </div>
             
@@ -532,7 +532,7 @@ function LivePage() {
                 {posts.slice(0, 10).map((p) => (
                   <li key={p.id} className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-surface-2/50 px-2 py-1.5">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-mono text-[10px] text-foreground">
+                      <p className="truncate text-[11px] text-foreground">
                         {new Date(p.scheduled_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
@@ -547,7 +547,7 @@ function LivePage() {
                 ))}
               </ul>
             ) : (
-              <p className="py-2 text-center font-mono text-[10px] text-muted-foreground">nenhum agendamento</p>
+              <p className="py-2 text-center text-[11px] text-muted-foreground">nenhum agendamento</p>
             )}
           </div>
 

@@ -253,7 +253,7 @@ function BatchProgressCard() {
     <div className="space-y-1.5 rounded-xl border border-border bg-surface-2 p-3">
       <div className="flex items-center justify-between gap-2">
         <p className="mono-label">Progresso do lote</p>
-        <p className="font-mono text-[11px] text-muted-foreground">
+        <p className="text-[12px] text-muted-foreground">
           {p.done}/{p.total} arquivos · {pct}%
         </p>
       </div>
@@ -263,13 +263,13 @@ function BatchProgressCard() {
           style={{ width: `${Math.max(pct, starting ? 3 : 0)}%` }}
         />
       </div>
-      <p className="truncate font-mono text-[11px] text-muted-foreground">
+      <p className="truncate text-[12px] text-muted-foreground">
         {p.itemLabel ? `${p.itemLabel} · ` : ""}
         {p.phase ?? "preparando"}
         {p.path ? ` · ${p.path}` : ""}
         {p.itemFps > 0 ? ` · ${p.itemFps.toFixed(0)} fps` : ""}
       </p>
-      <p className="font-mono text-[11px] text-muted-foreground">
+      <p className="text-[12px] text-muted-foreground">
         {measuring ? "medindo velocidade…" : `restam ~${formatEta(eta)} · ${formatSpeed(perItemSec)}`}
       </p>
     </div>
@@ -2022,7 +2022,7 @@ function Home() {
         {webmWarn && (
           <div className="flex items-start gap-3 rounded-xl border border-warn/50 bg-warn/10 p-4">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" />
-            <div className="font-mono text-[11px] leading-relaxed text-muted-foreground">
+            <div className="text-[12px] leading-relaxed text-muted-foreground">
               <p className="text-warn">este navegador não gera MP4</p>
               <p>
                 a saída sairá em WebM, que o Instagram e o TikTok recusam. Abra o VaiViral no Chrome
@@ -2038,7 +2038,7 @@ function Home() {
             <div>
               <p className="mono-label">Template ativo</p>
               <p className="text-lg font-semibold">{active.name}</p>
-              <p className="font-mono text-[11px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 v{active.version ?? 1}
                 {templates.some((t) => t.id === active.id) ? "" : " · não salvo"}
                 {savedFlash && <span className="ml-2 text-primary">â— salvo</span>}
@@ -2051,7 +2051,7 @@ function Home() {
                   Os vídeos serão agendados após o processamento.
                 </p>
                 <button
-                  className="mt-2 font-mono text-[10px] text-muted-foreground underline"
+                  className="mt-2 text-[11px] text-muted-foreground underline"
                   onClick={() => setAutoScheduleConfig(null)}
                 >
                   desativar
@@ -2062,7 +2062,7 @@ function Home() {
               <Button variant="outline" onClick={() => setLibraryOpen(true)}>
                 <LayoutTemplate className="size-4" /> Meus templates
                 {templates.length > 0 && (
-                  <span className="ml-1 font-mono text-[11px] text-muted-foreground">
+                  <span className="ml-1 text-[12px] text-muted-foreground">
                     ({templates.length})
                   </span>
                 )}
@@ -2134,12 +2134,12 @@ function Home() {
               <p className="text-lg font-semibold">
                 Remover legenda queimada, marca d'água e textos
               </p>
-              <p className="font-mono text-[11px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 marque as áreas sobre o quadro no preview — clonar vizinho, borrão, mosaico ou tarja
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="rounded-full border border-border px-3 py-1 font-mono text-[11px] text-muted-foreground">
+              <span className="rounded-full border border-border px-3 py-1 text-[12px] text-muted-foreground">
                 {(active.cleanup ?? []).length} área{(active.cleanup ?? []).length === 1 ? "" : "s"}
               </span>
               <select
@@ -2163,13 +2163,13 @@ function Home() {
             <div>
               <p className="mono-label">AI Video Cleaner</p>
               <p className="text-lg font-semibold">Remoção Profissional com ProPainter (GPU)</p>
-              <p className="font-mono text-[11px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 reconstrução temporal avançada utilizando frames vizinhos para restaurar o fundo
                 original
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-mono text-[11px] text-primary">
+              <span className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[12px] text-primary">
                 <Sparkles className="size-3" /> motor gpu
               </span>
             </div>
@@ -2179,7 +2179,7 @@ function Home() {
             <div>
               <p className="mono-label">Só cortes</p>
               <p className="text-lg font-semibold">Vídeo longo → clipes prontos</p>
-              <p className="font-mono text-[11px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 sem marca, sem headline — só recorte, proporção e anti-duplicidade
               </p>
             </div>
@@ -2361,7 +2361,7 @@ function Home() {
                         </label>
                       ))}
                       <button
-                        className="flex items-center gap-1.5 font-mono text-xs text-primary"
+                        className="flex items-center gap-1.5 text-xs text-primary"
                         onClick={() =>
                           setItems((p) =>
                             p.map((x) =>
@@ -2419,7 +2419,7 @@ function Home() {
                       <p className="mono-label">
                         Preview final
                         {selected?.w ? (
-                          <span className="ml-2 font-mono text-[10px] text-muted-foreground">
+                          <span className="ml-2 text-[11px] text-muted-foreground">
                             {orientationOf(selected.w, selected.h) === "horizontal"
                               ? "horizontal"
                               : orientationOf(selected.w, selected.h) === "square"
@@ -2433,7 +2433,7 @@ function Home() {
                         <button
                           type="button"
                           onClick={() => setCompare((c) => !c)}
-                          className={`rounded-md border px-2 py-1 font-mono text-[10px] ${
+                          className={`rounded-md border px-2 py-1 text-[11px] ${
                             compare
                               ? "border-primary/60 bg-primary/15 text-primary"
                               : "border-border text-muted-foreground hover:text-foreground"
@@ -2444,7 +2444,7 @@ function Home() {
                         <button
                           type="button"
                           onClick={() => setCropTune((c) => !c)}
-                          className={`rounded-md border px-2 py-1 font-mono text-[10px] ${
+                          className={`rounded-md border px-2 py-1 text-[11px] ${
                             cropTune
                               ? "border-primary/60 bg-primary/15 text-primary"
                               : "border-border text-muted-foreground hover:text-foreground"
@@ -2462,7 +2462,7 @@ function Home() {
                               localStorage.setItem("vv_ui_grid", v);
                             } catch {}
                           }}
-                          className={`rounded-md border px-2 py-1 font-mono text-[10px] ${
+                          className={`rounded-md border px-2 py-1 text-[11px] ${
                             uiGrid !== "off"
                               ? "border-primary/60 bg-primary/15 text-primary"
                               : "border-border bg-background text-muted-foreground"
@@ -2478,7 +2478,7 @@ function Home() {
                           <select
                             value={variantIdx}
                             onChange={(e) => setPreviewVariant(Number(e.target.value))}
-                            className="rounded-md border border-border bg-background px-2 py-1 font-mono text-[10px]"
+                            className="rounded-md border border-border bg-background px-2 py-1 text-[11px]"
                           >
                             {Array.from({ length: variants }, (_, k) => (
                               <option key={k} value={k}>
@@ -2578,7 +2578,7 @@ function Home() {
                             },
                           }))
                         }
-                        className={`rounded-md border px-2 py-1 font-mono text-[10px] ${
+                        className={`rounded-md border px-2 py-1 text-[11px] ${
                           capStyle.visible
                             ? "border-primary/60 bg-primary/15 text-primary"
                             : "border-border text-muted-foreground"
@@ -2600,14 +2600,14 @@ function Home() {
                               },
                             }))
                           }
-                          className="rounded-md border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:border-primary/60 hover:text-foreground"
+                          className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:border-primary/60 hover:text-foreground"
                         >
                           {p.label}
                         </button>
                       ))}
                     </div>
                     {previewVariation && (
-                      <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
+                      <p className="text-[11px] leading-relaxed text-muted-foreground">
                         {variants > 1 ? `v${variantIdx + 1} · ` : ""}
                         {describeVariation(previewVariation)}
                         {previewCues?.length
@@ -2691,14 +2691,32 @@ function Home() {
                 </div>
 
                 {saveMsg && (
-                  <p className="font-mono text-[11px] text-muted-foreground">{saveMsg}</p>
+                  <p className="text-[12px] text-muted-foreground">{saveMsg}</p>
                 )}
 
                 {user ? <CloudRenderPanel tool={mode} /> : null}
 
 
+                {/* pipeline: leitura rápida do estado do lote */}
+                {items.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {[
+                      { label: "Na fila", value: items.filter((i) => i.status === "na fila").length, tone: "text-muted-foreground" },
+                      { label: "Processando", value: items.filter((i) => i.status === "processando").length, tone: "text-primary" },
+                      { label: "Prontos", value: readyCount, tone: "text-success" },
+                      { label: "Erros", value: items.filter((i) => i.status === "erro").length, tone: "text-destructive" },
+                    ].map((s) => (
+                      <div key={s.label} className="rounded-xl border border-border bg-surface-2 px-3 py-2">
+                        <p className={`font-display text-xl leading-none ${s.tone}`}>{s.value}</p>
+                        <p className="mono-label mt-1">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* progresso do lote: fonte única (mesmo estado do dock global) */}
                 {(running || batchItems.length > 0) && <BatchProgressCard />}
+
 
                 {/* relatório do lote */}
                 {report && !running && (
@@ -2708,12 +2726,12 @@ function Home() {
                       <button
                         type="button"
                         onClick={() => setReport(null)}
-                        className="font-mono text-[10px] text-muted-foreground hover:text-foreground"
+                        className="text-[11px] text-muted-foreground hover:text-foreground"
                       >
                         fechar
                       </button>
                     </div>
-                    <p className="font-mono text-[11px] text-muted-foreground">
+                    <p className="text-[12px] text-muted-foreground">
                       {report.ok} vídeo(s) exportado(s) · {report.fail} com erro · {report.seconds}s
                     </p>
                     {report.fails.length > 0 && (
@@ -2721,7 +2739,7 @@ function Home() {
                         {report.fails.map((f, i) => (
                           <li
                             key={`${f.name}-${i}`}
-                            className="font-mono text-[10px] text-destructive"
+                            className="text-[11px] text-destructive"
                           >
                             {f.name}: {f.error}
                           </li>
@@ -2735,7 +2753,7 @@ function Home() {
                 <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="mono-label">{flow.export.title}</p>
-                    <span className="font-mono text-[10px] text-muted-foreground">
+                    <span className="text-[11px] text-muted-foreground">
                       {flow.export.platforms
                         ? `${platforms.length} formato${platforms.length > 1 ? "s" : ""} × ${Math.max(1, flow.export.variants ? variants : 1)} variação${flow.export.variants && variants > 1 ? "ões" : ""} = ${platforms.length * Math.max(1, flow.export.variants ? variants : 1)} arquivos por vídeo`
                         : "1 arquivo por vídeo · resolução e proporção originais"}
@@ -2761,14 +2779,14 @@ function Home() {
                           >
                             {p.label}
                           </span>
-                          <span className="block font-mono text-[10px] text-muted-foreground">
+                          <span className="block text-[11px] text-muted-foreground">
                             {p.hint}
                           </span>
                         </button>
                       );
                     })}
                   </div>
-                  <label className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                  <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
                     <input
                       type="checkbox"
                       checked={autoBitrate}
@@ -2780,7 +2798,7 @@ function Home() {
                   </label>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-4 font-mono text-[11px] text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-4 text-[12px] text-muted-foreground">
                   <label className="flex items-center gap-2">
                     paralelo
                     <input
@@ -2853,7 +2871,7 @@ function Home() {
                         <select
                           value={capLang}
                           onChange={(e) => setCapLang(e.target.value)}
-                          className="rounded-md border border-border bg-background px-2 py-1 font-mono text-[11px]"
+                          className="rounded-md border border-border bg-background px-2 py-1 text-[12px]"
                         >
                           <option value="pt">pt</option>
                           <option value="en">en</option>
@@ -2875,12 +2893,12 @@ function Home() {
                       <div className="mt-2 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2">
                         <AlertTriangle className="mt-[2px] size-3.5 shrink-0 text-destructive" />
                         <div className="space-y-1">
-                          <p className="font-mono text-[11px] leading-relaxed text-destructive">
+                          <p className="text-[12px] leading-relaxed text-destructive">
                             {selected.capStatus}
                           </p>
                           <button
                             type="button"
-                            className="font-mono text-[10px] underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                            className="text-[11px] underline underline-offset-2 text-muted-foreground hover:text-foreground"
                             onClick={() => void makeCaptions(selected)}
                           >
                             tentar novamente
@@ -2888,7 +2906,7 @@ function Home() {
                         </div>
                       </div>
                     ) : (
-                      <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+                      <p className="mt-2 text-[12px] text-muted-foreground">
                         {selected.capStatus ??
                           "transcreve a fala e desenha no estilo escolhido abaixo."}
                       </p>
@@ -2896,11 +2914,11 @@ function Home() {
 
                     {!!selected.captions?.length && (
                       <div className="mt-2 flex items-center gap-2">
-                        <span className="font-mono text-[11px] text-primary">
+                        <span className="text-[12px] text-primary">
                           â— {selected.captions.length} blocos prontos
                         </span>
                         <button
-                          className="font-mono text-[11px] text-muted-foreground underline"
+                          className="text-[12px] text-muted-foreground underline"
                           onClick={() =>
                             setItems((p) =>
                               p.map((x) =>
@@ -2914,7 +2932,7 @@ function Home() {
                           remover
                         </button>
                         <button
-                          className="font-mono text-[11px] text-muted-foreground underline"
+                          className="text-[12px] text-muted-foreground underline"
                           onClick={() =>
                             downloadBlob(
                               new Blob([cuesToSrt(selected.captions!)], { type: "text/plain" }),
@@ -2925,7 +2943,7 @@ function Home() {
                           baixar .srt
                         </button>
                         <button
-                          className="font-mono text-[11px] text-muted-foreground underline"
+                          className="text-[12px] text-muted-foreground underline"
                           onClick={() =>
                             void navigator.clipboard.writeText(cuesToText(selected.captions!))
                           }
@@ -2938,10 +2956,10 @@ function Home() {
                     {!!selected.captions?.length && (
                       <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 p-2.5">
                         <div className="min-w-0 flex-1">
-                          <p className="font-mono text-[11px] text-primary">
+                          <p className="text-[12px] text-primary">
                             Editor de legendas · prévia grande, correção de texto e sincronia
                           </p>
-                          <p className="font-mono text-[10px] text-muted-foreground">
+                          <p className="text-[11px] text-muted-foreground">
                             arraste a legenda na tela, corrija erros e alinhe com a fala.
                           </p>
                         </div>
@@ -2972,7 +2990,7 @@ function Home() {
 
                     <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
                       <p className="mono-label">Estilo das legendas (CapCut)</p>
-                      <label className="flex items-center gap-2 font-mono text-[11px]">
+                      <label className="flex items-center gap-2 text-[12px]">
                         <input
                           type="checkbox"
                           checked={(active.captions ?? defaultCaptions()).visible}
@@ -2990,7 +3008,7 @@ function Home() {
                         exibir no vídeo
                       </label>
                     </div>
-                    <label className="mt-2 flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                    <label className="mt-2 flex items-center gap-2 text-[12px] text-muted-foreground">
                       <input
                         type="checkbox"
                         checked={autoCap}
@@ -3034,7 +3052,7 @@ function Home() {
                       </Button>
                     </div>
                     <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                      <label className="font-mono text-[11px] text-muted-foreground">
+                      <label className="text-[12px] text-muted-foreground">
                         duração mínima · {clipMinLen}s
                         <input
                           type="range"
@@ -3050,7 +3068,7 @@ function Home() {
                           className="w-full accent-[var(--primary)]"
                         />
                       </label>
-                      <label className="font-mono text-[11px] text-muted-foreground">
+                      <label className="text-[12px] text-muted-foreground">
                         duração máxima · {clipMaxLen}s
                         <input
                           type="range"
@@ -3066,7 +3084,7 @@ function Home() {
                           className="w-full accent-[var(--primary)]"
                         />
                       </label>
-                      <label className="font-mono text-[11px] text-muted-foreground">
+                      <label className="text-[12px] text-muted-foreground">
                         quantidade de cortes · até {clipMax}
                         <input
                           type="range"
@@ -3078,7 +3096,7 @@ function Home() {
                           className="w-full accent-[var(--primary)]"
                         />
                       </label>
-                      <label className="font-mono text-[11px] text-muted-foreground">
+                      <label className="text-[12px] text-muted-foreground">
                         intensidade do score · {clipMinScore}
                         <input
                           type="range"
@@ -3099,7 +3117,7 @@ function Home() {
                       </label>
                     </div>
 
-                    <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                    <p className="mt-1 text-[12px] text-muted-foreground">
                       {selected.clip
                         ? `trecho ${formatTime(selected.clip.start)}–${formatTime(selected.clip.end)}${
                             selected.score ? ` · score ${selected.score}` : ""
@@ -3112,7 +3130,7 @@ function Home() {
                 <div className="rounded-xl border border-border bg-surface-2 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="mono-label">Anti-duplicidade</p>
-                    <label className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                    <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
                       <input
                         type="checkbox"
                         checked={antiDup.auto}
@@ -3136,7 +3154,7 @@ function Home() {
                         ["eq", "equalização", 4, "db"],
                       ] as const
                     ).map(([key, label, max, unit]) => (
-                      <label key={key} className="font-mono text-[11px] text-muted-foreground">
+                      <label key={key} className="text-[12px] text-muted-foreground">
                         {label} ·{" "}
                         {unit === "pct"
                           ? `${(antiDup[key] * 100).toFixed(0)}%`
@@ -3169,7 +3187,7 @@ function Home() {
                           key={p.id}
                           title={p.hint}
                           onClick={() => setAntiDup({ motion: p.id })}
-                          className={`rounded-md border px-2 py-1 font-mono text-[11px] transition ${
+                          className={`rounded-md border px-2 py-1 text-[12px] transition ${
                             (antiDup.motion ?? "auto") === p.id
                               ? "border-primary text-primary"
                               : "border-border text-muted-foreground hover:text-foreground"
@@ -3180,7 +3198,7 @@ function Home() {
                       ))}
                     </div>
                     <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                      <label className="font-mono text-[11px] text-muted-foreground">
+                      <label className="text-[12px] text-muted-foreground">
                         intensidade · {((antiDup.motionAmount ?? 0) * 100).toFixed(0)}%
                         <input
                           type="range"
@@ -3192,7 +3210,7 @@ function Home() {
                           className="w-full accent-[var(--primary)]"
                         />
                       </label>
-                      <label className="font-mono text-[11px] text-muted-foreground">
+                      <label className="text-[12px] text-muted-foreground">
                         ciclo · {(antiDup.motionPeriod ?? 7).toFixed(1)}s
                         <input
                           type="range"
@@ -3213,7 +3231,7 @@ function Home() {
                           ["sway", "balanço"],
                         ] as const
                       ).map(([key, label]) => (
-                        <label key={key} className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                        <label key={key} className="flex items-center gap-2 text-[12px] text-muted-foreground">
                           <input
                             type="checkbox"
                             checked={antiDup[key] ?? false}
@@ -3225,7 +3243,7 @@ function Home() {
                       ))}
                     </div>
                   </div>
-                  <label className="mt-2 flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                  <label className="mt-2 flex items-center gap-2 text-[12px] text-muted-foreground">
                     <input
                       type="checkbox"
                       checked={antiDup.cleanMetadata}
@@ -3235,7 +3253,7 @@ function Home() {
                     limpar metadados do MP4 (datas e identificadores)
                   </label>
                   {selected && (
-                    <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                    <p className="mt-1 text-[12px] text-muted-foreground">
                       este vídeo: {describeVariation(variationOf(selected))} · impressão{" "}
                       {variationFingerprint(variationOf(selected))}
                     </p>
@@ -3249,7 +3267,7 @@ function Home() {
               <div className="mb-3 flex items-center justify-between">
                 <p className="font-semibold">Vídeos ({items.length})</p>
                 <button
-                  className="font-mono text-xs text-destructive"
+                  className="text-xs text-destructive"
                   onClick={() => {
                     setItems([]);
                     setSelectedId(null);
@@ -3264,7 +3282,7 @@ function Home() {
                   <p className="mono-label">Nome dos arquivos</p>
                   <div className="flex flex-wrap items-center gap-2">
                     <input
-                      className="min-w-0 flex-1 rounded-lg border border-input bg-background px-2.5 py-1.5 font-mono text-xs"
+                      className="min-w-0 flex-1 rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs"
                       value={namePattern}
                       onChange={(e) => setNamePattern(e.target.value)}
                       placeholder="{nome}-{indice}"
@@ -3279,7 +3297,7 @@ function Home() {
                       limpar
                     </button>
                   </div>
-                  <p className="font-mono text-[10px] text-muted-foreground">
+                  <p className="text-[11px] text-muted-foreground">
                     tokens: {"{nome}"} {"{indice}"} {"{data}"} {"{template}"} · exemplo:{" "}
                     {items[0]
                       ? expandPattern(namePattern, {
@@ -3309,7 +3327,7 @@ function Home() {
                     value={headlineBank}
                     onChange={(e) => setHeadlineBank(e.target.value)}
                   />
-                  <label className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                  <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
                     <input
                       type="checkbox"
                       checked={headlineAuto}
@@ -3318,7 +3336,7 @@ function Home() {
                     />
                     variar automaticamente (caixa, posição e tamanho)
                   </label>
-                  <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                     <span>editar:</span>
                     <button
                       className="btn-ghost h-6 px-2 text-[10px]"
@@ -3347,7 +3365,7 @@ function Home() {
                       const editing = headlineEdit.has(it.id) || Boolean(it.headline?.trim());
                       return (
                         <div key={it.id} className="space-y-1">
-                          <label className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
+                          <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
                             <input
                               type="checkbox"
                               checked={editing}
@@ -3384,7 +3402,7 @@ function Home() {
                               }
                             />
                           )}
-                          <p className="truncate font-mono text-[10px] text-muted-foreground">
+                          <p className="truncate text-[11px] text-muted-foreground">
                             {h.text || "usa o texto do template"} · {h.label}
                           </p>
                         </div>
@@ -3412,12 +3430,12 @@ function Home() {
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm">
-                        <span className="font-mono text-xs text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                           {String(i + 1).padStart(2, "0")}
                         </span>{" "}
                         {it.file.name}
                       </p>
-                      <p className="font-mono text-[11px] text-muted-foreground">
+                      <p className="text-[12px] text-muted-foreground">
                         {it.w && it.h ? `${it.w}×${it.h}` : "…"} ·{" "}
                         {it.clip
                           ? `${Math.max(0, it.clip.end - it.clip.start).toFixed(0)}s`
@@ -3431,7 +3449,7 @@ function Home() {
                         {mode === "lote" && it.headline?.trim() ? " · headline própria" : ""}
                       </p>
                       <p
-                        className={`font-mono text-[11px] ${
+                        className={`text-[12px] ${
                           it.status === "pronto"
                             ? "text-primary"
                             : it.status === "erro"
@@ -3447,7 +3465,7 @@ function Home() {
                       </p>
                       {mode === "limpar" && it.detectStatus && (
                         <p
-                          className={`font-mono text-[10px] ${
+                          className={`text-[11px] ${
                             it.detectStatus === "ok"
                               ? "text-primary"
                               : it.detectStatus === "erro"
@@ -3498,7 +3516,7 @@ function Home() {
                       >
                         <Download className="size-3.5" />
                         {(it.outputs?.length ?? 1) > 1 && (
-                          <span className="absolute -right-1 -top-1 rounded-full bg-primary px-1 font-mono text-[9px] text-primary-foreground">
+                          <span className="absolute -right-1 -top-1 rounded-full bg-primary px-1 text-[11px] text-primary-foreground">
                             {it.outputs!.length}
                           </span>
                         )}
@@ -3559,7 +3577,7 @@ function Home() {
           </div>
         )}
 
-        <footer className="py-8 text-center font-mono text-xs text-muted-foreground">
+        <footer className="py-8 text-center text-xs text-muted-foreground">
           lote comum roda no navegador; CleanerIA, links e Agenda usam VPS/nuvem quando acionados.{" "}
           <a href="/privacidade" className="hover:text-foreground">privacidade</a> ·{" "}
           <a href="/termos" className="hover:text-foreground">termos</a> ·{" "}
