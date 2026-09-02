@@ -10,8 +10,21 @@ import { renderAudioTrack } from "@/lib/audio-track";
 import { cleanMp4Metadata } from "@/lib/mp4meta";
 import { bgSleep } from "@/lib/keepalive";
 import {
+  composeTransitions,
+  cropRect,
+  keptSegments,
+  preEditFilter,
+  segmentTransitionAt,
+  segmentsDuration,
+  srcTimeAt,
+  transitionAt,
+  type PreEdit,
+  type TransitionState,
+} from "@/lib/preedit";
+import {
   ASPECT_SIZES,
   NEUTRAL_FILTER,
+  type AnimationSpec,
   type FilterValues,
   type TemplateDoc,
   type TemplateLayer,
@@ -26,10 +39,13 @@ export interface TemplateRenderOptions {
   doc: TemplateDoc;
   file: File;
   cut?: TemplateRenderCut | null;
+  /** pré-edição: trechos, keyframes de enquadramento, transições e cor */
+  preedit?: PreEdit | null;
   fps?: number;
   onProgress?: (p: number) => void;
   signal?: AbortSignal | undefined;
 }
+
 
 export function templateRenderSupported(): boolean {
   return (
