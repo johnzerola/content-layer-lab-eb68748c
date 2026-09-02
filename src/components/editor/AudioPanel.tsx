@@ -1,13 +1,13 @@
 /** Mixagem: música de fundo, áudio original, gravação e narração por IA. */
 import { useRef, useState } from "react";
-import { Mic, Music, Sparkles, Square, Trash2, Upload } from "lucide-react";
+import { Mic, Sparkles, Square, Trash2, Upload } from "lucide-react";
 import {
-  STOCK_MUSIC,
   createAudioClip,
   defaultEditorAudio,
   type AudioClip,
   type EditorAudio,
 } from "@/lib/editor/audio";
+
 import { NARRATION_VOICES, generateNarration } from "@/lib/tts.functions";
 import { SoundLibrary } from "@/components/editor/SoundLibrary";
 
