@@ -26,6 +26,8 @@ export type ProfileStats = {
   nextScheduledKind: string | null;
   lastError: string | null;
   byKind: { kind: string; count: number }[];
+  /** próximos horários de postagem já agendados */
+  upcomingSlots: { at: string; kind: string; status: string }[];
 };
 
 type PostRow = {
@@ -116,6 +118,11 @@ export const getSocialProfiles = createServerFn({ method: "GET" })
         nextScheduledAt: upcoming[0]?.scheduled_at ?? null,
         nextScheduledKind: upcoming[0]?.kind ?? null,
         lastError: lastFailed?.error ?? null,
+        upcomingSlots: upcoming.slice(0, 5).map((p) => ({
+          at: p.scheduled_at,
+          kind: p.kind,
+          status: p.status,
+        })),
         byKind: [...kinds.entries()]
           .map(([kind, count]) => ({ kind, count }))
           .sort((x, y) => y.count - x.count),
