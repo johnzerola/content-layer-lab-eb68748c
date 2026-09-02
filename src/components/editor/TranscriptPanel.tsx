@@ -158,6 +158,17 @@ export function TranscriptPanel({
         </div>
       </div>
 
+      {onRefine && doc.words.length > 0 && (
+        <button
+          type="button"
+          onClick={onRefine}
+          disabled={generating}
+          className="rounded-lg border border-primary/50 px-2 py-1.5 text-xs font-medium text-primary disabled:opacity-45"
+        >
+          {generating ? generateProgress || "Revisando…" : "Traduzir para português e pontuar"}
+        </button>
+      )}
+
       <div className="flex items-center gap-1.5">
         <input
           value={search}
