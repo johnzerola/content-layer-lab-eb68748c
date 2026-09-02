@@ -1,11 +1,13 @@
 /**
- * Aba ESTILOS: categorias de estilo, paletas de cor e tipografia, aplicadas
- * na legenda/identidade do projeto. Só apresentação — reaproveita os presets
- * de legenda que já existem em `caption-styles`.
+ * Aba ESTILOS: galeria de templates de estilo completo (cores + tipografia +
+ * animação + transição), paletas e tipografia. Só apresentação — reaproveita
+ * os presets de legenda e de transição que já existem.
  */
 import { useState } from "react";
 import { CaptionStylePanel } from "@/components/editor/CaptionStylePanel";
-import type { CaptionPreset } from "@/lib/editor/caption-styles";
+import { CAPTION_PRESETS, type CaptionPreset } from "@/lib/editor/caption-styles";
+import { STYLE_TEMPLATES, type StyleTemplate } from "@/lib/editor/style-templates";
+import type { TransitionKind } from "@/lib/preedit";
 import type { CaptionLayerStyle } from "@/lib/video-template/types";
 
 export interface StylePalette {
@@ -14,6 +16,7 @@ export interface StylePalette {
   /** [texto, destaque, fundo] */
   colors: [string, string, string];
 }
+
 
 export const STYLE_PALETTES: StylePalette[] = [
   { id: "viral", label: "Viral", colors: ["#ffffff", "#7c5cff", "#0b0b12"] },
