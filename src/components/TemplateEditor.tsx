@@ -1017,15 +1017,21 @@ export function TemplateEditor({
           </div>
         </div>
 
-        <footer className="flex justify-end gap-2 border-t border-border p-4">
-          <Button variant="ghost" onClick={onCancel}>
-            Cancelar
-          </Button>
-          <Button variant="outline" onClick={() => onUse(t)}>
-            Usar sem salvar
-          </Button>
-          <Button onClick={() => onSave(t)}>Salvar e usar</Button>
+        <footer className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t border-border bg-surface-2/40 px-5 py-3">
+          <p className="mono-label truncate text-muted-foreground">
+            alterações aplicadas no preview · nada é salvo até confirmar
+          </p>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <Button variant="ghost" onClick={onCancel}>
+              Cancelar
+            </Button>
+            <Button variant="outline" onClick={() => onUse(t)}>
+              Usar sem salvar
+            </Button>
+            <Button onClick={() => onSave(t)}>Salvar e usar</Button>
+          </div>
         </footer>
+
       </div>
     </div>
   );
