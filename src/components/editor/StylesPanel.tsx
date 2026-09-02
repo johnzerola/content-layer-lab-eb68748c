@@ -1,11 +1,13 @@
 /**
- * Aba ESTILOS: categorias de estilo, paletas de cor e tipografia, aplicadas
- * na legenda/identidade do projeto. Só apresentação — reaproveita os presets
- * de legenda que já existem em `caption-styles`.
+ * Aba ESTILOS: galeria de templates de estilo completo (cores + tipografia +
+ * animação + transição), paletas e tipografia. Só apresentação — reaproveita
+ * os presets de legenda e de transição que já existem.
  */
 import { useState } from "react";
 import { CaptionStylePanel } from "@/components/editor/CaptionStylePanel";
-import type { CaptionPreset } from "@/lib/editor/caption-styles";
+import { CAPTION_PRESETS, type CaptionPreset } from "@/lib/editor/caption-styles";
+import { STYLE_TEMPLATES, type StyleTemplate } from "@/lib/editor/style-templates";
+import type { TransitionKind } from "@/lib/preedit";
 import type { CaptionLayerStyle } from "@/lib/video-template/types";
 
 export interface StylePalette {
@@ -14,6 +16,7 @@ export interface StylePalette {
   /** [texto, destaque, fundo] */
   colors: [string, string, string];
 }
+
 
 export const STYLE_PALETTES: StylePalette[] = [
   { id: "viral", label: "Viral", colors: ["#ffffff", "#7c5cff", "#0b0b12"] },
@@ -40,15 +43,35 @@ interface Props {
   style: CaptionLayerStyle;
   onApplyPreset: (preset: CaptionPreset) => void;
   onStyleChange: (patch: Partial<CaptionLayerStyle>) => void;
+  /** aplica também a transição do template completo */
+  onApplyTransition?: ((kind: TransitionKind) => void) | undefined;
 }
 
-export function StylesPanel({ presetId, style, onApplyPreset, onStyleChange }: Props) {
-  const [section, setSection] = useState<"estilos" | "cores" | "tipografia">("estilos");
+export function StylesPanel({ presetId, style, onApplyPreset, onStyleChange, onApplyTransition }: Props) {
+  const [section, setSection] = useState<"templates" | "estilos" | "cores" | "tipografia">("templates");
+  const [appliedId, setAppliedId] = useState<string | null>(null);
+
+  /** Um clique configura cores, tipografia, animação da legenda e transição. */
+  const applyTemplate = (t: StyleTemplate) => {
+    const base = CAPTION_PRESETS.find((p) => p.id === t.presetId) ?? CAPTION_PRESETS[0]!;
+    const patch: Partial<CaptionLayerStyle> = {
+      color: t.colors[0],
+      highlightColor: t.colors[1],
+      strokeColor: t.colors[2],
+      fontFamily: t.fontFamily,
+      fontWeight: t.fontWeight,
+      uppercase: t.uppercase,
+    };
+    onApplyPreset({ ...base, style: { ...base.style, ...patch }, animation: t.animation });
+    onStyleChange(patch);
+    onApplyTransition?.(t.transition);
+    setAppliedId(t.id);
+  };
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-hidden">
-      <div className="flex rounded-lg border border-border/60 p-0.5 text-xs">
-        {(["estilos", "cores", "tipografia"] as const).map((s) => (
+      <div className="flex rounded-lg border border-border/60 p-0.5 text-[11px]">
+        {(["templates", "estilos", "cores", "tipografia"] as const).map((s) => (
           <button
             key={s}
             type="button"
@@ -60,6 +83,50 @@ export function StylesPanel({ presetId, style, onApplyPreset, onStyleChange }: P
         ))}
       </div>
 
+      {section === "templates" && (
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+          <p className="text-[11px] text-muted-foreground">
+            Cada template aplica cores, tipografia, animação da legenda e transição do corte de uma vez.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {STYLE_TEMPLATES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => applyTemplate(t)}
+                className={`overflow-hidden rounded-xl border text-left ${
+                  appliedId === t.id ? "border-primary" : "border-border/50 hover:border-primary/60"
+                }`}
+              >
+                <span
+                  className={`flex h-16 items-center justify-center bg-gradient-to-br ${t.gradient}`}
+                  style={{ background: t.colors[2] }}
+                >
+                  <span
+                    className="px-1 text-center text-[13px] leading-tight"
+                    style={{
+                      fontFamily: t.fontFamily,
+                      fontWeight: t.fontWeight,
+                      color: t.colors[0],
+                      textTransform: t.uppercase ? "uppercase" : "none",
+                    }}
+                  >
+                    seu <span style={{ color: t.colors[1] }}>corte</span>
+                  </span>
+                </span>
+                <span className="block px-2 py-1.5">
+                  <span className="block text-xs font-medium">{t.label}</span>
+                  <span className="block truncate text-[10px] text-muted-foreground">{t.hint}</span>
+                  <span className="mt-1 block font-mono text-[9px] uppercase text-muted-foreground">
+                    {t.animation} · {t.transition}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {section === "estilos" && (
         <div className="min-h-0 flex-1">
           <CaptionStylePanel
@@ -70,6 +137,7 @@ export function StylesPanel({ presetId, style, onApplyPreset, onStyleChange }: P
           />
         </div>
       )}
+
 
       {section === "cores" && (
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">

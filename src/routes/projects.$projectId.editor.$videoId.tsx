@@ -562,6 +562,12 @@ function EditorPage() {
                     style: { ...captionLayer.style, ...patch },
                   } as Partial<TemplateLayer>);
                 }}
+                onApplyTransition={(kind) =>
+                  patchPre(
+                    { transIn: { ...pre.transIn, kind }, transOut: { ...pre.transOut, kind } },
+                    "template-estilo",
+                  )
+                }
               />
             )}
           </div>
