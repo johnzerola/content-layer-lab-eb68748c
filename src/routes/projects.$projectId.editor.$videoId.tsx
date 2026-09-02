@@ -9,6 +9,7 @@ import {
   Palette,
   Scissors,
   Diamond,
+  Gauge,
   Shuffle,
   Sliders,
   Sparkles,
@@ -20,6 +21,7 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { TranscriptPanel } from "@/components/editor/TranscriptPanel";
 import { StylesPanel } from "@/components/editor/StylesPanel";
 import { KeyframePanel } from "@/components/editor/KeyframePanel";
+import { RenderReport } from "@/components/editor/RenderReport";
 import { READY_TEMPLATES } from "@/lib/editor/template-presets";
 import { loadAnimIdentity } from "@/lib/editor/animation-library";
 import {
@@ -104,6 +106,7 @@ type ToolId =
   | "audio"
   | "titulos"
   | "templates"
+  | "render"
   | "brand"
   | "camada";
 
@@ -115,6 +118,7 @@ const TOOL_GROUPS: { title: string; tools: { id: ToolId; label: string; icon: ty
       { id: "enquadrar", label: "Enquadrar", icon: Crop },
       { id: "transicoes", label: "Transições", icon: Shuffle },
       { id: "keyframes", label: "Keyframes", icon: Diamond },
+      { id: "render", label: "Render real", icon: Gauge },
     ],
   },
   {
@@ -917,6 +921,9 @@ function EditorPage() {
                 currentTime={currentTime}
                 onSeek={seek}
               />
+            )}
+            {tool === "render" && (
+              <RenderReport preedit={pre} duration={duration} currentTime={currentTime} onSeek={seek} />
             )}
             {tool === "layout" && <LayoutPanel preedit={pre} onChange={patchPre} />}
             {tool === "ajustes" && <GradePanel preedit={pre} onChange={patchPre} />}

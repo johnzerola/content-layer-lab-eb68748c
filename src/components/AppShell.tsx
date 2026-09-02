@@ -137,6 +137,7 @@ const MODES: ModeDef[] = [
 const ROUTE_PATHS = [
   "/templates",
   "/estilos",
+  "/comparar",
   "/editor",
   "/projects",
   "/projetos",
@@ -369,6 +370,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
         />
         {routeLink("/templates", "Templates de vídeo", Layers, expanded, close)}
         {routeLink("/estilos", "Estilos reutilizáveis", Palette, expanded, close)}
+        {routeLink("/comparar", "Comparar layouts", Layers, expanded, close)}
 
         {routeLink("/editor", "Editor profissional", Wand2, expanded, close)}
         {routeLink("/projetos", "Projetos", FolderKanban, expanded, close)}
