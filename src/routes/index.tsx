@@ -29,6 +29,7 @@ import {
   CopyPlus,
 } from "lucide-react";
 import { QuickPreviewModal } from "@/components/QuickPreviewModal";
+import { CaptionWorkbench } from "@/components/CaptionWorkbench";
 import { PLATFORM_UI_OPTIONS, type PlatformUI } from "@/components/PlatformUIOverlay";
 import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
 
@@ -508,6 +509,7 @@ function Home() {
   const [capBusyId, setCapBusyId] = useState<string | null>(null);
   // transcreve automaticamente no lote quando a legenda está ativa
   const [autoCap, setAutoCap] = useState(true);
+  const [capEditor, setCapEditor] = useState<string | null>(null);
   const [detecting, setDetecting] = useState(false);
   const [detectMsg, setDetectMsg] = useState<string | undefined>(undefined);
   const [suggestions, setSuggestions] = useState<CleanupRegion[]>([]);
@@ -3645,6 +3647,26 @@ function Home() {
               toast.success("Edição aplicada — vale no preview e na exportação");
             }
           }}
+        />
+      )}
+
+      {capEditorItem?.captions?.length && (
+        <CaptionWorkbench
+          file={capEditorItem.file}
+          cues={capEditorItem.captions}
+          style={active.captions ?? defaultCaptions()}
+          fonts={active.fonts}
+          onAddFont={(f) => setActive((t) => ({ ...t, fonts: [...(t.fonts ?? []), f] }))}
+          onCues={(cues) =>
+            setItems((p) => p.map((x) => (x.id === capEditorItem.id ? { ...x, captions: cues } : x)))
+          }
+          onStyle={(patch) =>
+            setActive((t) => ({
+              ...t,
+              captions: { ...(t.captions ?? defaultCaptions()), ...patch, visible: true },
+            }))
+          }
+          onClose={() => setCapEditor(null)}
         />
       )}
 
