@@ -402,11 +402,37 @@ function EditorPage() {
           </select>
           <button
             type="button"
+            onClick={() => void renderAndPublish(false)}
+            disabled={rendering}
+            className="rounded-lg border border-border/60 px-3 py-1.5 text-sm disabled:opacity-50"
+          >
+            {rendering ? `Renderizando ${Math.round(renderPct * 100)}%` : "Renderizar"}
+          </button>
+          {rendered && (
+            <a
+              href={URL.createObjectURL(rendered)}
+              download={rendered.name}
+              className="rounded-lg border border-border/60 px-3 py-1.5 text-sm"
+            >
+              Baixar MP4
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={() => void renderAndPublish(true)}
+            disabled={rendering}
+            className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          >
+            Renderizar e publicar
+          </button>
+          <button
+            type="button"
             onClick={() => setBatchOpen(true)}
-            className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground"
+            className="rounded-lg border border-primary/50 px-3 py-1.5 text-sm font-medium text-primary"
           >
             Aplicar em lote
           </button>
+
         </div>
       </header>
 
