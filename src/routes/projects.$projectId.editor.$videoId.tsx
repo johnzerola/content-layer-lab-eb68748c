@@ -477,24 +477,107 @@ function EditorPage() {
           </div>
         </main>
 
-        {/* PAINEL DIREITO */}
+        {/* PAINEL CONTEXTUAL */}
         <aside className="hidden min-h-0 flex-col border-l border-border/60 p-3 lg:flex">
-          <div className="mb-2 flex flex-wrap gap-1 text-xs">
-            {(["templates", "texto", "formas", "ia", "filtros"] as RightTab[]).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setRightTab(t)}
-                className={`rounded-full border px-2.5 py-1 capitalize ${
-                  rightTab === t ? "border-primary bg-primary/20" : "border-border/60"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {rightTab === "templates" && (
+          <p className="mb-2 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
+            {TOOL_GROUPS.flatMap((g) => g.tools).find((t) => t.id === tool)?.label}
+          </p>
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+            {tool === "corte" && (
+              <CutPanel
+                preedit={pre}
+                onChange={patchPre}
+                duration={duration}
+                currentTime={currentTime}
+                onSeek={seek}
+                silenceCount={silences.length}
+                onCutSilences={() => {
+                  const kept: { start: number; end: number }[] = [];
+                  let cursor = 0;
+                  for (const s of silences) {
+                    if (s.start > cursor) kept.push({ start: cursor, end: s.start });
+                    cursor = Math.max(cursor, s.end);
+                  }
+                  if (cursor < duration) kept.push({ start: cursor, end: duration });
+                  patchPre({ segments: kept }, "cortar-pausas");
+                }}
+              />
+            )}
+            {tool === "enquadrar" && (
+              <FramePanel
+                preedit={pre}
+                onChange={patchPre}
+                srcW={doc.media.width ?? 1920}
+                srcH={doc.media.height ?? 1080}
+              />
+            )}
+            {tool === "transicoes" && (
+              <div className="space-y-4">
+                <TransitionPicker
+                  value={pre.transIn}
+                  onChange={(t) => patchPre({ transIn: t }, "transicao-entrada")}
+                  label="Entrada"
+                  onPreview={() => seek(Math.max(0, (pre.segments[0]?.start ?? 0)))}
+                />
+                <TransitionPicker
+                  value={pre.transOut}
+                  onChange={(t) => patchPre({ transOut: t }, "transicao-saida")}
+                  label="Saída"
+                  onPreview={() => seek(Math.max(0, duration - (pre.transOut.dur || 0.5)))}
+                />
+              </div>
+            )}
+            {tool === "layout" && <LayoutPanel preedit={pre} onChange={patchPre} />}
+            {tool === "ajustes" && <GradePanel preedit={pre} onChange={patchPre} />}
+            {tool === "animacao" &&
+              (selectedLayer ? (
+                <AnimationPanel
+                  layer={selectedLayer}
+                  onUpdate={(patch) => updateLayer(selectedLayer.id, patch)}
+                  onPreview={() => setPlaying(true)}
+                />
+              ) : (
+                <p className="text-xs text-muted-foreground">Selecione uma camada no palco ou na timeline para animar.</p>
+              ))}
+            {tool === "camada" && (
+              <PropertiesPanel
+                layer={selectedLayer}
+                onUpdate={(patch) => selectedLayer && updateLayer(selectedLayer.id, patch)}
+              />
+            )}
+            {tool === "brand" && <BrandKitPanel doc={doc.composition} onUpdateLayer={updateLayer} />}
+            {tool === "legendas" && (
+              <CaptionStylePanel
+                presetId={doc.captionPresetId}
+                style={captionLayer?.style ?? captionPreset.style}
+                onApplyPreset={(preset) => {
+                  patchDoc({ captionPresetId: preset.id }, "preset-legenda");
+                  if (captionLayer)
+                    updateLayer(captionLayer.id, { presetId: preset.id, style: preset.style } as Partial<TemplateLayer>);
+                }}
+                onStyleChange={(patch) => {
+                  if (!captionLayer) return;
+                  updateLayer(captionLayer.id, { style: { ...captionLayer.style, ...patch } } as Partial<TemplateLayer>);
+                }}
+              />
+            )}
+            {tool === "mixagem" && (
+              <AudioPanel
+                audio={doc.audio ?? defaultEditorAudio()}
+                onChange={(next, label) => patchDoc({ audio: next }, label ?? "audio")}
+                scriptText={scriptText}
+                currentTime={currentTime}
+              />
+            )}
+            {tool === "titulos" && (
+              <TitlesPanel
+                title={doc.title}
+                hook={doc.hook}
+                cta={doc.cta}
+                onChange={(patch, label) => patchDoc(patch, label ?? "textos")}
+              />
+            )}
+            {tool === "templates" && (
               <div className="space-y-2">
                 {!templates.length && (
                   <p className="text-xs text-muted-foreground">
@@ -530,14 +613,9 @@ function EditorPage() {
                 ))}
               </div>
             )}
-            {rightTab !== "templates" && (
-              <p className="text-xs text-muted-foreground">
-                Painel “{rightTab}” chega nas próximas fases do editor. As camadas já criadas continuam editáveis pelo
-                canvas e pela timeline.
-              </p>
-            )}
           </div>
         </aside>
+
       </div>
 
       {/* TIMELINE */}
