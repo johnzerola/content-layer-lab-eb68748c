@@ -1,17 +1,39 @@
 /** Editor profissional de vídeos verticais do VaiViral. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  Crop,
+  Frame,
+  Layers,
+  Music4,
+  Palette,
+  Scissors,
+  Shuffle,
+  Sliders,
+  Sparkles,
+  Stamp,
+  Type,
+  Wand2,
+} from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { TranscriptPanel } from "@/components/editor/TranscriptPanel";
 import { CaptionStylePanel } from "@/components/editor/CaptionStylePanel";
 import { TimelinePro } from "@/components/editor/TimelinePro";
 import { BatchApplyModal } from "@/components/editor/BatchApplyModal";
+import { TransitionPicker } from "@/components/editor/TransitionPicker";
+import { AudioPanel } from "@/components/editor/AudioPanel";
+import { CutPanel, FramePanel, GradePanel, LayoutPanel, TitlesPanel } from "@/components/editor/ToolPanels";
 import { EditorCanvas } from "@/components/vtemplate/EditorCanvas";
+import { AnimationPanel } from "@/components/vtemplate/AnimationPanel";
+import { BrandKitPanel } from "@/components/vtemplate/BrandKitPanel";
+import { PropertiesPanel } from "@/components/vtemplate/PropertiesPanel";
 import { useEditorHistory } from "@/components/editor/useEditorHistory";
 import { openProjectForVideo, saveEditorProject } from "@/lib/editor/project.service";
 import { previewUrl, type EditorProjectDoc } from "@/lib/editor/project";
+import { defaultEditorAudio } from "@/lib/editor/audio";
+import { defaultPreEdit, type PreEdit } from "@/lib/preedit";
 import { ensureTranscript, saveTranscript } from "@/lib/editor/transcript.service";
-import { emptyTranscript, removedRanges, type TranscriptDoc } from "@/lib/editor/transcript";
+import { emptyTranscript, removedRanges, silenceRanges, type TranscriptDoc } from "@/lib/editor/transcript";
 import { findCaptionPreset } from "@/lib/editor/caption-styles";
 import { listMyTemplates } from "@/lib/video-template/service";
 import { applyTemplateToVideo } from "@/lib/video-template/bindings";
@@ -45,7 +67,49 @@ export const Route = createFileRoute("/projects/$projectId/editor/$videoId")({
   ),
 });
 
-type RightTab = "templates" | "texto" | "formas" | "ia" | "filtros";
+type ToolId =
+  | "corte"
+  | "enquadrar"
+  | "transicoes"
+  | "layout"
+  | "ajustes"
+  | "animacao"
+  | "legendas"
+  | "mixagem"
+  | "titulos"
+  | "templates"
+  | "brand"
+  | "camada";
+
+const TOOL_GROUPS: { title: string; tools: { id: ToolId; label: string; icon: typeof Crop }[] }[] = [
+  {
+    title: "Ferramentas",
+    tools: [
+      { id: "corte", label: "Corte", icon: Scissors },
+      { id: "enquadrar", label: "Enquadrar", icon: Crop },
+      { id: "transicoes", label: "Transições", icon: Shuffle },
+    ],
+  },
+  {
+    title: "Design",
+    tools: [
+      { id: "layout", label: "Layout", icon: Frame },
+      { id: "ajustes", label: "Ajustes", icon: Sliders },
+      { id: "animacao", label: "Animação", icon: Wand2 },
+      { id: "templates", label: "Templates", icon: Layers },
+      { id: "brand", label: "Brand Kit", icon: Stamp },
+    ],
+  },
+  {
+    title: "Áudio & Texto",
+    tools: [
+      { id: "legendas", label: "Legendas", icon: Palette },
+      { id: "mixagem", label: "Mixagem", icon: Music4 },
+      { id: "titulos", label: "Títulos", icon: Type },
+      { id: "camada", label: "Camada", icon: Sparkles },
+    ],
+  },
+];
 
 function EditorPage() {
   const { projectId, videoId } = Route.useParams();
@@ -53,7 +117,7 @@ function EditorPage() {
   const [transcript, setTranscript] = useState<TranscriptDoc>(emptyTranscript(videoId));
   const [templates, setTemplates] = useState<VideoTemplateRecord[]>([]);
   const [leftTab, setLeftTab] = useState<"texto" | "estilos">("texto");
-  const [rightTab, setRightTab] = useState<RightTab>("templates");
+  const [tool, setTool] = useState<ToolId>("corte");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -121,6 +185,7 @@ function EditorPage() {
   }, [transcript, recordId]);
 
   const cuts = useMemo(() => (cutOnRemove ? removedRanges(transcript) : []), [transcript, cutOnRemove]);
+  const silences = useMemo(() => silenceRanges(transcript, 0.6), [transcript]);
 
   const patchDoc = useCallback(
     (patch: Partial<EditorProjectDoc>, label = "editar") => {
@@ -128,6 +193,15 @@ function EditorPage() {
     },
     [history],
   );
+
+  /** Pré-edição (corte, enquadramento, cor, layout) — mesma estrutura do estúdio. */
+  const patchPre = useCallback(
+    (patch: Partial<PreEdit>, label = "preedit") => {
+      history.set((d) => (d ? { ...d, preedit: { ...(d.preedit ?? defaultPreEdit()), ...patch } } : d), label);
+    },
+    [history],
+  );
+
 
   const updateLayer = useCallback(
     (id: string, patch: Partial<TemplateLayer>) => {
@@ -237,6 +311,12 @@ function EditorPage() {
   const captionPreset = findCaptionPreset(doc.captionPresetId);
   const src = previewUrl(doc);
   const duration = doc.media.duration || transcript.duration;
+  const pre = doc.preedit ?? defaultPreEdit();
+  const selectedLayer = doc.composition.layers.find((l) => l.id === selectedId) ?? null;
+  const scriptText = transcript.words
+    .filter((w) => !w.removed)
+    .map((w) => w.word)
+    .join(" ");
 
   return (
     <div className="flex h-dvh flex-col bg-background text-foreground">
@@ -287,7 +367,36 @@ function EditorPage() {
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[340px_1fr_300px]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[76px_320px_1fr_330px]">
+        {/* BARRA DE FERRAMENTAS */}
+        <nav aria-label="Ferramentas do editor" className="hidden min-h-0 flex-col gap-3 overflow-y-auto border-r border-border/60 py-3 lg:flex">
+          {TOOL_GROUPS.map((group) => (
+            <div key={group.title} className="space-y-1">
+              <p className="px-1 text-center font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
+                {group.title}
+              </p>
+              {group.tools.map((t) => {
+                const Icon = t.icon;
+                const active = tool === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setTool(t.id)}
+                    aria-pressed={active}
+                    className={`mx-auto flex w-16 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] transition-colors ${
+                      active ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-card/70 hover:text-foreground"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+
         {/* PAINEL ESQUERDO */}
         <aside className="hidden min-h-0 flex-col border-r border-border/60 p-3 lg:flex">
           <div className="mb-3 flex rounded-lg border border-border/60 p-0.5 text-sm">
@@ -368,24 +477,107 @@ function EditorPage() {
           </div>
         </main>
 
-        {/* PAINEL DIREITO */}
+        {/* PAINEL CONTEXTUAL */}
         <aside className="hidden min-h-0 flex-col border-l border-border/60 p-3 lg:flex">
-          <div className="mb-2 flex flex-wrap gap-1 text-xs">
-            {(["templates", "texto", "formas", "ia", "filtros"] as RightTab[]).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setRightTab(t)}
-                className={`rounded-full border px-2.5 py-1 capitalize ${
-                  rightTab === t ? "border-primary bg-primary/20" : "border-border/60"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {rightTab === "templates" && (
+          <p className="mb-2 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
+            {TOOL_GROUPS.flatMap((g) => g.tools).find((t) => t.id === tool)?.label}
+          </p>
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+            {tool === "corte" && (
+              <CutPanel
+                preedit={pre}
+                onChange={patchPre}
+                duration={duration}
+                currentTime={currentTime}
+                onSeek={seek}
+                silenceCount={silences.length}
+                onCutSilences={() => {
+                  const kept: { start: number; end: number }[] = [];
+                  let cursor = 0;
+                  for (const s of silences) {
+                    if (s.start > cursor) kept.push({ start: cursor, end: s.start });
+                    cursor = Math.max(cursor, s.end);
+                  }
+                  if (cursor < duration) kept.push({ start: cursor, end: duration });
+                  patchPre({ segments: kept }, "cortar-pausas");
+                }}
+              />
+            )}
+            {tool === "enquadrar" && (
+              <FramePanel
+                preedit={pre}
+                onChange={patchPre}
+                srcW={doc.media.width ?? 1920}
+                srcH={doc.media.height ?? 1080}
+              />
+            )}
+            {tool === "transicoes" && (
+              <div className="space-y-4">
+                <TransitionPicker
+                  value={pre.transIn}
+                  onChange={(t) => patchPre({ transIn: t }, "transicao-entrada")}
+                  label="Entrada"
+                  onPreview={() => seek(Math.max(0, (pre.segments[0]?.start ?? 0)))}
+                />
+                <TransitionPicker
+                  value={pre.transOut}
+                  onChange={(t) => patchPre({ transOut: t }, "transicao-saida")}
+                  label="Saída"
+                  onPreview={() => seek(Math.max(0, duration - (pre.transOut.dur || 0.5)))}
+                />
+              </div>
+            )}
+            {tool === "layout" && <LayoutPanel preedit={pre} onChange={patchPre} />}
+            {tool === "ajustes" && <GradePanel preedit={pre} onChange={patchPre} />}
+            {tool === "animacao" &&
+              (selectedLayer ? (
+                <AnimationPanel
+                  layer={selectedLayer}
+                  onUpdate={(patch) => updateLayer(selectedLayer.id, patch)}
+                  onPreview={() => setPlaying(true)}
+                />
+              ) : (
+                <p className="text-xs text-muted-foreground">Selecione uma camada no palco ou na timeline para animar.</p>
+              ))}
+            {tool === "camada" && (
+              <PropertiesPanel
+                layer={selectedLayer}
+                onUpdate={(patch) => selectedLayer && updateLayer(selectedLayer.id, patch)}
+              />
+            )}
+            {tool === "brand" && <BrandKitPanel doc={doc.composition} onUpdateLayer={updateLayer} />}
+            {tool === "legendas" && (
+              <CaptionStylePanel
+                presetId={doc.captionPresetId}
+                style={captionLayer?.style ?? captionPreset.style}
+                onApplyPreset={(preset) => {
+                  patchDoc({ captionPresetId: preset.id }, "preset-legenda");
+                  if (captionLayer)
+                    updateLayer(captionLayer.id, { presetId: preset.id, style: preset.style } as Partial<TemplateLayer>);
+                }}
+                onStyleChange={(patch) => {
+                  if (!captionLayer) return;
+                  updateLayer(captionLayer.id, { style: { ...captionLayer.style, ...patch } } as Partial<TemplateLayer>);
+                }}
+              />
+            )}
+            {tool === "mixagem" && (
+              <AudioPanel
+                audio={doc.audio ?? defaultEditorAudio()}
+                onChange={(next, label) => patchDoc({ audio: next }, label ?? "audio")}
+                scriptText={scriptText}
+                currentTime={currentTime}
+              />
+            )}
+            {tool === "titulos" && (
+              <TitlesPanel
+                title={doc.title}
+                hook={doc.hook}
+                cta={doc.cta}
+                onChange={(patch, label) => patchDoc(patch, label ?? "textos")}
+              />
+            )}
+            {tool === "templates" && (
               <div className="space-y-2">
                 {!templates.length && (
                   <p className="text-xs text-muted-foreground">
@@ -421,18 +613,43 @@ function EditorPage() {
                 ))}
               </div>
             )}
-            {rightTab !== "templates" && (
-              <p className="text-xs text-muted-foreground">
-                Painel “{rightTab}” chega nas próximas fases do editor. As camadas já criadas continuam editáveis pelo
-                canvas e pela timeline.
-              </p>
-            )}
           </div>
         </aside>
+
       </div>
+
+      {/* TRILHA DE ÁUDIO */}
+      {!!(doc.audio?.tracks.length) && (
+        <div className="shrink-0 border-t border-border/60 px-3 py-2">
+          <div className="relative h-7 overflow-hidden rounded-lg bg-card/50">
+            {doc.audio.tracks.map((c) => {
+              const total = Math.max(1, duration);
+              const width = ((c.duration || Math.max(2, total - c.startTime)) / total) * 100;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    setTool("mixagem");
+                    seek(c.startTime);
+                  }}
+                  title={`${c.name} · ${c.kind}`}
+                  className={`absolute top-1 h-5 truncate rounded px-2 text-[10px] ${
+                    c.kind === "voice" ? "bg-cyan-500/30 text-cyan-100" : "bg-primary/30 text-primary-foreground"
+                  }`}
+                  style={{ left: `${(c.startTime / total) * 100}%`, width: `${Math.min(100, width)}%` }}
+                >
+                  {c.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* TIMELINE */}
       <div className="h-56 shrink-0">
+
         <TimelinePro
           duration={duration}
           currentTime={currentTime}
