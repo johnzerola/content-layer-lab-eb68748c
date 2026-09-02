@@ -372,6 +372,23 @@ function Home() {
     void currentUser().then(setUser);
     return onAuth(setUser);
   }, []);
+
+  // ao entrar, restaura os templates da própria conta (cada login tem o seu acervo)
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    void pullTemplates(loadTemplates())
+      .then((list) => {
+        if (!alive || !list.length) return;
+        saveTemplates(list);
+        setTemplates(list);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [user?.id]);
+
   const [editing, setEditing] = useState(false);
   const [studioId, setStudioId] = useState<string | null>(null);
   const [quickId, setQuickId] = useState<string | null>(null);
