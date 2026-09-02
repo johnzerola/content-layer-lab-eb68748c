@@ -20,6 +20,7 @@ export interface SavedStylePreset {
 
 const KEY = "vaiviral.stylepresets.v1";
 const PENDING = "vaiviral.stylepresets.pending";
+const PENDING_LAYOUT = "vaiviral.layout.pending";
 
 export function listStylePresets(): SavedStylePreset[] {
   if (typeof localStorage === "undefined") return [];
@@ -79,4 +80,21 @@ export function takePendingStyle(): SavedStylePreset | null {
   } catch {
     return null;
   }
+}
+
+/** Layout pronto (hook, fato x fake, lower third, CTA) escolhido em /estilos. */
+export function setPendingLayout(templateId: string) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(PENDING_LAYOUT, templateId);
+  } catch {
+    /* ignora */
+  }
+}
+
+export function takePendingLayout(): string | null {
+  if (typeof localStorage === "undefined") return null;
+  const id = localStorage.getItem(PENDING_LAYOUT);
+  if (id) localStorage.removeItem(PENDING_LAYOUT);
+  return id;
 }
