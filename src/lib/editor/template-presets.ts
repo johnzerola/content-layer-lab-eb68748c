@@ -4,7 +4,7 @@
  * que ele mesmo salvou. Só montam camadas — nenhuma regra de negócio nova.
  */
 import { createShapeLayer, createTextLayer } from "@/lib/video-template/factory";
-import type { TemplateLayer } from "@/lib/video-template/types";
+import type { AnimationSpec, TemplateLayer } from "@/lib/video-template/types";
 
 export interface ReadyTemplate {
   id: string;
@@ -15,7 +15,7 @@ export interface ReadyTemplate {
   build: (layers: TemplateLayer[], identity: { handle: string; name: string }) => TemplateLayer[];
 }
 
-const anim = (type: string, duration = 0.5, delay = 0) => ({ type, duration, delay, easing: "ease-out" as const });
+const anim = (type: string, duration = 0.5, delay = 0): AnimationSpec => ({ type, duration, delay, easing: "easeOut" });
 
 function text(layers: TemplateLayer[], patch: Partial<TemplateLayer> & { text: string }): TemplateLayer {
   return { ...createTextLayer(layers, patch.text), ...patch } as TemplateLayer;
