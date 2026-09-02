@@ -261,11 +261,11 @@ export function EditorCanvas({
   const ordered = [...doc.layers].sort((a, b) => a.zIndex - b.zIndex);
 
   return (
-    <div className="flex h-full w-full items-center justify-center overflow-auto p-4">
+    <div className={`flex h-full w-full items-center justify-center overflow-hidden ${bare ? "" : "overflow-auto p-4"}`}>
       <div
         ref={wrapRef}
         onPointerDown={() => onSelect(null)}
-        className="relative shadow-2xl"
+        className={`relative ${bare ? "" : "shadow-2xl"}`}
         style={{
           aspectRatio: `${doc.canvas.width}/${doc.canvas.height}`,
           height: `${Math.round(zoom * 100)}%`,
@@ -275,6 +275,7 @@ export function EditorCanvas({
           filter: filterToCss(doc.filter),
         }}
       >
+
         {ordered.map((layer) =>
           layer.visible ? (
             <div
