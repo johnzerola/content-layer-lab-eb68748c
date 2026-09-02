@@ -246,13 +246,13 @@ function LimparIAPage() {
 
 function GuardedLimparIAPage() {
   return (
-    <RequireAuth
-      title={"Entre para usar o CleanerIA"}
-      description={"Os jobs de limpeza ficam salvos na sua conta com histórico e link de download."}
-    >
-      <RouteShell>
+    <RouteShell>
+      <RequireAuth
+        title={"Entre para usar o CleanerIA"}
+        description={"Os jobs de limpeza ficam salvos na sua conta com histórico e link de download."}
+      >
         <LimparIAPage />
-      </RouteShell>
-    </RequireAuth>
+      </RequireAuth>
+    </RouteShell>
   );
 }

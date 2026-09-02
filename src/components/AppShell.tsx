@@ -153,6 +153,7 @@ const ROUTE_PATHS = [
   "/metricas",
   "/admin",
   "/fotos",
+  "/limpar-ia",
 ] as const;
 
 interface Props {

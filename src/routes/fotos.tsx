@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Images } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
-import { PlanGate } from "@/components/PlanGate";
 import { RouteShell } from "@/components/RouteShell";
 import { PhotoBatchStudio } from "@/components/photo/PhotoBatchStudio";
 
@@ -25,12 +24,11 @@ export const Route = createFileRoute("/fotos")({
 
 function FotosPage() {
   return (
-    <RequireAuth
-      title="Entre para usar o FotoViral"
-      description="Limpeza de metadados e anti-duplicidade de fotos em lote."
-    >
-      <RouteShell>
-        <PlanGate>
+    <RouteShell>
+      <RequireAuth
+        title="Entre para usar o FotoViral"
+        description="Limpeza de metadados e anti-duplicidade de fotos em lote."
+      >
         <main className="mx-auto w-full max-w-6xl px-4 py-8">
           <Link
             to="/"
@@ -53,8 +51,7 @@ function FotosPage() {
           </header>
           <PhotoBatchStudio />
         </main>
-        </PlanGate>
-      </RouteShell>
-    </RequireAuth>
+      </RequireAuth>
+    </RouteShell>
   );
 }
