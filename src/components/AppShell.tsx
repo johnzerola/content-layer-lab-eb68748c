@@ -3,6 +3,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Layers,
   Palette,
+  KeyRound,
   FolderKanban,
   Scissors,
   Eraser,
@@ -140,6 +141,7 @@ const ROUTE_PATHS = [
   "/biblioteca",
   "/agenda",
   "/perfis",
+  "/contas",
   "/integracoes",
   "/armazenamento",
   "/metricas",
@@ -326,6 +328,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
       <div className="mt-4 flex flex-col gap-0.5 px-3">
         {expanded && <p className="mono-label px-2.5 pb-1.5">3 · Distribuição</p>}
         {routeLink("/agenda", "Agenda", CalendarClock, expanded, close)}
+        {routeLink("/contas", "Contas e credenciais", KeyRound, expanded, close)}
         {routeLink("/perfis", "Perfis", Users, expanded, close)}
         {routeLink("/live", "Monitora Live", Radio, expanded, close)}
         {routeLink("/metricas", "Métricas", BarChart3, expanded, close)}
