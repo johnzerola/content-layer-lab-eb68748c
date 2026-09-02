@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { ActivityDock } from "../components/ActivityDock";
 import { Toaster } from "../components/ui/sonner";
 import { BatchProgressDock } from "../components/BatchProgressDock";
+import { CommandPalette } from "../components/CommandPalette";
 
 
 function NotFoundComponent() {
@@ -130,6 +131,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      <CommandPalette />
       <ActivityDock />
       <BatchProgressDock />
       <Toaster />
