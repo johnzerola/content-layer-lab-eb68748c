@@ -14,6 +14,156 @@ export type Database = {
   }
   public: {
     Tables: {
+      batch_job_items: {
+        Row: {
+          attempts: number
+          batch_job_id: string
+          created_at: string
+          cut_id: string | null
+          error_message: string | null
+          id: string
+          idempotency_key: string
+          label: string | null
+          payload: Json
+          render_job_id: string | null
+          status: string
+          template_instance_id: string | null
+          updated_at: string
+          user_id: string
+          video_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          batch_job_id: string
+          created_at?: string
+          cut_id?: string | null
+          error_message?: string | null
+          id?: string
+          idempotency_key: string
+          label?: string | null
+          payload?: Json
+          render_job_id?: string | null
+          status?: string
+          template_instance_id?: string | null
+          updated_at?: string
+          user_id: string
+          video_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          batch_job_id?: string
+          created_at?: string
+          cut_id?: string | null
+          error_message?: string | null
+          id?: string
+          idempotency_key?: string
+          label?: string | null
+          payload?: Json
+          render_job_id?: string | null
+          status?: string
+          template_instance_id?: string | null
+          updated_at?: string
+          user_id?: string
+          video_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_job_items_batch_job_id_fkey"
+            columns: ["batch_job_id"]
+            isOneToOne: false
+            referencedRelation: "batch_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_job_items_render_job_id_fkey"
+            columns: ["render_job_id"]
+            isOneToOne: false
+            referencedRelation: "render_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_job_items_template_instance_id_fkey"
+            columns: ["template_instance_id"]
+            isOneToOne: false
+            referencedRelation: "template_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      batch_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          failed_items: number
+          id: string
+          lock_id: string | null
+          locked_at: string | null
+          paused_reason: string | null
+          processed_items: number
+          settings: Json
+          started_at: string | null
+          status: string
+          successful_items: number
+          template_id: string | null
+          total_items: number
+          type: string
+          updated_at: string
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          failed_items?: number
+          id?: string
+          lock_id?: string | null
+          locked_at?: string | null
+          paused_reason?: string | null
+          processed_items?: number
+          settings?: Json
+          started_at?: string | null
+          status?: string
+          successful_items?: number
+          template_id?: string | null
+          total_items?: number
+          type?: string
+          updated_at?: string
+          user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          failed_items?: number
+          id?: string
+          lock_id?: string | null
+          locked_at?: string | null
+          paused_reason?: string | null
+          processed_items?: number
+          settings?: Json
+          started_at?: string | null
+          status?: string
+          successful_items?: number
+          template_id?: string | null
+          total_items?: number
+          type?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_jobs_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "video_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       batches: {
         Row: {
           created_at: string
@@ -395,6 +545,90 @@ export type Database = {
             columns: ["batch_id"]
             isOneToOne: false
             referencedRelation: "render_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      render_jobs: {
+        Row: {
+          attempts: number
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          format: string
+          fps: number
+          height: number
+          id: string
+          idempotency_key: string | null
+          output_path: string | null
+          output_url: string | null
+          progress: number
+          project_id: string | null
+          started_at: string | null
+          status: string
+          template_instance_id: string | null
+          updated_at: string
+          user_id: string
+          video_id: string | null
+          width: number
+        }
+        Insert: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          format?: string
+          fps?: number
+          height?: number
+          id?: string
+          idempotency_key?: string | null
+          output_path?: string | null
+          output_url?: string | null
+          progress?: number
+          project_id?: string | null
+          started_at?: string | null
+          status?: string
+          template_instance_id?: string | null
+          updated_at?: string
+          user_id: string
+          video_id?: string | null
+          width?: number
+        }
+        Update: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          format?: string
+          fps?: number
+          height?: number
+          id?: string
+          idempotency_key?: string | null
+          output_path?: string | null
+          output_url?: string | null
+          progress?: number
+          project_id?: string | null
+          started_at?: string | null
+          status?: string
+          template_instance_id?: string | null
+          updated_at?: string
+          user_id?: string
+          video_id?: string | null
+          width?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "render_jobs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "render_jobs_template_instance_id_fkey"
+            columns: ["template_instance_id"]
+            isOneToOne: false
+            referencedRelation: "template_instances"
             referencedColumns: ["id"]
           },
         ]
@@ -896,6 +1130,62 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: []
+      }
+      video_transcripts: {
+        Row: {
+          created_at: string
+          duration: number
+          id: string
+          language: string
+          project_id: string | null
+          scenes: Json
+          speakers: Json
+          status: string
+          text: string
+          updated_at: string
+          user_id: string
+          video_id: string
+          words: Json
+        }
+        Insert: {
+          created_at?: string
+          duration?: number
+          id?: string
+          language?: string
+          project_id?: string | null
+          scenes?: Json
+          speakers?: Json
+          status?: string
+          text?: string
+          updated_at?: string
+          user_id: string
+          video_id: string
+          words?: Json
+        }
+        Update: {
+          created_at?: string
+          duration?: number
+          id?: string
+          language?: string
+          project_id?: string | null
+          scenes?: Json
+          speakers?: Json
+          status?: string
+          text?: string
+          updated_at?: string
+          user_id?: string
+          video_id?: string
+          words?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_transcripts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
