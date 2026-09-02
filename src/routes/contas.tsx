@@ -4,6 +4,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { RequireAuth } from "@/components/RequireAuth";
+import { RouteShell } from "@/components/RouteShell";
 import {
   deleteManualCredential,
   listManualCredentials,
@@ -31,9 +32,11 @@ export const Route = createFileRoute("/contas")({
     ],
   }),
   component: () => (
-    <RequireAuth title="Contas e credenciais" description="Entre na sua conta para gerenciar as credenciais.">
-      <ContasPage />
-    </RequireAuth>
+    <RouteShell>
+      <RequireAuth title="Contas e credenciais" description="Entre na sua conta para gerenciar as credenciais.">
+        <ContasPage />
+      </RequireAuth>
+    </RouteShell>
   ),
 });
 

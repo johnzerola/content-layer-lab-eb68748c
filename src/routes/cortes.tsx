@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { RequireAuth } from "@/components/RequireAuth";
+import { RouteShell } from "@/components/RouteShell";
 import { Button } from "@/components/ui/base";
 import { findClips } from "@/lib/clips";
 import { CutLibrary } from "@/components/CutLibrary";
@@ -47,9 +48,11 @@ export const Route = createFileRoute("/cortes")({
     ],
   }),
   component: () => (
-    <RequireAuth title="Cortes" description="Entre na sua conta para gerar e salvar cortes.">
-      <CutsPage />
-    </RequireAuth>
+    <RouteShell>
+      <RequireAuth title="Cortes" description="Entre na sua conta para gerar e salvar cortes.">
+        <CutsPage />
+      </RequireAuth>
+    </RouteShell>
   ),
 });
 

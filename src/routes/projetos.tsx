@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { RequireAuth } from "@/components/RequireAuth";
+import { RouteShell } from "@/components/RouteShell";
 import { SavedProjects } from "@/components/editor/SavedProjects";
 import { Button } from "@/components/ui/base";
 import { attachInstanceProject, deleteInstance, listInstances, updateInstance } from "@/lib/video-template/service";
@@ -27,9 +28,11 @@ export const Route = createFileRoute("/projetos")({
     ],
   }),
   component: () => (
-    <RequireAuth title="Projetos" description="Entre na sua conta para ver seus projetos de template.">
-      <ProjectsPage />
-    </RequireAuth>
+    <RouteShell>
+      <RequireAuth title="Projetos" description="Entre na sua conta para ver seus projetos de template.">
+        <ProjectsPage />
+      </RequireAuth>
+    </RouteShell>
   ),
 });
 

@@ -5,3 +5,4 @@
 - [x] Tornar a galeria de Estilos visível e aplicável no painel contextual do editor
 - [x] Corrigir lentidão e ausência do menu em /templates e permitir selecionar novamente o mesmo vídeo
 - [x] Criar Estúdio de câmera/microfone com envio direto ao editor profissional
+- [x] Corrigir navegação travada em Integrações e padronizar o menu nas ferramentas internas

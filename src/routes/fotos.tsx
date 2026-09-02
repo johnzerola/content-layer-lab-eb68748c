@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Images } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { PlanGate } from "@/components/PlanGate";
+import { RouteShell } from "@/components/RouteShell";
 import { PhotoBatchStudio } from "@/components/photo/PhotoBatchStudio";
 
 const TITLE = "FotoViral — fotos únicas para Instagram, TikTok e Shorts";
@@ -28,7 +29,8 @@ function FotosPage() {
       title="Entre para usar o FotoViral"
       description="Limpeza de metadados e anti-duplicidade de fotos em lote."
     >
-      <PlanGate>
+      <RouteShell>
+        <PlanGate>
         <main className="mx-auto w-full max-w-6xl px-4 py-8">
           <Link
             to="/"
@@ -51,7 +53,8 @@ function FotosPage() {
           </header>
           <PhotoBatchStudio />
         </main>
-      </PlanGate>
+        </PlanGate>
+      </RouteShell>
     </RequireAuth>
   );
 }

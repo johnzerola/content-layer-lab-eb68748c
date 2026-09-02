@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -120,7 +120,7 @@ const YOUTUBE_PLATFORM = {
 };
 
 function IntegrationsPage() {
-  const [mode, setMode] = useState<AppMode>("external");
+  const mode: AppMode = "external";
   const jobs = listJobs();
   const [user, setUser] = useState<CloudUser | null>(null);
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
@@ -376,7 +376,7 @@ function IntegrationsPage() {
   return (
     <AppShell
       mode={mode}
-      onMode={setMode}
+      onMode={() => {}}
       count={jobs.length}
       onLibrary={() => {}}
       onCloud={() => {}}
@@ -575,12 +575,12 @@ function IntegrationsPage() {
             </p>
           </div>
           <div className="flex gap-4">
-            <a href="/privacidade" className="underline hover:text-foreground">
+            <Link to="/privacidade" className="underline hover:text-foreground">
               Privacidade
-            </a>
-            <a href="/exclusao-de-dados" className="underline hover:text-foreground">
+            </Link>
+            <Link to="/exclusao-de-dados" className="underline hover:text-foreground">
               Excluir dados
-            </a>
+            </Link>
           </div>
         </section>
 

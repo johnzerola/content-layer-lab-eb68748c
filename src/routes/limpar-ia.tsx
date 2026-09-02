@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Eraser, Sparkles, Upload, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { RouteShell } from "@/components/RouteShell";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -249,7 +250,9 @@ function GuardedLimparIAPage() {
       title={"Entre para usar o CleanerIA"}
       description={"Os jobs de limpeza ficam salvos na sua conta com histórico e link de download."}
     >
-      <LimparIAPage />
+      <RouteShell>
+        <LimparIAPage />
+      </RouteShell>
     </RequireAuth>
   );
 }
