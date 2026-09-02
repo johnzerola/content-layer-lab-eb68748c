@@ -127,7 +127,7 @@ function EstilosPage() {
               {t === "meus" ? `Meus estilos (${mine.length})` : t}
             </button>
           ))}
-        {tab === "prontos" && (
+          {tab === "prontos" && (
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
