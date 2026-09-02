@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Input } from "@/components/ui/base";
 import { Label } from "@/components/ui/label";
-import { BRAND_FONTS, loadBrandKit, saveBrandKit, type BrandKit } from "@/lib/brand-kit";
+import { BRAND_FONTS, extractBrandFromLogo, loadBrandKit, saveBrandKit, type BrandKit } from "@/lib/brand-kit";
 import type { TemplateDoc, TemplateLayer } from "@/lib/video-template/types";
 
 function ColorRow({
@@ -46,6 +46,9 @@ export function BrandKitPanel({
   const [local, setLocal] = useState<BrandKit>(() => value ?? loadBrandKit());
   const kit = value ?? local;
   const [saved, setSaved] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [palette, setPalette] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -144,6 +147,17 @@ export function BrandKitPanel({
               Inserir no template
             </Button>
           )}
+          {kit.logoUrl && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7"
+              disabled={generating}
+              onClick={() => void generateFromLogo(kit.logoUrl as string)}
+            >
+              {generating ? "Analisando logo…" : "Gerar paleta do logo"}
+            </Button>
+          )}
         </div>
         <input
           ref={fileRef}
@@ -158,6 +172,26 @@ export function BrandKitPanel({
           }}
         />
       </div>
+
+      {genError && <p className="text-[11px] text-destructive">{genError}</p>}
+      {palette.length > 0 && (
+        <div className="space-y-1">
+          <p className="font-mono text-[10px] uppercase text-muted-foreground">Paleta extraída do logo</p>
+          <div className="flex gap-1">
+            {palette.map((c) => (
+              <button
+                key={c}
+                type="button"
+                title={c}
+                aria-label={`Usar ${c} como cor primária`}
+                onClick={() => patch({ primary: c })}
+                className="h-7 flex-1 rounded border border-border/60"
+                style={{ background: c }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <ColorRow label="Primária" value={kit.primary} onChange={(v) => patch({ primary: v })} />
       <ColorRow label="Secundária" value={kit.secondary} onChange={(v) => patch({ secondary: v })} />
