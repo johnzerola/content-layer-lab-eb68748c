@@ -482,7 +482,7 @@
     transparent 90%
   );
   background-size: 220% 100%;
-  animation: vv-shimmer 1.4s linear infinite;
+  animation: vv-shimmer 1.9s linear infinite;
 }
 
 @utility typing-dot {
@@ -580,6 +580,211 @@
 
 @media (prefers-reduced-motion: reduce) {
   .drawer-in {
+    animation: none;
+  }
+}
+
+/* =========================================================
+   VAIVIRAL AURORA — linguagem de interação visual
+   borda animada (1–1.25px), glow discreto, sempre por estado
+   ========================================================= */
+
+@property --aurora-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+:root {
+  --aurora-speed: 4.5s;
+  --aurora-glow-opacity: 0.14;
+}
+
+@keyframes vv-aurora-spin {
+  to {
+    --aurora-angle: 360deg;
+  }
+}
+
+@keyframes vv-aurora-sweep {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes vv-progress-light {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: translate(50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(50%, -50%) scale(1.25);
+  }
+}
+
+/* base: nenhum aurora visível — só borda neutra */
+@utility aurora {
+  position: relative;
+  isolation: isolate;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1.25px;
+    background: conic-gradient(
+      from var(--aurora-angle),
+      #4f7fd1,
+      #6d5dfb,
+      #c05de0,
+      #d0564f,
+      #d8a63f,
+      #3f9e69,
+      #4f7fd1
+    );
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-panel) var(--ease-out-expo);
+    will-change: opacity;
+  }
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    z-index: -1;
+    border-radius: inherit;
+    background: conic-gradient(
+      from var(--aurora-angle),
+      #4f7fd1,
+      #6d5dfb,
+      #c05de0,
+      #d0564f,
+      #d8a63f,
+      #3f9e69,
+      #4f7fd1
+    );
+    filter: blur(14px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-slow) var(--ease-out-expo);
+    will-change: opacity;
+  }
+}
+
+/* estado ativo: a luz percorre o perímetro */
+@utility aurora-on {
+  &::before {
+    opacity: 1;
+    animation: vv-aurora-spin var(--aurora-speed) linear infinite;
+  }
+  &::after {
+    opacity: var(--aurora-glow-opacity);
+    animation: vv-aurora-spin var(--aurora-speed) linear infinite;
+  }
+}
+
+/* aceleração temporária: "o sistema recebeu o comando" */
+@utility aurora-boost {
+  --aurora-speed: 1.8s;
+  --aurora-glow-opacity: 0.2;
+}
+
+/* conclusão: multicolor → verde suave */
+@utility aurora-success {
+  &::before {
+    background: conic-gradient(from var(--aurora-angle), #2dd4a3, #3f9e69, #2dd4a3);
+    opacity: 1;
+  }
+  &::after {
+    background: #2dd4a3;
+    opacity: 0.1;
+    animation: none;
+  }
+}
+
+/* erro: movimento reduz, borda vermelha discreta — sem piscar */
+@utility aurora-error {
+  --aurora-speed: 9s;
+  --aurora-glow-opacity: 0.08;
+  &::before {
+    background: conic-gradient(from var(--aurora-angle), #f06b78, #b34a55, #f06b78);
+    opacity: 1;
+  }
+  &::after {
+    background: #f06b78;
+    animation: none;
+  }
+}
+
+/* sweep luminoso curto (ex.: soltar arquivos na dropzone) */
+@utility aurora-sweep {
+  position: relative;
+  overflow: hidden;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      100deg,
+      transparent 35%,
+      color-mix(in oklab, var(--color-primary) 22%, transparent) 50%,
+      transparent 65%
+    );
+    animation: vv-aurora-sweep 700ms var(--ease-out-expo) 1;
+    pointer-events: none;
+  }
+}
+
+/* luz na ponta da barra de progresso */
+@utility progress-light {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--color-primary) 85%, white);
+    box-shadow: 0 0 10px 2px color-mix(in oklab, var(--color-primary) 45%, transparent);
+    animation: vv-progress-light 1.6s var(--ease-out-expo) infinite;
+  }
+}
+
+/* conteúdo principal entra sem apagar o shell */
+@keyframes vv-page-in {
+  from {
+    opacity: 0.85;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility page-in {
+  animation: vv-page-in 190ms var(--ease-out-expo) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-on::before,
+  .aurora-on::after,
+  .aurora-sweep::after,
+  .progress-light::after {
+    animation: none !important;
+  }
+  .page-in {
     animation: none;
   }
 }
