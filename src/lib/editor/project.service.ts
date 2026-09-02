@@ -42,13 +42,17 @@ export async function listEditorProjects(limit = 60): Promise<EditorProjectRecor
   return (data ?? []).map((row) => toRecord(row as Row));
 }
 
-export async function createEditorProjectRecord(doc: EditorProjectDoc): Promise<EditorProjectRecord> {
+export async function createEditorProjectRecord(
+  doc: EditorProjectDoc,
+  requestedId?: string,
+): Promise<EditorProjectRecord> {
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth.user?.id;
   if (!userId) throw new Error("Sessão expirada.");
   const { data, error } = await supabase
     .from("projects")
     .insert({
+      ...(requestedId ? { id: requestedId } : {}),
       user_id: userId,
       mode: EDITOR_PROJECT_MODE,
       name: doc.title,
@@ -82,5 +86,16 @@ export async function openProjectForVideo(
     ...createEditorProject(videoId, fallback?.title ? { title: fallback.title } : {}),
     ...fallback,
   };
-  return createEditorProjectRecord(doc as EditorProjectDoc);
+  if (projectId === "novo") return createEditorProjectRecord(doc as EditorProjectDoc);
+
+  // React pode iniciar o mesmo efeito duas vezes em desenvolvimento. Usar o ID
+  // da URL torna a criação determinística; se outra chamada vencer a corrida,
+  // recuperamos o registro já criado em vez de deixar o editor sem documento.
+  try {
+    return await createEditorProjectRecord(doc as EditorProjectDoc, projectId);
+  } catch (error) {
+    const createdByConcurrentOpen = await getEditorProject(projectId);
+    if (createdByConcurrentOpen) return createdByConcurrentOpen;
+    throw error;
+  }
 }
