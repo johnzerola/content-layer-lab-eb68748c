@@ -47,7 +47,7 @@ function EditTemplatePage() {
 
   if (error) {
     return (
-      <RequireAuth>
+      <RequireAuth title="Editor de template" description="Entre na sua conta para editar templates.">
         <div className="flex min-h-screen flex-col items-center justify-center gap-3">
           <p className="text-sm text-muted-foreground">{error}</p>
           <Button asChild variant="outline">
@@ -60,7 +60,7 @@ function EditTemplatePage() {
 
   if (!record) {
     return (
-      <RequireAuth>
+      <RequireAuth title="Editor de template" description="Entre na sua conta para editar templates.">
         <div className="flex min-h-screen items-center justify-center">
           <div className="skeleton h-96 w-64 rounded-2xl" />
         </div>
@@ -103,7 +103,7 @@ function Editor({ record }: { record: VideoTemplateRecord }) {
   }, [ed, saveNow]);
 
   return (
-    <RequireAuth>
+    <RequireAuth title="Editor de template" description="Entre na sua conta para editar templates.">
       <div className="flex h-screen flex-col overflow-hidden bg-background">
         <header className="flex items-center gap-3 border-b border-border/70 px-3 py-2">
           <Button size="icon" variant="ghost" asChild aria-label="Voltar" className="size-8">

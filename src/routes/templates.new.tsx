@@ -1,13 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/AppShell";
 import { RequireAuth } from "@/components/RequireAuth";
 import { Button, Input } from "@/components/ui/base";
 import { Label } from "@/components/ui/label";
 import { createTemplateDoc } from "@/lib/video-template/factory";
 import { createTemplate } from "@/lib/video-template/service";
-import { ASPECT_SIZES, TEMPLATE_CATEGORIES, type AspectRatio } from "@/lib/video-template/types";
+import { TEMPLATE_CATEGORIES } from "@/lib/video-template/factory";
+import { ASPECT_SIZES, type AspectRatio } from "@/lib/video-template/types";
 
 export const Route = createFileRoute("/templates/new")({
   head: () => ({
@@ -50,8 +50,7 @@ function NewTemplatePage() {
   };
 
   return (
-    <RequireAuth>
-      <AppShell>
+    <RequireAuth title="Criar template" description="Entre na sua conta para criar templates.">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-6">
           <header>
             <h1 className="text-2xl font-semibold tracking-tight">Criar template</h1>
@@ -106,7 +105,6 @@ function NewTemplatePage() {
             </Button>
           </div>
         </div>
-      </AppShell>
     </RequireAuth>
   );
 }
