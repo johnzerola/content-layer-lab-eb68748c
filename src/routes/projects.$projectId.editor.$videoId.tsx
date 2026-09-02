@@ -40,14 +40,16 @@ import { useEditorHistory } from "@/components/editor/useEditorHistory";
 import { openProjectForVideo, saveEditorProject } from "@/lib/editor/project.service";
 import { previewUrl, type EditorProjectDoc } from "@/lib/editor/project";
 import { defaultEditorAudio } from "@/lib/editor/audio";
+import { generateCaptions } from "@/lib/captions";
 import { applyBrandKitToDoc } from "@/lib/brand-kit";
 import { defaultPreEdit, type PreEdit } from "@/lib/preedit";
 import { ensureTranscript, saveTranscript } from "@/lib/editor/transcript.service";
-import { emptyTranscript, removedRanges, silenceRanges, type TranscriptDoc } from "@/lib/editor/transcript";
+import { emptyTranscript, removedRanges, silenceRanges, transcriptFromCues, type TranscriptDoc } from "@/lib/editor/transcript";
 import { findCaptionPreset } from "@/lib/editor/caption-styles";
 import { listMyTemplates } from "@/lib/video-template/service";
 import { applyTemplateToVideo } from "@/lib/video-template/bindings";
 import type { CaptionLayer, TemplateLayer, VideoTemplateRecord } from "@/lib/video-template/types";
+import { createCaptionLayer } from "@/lib/video-template/factory";
 
 export const Route = createFileRoute("/projects/$projectId/editor/$videoId")({
   head: () => ({
@@ -84,8 +86,10 @@ type ToolId =
   | "layout"
   | "ajustes"
   | "animacao"
+  | "texto"
+  | "estilos"
   | "legendas"
-  | "mixagem"
+  | "audio"
   | "titulos"
   | "templates"
   | "brand"
@@ -106,6 +110,7 @@ const TOOL_GROUPS: { title: string; tools: { id: ToolId; label: string; icon: ty
       { id: "layout", label: "Layout", icon: Frame },
       { id: "ajustes", label: "Ajustes", icon: Sliders },
       { id: "animacao", label: "Animação", icon: Wand2 },
+      { id: "estilos", label: "Estilos", icon: Palette },
       { id: "templates", label: "Templates", icon: Layers },
       { id: "brand", label: "Brand Kit", icon: Stamp },
     ],
@@ -113,8 +118,9 @@ const TOOL_GROUPS: { title: string; tools: { id: ToolId; label: string; icon: ty
   {
     title: "Áudio & Texto",
     tools: [
+      { id: "texto", label: "Texto", icon: Type },
+      { id: "audio", label: "Áudio", icon: Music4 },
       { id: "legendas", label: "Legendas", icon: Palette },
-      { id: "mixagem", label: "Mixagem", icon: Music4 },
       { id: "titulos", label: "Títulos", icon: Type },
       { id: "camada", label: "Camada", icon: Sparkles },
     ],
@@ -144,6 +150,8 @@ function EditorPage() {
   const [rendered, setRendered] = useState<File | null>(null);
   const [rendering, setRendering] = useState(false);
   const [renderPct, setRenderPct] = useState(0);
+  const [transcribing, setTranscribing] = useState(false);
+  const [transcribeProgress, setTranscribeProgress] = useState("");
 
 
   const history = useEditorHistory<EditorProjectDoc | null>(null);
@@ -308,6 +316,41 @@ function EditorPage() {
     },
     [history],
   );
+
+  const ensureCaptionLayer = useCallback((): CaptionLayer | null => {
+    if (!doc) return null;
+    const existing = doc.composition.layers.find((layer): layer is CaptionLayer => layer.type === "caption");
+    if (existing) return existing;
+    const created = createCaptionLayer(doc.composition.layers, doc.captionPresetId);
+    addLayers([created], "adicionar-legendas");
+    setSelectedId(created.id);
+    return created;
+  }, [addLayers, doc]);
+
+  const generateTranscript = useCallback(async () => {
+    const file = getSourceFile(videoId);
+    if (!file) {
+      toast.error("Carregue o vídeo para gerar a transcrição.");
+      return;
+    }
+    setTranscribing(true);
+    setTranscribeProgress("Preparando áudio…");
+    try {
+      const cues = await generateCaptions(file, {
+        language: "pt",
+        onProgress: ({ done, total }) => setTranscribeProgress(`Transcrevendo ${done}/${total}`),
+      });
+      const next = transcriptFromCues(videoId, cues, "pt-BR");
+      setTranscript(next);
+      ensureCaptionLayer();
+      toast.success("Transcrição pronta para editar.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível transcrever o vídeo.");
+    } finally {
+      setTranscribing(false);
+      setTranscribeProgress("");
+    }
+  }, [ensureCaptionLayer, videoId]);
 
   const applyTemplate = useCallback(
     (template: VideoTemplateRecord) => {
@@ -509,7 +552,11 @@ function EditorPage() {
                   <button
                     key={t.id}
                     type="button"
-                    onClick={() => setTool(t.id)}
+                    onClick={() => {
+                      setTool(t.id);
+                      if (t.id === "texto") setLeftTab("texto");
+                      if (t.id === "estilos") setLeftTab("estilos");
+                    }}
                     aria-pressed={active}
                     className={`mx-auto flex w-16 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] transition-colors ${
                       active ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-card/70 hover:text-foreground"
@@ -547,6 +594,10 @@ function EditorPage() {
                 onSeek={seek}
                 cutOnRemove={cutOnRemove}
                 onCutOnRemoveChange={setCutOnRemove}
+                onGenerate={() => void generateTranscript()}
+                generating={transcribing}
+                generateProgress={transcribeProgress}
+                hasMedia={Boolean(src)}
               />
             ) : (
               <StylesPanel
@@ -554,12 +605,14 @@ function EditorPage() {
                 style={captionLayer?.style ?? captionPreset.style}
                 onApplyPreset={(preset) => {
                   patchDoc({ captionPresetId: preset.id }, "preset-legenda");
-                  if (captionLayer) updateLayer(captionLayer.id, { presetId: preset.id, style: preset.style } as Partial<TemplateLayer>);
+                  const target = captionLayer ?? ensureCaptionLayer();
+                  if (target) updateLayer(target.id, { presetId: preset.id, style: preset.style } as Partial<TemplateLayer>);
                 }}
                 onStyleChange={(patch) => {
-                  if (!captionLayer) return;
-                  updateLayer(captionLayer.id, {
-                    style: { ...captionLayer.style, ...patch },
+                  const target = captionLayer ?? ensureCaptionLayer();
+                  if (!target) return;
+                  updateLayer(target.id, {
+                    style: { ...target.style, ...patch },
                   } as Partial<TemplateLayer>);
                 }}
                 onApplyTransition={(kind) =>
@@ -675,6 +728,32 @@ function EditorPage() {
             )}
             {tool === "layout" && <LayoutPanel preedit={pre} onChange={patchPre} />}
             {tool === "ajustes" && <GradePanel preedit={pre} onChange={patchPre} />}
+            {tool === "texto" && (
+              <div className="space-y-3 text-sm">
+                <p className="font-medium">Roteiro e transcrição</p>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  O roteiro está aberto no painel à esquerda. Edite palavras, substitua termos ou corte trechos diretamente pelo texto.
+                </p>
+                {!transcript.words.length && (
+                  <button
+                    type="button"
+                    onClick={() => void generateTranscript()}
+                    disabled={!src || transcribing}
+                    className="w-full rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-45"
+                  >
+                    {transcribing ? transcribeProgress || "Transcrevendo…" : "Gerar transcrição do vídeo"}
+                  </button>
+                )}
+              </div>
+            )}
+            {tool === "estilos" && (
+              <div className="space-y-2 text-sm">
+                <p className="font-medium">Galeria de estilos</p>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Os templates completos, cores e tipografias estão abertos no painel à esquerda.
+                </p>
+              </div>
+            )}
             {tool === "animacao" && (
               <div className="space-y-4">
                 {selectedLayer ? (
@@ -719,16 +798,17 @@ function EditorPage() {
                 style={captionLayer?.style ?? captionPreset.style}
                 onApplyPreset={(preset) => {
                   patchDoc({ captionPresetId: preset.id }, "preset-legenda");
-                  if (captionLayer)
-                    updateLayer(captionLayer.id, { presetId: preset.id, style: preset.style } as Partial<TemplateLayer>);
+                  const target = captionLayer ?? ensureCaptionLayer();
+                  if (target) updateLayer(target.id, { presetId: preset.id, style: preset.style } as Partial<TemplateLayer>);
                 }}
                 onStyleChange={(patch) => {
-                  if (!captionLayer) return;
-                  updateLayer(captionLayer.id, { style: { ...captionLayer.style, ...patch } } as Partial<TemplateLayer>);
+                  const target = captionLayer ?? ensureCaptionLayer();
+                  if (!target) return;
+                  updateLayer(target.id, { style: { ...target.style, ...patch } } as Partial<TemplateLayer>);
                 }}
               />
             )}
-            {tool === "mixagem" && (
+            {tool === "audio" && (
               <AudioPanel
                 audio={doc.audio ?? defaultEditorAudio()}
                 onChange={(next, label) => patchDoc({ audio: next }, label ?? "audio")}
@@ -797,7 +877,7 @@ function EditorPage() {
                   key={c.id}
                   type="button"
                   onClick={() => {
-                    setTool("mixagem");
+                    setTool("audio");
                     seek(c.startTime);
                   }}
                   title={`${c.name} · ${c.kind}`}
