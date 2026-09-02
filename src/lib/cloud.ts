@@ -234,6 +234,12 @@ export type ExportLog = {
   variant?: string;
   bytes?: number;
   seconds?: number;
+  /** miniatura (data URL ou link) do clipe */
+  thumbUrl?: string | null;
+  /** legenda/headline usada no clipe */
+  caption?: string | null;
+  /** caminho no storage privado, quando o arquivo foi guardado para publicar */
+  storagePath?: string | null;
 };
 
 /** Registra os arquivos gerados (silencioso quando não há login). */
@@ -251,6 +257,9 @@ export async function logExports(list: ExportLog[]) {
       variant: e.variant ?? null,
       bytes: Math.round(e.bytes ?? 0),
       seconds: e.seconds ?? 0,
+      thumb_url: e.thumbUrl ?? null,
+      caption: e.caption ?? null,
+      storage_path: e.storagePath ?? null,
     })),
   );
 }
@@ -264,12 +273,15 @@ export type ExportRow = {
   variant: string | null;
   bytes: number;
   created_at: string;
+  thumb_url: string | null;
+  caption: string | null;
+  storage_path: string | null;
 };
 
 export async function listExports(limit = 30): Promise<ExportRow[]> {
   const { data, error } = await supabase
     .from("exports")
-    .select("id,mode,file_name,source_name,platform,variant,bytes,created_at")
+    .select("id,mode,file_name,source_name,platform,variant,bytes,created_at,thumb_url,caption,storage_path")
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;

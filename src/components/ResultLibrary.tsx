@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { listExports, type ExportRow } from "@/lib/cloud";
+import { supabase } from "@/integrations/supabase/client";
+import { listAccounts, type SocialAccount } from "@/lib/social";
+import { BulkScheduleModal, type BulkScheduleItem } from "@/components/BulkScheduleModal";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Download,
@@ -11,6 +15,8 @@ import {
   Layers,
   Monitor,
   Search,
+  Send,
+  Loader2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -22,13 +28,37 @@ export function ResultLibrary() {
   const [exports, setExports] = useState<ExportRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [accounts, setAccounts] = useState<SocialAccount[]>([]);
+  const [preparing, setPreparing] = useState<string | null>(null);
+  const [publishItem, setPublishItem] = useState<BulkScheduleItem | null>(null);
 
   useEffect(() => {
     listExports(100)
       .then(setExports)
       .catch(console.error)
       .finally(() => setLoading(false));
+    listAccounts().then(setAccounts).catch(() => undefined);
   }, []);
+
+  const openPublish = async (row: ExportRow) => {
+    if (!row.storage_path) return;
+    setPreparing(row.id);
+    try {
+      const { data, error } = await supabase.storage
+        .from("posts")
+        .createSignedUrl(row.storage_path, 60 * 60);
+      if (error || !data?.signedUrl) throw error ?? new Error("Link indisponível.");
+      const res = await fetch(data.signedUrl);
+      if (!res.ok) throw new Error("Não foi possível carregar o vídeo salvo.");
+      const blob = await res.blob();
+      const file = new File([blob], row.file_name, { type: blob.type || "video/mp4" });
+      setPublishItem({ file, ...(row.caption ? { caption: row.caption } : {}) });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao preparar a publicação.");
+    } finally {
+      setPreparing(null);
+    }
+  };
 
   const filtered = exports.filter((e) =>
     (e.file_name + (e.source_name || "")).toLowerCase().includes(search.toLowerCase()),
@@ -87,8 +117,17 @@ export function ResultLibrary() {
               key={e.id}
               className="group overflow-hidden border-border/60 bg-surface/40 p-0 transition-colors hover:border-[var(--border-hover)] hover:bg-surface/60"
             >
-              <div className="relative grid aspect-[16/9] place-items-center border-b border-border/60 bg-surface-2">
-                <FileVideo className="size-8 text-primary/70" />
+              <div className="relative grid aspect-[16/9] place-items-center overflow-hidden border-b border-border/60 bg-surface-2">
+                {e.thumb_url ? (
+                  <img
+                    src={e.thumb_url}
+                    alt={`Miniatura de ${e.file_name}`}
+                    loading="lazy"
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  <FileVideo className="size-8 text-primary/70" />
+                )}
                 <Badge
                   variant="outline"
                   className="absolute left-2 top-2 h-5 bg-background/70 font-mono text-[10px] uppercase tracking-[0.1em] backdrop-blur"
@@ -106,6 +145,15 @@ export function ResultLibrary() {
                 <h4 className="truncate text-sm font-medium" title={e.file_name}>
                   {e.file_name}
                 </h4>
+
+                {e.caption && (
+                  <p
+                    className="line-clamp-2 text-xs leading-snug text-muted-foreground"
+                    title={e.caption}
+                  >
+                    {e.caption}
+                  </p>
+                )}
 
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                   {e.source_name && (
@@ -126,20 +174,46 @@ export function ResultLibrary() {
                   )}
                 </div>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 w-full gap-2"
-                  disabled
-                  title="Este é o histórico das exportações. O arquivo foi salvo no seu computador no momento do download. Para arquivos guardados no servidor, use a fila de renderização na nuvem."
-                >
-                  <Download className="size-4" /> Salvo localmente
-                </Button>
+                {e.storage_path ? (
+                  <Button
+                    size="sm"
+                    className="h-9 w-full gap-2"
+                    onClick={() => void openPublish(e)}
+                    disabled={preparing === e.id}
+                  >
+                    {preparing === e.id ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Send className="size-4" />
+                    )}
+                    Publicar
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 w-full gap-2"
+                    disabled
+                    title="Este arquivo não foi guardado no servidor: ele foi salvo no seu computador no momento do download."
+                  >
+                    <Download className="size-4" /> Salvo localmente
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      <BulkScheduleModal
+        open={!!publishItem}
+        onClose={() => setPublishItem(null)}
+        accounts={accounts}
+        items={publishItem ? [publishItem] : []}
+        hideFilePicker
+        subtitle="Publique este clipe da biblioteca na conta escolhida."
+        onDone={() => setPublishItem(null)}
+      />
     </div>
   );
 }

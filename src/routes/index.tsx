@@ -1750,8 +1750,8 @@ function Home() {
         seconds,
         fails: [...failures.current],
       });
-      void logExports(
-        listNow()
+      void (async () => {
+        const rows = listNow()
           .filter((i) => i.status === "pronto")
           .flatMap((i) =>
             (i.outputs?.length
@@ -1760,16 +1760,34 @@ function Home() {
                 ? [{ blob: i.blob, ext: i.ext ?? "mp4", label: "" }]
                 : []
             ).map((o) => ({
-              mode: runMode,
-              fileName: `${i.outName?.trim() ? sanitizeName(i.outName) : stripExt(i.file.name)}${o.label ? `-${o.label}` : ""}.${o.ext}`,
-              sourceName: i.file.name,
-              platform: platforms.join(","),
-              ...(o.label ? { variant: o.label } : {}),
-              bytes: o.blob.size,
-              seconds: i.duration,
+              blob: o.blob,
+              log: {
+                mode: runMode,
+                fileName: `${i.outName?.trim() ? sanitizeName(i.outName) : stripExt(i.file.name)}${o.label ? `-${o.label}` : ""}.${o.ext}`,
+                sourceName: i.file.name,
+                platform: platforms.join(","),
+                ...(o.label ? { variant: o.label } : {}),
+                bytes: o.blob.size,
+                seconds: i.duration,
+                thumbUrl: i.poster ?? null,
+                caption: (i.headline || i.clipTitle || "").trim() || null,
+                storagePath: null as string | null,
+              },
             })),
-          ),
-      ).catch(() => {});
+          );
+        // guarda os arquivos no storage privado (melhor esforço) para permitir publicar depois
+        const { uploadPostMedia } = await import("@/lib/social");
+        for (const row of rows) {
+          try {
+            const up = await uploadPostMedia(row.blob, row.log.fileName);
+            row.log.storagePath = up.path;
+          } catch {
+            /* segue sem storage: o arquivo continua salvo no computador */
+          }
+        }
+        await logExports(rows.map((r) => r.log));
+      })().catch(() => {});
+
       void logBatch({
         mode: runMode,
         templateName: active.name,
