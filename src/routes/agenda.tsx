@@ -20,6 +20,7 @@ import { AppShell, type AppMode } from "@/components/AppShell";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
 import { BulkScheduleModal } from "@/components/BulkScheduleModal";
+import { ScheduleCalendar } from "@/components/ScheduleCalendar";
 import { Button } from "@/components/ui/button";
 import { listJobs } from "@/lib/jobs";
 import type { Template } from "@/lib/template";
@@ -105,6 +106,7 @@ function AgendaPage() {
   const [sending, setSending] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const runPublishNow = useServerFn(publishPostNow);
 
   useEffect(() => {
@@ -174,9 +176,18 @@ function AgendaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  const visiblePosts = useMemo(() => {
+    if (!selectedDay) return posts;
+    return posts.filter((p) => {
+      const d = new Date(p.scheduled_at);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      return key === selectedDay;
+    });
+  }, [posts, selectedDay]);
+
   const grouped = useMemo(() => {
     const map = new Map<string, ScheduledPost[]>();
-    for (const p of posts) {
+    for (const p of visiblePosts) {
       const key = new Date(p.scheduled_at).toLocaleDateString("pt-BR", {
         weekday: "short",
         day: "2-digit",
@@ -185,7 +196,7 @@ function AgendaPage() {
       map.set(key, [...(map.get(key) ?? []), p]);
     }
     return [...map.entries()];
-  }, [posts]);
+  }, [visiblePosts]);
 
   async function onAddAccount() {
     setLinkingAccount(true);
@@ -341,14 +352,15 @@ function AgendaPage() {
                       </span>
 
                       <button
+                        type="button"
                         onClick={async () => {
                           await removeAccount(a.id);
                           await refresh();
                         }}
                         aria-label={`Remover @${a.username}`}
-                        className="rounded-lg p-1.5 text-muted-foreground transition hover:text-red-400"
+                        className="interactive grid size-11 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:text-red-400"
                       >
-                        <Trash2 className="size-4" />
+                        <Trash2 className="size-4" aria-hidden="true" />
                       </button>
                     </li>
                   ))}
@@ -476,14 +488,28 @@ function AgendaPage() {
               </section>
             </div>
 
-            {/* fila */}
-            <section className="rounded-2xl border border-border/70 bg-surface/60 p-5">
+            {/* calendário + fila */}
+            <div className="flex flex-col gap-6">
+              <ScheduleCalendar
+                posts={posts}
+                selectedDay={selectedDay}
+                onSelectDay={setSelectedDay}
+              />
+
+              <section className="rounded-2xl border border-border/70 bg-surface/60 p-5">
               <div className="flex items-center justify-between pb-3">
-                <p className="mono-label">Fila</p>
-                {loading && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
+                <p className="mono-label">
+                  Fila{selectedDay ? " · dia selecionado" : ""}
+                </p>
+                {loading && (
+                  <Loader2
+                    className="size-4 animate-spin text-muted-foreground"
+                    aria-label="Carregando agenda"
+                  />
+                )}
               </div>
 
-              {!posts.length && (
+              {!visiblePosts.length && (
                 <p className="rounded-xl border border-dashed border-border px-3 py-10 text-center text-[12px] text-muted-foreground">
                   nada agendado ainda
                 </p>
@@ -528,23 +554,26 @@ function AgendaPage() {
                               {STATUS_LABEL[p.status] ?? p.status}
                             </span>
                           </div>
-                          <div className="mt-3 flex justify-end gap-2 border-t border-border/50 pt-2">
+                          <div className="mt-3 flex flex-wrap justify-end gap-2 border-t border-border/50 pt-2">
                             {(p.status === "falhou" || p.status === "agendado") && (
                               <button
+                                type="button"
                                 disabled={publishingId === p.id}
                                 onClick={() => void onPublishNow(p.id)}
-                                className="flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary hover:bg-primary/20 disabled:opacity-60"
+                                aria-label={`Publicar agora: ${p.file_name ?? "vídeo"}`}
+                                className="interactive inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary/10 px-3 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-60"
                               >
                                 {publishingId === p.id ? (
-                                  <Loader2 className="size-3 animate-spin" />
+                                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
                                 ) : (
-                                  <UploadCloud className="size-3" />
+                                  <UploadCloud className="size-3.5" aria-hidden="true" />
                                 )}
                                 {publishingId === p.id ? "Publicando…" : "Publicar agora"}
                               </button>
                             )}
                             {p.status === "falhou" && (
                               <button
+                                type="button"
                                 onClick={async () => {
                                   try {
                                     await reschedulePost(
@@ -557,32 +586,35 @@ function AgendaPage() {
                                     toast.error("Falha ao re-agendar.");
                                   }
                                 }}
-                                className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
+                                aria-label={`Re-agendar ${p.file_name ?? "vídeo"}`}
+                                className="interactive inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs text-muted-foreground transition hover:text-foreground"
                               >
-                                re-agendar
+                                Re-agendar
                               </button>
                             )}
                             {p.status === "agendado" && (
-                              <>
-                                <button
-                                  onClick={async () => {
-                                    await cancelPost(p.id);
-                                    await refresh();
-                                  }}
-                                  className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
-                                >
-                                  <X className="size-3" /> cancelar
-                                </button>
-                              </>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  await cancelPost(p.id);
+                                  await refresh();
+                                }}
+                                aria-label={`Cancelar ${p.file_name ?? "vídeo"}`}
+                                className="interactive inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs text-muted-foreground transition hover:text-foreground"
+                              >
+                                <X className="size-3.5" aria-hidden="true" /> Cancelar
+                              </button>
                             )}
                             <button
+                              type="button"
                               onClick={async () => {
                                 await deletePost(p.id);
                                 await refresh();
                               }}
-                              className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground transition hover:text-red-400"
+                              aria-label={`Excluir ${p.file_name ?? "vídeo"} da agenda`}
+                              className="interactive inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs text-muted-foreground transition hover:text-red-400"
                             >
-                              <Trash2 className="size-3" /> excluir
+                              <Trash2 className="size-3.5" aria-hidden="true" /> Excluir
                             </button>
                           </div>
                         </li>
@@ -591,7 +623,8 @@ function AgendaPage() {
                   </div>
                 ))}
               </div>
-            </section>
+              </section>
+            </div>
           </div>
         )}
       </main>

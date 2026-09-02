@@ -160,6 +160,35 @@ function ProfileCard({ p }: { p: ProfileStats }) {
           )}
         </div>
 
+        <div className="rounded-xl border border-border bg-surface-2 p-3">
+          <p className="mono-label pb-2">Horários de postagem</p>
+          {p.upcomingSlots.length ? (
+            <ul className="flex flex-col gap-1.5">
+              {p.upcomingSlots.map((s) => (
+                <li key={`${s.at}-${s.kind}`} className="flex items-center gap-2 text-[12px]">
+                  <CalendarClock className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                  <span className="tabular-nums text-foreground">
+                    {new Date(s.at).toLocaleString("pt-BR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  <span className="truncate text-muted-foreground">
+                    {KIND_LABEL[s.kind] ?? s.kind}
+                    {s.status === "processando" ? " · publicando" : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-[12px] text-muted-foreground">
+              Sem horários futuros — agende um lote para este perfil.
+            </p>
+          )}
+        </div>
+
         {p.byKind.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {p.byKind.map((k) => (
@@ -174,11 +203,18 @@ function ProfileCard({ p }: { p: ProfileStats }) {
         )}
 
         <div className="flex gap-2">
-          <Button asChild size="sm" variant="secondary" className="flex-1">
-            <Link to="/agenda">Agendar</Link>
+          <Button asChild size="sm" variant="secondary" className="min-h-11 flex-1">
+            <Link to="/agenda" aria-label={`Agendar publicação para ${p.displayName || p.username}`}>
+              Agendar
+            </Link>
           </Button>
-          <Button asChild size="sm" variant="outline" className="flex-1">
-            <Link to="/integracoes">{healthy ? "Gerenciar" : "Reconectar"}</Link>
+          <Button asChild size="sm" variant="outline" className="min-h-11 flex-1">
+            <Link
+              to="/integracoes"
+              aria-label={`${healthy ? "Gerenciar" : "Reconectar"} ${p.displayName || p.username}`}
+            >
+              {healthy ? "Gerenciar" : "Reconectar"}
+            </Link>
           </Button>
         </div>
       </CardContent>
@@ -213,7 +249,7 @@ function ProfilesPage() {
 
   return (
     <AppShell mode="lote" onMode={() => {}} count={0} onLibrary={() => {}} onCloud={() => {}}>
-      <div className="mx-auto max-w-7xl space-y-8 p-6">
+      <main className="mx-auto max-w-7xl space-y-8 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="font-display text-2xl font-bold">Perfis Meta</h1>
@@ -221,11 +257,18 @@ function ProfilesPage() {
               Páginas, Instagram e canais conectados — status de publicação e próximo agendamento.
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="min-h-11"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            aria-label="Atualizar lista de perfis"
+          >
             {isFetching ? (
-              <Loader2 className="mr-2 size-4 animate-spin" />
+              <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
             ) : (
-              <RefreshCcw className="mr-2 size-4" />
+              <RefreshCcw className="mr-2 size-4" aria-hidden="true" />
             )}
             Atualizar
           </Button>
@@ -248,7 +291,9 @@ function ProfilesPage() {
         </div>
 
         {isLoading ? (
-          <p className="text-xs text-muted-foreground">Carregando perfis…</p>
+          <p className="text-xs text-muted-foreground" role="status">
+            Carregando perfis…
+          </p>
         ) : profiles.length === 0 ? (
           <Card>
             <CardContent className="space-y-3 p-8 text-center">
@@ -276,7 +321,7 @@ function ProfilesPage() {
             );
           })
         )}
-      </div>
+      </main>
     </AppShell>
   );
 }
