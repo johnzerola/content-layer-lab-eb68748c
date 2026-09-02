@@ -377,12 +377,10 @@ function EditorPage() {
           hasMedia={Boolean(localSrc ?? previewUrl(doc))}
           onLoaded={(file, objectUrl) => {
             setLocalSrc(objectUrl);
-            patchDoc(
-              { media: { ...doc.media, posterUrl: doc.media.posterUrl, originalUrl: doc.media.originalUrl } },
-              "midia",
-            );
-            void file;
+            // zera a duração para o <video> recalcular na nova mídia
+            patchDoc({ media: { ...doc.media, duration: 0 }, title: doc.title || file.name }, "midia");
           }}
+
         />
         <div className="ml-auto flex items-center gap-2">
           <select
