@@ -150,6 +150,17 @@ function EstilosPage() {
                     : t}
             </button>
           ))}
+
+        {tab === "prontos" && (
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar estilo"
+              className="ml-auto rounded-lg border border-border/60 bg-transparent px-3 py-1.5 text-xs"
+            />
+          )}
+        </div>
+
           {tab === "templates" && (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
@@ -224,16 +235,6 @@ function EstilosPage() {
             </div>
           </div>
         )}
-
-        {tab === "prontos" && (
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar estilo"
-              className="ml-auto rounded-lg border border-border/60 bg-transparent px-3 py-1.5 text-xs"
-            />
-          )}
-        </div>
 
         {tab === "layouts" && (
           <div className="space-y-4">
