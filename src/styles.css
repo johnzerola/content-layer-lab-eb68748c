@@ -777,14 +777,73 @@
   animation: vv-page-in 190ms var(--ease-out-expo) both;
 }
 
+/* botão morph: a borda acende ao passar/focar, sem mexer no layout */
+@utility aurora-hover {
+  &:hover::before,
+  &:focus-visible::before {
+    opacity: 1;
+    animation: vv-aurora-spin var(--aurora-speed) linear infinite;
+  }
+  &:hover::after,
+  &:focus-visible::after {
+    opacity: var(--aurora-glow-opacity);
+    animation: vv-aurora-spin var(--aurora-speed) linear infinite;
+  }
+}
+
+/* trilho deslizante (tabs / sidebar): luz que acompanha o item ativo */
+@utility aurora-rail {
+  background: linear-gradient(
+    120deg,
+    color-mix(in oklab, var(--color-primary) 90%, white),
+    #c05de0,
+    color-mix(in oklab, var(--color-primary) 90%, white)
+  );
+  background-size: 220% 100%;
+  animation: vv-aurora-rail 5s linear infinite;
+  box-shadow: 0 0 12px 1px color-mix(in oklab, var(--color-primary) 40%, transparent);
+}
+
+@keyframes vv-aurora-rail {
+  to {
+    background-position: 220% 0;
+  }
+}
+
+/* superfície do item ativo de tabs — desliza junto com o trilho */
+@utility aurora-slider {
+  transition:
+    transform var(--dur-panel) var(--ease-out-expo),
+    width var(--dur-panel) var(--ease-out-expo),
+    opacity var(--dur-fast) var(--ease-out-expo);
+}
+
+/* playhead vivo na timeline */
+@utility aurora-playhead {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--color-primary) 85%, white),
+    #c05de0,
+    color-mix(in oklab, var(--color-primary) 85%, white)
+  );
+  box-shadow: 0 0 10px 1px color-mix(in oklab, var(--color-primary) 55%, transparent);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .aurora-on::before,
   .aurora-on::after,
+  .aurora-hover:hover::before,
+  .aurora-hover:hover::after,
+  .aurora-rail,
   .aurora-sweep::after,
   .progress-light::after {
     animation: none !important;
+  }
+  .aurora-slider {
+    transition: none;
   }
   .page-in {
     animation: none;
   }
 }
+
