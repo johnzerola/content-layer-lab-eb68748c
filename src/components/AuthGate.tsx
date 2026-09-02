@@ -26,6 +26,8 @@ export function AuthGate({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState<"in" | "up">("in");
+
 
   useEffect(() => {
     const off = onAuth((u) => {
