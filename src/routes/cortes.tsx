@@ -5,7 +5,9 @@ import { toast } from "sonner";
 import { RequireAuth } from "@/components/RequireAuth";
 import { Button } from "@/components/ui/base";
 import { findClips } from "@/lib/clips";
+import { CutLibrary } from "@/components/CutLibrary";
 import {
+  captureCutThumbnail,
   cutAsSource,
   cutBinding,
   cutDuration,
@@ -18,6 +20,7 @@ import {
   upsertCuts,
   type CutRecord,
 } from "@/lib/editor/cuts";
+import { publishCuts } from "@/lib/editor/cuts.service";
 import { createInstance, listMyTemplates, updateInstance } from "@/lib/video-template/service";
 import type { VideoTemplateRecord } from "@/lib/video-template/types";
 
@@ -64,6 +67,8 @@ function CutsPage() {
   const [progress, setProgress] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
+  const [libraryKey, setLibraryKey] = useState(0);
+  const [publishing, setPublishing] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -103,14 +108,35 @@ function CutsPage() {
         toast.info("Nenhum corte encontrado neste vídeo.");
         return;
       }
-      const next = upsertCuts(cutsFromClips(clips, file));
+      const generated = cutsFromClips(clips, file);
+      const next = upsertCuts(generated);
       setCuts(next);
-      setSelected(cutsFromClips(clips, file)[0]?.id ?? null);
+      setSelected(generated[0]?.id ?? null);
       toast.success(`${clips.length} cortes gerados.`);
+      void publishToLibrary(generated);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao analisar o vídeo.");
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  /** Publica os cortes na biblioteca real, com miniatura e legenda. */
+  const publishToLibrary = async (list: CutRecord[]) => {
+    if (!file || !list.length) return;
+    setPublishing(true);
+    try {
+      const thumbs: Record<string, string | null> = {};
+      for (const cut of list) {
+        thumbs[cut.id] = await captureCutThumbnail(file, cut.start + Math.min(1, cutDuration(cut) / 4));
+      }
+      await publishCuts(list, thumbs);
+      setLibraryKey((k) => k + 1);
+      toast.success("Cortes publicados na biblioteca.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível publicar na biblioteca.");
+    } finally {
+      setPublishing(false);
     }
   };
 
@@ -181,6 +207,13 @@ function CutsPage() {
           {file && <span className="truncate text-sm text-muted-foreground">{file.name}</span>}
           <Button onClick={() => void analyze()} disabled={!file || analyzing}>
             {analyzing ? `Analisando… ${Math.round(progress * 100)}%` : "Gerar cortes"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => void publishToLibrary(visible)}
+            disabled={!file || !visible.length || publishing}
+          >
+            {publishing ? "Publicando…" : "Publicar na biblioteca"}
           </Button>
         </div>
       </section>
@@ -304,6 +337,15 @@ function CutsPage() {
           </div>
         </aside>
       </div>
+
+      <CutLibrary
+        refreshKey={libraryKey}
+        onPreview={(cut) => {
+          const local = cuts.find((c) => c.id === cut.id);
+          if (local) preview(local);
+          else if (file) registerSourceFile(sourceIdFor(file), file);
+        }}
+      />
     </div>
   );
 }

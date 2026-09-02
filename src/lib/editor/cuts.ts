@@ -129,3 +129,42 @@ export function readCutBinding(settings: Record<string, unknown> | undefined): C
     title: c.title ?? "",
   };
 }
+
+/** Gera uma miniatura JPEG (data URL) do vídeo em um instante do corte. */
+export async function captureCutThumbnail(
+  file: File,
+  time: number,
+  width = 320,
+): Promise<string | null> {
+  if (typeof document === "undefined") return null;
+  const url = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "auto";
+  video.src = url;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const onErr = () => reject(new Error("Falha ao ler o vídeo."));
+      video.onloadedmetadata = () => resolve();
+      video.onerror = onErr;
+    });
+    await new Promise<void>((resolve) => {
+      video.onseeked = () => resolve();
+      video.currentTime = Math.min(Math.max(0.1, time), Math.max(0.1, video.duration - 0.1));
+    });
+    const ratio = video.videoHeight / Math.max(1, video.videoWidth);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = Math.round(width * (ratio || 0.5625));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.7);
+  } catch {
+    return null;
+  } finally {
+    video.src = "";
+    URL.revokeObjectURL(url);
+  }
+}

@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { ResultLibrary } from "@/components/ResultLibrary";
+import { CutLibrary } from "@/components/CutLibrary";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
 import { listJobs } from "@/lib/jobs";
@@ -52,6 +53,10 @@ function BibliotecaPage() {
         </header>
 
         <ResultLibrary />
+
+        <div className="mt-10">
+          <CutLibrary />
+        </div>
       </div>
 
       {libOpen && (
