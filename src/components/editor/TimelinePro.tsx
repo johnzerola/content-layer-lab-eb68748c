@@ -213,7 +213,29 @@ export function TimelinePro({
               className="pointer-events-none absolute top-0 z-20 h-full w-px bg-primary"
               style={{ left: `${duration ? (currentTime / duration) * 100 : 0}%` }}
             />
+            {media && (
+              <div className="relative h-9 border-b border-border/30">
+                <div className="absolute left-0 top-0 z-20 flex h-full w-28 items-center gap-1 bg-card/80 px-2 text-[11px]">
+                  <span className="truncate">vídeo</span>
+                </div>
+                <div className="absolute inset-y-0 left-28 right-0">
+                  {(media.segments.length ? media.segments : [{ start: 0, end: duration }]).map((s, i) => (
+                    <div
+                      key={i}
+                      className="absolute top-1 h-7 truncate rounded-md border border-primary/40 bg-primary/30 px-3 text-[11px] leading-7"
+                      style={{
+                        left: `${duration ? (s.start / duration) * 100 : 0}%`,
+                        width: `${duration ? Math.max(1, ((s.end - s.start) / duration) * 100) : 100}%`,
+                      }}
+                    >
+                      {media.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {ordered.map((layer) => (
+
               <div key={layer.id} className="relative h-9 border-b border-border/30">
                 <div className="absolute left-0 top-0 z-20 flex h-full w-28 items-center gap-1 bg-card/80 px-2 text-[11px]">
                   <button
