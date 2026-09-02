@@ -661,7 +661,7 @@ function drawVideoLayer(
       box: { x: number; y: number; w: number; h: number },
       mode: "cover" | "contain",
       rect: typeof cr = cr,
-      style?: { blur?: number; dim?: number; useOffset?: boolean; voiceLevel?: number; musicLevel?: number },
+      style?: { blur?: number; dim?: number; useOffset?: boolean; voiceLevel?: number; musicLevel?: number; raw?: boolean },
     ) => {
 
       const fitScale =
@@ -681,7 +681,10 @@ function drawVideoLayer(
       ctx.rect(box.x, box.y, box.w, box.h);
       ctx.clip();
       const extraBlur = style?.blur ? ` blur(${style.blur}px)` : "";
-      ctx.filter = (baseFilter === "none" ? "" : baseFilter) + extraBlur || "none";
+      // raw: fundo desfocado fica natural — os ajustes (cor, desfoque etc.)
+      // valem só para a área do vídeo em primeiro plano
+      const base = style?.raw ? "" : baseFilter === "none" ? "" : baseFilter;
+      ctx.filter = (base + extraBlur).trim() || "none";
       ctx.translate(dx + dw / 2, dy + dh / 2);
       if (rect.quarter) ctx.rotate((rect.quarter * Math.PI) / 2);
       if (pre?.flipH) ctx.scale(-1, 1);
