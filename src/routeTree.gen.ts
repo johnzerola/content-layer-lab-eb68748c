@@ -30,6 +30,7 @@ import { Route as TermosRouteImport } from './routes/termos'
 import { Route as VendasRouteImport } from './routes/vendas'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as TemplatesNewRouteImport } from './routes/templates.new'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as ApiPublicCleanerCallbackRouteImport } from './routes/api/public/cleaner-callback'
@@ -154,6 +155,11 @@ const Char91DotwellKnownChar93OauthProtectedResourceRoute =
     path: '/.well-known/oauth-protected-resource',
     getParentRoute: () => rootRouteImport,
   } as any)
+const TemplatesNewRoute = TemplatesNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => TemplatesRoute,
+} as any)
 const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   id: '/.lovable/oauth/consent',
   path: '/.lovable/oauth/consent',
@@ -262,11 +268,12 @@ export interface FileRoutesByFullPath {
   '/metricas': typeof MetricasRoute
   '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
-  '/templates': typeof TemplatesRoute
+  '/templates': typeof TemplatesRouteWithChildren
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/templates/new': typeof TemplatesNewRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
@@ -301,11 +308,12 @@ export interface FileRoutesByTo {
   '/metricas': typeof MetricasRoute
   '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
-  '/templates': typeof TemplatesRoute
+  '/templates': typeof TemplatesRouteWithChildren
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/templates/new': typeof TemplatesNewRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
@@ -341,11 +349,12 @@ export interface FileRoutesById {
   '/metricas': typeof MetricasRoute
   '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
-  '/templates': typeof TemplatesRoute
+  '/templates': typeof TemplatesRouteWithChildren
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/templates/new': typeof TemplatesNewRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
@@ -387,6 +396,7 @@ export interface FileRouteTypes {
     | '/vendas'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/templates/new'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/cleaner-callback'
@@ -426,6 +436,7 @@ export interface FileRouteTypes {
     | '/vendas'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/templates/new'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/cleaner-callback'
@@ -465,6 +476,7 @@ export interface FileRouteTypes {
     | '/vendas'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/templates/new'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/cleaner-callback'
@@ -500,7 +512,7 @@ export interface RootRouteChildren {
   MetricasRoute: typeof MetricasRoute
   PerfisRoute: typeof PerfisRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
-  TemplatesRoute: typeof TemplatesRoute
+  TemplatesRoute: typeof TemplatesRouteWithChildren
   TermosRoute: typeof TermosRoute
   VendasRoute: typeof VendasRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
@@ -672,6 +684,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/templates/new': {
+      id: '/templates/new'
+      path: '/new'
+      fullPath: '/templates/new'
+      preLoaderRoute: typeof TemplatesNewRouteImport
+      parentRoute: typeof TemplatesRoute
+    }
     '/.lovable/oauth/consent': {
       id: '/.lovable/oauth/consent'
       path: '/.lovable/oauth/consent'
@@ -787,6 +806,18 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface TemplatesRouteChildren {
+  TemplatesNewRoute: typeof TemplatesNewRoute
+}
+
+const TemplatesRouteChildren: TemplatesRouteChildren = {
+  TemplatesNewRoute: TemplatesNewRoute,
+}
+
+const TemplatesRouteWithChildren = TemplatesRoute._addFileChildren(
+  TemplatesRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -804,7 +835,7 @@ const rootRouteChildren: RootRouteChildren = {
   MetricasRoute: MetricasRoute,
   PerfisRoute: PerfisRoute,
   PrivacidadeRoute: PrivacidadeRoute,
-  TemplatesRoute: TemplatesRoute,
+  TemplatesRoute: TemplatesRouteWithChildren,
   TermosRoute: TermosRoute,
   VendasRoute: VendasRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
