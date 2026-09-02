@@ -78,6 +78,9 @@ export async function openProjectForVideo(
     const found = await getEditorProject(projectId);
     if (found) return found;
   }
-  const doc = { ...createEditorProject(videoId, { title: fallback?.title }), ...fallback };
+  const doc = {
+    ...createEditorProject(videoId, fallback?.title ? { title: fallback.title } : {}),
+    ...fallback,
+  };
   return createEditorProjectRecord(doc as EditorProjectDoc);
 }
