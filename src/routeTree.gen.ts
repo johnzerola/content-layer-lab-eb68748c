@@ -27,11 +27,11 @@ import { Route as MetricasRouteImport } from './routes/metricas'
 import { Route as PerfisRouteImport } from './routes/perfis'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as ProjetosRouteImport } from './routes/projetos'
-import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as VendasRouteImport } from './routes/vendas'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as TemplatesIndexRouteImport } from './routes/templates.index'
 import { Route as TemplatesNewRouteImport } from './routes/templates.new'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
@@ -143,11 +143,6 @@ const ProjetosRoute = ProjetosRouteImport.update({
   path: '/projetos',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TemplatesRoute = TemplatesRouteImport.update({
-  id: '/templates',
-  path: '/templates',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const TermosRoute = TermosRouteImport.update({
   id: '/termos',
   path: '/termos',
@@ -170,10 +165,15 @@ const Char91DotwellKnownChar93OauthProtectedResourceRoute =
     path: '/.well-known/oauth-protected-resource',
     getParentRoute: () => rootRouteImport,
   } as any)
+const TemplatesIndexRoute = TemplatesIndexRouteImport.update({
+  id: '/templates/',
+  path: '/templates/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TemplatesNewRoute = TemplatesNewRouteImport.update({
-  id: '/new',
-  path: '/new',
-  getParentRoute: () => TemplatesRoute,
+  id: '/templates/new',
+  path: '/templates/new',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   id: '/.lovable/oauth/consent',
@@ -242,9 +242,9 @@ const IntegracoesYoutubeCallbackRoute =
     getParentRoute: () => rootRouteImport,
   } as any)
 const TemplatesIdEditRoute = TemplatesIdEditRouteImport.update({
-  id: '/$id/edit',
-  path: '/$id/edit',
-  getParentRoute: () => TemplatesRoute,
+  id: '/templates/$id/edit',
+  path: '/templates/$id/edit',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicHooksProcessBatchRoute =
   ApiPublicHooksProcessBatchRouteImport.update({
@@ -302,12 +302,12 @@ export interface FileRoutesByFullPath {
   '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
   '/projetos': typeof ProjetosRoute
-  '/templates': typeof TemplatesRouteWithChildren
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/templates/new': typeof TemplatesNewRoute
+  '/templates/': typeof TemplatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
@@ -347,12 +347,12 @@ export interface FileRoutesByTo {
   '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
   '/projetos': typeof ProjetosRoute
-  '/templates': typeof TemplatesRouteWithChildren
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/templates/new': typeof TemplatesNewRoute
+  '/templates': typeof TemplatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
@@ -393,12 +393,12 @@ export interface FileRoutesById {
   '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
   '/projetos': typeof ProjetosRoute
-  '/templates': typeof TemplatesRouteWithChildren
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/templates/new': typeof TemplatesNewRoute
+  '/templates/': typeof TemplatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
@@ -440,12 +440,12 @@ export interface FileRouteTypes {
     | '/perfis'
     | '/privacidade'
     | '/projetos'
-    | '/templates'
     | '/termos'
     | '/vendas'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/templates/new'
+    | '/templates/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/cleaner-callback'
@@ -485,12 +485,12 @@ export interface FileRouteTypes {
     | '/perfis'
     | '/privacidade'
     | '/projetos'
-    | '/templates'
     | '/termos'
     | '/vendas'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/templates/new'
+    | '/templates'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/cleaner-callback'
@@ -530,12 +530,12 @@ export interface FileRouteTypes {
     | '/perfis'
     | '/privacidade'
     | '/projetos'
-    | '/templates'
     | '/termos'
     | '/vendas'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/templates/new'
+    | '/templates/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/cleaner-callback'
@@ -576,11 +576,12 @@ export interface RootRouteChildren {
   PerfisRoute: typeof PerfisRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   ProjetosRoute: typeof ProjetosRoute
-  TemplatesRoute: typeof TemplatesRouteWithChildren
   TermosRoute: typeof TermosRoute
   VendasRoute: typeof VendasRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  TemplatesNewRoute: typeof TemplatesNewRoute
+  TemplatesIndexRoute: typeof TemplatesIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicCleanerCallbackRoute: typeof ApiPublicCleanerCallbackRoute
@@ -593,6 +594,7 @@ export interface RootRouteChildren {
   IntegracoesInstagramCallbackRoute: typeof IntegracoesInstagramCallbackRoute
   IntegracoesTiktokCallbackRoute: typeof IntegracoesTiktokCallbackRoute
   IntegracoesYoutubeCallbackRoute: typeof IntegracoesYoutubeCallbackRoute
+  TemplatesIdEditRoute: typeof TemplatesIdEditRoute
   ApiPublicHooksProcessBatchRoute: typeof ApiPublicHooksProcessBatchRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
   ApiPublicHooksSyncSocialRoute: typeof ApiPublicHooksSyncSocialRoute
@@ -729,13 +731,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjetosRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/templates': {
-      id: '/templates'
-      path: '/templates'
-      fullPath: '/templates'
-      preLoaderRoute: typeof TemplatesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/termos': {
       id: '/termos'
       path: '/termos'
@@ -764,12 +759,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/templates/': {
+      id: '/templates/'
+      path: '/templates'
+      fullPath: '/templates/'
+      preLoaderRoute: typeof TemplatesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/templates/new': {
       id: '/templates/new'
-      path: '/new'
+      path: '/templates/new'
       fullPath: '/templates/new'
       preLoaderRoute: typeof TemplatesNewRouteImport
-      parentRoute: typeof TemplatesRoute
+      parentRoute: typeof rootRouteImport
     }
     '/.lovable/oauth/consent': {
       id: '/.lovable/oauth/consent'
@@ -857,10 +859,10 @@ declare module '@tanstack/react-router' {
     }
     '/templates/$id/edit': {
       id: '/templates/$id/edit'
-      path: '/$id/edit'
+      path: '/templates/$id/edit'
       fullPath: '/templates/$id/edit'
       preLoaderRoute: typeof TemplatesIdEditRouteImport
-      parentRoute: typeof TemplatesRoute
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/process-batch': {
       id: '/api/public/hooks/process-batch'
@@ -907,20 +909,6 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface TemplatesRouteChildren {
-  TemplatesNewRoute: typeof TemplatesNewRoute
-  TemplatesIdEditRoute: typeof TemplatesIdEditRoute
-}
-
-const TemplatesRouteChildren: TemplatesRouteChildren = {
-  TemplatesNewRoute: TemplatesNewRoute,
-  TemplatesIdEditRoute: TemplatesIdEditRoute,
-}
-
-const TemplatesRouteWithChildren = TemplatesRoute._addFileChildren(
-  TemplatesRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -940,12 +928,13 @@ const rootRouteChildren: RootRouteChildren = {
   PerfisRoute: PerfisRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   ProjetosRoute: ProjetosRoute,
-  TemplatesRoute: TemplatesRouteWithChildren,
   TermosRoute: TermosRoute,
   VendasRoute: VendasRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  TemplatesNewRoute: TemplatesNewRoute,
+  TemplatesIndexRoute: TemplatesIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicCleanerCallbackRoute: ApiPublicCleanerCallbackRoute,
@@ -958,6 +947,7 @@ const rootRouteChildren: RootRouteChildren = {
   IntegracoesInstagramCallbackRoute: IntegracoesInstagramCallbackRoute,
   IntegracoesTiktokCallbackRoute: IntegracoesTiktokCallbackRoute,
   IntegracoesYoutubeCallbackRoute: IntegracoesYoutubeCallbackRoute,
+  TemplatesIdEditRoute: TemplatesIdEditRoute,
   ApiPublicHooksProcessBatchRoute: ApiPublicHooksProcessBatchRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
   ApiPublicHooksSyncSocialRoute: ApiPublicHooksSyncSocialRoute,
