@@ -96,14 +96,10 @@ export function SavedProjects() {
         {filtered.map((p) => {
           const hasFile = Boolean(getSourceFile(p.doc.videoId));
           const layers = p.doc.composition?.layers?.length ?? 0;
-          const segs = p.doc.preedit?.segments?.length ?? 0;
-          const keys = p.doc.preedit?.keyframes?.length ?? 0;
-          const audio = p.doc.audio;
-          const audioBits = [
-            audio?.music?.src ? "música" : null,
-            audio?.narration?.src ? "narração" : null,
-            audio?.voiceover?.src ? "gravação" : null,
-          ].filter(Boolean);
+          const keys = p.doc.preedit?.keys?.length ?? 0;
+          const cuts = p.doc.removedRanges?.length ?? 0;
+          const tracks = p.doc.audio?.tracks ?? [];
+          const audioBits = Array.from(new Set(tracks.map((t) => t.kind)));
           return (
             <article key={p.id} className="glass space-y-2 rounded-2xl border border-border/60 p-3">
               <div className="flex items-baseline justify-between gap-2">
@@ -111,7 +107,7 @@ export function SavedProjects() {
                 <span className="mono-label">{seconds(p.doc.media?.duration)}</span>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                {layers} camadas · {segs || 1} trecho(s) · {keys} keyframes ·{" "}
+                {layers} camadas · {cuts} corte(s) · {keys} keyframes ·{" "}
                 {audioBits.length ? audioBits.join(" + ") : "sem áudio extra"}
               </p>
               <p className="text-[11px] text-muted-foreground">
