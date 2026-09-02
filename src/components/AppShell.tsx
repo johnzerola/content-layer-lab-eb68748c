@@ -220,23 +220,115 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
     root.classList.add(`theme-${mode}`);
   }, [mode]);
 
-  const routeLink = (to: string, label: string, Icon: typeof Layers) => (
+  const routeLink = (
+    to: string,
+    label: string,
+    Icon: typeof Layers,
+    expanded = open,
+    close?: () => void,
+  ) => (
     <Link
       key={to}
       to={to as any}
       title={label}
+      onClick={close}
       aria-current={pathname.startsWith(to) ? "page" : undefined}
-      className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors duration-150 ${
+      className={`flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors duration-150 ${
         pathname.startsWith(to)
           ? "bg-surface-2 text-foreground"
           : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-      } ${open ? "" : "justify-center px-0"}`}
+      } ${expanded ? "" : "justify-center px-0"}`}
     >
       <Icon
         className={`size-[17px] shrink-0 ${pathname.startsWith(to) ? "text-primary" : ""}`}
       />
-      {open && <span className="truncate">{label}</span>}
+      {expanded && <span className="truncate">{label}</span>}
     </Link>
+  );
+
+  /** Navegação agrupada por fluxo — reaproveitada na sidebar e no menu mobile. */
+  const navSections = (expanded: boolean, close?: () => void) => (
+    <>
+      <nav className="flex flex-col gap-0.5 px-3" aria-label="Criar">
+        {expanded && <p className="mono-label px-2.5 pb-1.5 pt-2">1 · Criar</p>}
+        {MODES.filter((m) => m.id !== "external").map((m) => (
+          <NavItem
+            key={m.id}
+            open={expanded}
+            active={m.id === mode && !onFixedRoute}
+            label={m.brand}
+            hint={expanded ? m.hint : undefined}
+            icon={m.icon}
+            onClick={() => {
+              onMode(m.id);
+              close?.();
+            }}
+            badge={
+              (counts?.[m.id] ?? 0) > 0 ? (
+                <span className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                  {counts?.[m.id]}
+                </span>
+              ) : undefined
+            }
+          />
+        ))}
+        {routeLink("/fotos", "FotoViral", Images, expanded, close)}
+      </nav>
+
+      <div className="mt-4 flex flex-col gap-0.5 px-3">
+        {expanded && <p className="mono-label px-2.5 pb-1.5">2 · Produção</p>}
+        <NavItem
+          open={expanded}
+          label="Templates"
+          icon={Library}
+          onClick={() => {
+            onLibrary();
+            close?.();
+          }}
+        />
+        {routeLink("/biblioteca", "Resultados", History, expanded, close)}
+        {routeLink("/armazenamento", "Armazenamento", HardDrive, expanded, close)}
+        <NavItem
+          open={expanded}
+          label="Nuvem"
+          icon={Cloud}
+          onClick={() => {
+            onCloud();
+            close?.();
+          }}
+        />
+      </div>
+
+      <div className="mt-4 flex flex-col gap-0.5 px-3">
+        {expanded && <p className="mono-label px-2.5 pb-1.5">3 · Distribuição</p>}
+        {routeLink("/agenda", "Agenda", CalendarClock, expanded, close)}
+        {routeLink("/perfis", "Perfis", Users, expanded, close)}
+        {routeLink("/live", "Monitora Live", Radio, expanded, close)}
+        {routeLink("/metricas", "Métricas", BarChart3, expanded, close)}
+      </div>
+
+      <div className="mt-4 flex flex-col gap-0.5 px-3">
+        {expanded && <p className="mono-label px-2.5 pb-1.5">Workspace</p>}
+        {routeLink("/integracoes", "Integrações", Settings2, expanded, close)}
+        {isAdmin && routeLink("/admin", "Admin", Shield, expanded, close)}
+      </div>
+    </>
+  );
+
+  const brandBlock = (expanded: boolean) => (
+    <div className={`flex items-center gap-2.5 px-4 py-4 ${expanded ? "" : "justify-center px-0"}`}>
+      <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary font-display text-[13px] font-semibold text-primary-foreground">
+        {current.mark}
+      </div>
+      {expanded && (
+        <div className="min-w-0">
+          <p className="truncate font-display text-[15px] font-semibold tracking-tight text-foreground">
+            {current.brand}
+          </p>
+          <p className="truncate text-[11px] text-[var(--muted-2)]">{current.tagline}</p>
+        </div>
+      )}
+    </div>
   );
 
   return (
@@ -247,71 +339,15 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           open ? "w-[244px]" : "w-[68px]"
         }`}
       >
-        <div className={`flex items-center gap-2.5 px-4 py-4 ${open ? "" : "justify-center px-0"}`}>
-          <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary font-display text-[13px] font-semibold text-primary-foreground">
-            {current.mark}
-          </div>
-          {open && (
-            <div className="min-w-0">
-              <p className="truncate font-display text-[15px] font-semibold tracking-tight text-foreground">
-                {current.brand}
-              </p>
-              <p className="truncate text-[11px] text-[var(--muted-2)]">{current.tagline}</p>
-            </div>
-          )}
-        </div>
-
-        <nav className="flex flex-col gap-0.5 px-3">
-          {open && <p className="mono-label px-2.5 pb-1.5 pt-2">Criar</p>}
-          {MODES.filter((m) => m.id !== "external").map((m) => (
-            <NavItem
-              key={m.id}
-              open={open}
-              active={m.id === mode && !onFixedRoute}
-              label={m.brand}
-              hint={open ? m.hint : undefined}
-              icon={m.icon}
-              onClick={() => onMode(m.id)}
-              badge={
-                (counts?.[m.id] ?? 0) > 0 ? (
-                  <span className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-                    {counts?.[m.id]}
-                  </span>
-                ) : undefined
-              }
-            />
-          ))}
-          {routeLink("/fotos", "FotoViral", Images)}
-        </nav>
-
-        <div className="mt-4 flex flex-col gap-0.5 px-3">
-          {open && <p className="mono-label px-2.5 pb-1.5">Produção</p>}
-          <NavItem open={open} label="Templates" icon={Library} onClick={onLibrary} />
-          {routeLink("/biblioteca", "Resultados", History)}
-          {routeLink("/armazenamento", "Armazenamento", HardDrive)}
-          <NavItem open={open} label="Nuvem" icon={Cloud} onClick={onCloud} />
-        </div>
-
-        <div className="mt-4 flex flex-col gap-0.5 px-3">
-          {open && <p className="mono-label px-2.5 pb-1.5">Distribuição</p>}
-          {routeLink("/agenda", "Agenda", CalendarClock)}
-          {routeLink("/perfis", "Perfis", Users)}
-          {routeLink("/live", "Monitora Live", Radio)}
-          {routeLink("/metricas", "Métricas", BarChart3)}
-        </div>
-
-        <div className="mt-4 flex flex-col gap-0.5 px-3">
-          {open && <p className="mono-label px-2.5 pb-1.5">Workspace</p>}
-          {routeLink("/integracoes", "Integrações", Settings2)}
-          {isAdmin && routeLink("/admin", "Admin", Shield)}
-        </div>
+        {brandBlock(open)}
+        {navSections(open)}
 
         <div className="mt-auto p-3">
           <button
             onClick={() => setOpen((v) => !v)}
             aria-label={open ? "Recolher menu" : "Expandir menu"}
             aria-expanded={open}
-            className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground ${
+            className={`flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground ${
               open ? "" : "justify-center px-0"
             }`}
           >
@@ -324,6 +360,37 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           </button>
         </div>
       </aside>
+
+      {/* menu mobile / tablet */}
+      {mobileNav && (
+        <div
+          className="fixed inset-0 z-[60] md:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu"
+        >
+          <button
+            aria-label="Fechar menu"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setMobileNav(false)}
+          />
+          <div className="drawer-in absolute inset-y-0 left-0 flex w-[86vw] max-w-[300px] flex-col overflow-y-auto border-r border-border bg-[var(--background-2)] pb-6">
+            <div className="flex items-center justify-between pr-3">
+              {brandBlock(true)}
+              <button
+                type="button"
+                aria-label="Fechar menu"
+                onClick={() => setMobileNav(false)}
+                className="grid size-11 place-items-center rounded-lg text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            {navSections(true, () => setMobileNav(false))}
+          </div>
+        </div>
+      )}
+
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-[20] border-b border-border bg-[color-mix(in_srgb,var(--background)_88%,transparent)] backdrop-blur-md">
