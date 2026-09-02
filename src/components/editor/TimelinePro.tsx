@@ -271,11 +271,12 @@ export function TimelinePro({
                 </div>
               </div>
             ))}
-            {!ordered.length && (
+            {!ordered.length && !media && (
               <p className="p-4 text-xs text-muted-foreground">
                 Nenhuma camada ainda. Aplique um template ou adicione texto/mídia.
               </p>
             )}
+
           </div>
         </div>
       </div>
