@@ -463,6 +463,19 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
                 <Menu className="size-5" />
               </button>
 
+              <nav
+                aria-label="Trilha"
+                className="hidden min-w-0 shrink items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--muted-2)] lg:flex"
+              >
+                <span className="text-foreground">VaiViral</span>
+                <span className="text-border">/</span>
+                <span className="truncate">
+                  {onFixedRoute
+                    ? (pathname.split("/")[1] ?? "").replace(/-/g, " ") || "estúdio"
+                    : current.brand}
+                </span>
+              </nav>
+
               <GlobalActionBar className="max-w-md" />
             </div>
             <div className="flex shrink-0 items-center gap-2">
@@ -487,14 +500,20 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
                   title="Plano e créditos"
                   className="hidden items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[12px] text-muted-foreground transition hover:border-[var(--border-hover)] hover:text-foreground sm:inline-flex"
                 >
-                  <span className="text-foreground">{plan.name}</span>
-                  <span className="text-[var(--muted-2)]">·</span>
-                  {plan.credits === null ? "ilimitado" : `${sub.credits} créditos`}
+                  <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-foreground">
+                    {plan.name}
+                  </span>
+                  <span className="text-border">/</span>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.1em]">
+                    {plan.credits === null ? "ilimitado" : `${sub.credits} créditos`}
+                  </span>
                 </Link>
               )}
               <span className="hidden items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[12px] text-muted-foreground sm:inline-flex">
                 <span className="size-1.5 rounded-full bg-success" aria-hidden />
-                {count} vídeo{count === 1 ? "" : "s"}
+                <span className="font-mono text-[10px] uppercase tracking-[0.1em]">
+                  {count} vídeo{count === 1 ? "" : "s"}
+                </span>
               </span>
             </div>
           </div>
