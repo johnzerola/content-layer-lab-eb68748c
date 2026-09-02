@@ -151,9 +151,9 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
   }, [mode]);
 
   return (
-    <div className={`theme-${mode} flex min-h-dvh w-full bg-background`}>
+    <div className={`theme-${mode} flex min-h-dvh w-full aurora-bg`}>
       <aside
-        className={`sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-border/70 bg-surface/60 backdrop-blur transition-[width] duration-300 md:flex ${
+        className={`sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-border/60 bg-surface/50 backdrop-blur-xl transition-[width] duration-300 md:flex ${
           open ? "w-[16.5rem]" : "w-[4.5rem]"
         }`}
       >
@@ -342,7 +342,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur">
+        <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/55">
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 py-3 sm:gap-4 sm:px-6">
             <div className="flex min-w-0 items-center gap-3">
               <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-primary/35 bg-primary/12 text-primary md:hidden">
