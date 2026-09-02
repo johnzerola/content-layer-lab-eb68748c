@@ -622,7 +622,8 @@ function AgendaPage() {
                   </div>
                 ))}
               </div>
-            </section>
+              </section>
+            </div>
           </div>
         )}
       </main>
