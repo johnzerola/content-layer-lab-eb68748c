@@ -43,6 +43,7 @@ import { Route as IntegracoesFacebookCallbackRouteImport } from './routes/integr
 import { Route as IntegracoesInstagramCallbackRouteImport } from './routes/integracoes_.instagram.callback'
 import { Route as IntegracoesTiktokCallbackRouteImport } from './routes/integracoes_.tiktok.callback'
 import { Route as IntegracoesYoutubeCallbackRouteImport } from './routes/integracoes_.youtube.callback'
+import { Route as TemplatesIdEditRouteImport } from './routes/templates.$id.edit'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
 import { Route as ApiPublicHooksSyncSocialRouteImport } from './routes/api/public/hooks/sync-social'
 import { Route as ApiPublicMetaDataDeletionRouteImport } from './routes/api/public/meta.data-deletion'
@@ -226,6 +227,11 @@ const IntegracoesYoutubeCallbackRoute =
     path: '/integracoes/youtube/callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const TemplatesIdEditRoute = TemplatesIdEditRouteImport.update({
+  id: '/$id/edit',
+  path: '/$id/edit',
+  getParentRoute: () => TemplatesRoute,
+} as any)
 const ApiPublicHooksPublishDueRoute =
   ApiPublicHooksPublishDueRouteImport.update({
     id: '/api/public/hooks/publish-due',
@@ -286,6 +292,7 @@ export interface FileRoutesByFullPath {
   '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/integracoes/youtube/callback': typeof IntegracoesYoutubeCallbackRoute
+  '/templates/$id/edit': typeof TemplatesIdEditRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/hooks/sync-social': typeof ApiPublicHooksSyncSocialRoute
   '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
@@ -326,6 +333,7 @@ export interface FileRoutesByTo {
   '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/integracoes/youtube/callback': typeof IntegracoesYoutubeCallbackRoute
+  '/templates/$id/edit': typeof TemplatesIdEditRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/hooks/sync-social': typeof ApiPublicHooksSyncSocialRoute
   '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
@@ -367,6 +375,7 @@ export interface FileRoutesById {
   '/integracoes_/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes_/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/integracoes_/youtube/callback': typeof IntegracoesYoutubeCallbackRoute
+  '/templates/$id/edit': typeof TemplatesIdEditRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/hooks/sync-social': typeof ApiPublicHooksSyncSocialRoute
   '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
@@ -409,6 +418,7 @@ export interface FileRouteTypes {
     | '/integracoes/instagram/callback'
     | '/integracoes/tiktok/callback'
     | '/integracoes/youtube/callback'
+    | '/templates/$id/edit'
     | '/api/public/hooks/publish-due'
     | '/api/public/hooks/sync-social'
     | '/api/public/meta/data-deletion'
@@ -449,6 +459,7 @@ export interface FileRouteTypes {
     | '/integracoes/instagram/callback'
     | '/integracoes/tiktok/callback'
     | '/integracoes/youtube/callback'
+    | '/templates/$id/edit'
     | '/api/public/hooks/publish-due'
     | '/api/public/hooks/sync-social'
     | '/api/public/meta/data-deletion'
@@ -489,6 +500,7 @@ export interface FileRouteTypes {
     | '/integracoes_/instagram/callback'
     | '/integracoes_/tiktok/callback'
     | '/integracoes_/youtube/callback'
+    | '/templates/$id/edit'
     | '/api/public/hooks/publish-due'
     | '/api/public/hooks/sync-social'
     | '/api/public/meta/data-deletion'
@@ -775,6 +787,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IntegracoesYoutubeCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/templates/$id/edit': {
+      id: '/templates/$id/edit'
+      path: '/$id/edit'
+      fullPath: '/templates/$id/edit'
+      preLoaderRoute: typeof TemplatesIdEditRouteImport
+      parentRoute: typeof TemplatesRoute
+    }
     '/api/public/hooks/publish-due': {
       id: '/api/public/hooks/publish-due'
       path: '/api/public/hooks/publish-due'
@@ -808,10 +827,12 @@ declare module '@tanstack/react-router' {
 
 interface TemplatesRouteChildren {
   TemplatesNewRoute: typeof TemplatesNewRoute
+  TemplatesIdEditRoute: typeof TemplatesIdEditRoute
 }
 
 const TemplatesRouteChildren: TemplatesRouteChildren = {
   TemplatesNewRoute: TemplatesNewRoute,
+  TemplatesIdEditRoute: TemplatesIdEditRoute,
 }
 
 const TemplatesRouteWithChildren = TemplatesRoute._addFileChildren(
