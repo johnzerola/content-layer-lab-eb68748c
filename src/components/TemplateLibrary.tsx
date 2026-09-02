@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Copy, Download, History, RotateCcw, Trash2, Upload, X, Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { STARTER_PRESETS } from "@/lib/presets";
+import { STARTER_PRESETS, type PresetCategory } from "@/lib/presets";
+import { PresetThumb } from "@/components/PresetThumb";
 import {
   deleteTemplate,
   duplicateTemplate,
@@ -23,6 +24,16 @@ interface Props {
 
 }
 
+const CATEGORIES: ("Todos" | PresetCategory)[] = [
+  "Todos",
+  "Fofoca",
+  "Notícia",
+  "Podcast",
+  "Viral",
+  "UGC",
+  "Minimal",
+];
+
 const fmt = (ts?: number) =>
   ts ? new Date(ts).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—";
 
@@ -33,6 +44,16 @@ export function TemplateLibrary({ templates, activeId, onClose, onChangeList, on
   const [draftName, setDraftName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [category, setCategory] = useState<"Todos" | PresetCategory>("Todos");
+
+  const thumbs = useMemo(
+    () => Object.fromEntries(STARTER_PRESETS.map((p) => [p.id, p.build()])),
+    [],
+  );
+  const visiblePresets = useMemo(
+    () => STARTER_PRESETS.filter((p) => category === "Todos" || p.category === category),
+    [category],
+  );
 
   useEffect(() => {
     setVersions(openHistory ? loadVersions(openHistory) : []);
@@ -78,29 +99,52 @@ export function TemplateLibrary({ templates, activeId, onClose, onChangeList, on
         {error && <p className="mb-3 text-xs text-destructive">{error}</p>}
 
         <div className="mb-5">
-          <div className="mb-2 flex items-center gap-2">
-            <Sparkles className="size-4 text-primary" />
-            <p className="mono-label">Modelos prontos</p>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="size-4 text-primary" />
+              <p className="mono-label">Modelos prontos ({STARTER_PRESETS.length})</p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {CATEGORIES.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setCategory(c)}
+                  aria-pressed={category === c}
+                  className={`rounded-full border px-3 py-1 text-[11px] transition-colors ${
+                    category === c
+                      ? "border-primary bg-primary/15 text-foreground"
+                      : "border-border text-muted-foreground hover:border-primary/60 hover:text-foreground"
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {STARTER_PRESETS.map((p) => (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {visiblePresets.map((p) => (
               <div
                 key={p.id}
-                className="rounded-xl border border-border bg-surface-2 p-3 transition-colors hover:border-primary"
+                className="group flex gap-3 rounded-xl border border-border bg-surface-2 p-3 transition-colors hover:border-primary"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{p.name}</p>
-                    <span
-                      className="mt-1 inline-block rounded-full px-2 py-0.5 text-[11px]"
-                      style={{ color: p.accent, border: `1px solid ${p.accent}55` }}
-                    >
-                      {p.tag}
-                    </span>
-                  </div>
+                <div className="shrink-0 overflow-hidden rounded-lg border border-border/70">
+                  <PresetThumb template={thumbs[p.id]!} width={78} />
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <p className="truncate text-sm font-semibold">{p.name}</p>
+                  <span
+                    className="mt-1 inline-block w-fit rounded-full px-2 py-0.5 text-[11px]"
+                    style={{ color: p.accent, border: `1px solid ${p.accent}55` }}
+                  >
+                    {p.tag}
+                  </span>
+                  <p className="mt-1.5 line-clamp-3 text-[11px] leading-snug text-muted-foreground">
+                    {p.description}
+                  </p>
                   <Button
                     size="sm"
                     variant="outline"
+                    className="mt-2 w-full"
                     onClick={() => {
                       const t = p.build();
                       onUse(onCommit(t, "modelo pronto") || t);
@@ -108,13 +152,12 @@ export function TemplateLibrary({ templates, activeId, onClose, onChangeList, on
                   >
                     Usar
                   </Button>
-
                 </div>
-                <p className="mt-2 text-xs leading-snug text-muted-foreground">{p.description}</p>
               </div>
             ))}
           </div>
         </div>
+
 
         {templates.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
