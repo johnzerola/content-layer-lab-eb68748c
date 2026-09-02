@@ -1,4 +1,4 @@
-/** Facebook Login: autoriza Páginas do Facebook e contas Instagram profissionais. */
+/** Facebook Login: autoriza Páginas do Facebook. */
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { facebookGraphBase, metaGraphVersion } from "@/lib/meta.server";
 import { MetaLinkError } from "@/lib/social-linking.server";
@@ -10,25 +10,23 @@ const FACEBOOK_PAGE_FIELDS_FALLBACK =
   "id,name,access_token,tasks,instagram_business_account{id,username,name}";
 
 /**
- * Permissões mínimas do fluxo usado por este projeto.
+ * Permissões mínimas do fluxo de Páginas usado por este projeto.
  *
- * `pages_read_engagement` é necessária para descobrir Páginas e a conta
- * Instagram vinculada por `GET /me/accounts`. A permissão também precisa estar
- * adicionada ao caso de uso do app no painel da Meta; código não ativa uma
- * permissão externa que ainda aparece como "Adicionar" no App Dashboard.
+ * `pages_show_list` lista as Páginas do usuário, `pages_read_engagement`
+ * permite consultar a Página e `pages_manage_posts` é a permissão de publicação.
+ * Instagram usa o fluxo próprio em `meta-oauth.server.ts`; misturar escopos de
+ * Instagram/Business no login de Páginas pode fazer a Meta bloquear usuários
+ * públicos antes mesmo de devolver o código OAuth.
  */
 export const FACEBOOK_SCOPES = [
   "pages_show_list",
   "pages_read_engagement",
-  "business_management",
   "pages_manage_posts",
-  "instagram_basic",
-  "instagram_content_publish",
 ] as const;
 
 export function facebookScopes(_environment: NodeJS.ProcessEnv = process.env): string[] {
-  // O fluxo combinado sempre descobre Páginas e Instagram antes de publicar;
-  // por isso todos os scopes abaixo são invariantes, não configuração de deploy.
+  // O fluxo de Facebook fica limitado a Páginas para evitar bloqueios de
+  // permissões Instagram/Business no Login clássico.
   return [...FACEBOOK_SCOPES];
 }
 
@@ -230,7 +228,7 @@ export function facebookConfigChecklist(
     permissionSource: mode === "classic" ? "manual-scope" : "meta-business-configuration",
     permissionWarning:
       mode === "business"
-        ? "No modo Business, confirme que a configuração publicada da Meta contém todos os scopes obrigatórios, incluindo pages_read_engagement."
+        ? "No modo Business, confirme que a configuração publicada da Meta contém todos os scopes obrigatórios, incluindo pages_show_list, pages_read_engagement e pages_manage_posts."
         : "No modo clássico, cada scope enviado também precisa aparecer como adicionado no caso de uso do App Dashboard da Meta.",
     redirectUri,
     siteUrl,
