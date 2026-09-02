@@ -9,6 +9,7 @@ import {
   type EditorAudio,
 } from "@/lib/editor/audio";
 import { NARRATION_VOICES, generateNarration } from "@/lib/tts.functions";
+import { SoundLibrary } from "@/components/editor/SoundLibrary";
 
 const NARRATION_TONES: { id: string; label: string; prompt: string }[] = [
   { id: "viral", label: "Viral / energia alta", prompt: "Narre em português do Brasil com energia alta de vídeo curto, ritmo acelerado e ênfase nas primeiras palavras." },

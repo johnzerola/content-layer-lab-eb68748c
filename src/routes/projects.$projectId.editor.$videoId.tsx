@@ -18,6 +18,7 @@ import {
 import { RequireAuth } from "@/components/RequireAuth";
 import { TranscriptPanel } from "@/components/editor/TranscriptPanel";
 import { CaptionStylePanel } from "@/components/editor/CaptionStylePanel";
+import { StylesPanel } from "@/components/editor/StylesPanel";
 import { TimelinePro } from "@/components/editor/TimelinePro";
 import { BatchApplyModal } from "@/components/editor/BatchApplyModal";
 import { TransitionPicker } from "@/components/editor/TransitionPicker";
@@ -464,7 +465,7 @@ function EditorPage() {
                 onCutOnRemoveChange={setCutOnRemove}
               />
             ) : (
-              <CaptionStylePanel
+              <StylesPanel
                 presetId={doc.captionPresetId}
                 style={captionLayer?.style ?? captionPreset.style}
                 onApplyPreset={(preset) => {
