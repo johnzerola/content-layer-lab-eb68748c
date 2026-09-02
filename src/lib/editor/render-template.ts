@@ -77,6 +77,85 @@ function activeAt(layer: TemplateLayer, t: number): boolean {
   return true;
 }
 
+const EASE: Record<string, (k: number) => number> = {
+  linear: (k) => k,
+  easeIn: (k) => k * k,
+  easeOut: (k) => 1 - Math.pow(1 - k, 3),
+  easeInOut: (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2),
+};
+
+interface AnimState {
+  alpha: number;
+  scale: number;
+  dx: number;
+  dy: number;
+  rotate: number;
+}
+
+const NEUTRAL_ANIM: AnimState = { alpha: 1, scale: 1, dx: 0, dy: 0, rotate: 0 };
+
+/** Estado visual de uma animação (entrada/saída/loop) em `k` de 0 a 1. */
+function animState(spec: AnimationSpec | null | undefined, k: number, outward: boolean, loop = false): AnimState {
+  if (!spec || !spec.type || spec.type === "none") return NEUTRAL_ANIM;
+  const e = (EASE[spec.easing] ?? EASE["easeOut"]!)(Math.min(1, Math.max(0, k)));
+  const inv = 1 - e;
+  const dir = outward ? -1 : 1;
+  switch (spec.type) {
+    case "fadeIn":
+      return { ...NEUTRAL_ANIM, alpha: e };
+    case "slideUp":
+      return { ...NEUTRAL_ANIM, alpha: e, dy: dir * inv * 0.25 };
+    case "slideDown":
+      return { ...NEUTRAL_ANIM, alpha: e, dy: -dir * inv * 0.25 };
+    case "slideLeft":
+      return { ...NEUTRAL_ANIM, alpha: e, dx: dir * inv * 0.25 };
+    case "slideRight":
+      return { ...NEUTRAL_ANIM, alpha: e, dx: -dir * inv * 0.25 };
+    case "scaleIn":
+    case "zoom":
+      return { ...NEUTRAL_ANIM, alpha: e, scale: 0.7 + e * 0.3 };
+    case "pop":
+      return { ...NEUTRAL_ANIM, alpha: e, scale: 0.6 + Math.sin(e * Math.PI * 0.5) * 0.45 };
+    case "bounce":
+      return { ...NEUTRAL_ANIM, alpha: e, dy: -Math.abs(Math.sin(inv * Math.PI * 2)) * 0.06 };
+    case "pulse":
+      return loop
+        ? { ...NEUTRAL_ANIM, scale: 1 + Math.sin(k * Math.PI * 2) * 0.05 }
+        : { ...NEUTRAL_ANIM, alpha: e, scale: 0.95 + e * 0.05 };
+    case "shake":
+      return { ...NEUTRAL_ANIM, dx: Math.sin(k * Math.PI * 8) * 0.01 };
+    case "float":
+      return { ...NEUTRAL_ANIM, dy: Math.sin(k * Math.PI * 2) * 0.02 };
+    case "spin":
+      return { ...NEUTRAL_ANIM, rotate: k * 360 };
+    default:
+      return { ...NEUTRAL_ANIM, alpha: e };
+  }
+}
+
+/** Junta entrada, saída e loop de uma camada no instante `t`. */
+function layerAnim(layer: TemplateLayer, t: number): AnimState {
+  const local = t - layer.startTime;
+  let s: AnimState = NEUTRAL_ANIM;
+  const inSpec = layer.animationIn;
+  if (inSpec && inSpec.duration > 0) {
+    const k = (local - (inSpec.delay || 0)) / inSpec.duration;
+    if (k < 1) s = animState(inSpec, Math.max(0, k), false);
+  }
+  const outSpec = layer.animationOut;
+  if (outSpec && outSpec.duration > 0 && layer.endTime != null) {
+    const left = layer.endTime - t;
+    if (left < outSpec.duration) s = animState(outSpec, Math.max(0, left) / outSpec.duration, true);
+  }
+  const loopSpec = layer.animationLoop;
+  if (loopSpec && loopSpec.duration > 0) {
+    const l = animState(loopSpec, (local % loopSpec.duration) / loopSpec.duration, false, true);
+    s = { alpha: s.alpha * l.alpha, scale: s.scale * l.scale, dx: s.dx + l.dx, dy: s.dy + l.dy, rotate: s.rotate + l.rotate };
+  }
+  return s;
+}
+
+
 function drawFit(
   ctx: CanvasRenderingContext2D,
   src: CanvasImageSource,
