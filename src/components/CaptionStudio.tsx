@@ -14,6 +14,8 @@ interface Props {
   cues?: CaptionCue[] | undefined;
   fonts?: CustomFont[] | undefined;
   onAddFont?: (f: CustomFont) => void;
+  /** esconde a mini-prévia (usada quando já existe prévia grande ao lado) */
+  hidePreview?: boolean;
 }
 
 const DEMO_TEXT = "isso aqui muda o seu jogo agora mesmo";
