@@ -7,6 +7,7 @@ import { createTemplateDoc } from "@/lib/video-template/factory";
 import type { AspectRatio, TemplateDoc } from "@/lib/video-template/types";
 import { defaultPreEdit, type PreEdit } from "@/lib/preedit";
 import { defaultEditorAudio, type EditorAudio } from "./audio";
+import { DEFAULT_BRAND_KIT, type BrandKit } from "@/lib/brand-kit";
 import type { TimeRange } from "./transcript";
 
 export const EDITOR_PROJECT_MODE = "video-editor";
@@ -44,6 +45,8 @@ export interface EditorProjectDoc {
   preedit?: PreEdit;
   /** trilha de áudio: música, narração, ducking */
   audio?: EditorAudio;
+  /** Brand Kit do projeto: cores, fontes e logo aplicados ao render */
+  brandKit?: BrandKit;
 }
 
 export function createEditorProject(
@@ -78,6 +81,7 @@ export function createEditorProject(
     composition: createTemplateDoc(title, aspectRatio),
     preedit: defaultPreEdit(),
     audio: defaultEditorAudio(),
+    brandKit: { ...DEFAULT_BRAND_KIT },
     timelineZoom: 1,
   };
 }
