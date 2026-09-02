@@ -18,7 +18,10 @@ interface Props {
   onSplit: () => void;
   /** Move/redimensiona a camada na timeline (arraste do clipe ou das bordas). */
   onTrim?: (id: string, startTime: number, endTime: number) => void;
+  /** Faixa base do vídeo importado (só apresentação). */
+  media?: { name: string; segments: TimeRange[] } | null;
 }
+
 
 function fmt(t: number): string {
   const m = Math.floor(t / 60);
@@ -137,7 +140,9 @@ export function TimelinePro({
   onToggleLock,
   onSplit,
   onTrim,
+  media,
 }: Props) {
+
   const trackRef = useRef<HTMLDivElement | null>(null);
 
   const seekFromEvent = useCallback(
@@ -208,7 +213,29 @@ export function TimelinePro({
               className="pointer-events-none absolute top-0 z-20 h-full w-px bg-primary"
               style={{ left: `${duration ? (currentTime / duration) * 100 : 0}%` }}
             />
+            {media && (
+              <div className="relative h-9 border-b border-border/30">
+                <div className="absolute left-0 top-0 z-20 flex h-full w-28 items-center gap-1 bg-card/80 px-2 text-[11px]">
+                  <span className="truncate">vídeo</span>
+                </div>
+                <div className="absolute inset-y-0 left-28 right-0">
+                  {(media.segments.length ? media.segments : [{ start: 0, end: duration }]).map((s, i) => (
+                    <div
+                      key={i}
+                      className="absolute top-1 h-7 truncate rounded-md border border-primary/40 bg-primary/30 px-3 text-[11px] leading-7"
+                      style={{
+                        left: `${duration ? (s.start / duration) * 100 : 0}%`,
+                        width: `${duration ? Math.max(1, ((s.end - s.start) / duration) * 100) : 100}%`,
+                      }}
+                    >
+                      {media.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {ordered.map((layer) => (
+
               <div key={layer.id} className="relative h-9 border-b border-border/30">
                 <div className="absolute left-0 top-0 z-20 flex h-full w-28 items-center gap-1 bg-card/80 px-2 text-[11px]">
                   <button
@@ -244,11 +271,12 @@ export function TimelinePro({
                 </div>
               </div>
             ))}
-            {!ordered.length && (
+            {!ordered.length && !media && (
               <p className="p-4 text-xs text-muted-foreground">
                 Nenhuma camada ainda. Aplique um template ou adicione texto/mídia.
               </p>
             )}
+
           </div>
         </div>
       </div>

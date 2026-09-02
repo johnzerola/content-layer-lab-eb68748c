@@ -575,20 +575,13 @@ function EditorPage() {
 
         {/* CANVAS */}
         <main className="flex min-h-0 flex-col items-center justify-center gap-3 overflow-hidden bg-black/30 p-4">
-          <div className="relative max-h-full">
-            <EditorCanvas
-              doc={{ ...doc.composition, sampleVideoUrl: src }}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onChange={updateLayer}
-              zoom={0.42}
-              showSafeArea
-            />
-            {src && (
+          <div className="relative h-full max-h-full overflow-hidden rounded-xl bg-black" style={{ aspectRatio: "9 / 16" }}>
+            {src ? (
               <video
                 ref={videoRef}
                 src={src}
-                className="sr-only"
+                playsInline
+                className="absolute inset-0 h-full w-full object-contain"
                 onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
                 onLoadedMetadata={(e) => {
                   if (!doc.media.duration) {
@@ -596,8 +589,28 @@ function EditorPage() {
                   }
                 }}
               />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-xs text-muted-foreground">
+                Nenhuma mídia carregada. Use “Carregar vídeo” ou cole um link na barra superior.
+              </div>
             )}
+            <div className="absolute inset-0">
+              <EditorCanvas
+                bare
+                doc={{
+                  ...doc.composition,
+                  canvas: { ...doc.composition.canvas, background: { kind: "color", color: "transparent" } },
+                }}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                onChange={updateLayer}
+                zoom={1}
+                showSafeArea
+              />
+            </div>
+
           </div>
+
           <div className="flex items-center gap-2 text-sm">
             <button
               type="button"
@@ -815,6 +828,8 @@ function EditorPage() {
           onSelect={setSelectedId}
           onZoom={(z) => patchDoc({ timelineZoom: z }, "zoom")}
           onTrim={(id, startTime, endTime) => updateLayer(id, { startTime, endTime })}
+          media={src ? { name: "vídeo", segments: pre.segments ?? [] } : null}
+
           onToggleVisible={(id) => {
             const layer = doc.composition.layers.find((l) => l.id === id);
             if (layer) updateLayer(id, { visible: !layer.visible });

@@ -171,6 +171,7 @@ export function EditorCanvas({
   snap = true,
   interactive = true,
   animPreview,
+  bare,
 }: {
   doc: TemplateDoc;
   selectedId: string | null;
@@ -181,9 +182,12 @@ export function EditorCanvas({
   showSafeArea?: boolean;
   snap?: boolean;
   interactive?: boolean;
+  /** remove o preenchimento/sombra para sobrepor exatamente uma mídia atrás */
+  bare?: boolean;
   /** dispara a prévia da animação de uma camada: { key, layerId, slot } */
   animPreview?: { key: number; layerId: string; slot: "animationIn" | "animationOut" | "animationLoop" } | null;
 }) {
+
   const wrapRef = useRef<HTMLDivElement>(null);
   const [guides, setGuides] = useState<{ axis: "x" | "y"; pos: number }[]>([]);
 
@@ -257,11 +261,11 @@ export function EditorCanvas({
   const ordered = [...doc.layers].sort((a, b) => a.zIndex - b.zIndex);
 
   return (
-    <div className="flex h-full w-full items-center justify-center overflow-auto p-4">
+    <div className={`flex h-full w-full items-center justify-center overflow-hidden ${bare ? "" : "overflow-auto p-4"}`}>
       <div
         ref={wrapRef}
         onPointerDown={() => onSelect(null)}
-        className="relative shadow-2xl"
+        className={`relative ${bare ? "" : "shadow-2xl"}`}
         style={{
           aspectRatio: `${doc.canvas.width}/${doc.canvas.height}`,
           height: `${Math.round(zoom * 100)}%`,
@@ -271,6 +275,7 @@ export function EditorCanvas({
           filter: filterToCss(doc.filter),
         }}
       >
+
         {ordered.map((layer) =>
           layer.visible ? (
             <div
