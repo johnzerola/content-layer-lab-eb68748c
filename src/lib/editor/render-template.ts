@@ -42,6 +42,8 @@ export interface TemplateRenderOptions {
   /** pré-edição: trechos, keyframes de enquadramento, transições e cor */
   preedit?: PreEdit | null;
   fps?: number;
+  /** escala do canvas de saída: 1 = 1080x1920, 2 = 4K */
+  scale?: number;
   onProgress?: (p: number) => void;
   signal?: AbortSignal | undefined;
 }
@@ -320,9 +322,11 @@ export function drawTemplateFrame(
   crop: SourceCrop | null = null,
   /** correção de cor da pré-edição, aplicada só ao vídeo */
   grade = "none",
+  /** espaço de coordenadas do desenho (padrão: o próprio canvas) */
+  space?: { width: number; height: number },
 ) {
-  const W = ctx.canvas.width;
-  const H = ctx.canvas.height;
+  const W = space?.width ?? ctx.canvas.width;
+  const H = space?.height ?? ctx.canvas.height;
   ctx.save();
   ctx.filter = "none";
   paintBackground(ctx, doc, W, H, images);
@@ -437,8 +441,14 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
   const size = ASPECT_SIZES[doc.aspectRatio] ?? ASPECT_SIZES["9:16"];
   const W = doc.canvas.width || size.width;
   const H = doc.canvas.height || size.height;
-  const bitrate = pickBitrate({ width: W, height: H, fps, tier: "balanced" });
-  const picked = await pickVideoCodec(W, H, bitrate, fps, "balanced");
+  // 4K/2K: o desenho continua em W x H e o canvas é ampliado por transformação
+  const q = Math.max(1, Math.min(2, opts.scale ?? 1));
+  const outW = Math.round((W * q) / 2) * 2;
+  const outH = Math.round((H * q) / 2) * 2;
+  const sx = outW / W;
+  const sy = outH / H;
+  const bitrate = pickBitrate({ width: outW, height: outH, fps, tier: "balanced" });
+  const picked = await pickVideoCodec(outW, outH, bitrate, fps, "balanced");
   if (!picked) throw new Error("Codificação de vídeo não suportada neste navegador.");
 
   const url = URL.createObjectURL(file);
@@ -475,7 +485,7 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
 
     const muxer = new Muxer({
       target: new ArrayBufferTarget(),
-      video: { codec: picked.mux, width: W, height: H, frameRate: fps },
+      video: { codec: picked.mux, width: outW, height: outH, frameRate: fps },
       ...(audio && audioCodec
         ? { audio: { codec: audioCodec, numberOfChannels: audio.channels, sampleRate: audio.sampleRate } }
         : {}),
@@ -492,8 +502,8 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
     encoder.configure(picked.cfg);
 
     const canvas = document.createElement("canvas");
-    canvas.width = W;
-    canvas.height = H;
+    canvas.width = outW;
+    canvas.height = outH;
     const ctx = canvas.getContext("2d", { alpha: false })!;
     const cues = captionCues(doc);
     const frameDur = Math.round(1_000_000 / fps);
@@ -531,6 +541,7 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
       );
 
       ctx.save();
+      ctx.setTransform(sx, 0, 0, sy, 0, 0);
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, W, H);
       ctx.globalAlpha = Math.max(0, Math.min(1, tr.alpha));
@@ -540,8 +551,9 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
         ctx.translate(-W / 2, -H / 2);
       }
       const grade = pre ? preEditFilter(pre) : "none";
-      drawTemplateFrame(ctx, doc, tOut, video, images, cues, crop, grade);
+      drawTemplateFrame(ctx, doc, tOut, video, images, cues, crop, grade, { width: W, height: H });
       ctx.restore();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
 
       const frame = new VideoFrame(canvas, { timestamp: i * frameDur, duration: frameDur });
       encoder.encode(frame, { keyFrame: i % (fps * 2) === 0 });

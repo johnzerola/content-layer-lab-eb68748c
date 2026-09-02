@@ -23,6 +23,10 @@ export interface ReadyTemplate {
   /** amostra do card: [fundo, texto] */
   swatch: [string, string];
   build: (layers: TemplateLayer[], identity: TemplateIdentity, brand?: BrandKit) => TemplateLayer[];
+  /** paleta e tipografia do layout — aplicadas junto com as camadas (sem imagem de logo) */
+  palette?: Partial<BrandKit>;
+  /** transição de entrada/saída que acompanha o layout */
+  transition?: { kind: string; dur: number };
 }
 
 const anim = (type: string, duration = 0.5, delay = 0): AnimationSpec => ({ type, duration, delay, easing: "easeOut" });
@@ -228,3 +232,68 @@ export const READY_TEMPLATES: ReadyTemplate[] = [
     },
   },
 ];
+
+
+/**
+ * PALETA, TIPOGRAFIA E TRANSIÇÃO de cada layout pronto. É o que faz o template
+ * sair "montado": ao aplicar, as cores e fontes entram no Brand Kit do projeto
+ * e a transição entra na pré-edição. Nenhuma imagem de logo é necessária.
+ */
+const LAYOUT_STYLE: Record<string, { palette: Partial<BrandKit>; transition: { kind: string; dur: number } }> = {
+  "hook-topo": {
+    palette: { primary: "#ffd93d", secondary: "#ff6b35", text: "#0b0b12", background: "#0b0b12", headingFont: "Anton", bodyFont: "Figtree" },
+    transition: { kind: "punch", dur: 0.3 },
+  },
+  "fato-fake": {
+    palette: { primary: "#e5253c", secondary: "#12a150", text: "#ffffff", background: "#0b0b12", headingFont: "Archivo Black", bodyFont: "Inter" },
+    transition: { kind: "whip-left", dur: 0.3 },
+  },
+  "handle-cta": {
+    palette: { primary: "#7c5cff", secondary: "#22d3ee", text: "#ffffff", background: "#0b0b16", headingFont: "Bebas Neue", bodyFont: "Figtree" },
+    transition: { kind: "zoom", dur: 0.4 },
+  },
+  "lower-third": {
+    palette: { primary: "#4cc9f0", secondary: "#9bb0c9", text: "#ffffff", background: "#0b0b12", headingFont: "Figtree", bodyFont: "Inter" },
+    transition: { kind: "slide-left", dur: 0.4 },
+  },
+  "barra-progresso": {
+    palette: { primary: "#31f39a", secondary: "#31f39a", text: "#ffffff", background: "#0b0b12", headingFont: "Figtree", bodyFont: "Inter" },
+    transition: { kind: "fade", dur: 0.3 },
+  },
+  "titulo-caixa": {
+    palette: { primary: "#e5253c", secondary: "#ffd93d", text: "#ffffff", background: "#101018", headingFont: "Archivo Black", bodyFont: "Inter" },
+    transition: { kind: "slide-up", dur: 0.35 },
+  },
+  "marca-canto": {
+    palette: { primary: "#7c5cff", secondary: "#c4b5fd", text: "#ffffff", background: "#0b0b16", headingFont: "Bebas Neue", bodyFont: "Figtree" },
+    transition: { kind: "fade", dur: 0.25 },
+  },
+  "legenda-hook-3": {
+    palette: { primary: "#22d3ee", secondary: "#7c5cff", text: "#ffffff", background: "#0b0b16", headingFont: "Anton", bodyFont: "Figtree" },
+    transition: { kind: "slide-right", dur: 0.4 },
+  },
+  "quote-editorial": {
+    palette: { primary: "#c08a3e", secondary: "#7b6a52", text: "#20123a", background: "#f6f1e7", headingFont: "Playfair Display", bodyFont: "Inter" },
+    transition: { kind: "drift", dur: 0.8 },
+  },
+  contagem: {
+    palette: { primary: "#ff3b6b", secondary: "#ffd93d", text: "#ffffff", background: "#0b0b12", headingFont: "Archivo Black", bodyFont: "Figtree" },
+    transition: { kind: "punch", dur: 0.25 },
+  },
+  "cta-inscreva": {
+    palette: { primary: "#7c5cff", secondary: "#ffffff", text: "#ffffff", background: "#0b0b16", headingFont: "Bebas Neue", bodyFont: "Figtree" },
+    transition: { kind: "zoom-out", dur: 0.4 },
+  },
+  "faixa-lateral": {
+    palette: { primary: "#22d3ee", secondary: "#22d3ee", text: "#ffffff", background: "#0b0b16", headingFont: "Anton", bodyFont: "Inter" },
+    transition: { kind: "swing", dur: 0.5 },
+  },
+};
+
+for (const t of READY_TEMPLATES) {
+  const style = LAYOUT_STYLE[t.id];
+  if (!style) continue;
+  t.palette = style.palette;
+  t.transition = style.transition;
+  t.swatch = [style.palette.primary ?? t.swatch[0], style.palette.background ?? t.swatch[1]];
+}

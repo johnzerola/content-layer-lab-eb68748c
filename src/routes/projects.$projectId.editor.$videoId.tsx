@@ -37,6 +37,7 @@ import { MediaSourceBar } from "@/components/editor/MediaSourceBar";
 import { BulkScheduleModal } from "@/components/BulkScheduleModal";
 import { listAccounts, type SocialAccount } from "@/lib/social";
 import { renderTemplateProject, templateRenderSupported } from "@/lib/editor/render-template";
+import { exportScale, loadExportQuality } from "@/lib/editor/export-quality";
 import { toast } from "sonner";
 import { getSourceFile } from "@/lib/editor/cuts";
 
@@ -52,7 +53,7 @@ import { previewUrl, type EditorProjectDoc } from "@/lib/editor/project";
 import { defaultEditorAudio } from "@/lib/editor/audio";
 import { generateCaptions } from "@/lib/captions";
 import { refineTranscriptWords } from "@/lib/transcribe.functions";
-import { applyBrandKitToDoc } from "@/lib/brand-kit";
+import { applyBrandKitToDoc, DEFAULT_BRAND_KIT, type BrandKit } from "@/lib/brand-kit";
 import { defaultPreEdit, TRANSITIONS, type PreEdit } from "@/lib/preedit";
 import { ensureTranscript, saveTranscript } from "@/lib/editor/transcript.service";
 import { emptyTranscript, removedRanges, silenceRanges, transcriptFromCues, type TranscriptDoc } from "@/lib/editor/transcript";
@@ -265,6 +266,7 @@ function EditorPage() {
           file,
           cut: seg ? { start: seg.start, end: seg.end } : null,
           preedit: doc.preedit ?? null,
+          scale: exportScale(loadExportQuality()),
           onProgress: setRenderPct,
         });
 
@@ -386,12 +388,19 @@ function EditorPage() {
     if (!ready) return;
     pendingLayoutApplied.current = true;
     const ident = loadAnimIdentity();
+    // o layout traz paleta e tipografia próprias: entram no Brand Kit do projeto
+    const kit: BrandKit = { ...DEFAULT_BRAND_KIT, ...(doc.brandKit ?? {}), ...(ready.palette ?? {}) };
     addLayers(
-      ready.build(doc.composition.layers, { handle: ident.handle, name: ident.name, role: ident.role }, doc.brandKit),
+      ready.build(doc.composition.layers, { handle: ident.handle, name: ident.name, role: ident.role }, kit),
       `template-${ready.id}`,
     );
-    toast.success(`Layout “${ready.label}” aplicado.`);
-  }, [addLayers, doc]);
+    patchDoc({ brandKit: kit }, `paleta-${ready.id}`);
+    if (ready.transition) {
+      const tr = { kind: ready.transition.kind as PreEdit["transIn"]["kind"], dur: ready.transition.dur };
+      patchPre({ transIn: tr, transOut: tr }, `transicao-${ready.id}`);
+    }
+    toast.success(`Layout “${ready.label}” aplicado com paleta, fontes e transição.`);
+  }, [addLayers, doc, patchDoc, patchPre]);
 
   /** template de vídeo salvo escolhido em /estilos (tabela video_templates) */
   const pendingTemplateApplied = useRef(false);
