@@ -738,7 +738,7 @@ function drawVideoLayer(
       const blurPx = Math.max(0, baseBlur * bgIntensity);
       const dimPx = dim * Math.min(1, bgIntensity);
       if (!blurPx) {
-        paint(target, "cover", full, { dim: dimPx, useOffset: false });
+        paint(target, "cover", full, { dim: dimPx, useOffset: false, raw: true });
         return;
       }
 
@@ -750,7 +750,6 @@ function drawVideoLayer(
         bw,
         bh,
         blurPx.toFixed(1),
-        baseFilter,
         zoom.toFixed(3),
         full.quarter,
         pre?.flipH ? 1 : 0,
