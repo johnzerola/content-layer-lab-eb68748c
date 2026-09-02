@@ -31,6 +31,7 @@ import { useEditorHistory } from "@/components/editor/useEditorHistory";
 import { openProjectForVideo, saveEditorProject } from "@/lib/editor/project.service";
 import { previewUrl, type EditorProjectDoc } from "@/lib/editor/project";
 import { defaultEditorAudio } from "@/lib/editor/audio";
+import { applyBrandKitToDoc } from "@/lib/brand-kit";
 import { defaultPreEdit, type PreEdit } from "@/lib/preedit";
 import { ensureTranscript, saveTranscript } from "@/lib/editor/transcript.service";
 import { emptyTranscript, removedRanges, silenceRanges, type TranscriptDoc } from "@/lib/editor/transcript";
