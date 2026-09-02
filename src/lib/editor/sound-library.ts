@@ -186,7 +186,8 @@ export async function searchFreeSounds(
       kind,
       category: query,
       sizeMb: Math.round((info.size / 1_000_000) * 10) / 10,
-      attribution: stripHtml(info.extmetadata?.["Artist"]?.value ?? info.extmetadata?.["LicenseShortName"]?.value),
+      attribution: stripHtml(info.extmetadata?.["Artist"]?.value) || "Autor não informado",
+      license: stripHtml(info.extmetadata?.["LicenseShortName"]?.value ?? info.extmetadata?.["UsageTerms"]?.value),
       pageUrl: info.descriptionurl ?? "https://commons.wikimedia.org",
     });
   }
