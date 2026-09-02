@@ -1565,6 +1565,41 @@ export function VideoStudio({
               )}
               {tab === "color" && (
               <div className="space-y-4">
+                <div className="space-y-2">
+                  <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Estilos de edição
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {LOOKS.map((l) => {
+                      const active = (pre.look ?? "original") === l.id;
+                      return (
+                        <button
+                          key={l.id}
+                          onClick={() => set(applyLook(l.id), `estilo ${l.label}`)}
+                          title={l.hint}
+                          className={`overflow-hidden rounded-lg border text-left transition ${
+                            active
+                              ? "border-primary ring-1 ring-primary/40"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                        >
+                          <div
+                            className="h-10 w-full"
+                            style={{
+                              background: `linear-gradient(120deg, ${l.swatch[0]}, ${l.swatch[1]})`,
+                              filter: lookPreviewFilter(l),
+                            }}
+                          />
+                          <div className="px-2 py-1.5">
+                            <p className="font-mono text-[11px] text-foreground">{l.label}</p>
+                            <p className="text-[10px] leading-tight text-muted-foreground">{l.hint}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="flex flex-wrap gap-1.5">
                   {COLOR_PRESETS.map((p) => (
                     <button
