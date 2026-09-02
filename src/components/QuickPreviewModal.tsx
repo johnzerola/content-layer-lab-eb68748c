@@ -63,7 +63,7 @@ export function QuickPreviewModal({
             <label className="block text-xs text-muted-foreground">
               Headline só deste vídeo
               <input
-                className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                className="field mt-1 text-sm"
                 placeholder={template.headline.text || "texto do template"}
                 value={headline}
                 onChange={(e) => onHeadline(e.target.value)}
@@ -72,7 +72,7 @@ export function QuickPreviewModal({
             <label className="block text-xs text-muted-foreground">
               CTA só deste vídeo
               <input
-                className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                className="field mt-1 text-sm"
                 placeholder={template.cta.text || "texto do template"}
                 value={cta}
                 onChange={(e) => onCta(e.target.value)}
