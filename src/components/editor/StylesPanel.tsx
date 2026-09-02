@@ -7,7 +7,7 @@ import { useState } from "react";
 import { CaptionStylePanel } from "@/components/editor/CaptionStylePanel";
 import { CAPTION_PRESETS, type CaptionPreset } from "@/lib/editor/caption-styles";
 import { STYLE_TEMPLATES, type StyleTemplate } from "@/lib/editor/style-templates";
-import type { TransitionKind } from "@/lib/preedit";
+import { TRANSITIONS, type TransitionKind } from "@/lib/preedit";
 import type { CaptionLayerStyle } from "@/lib/video-template/types";
 
 export interface StylePalette {
@@ -38,6 +38,24 @@ export const STYLE_FONTS: { id: string; label: string; family: string; weight: n
   { id: "arial", label: "Clássica", family: "Arial Black, sans-serif", weight: 900 },
 ];
 
+/** Animação em loop de cada transição na miniatura (keyframes em styles.css). */
+const TRANSITION_PREVIEW: Record<string, string> = {
+  none: "",
+  fade: "tp-fade",
+  flash: "tp-flash",
+  zoom: "tp-zoom",
+  "zoom-out": "tp-zoomout",
+  punch: "tp-punch",
+  "slide-up": "tp-up",
+  "slide-down": "tp-down",
+  "slide-left": "tp-left",
+  "slide-right": "tp-right",
+  whip: "tp-whip",
+  "whip-vertical": "tp-whipv",
+  drift: "tp-drift",
+  swing: "tp-swing",
+};
+
 interface Props {
   presetId: string;
   style: CaptionLayerStyle;
@@ -48,7 +66,7 @@ interface Props {
 }
 
 export function StylesPanel({ presetId, style, onApplyPreset, onStyleChange, onApplyTransition }: Props) {
-  const [section, setSection] = useState<"templates" | "estilos" | "cores" | "tipografia">("templates");
+  const [section, setSection] = useState<"templates" | "estilos" | "cores" | "tipografia" | "efeitos">("templates");
   const [appliedId, setAppliedId] = useState<string | null>(null);
 
   /** Um clique configura cores, tipografia, animação da legenda e transição. */
@@ -71,17 +89,53 @@ export function StylesPanel({ presetId, style, onApplyPreset, onStyleChange, onA
   return (
     <div className="flex h-full flex-col gap-3 overflow-hidden">
       <div className="flex rounded-lg border border-border/60 p-0.5 text-[11px]">
-        {(["templates", "estilos", "cores", "tipografia"] as const).map((s) => (
+        {(["templates", "estilos", "cores", "tipografia", "efeitos"] as const).map((s) => (
           <button
             key={s}
             type="button"
             onClick={() => setSection(s)}
-            className={`flex-1 rounded-md px-2 py-1 capitalize ${section === s ? "bg-primary/20" : "text-muted-foreground"}`}
+            className={`flex-1 rounded-md px-1.5 py-1 capitalize ${section === s ? "bg-primary/20" : "text-muted-foreground"}`}
           >
             {s}
           </button>
         ))}
       </div>
+
+      {section === "efeitos" && (
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+          <p className="text-[11px] text-muted-foreground">
+            Efeitos de transição do corte — o mesmo efeito é aplicado na entrada e na saída.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {TRANSITIONS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => {
+                  onApplyTransition?.(t.id);
+                  setAppliedId(`trans:${t.id}`);
+                }}
+                className={`group overflow-hidden rounded-xl border text-left ${
+                  appliedId === `trans:${t.id}` ? "border-primary" : "border-border/50 hover:border-primary/60"
+                }`}
+              >
+                <span className="flex h-14 items-center justify-center overflow-hidden bg-gradient-to-br from-primary/25 to-fuchsia-500/15">
+                  <span
+                    className="h-7 w-7 rounded-md bg-primary/80"
+                    style={
+                      TRANSITION_PREVIEW[t.id]
+                        ? { animation: `${TRANSITION_PREVIEW[t.id]} 1.6s ease-in-out infinite` }
+                        : undefined
+                    }
+                  />
+                </span>
+                <span className="block px-2 py-1.5 text-xs font-medium">{t.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
 
       {section === "templates" && (
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">

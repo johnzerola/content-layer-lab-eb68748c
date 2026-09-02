@@ -32,6 +32,8 @@ interface Props {
   generating?: boolean | undefined;
   generateProgress?: string | undefined;
   hasMedia?: boolean | undefined;
+  /** traduz para português e pontua a transcrição já existente */
+  onRefine?: (() => void) | undefined;
 }
 
 const WordChip = memo(function WordChip({
@@ -101,6 +103,7 @@ export function TranscriptPanel({
   generating = false,
   generateProgress,
   hasMedia = false,
+  onRefine,
 }: Props) {
   const [mode, setMode] = useState<"paragrafo" | "palavra">("paragrafo");
   const [search, setSearch] = useState("");
@@ -154,6 +157,17 @@ export function TranscriptPanel({
           ))}
         </div>
       </div>
+
+      {onRefine && doc.words.length > 0 && (
+        <button
+          type="button"
+          onClick={onRefine}
+          disabled={generating}
+          className="rounded-lg border border-primary/50 px-2 py-1.5 text-xs font-medium text-primary disabled:opacity-45"
+        >
+          {generating ? generateProgress || "Revisando…" : "Traduzir para português e pontuar"}
+        </button>
+      )}
 
       <div className="flex items-center gap-1.5">
         <input

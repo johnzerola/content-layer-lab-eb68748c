@@ -41,6 +41,7 @@ import { openProjectForVideo, saveEditorProject } from "@/lib/editor/project.ser
 import { previewUrl, type EditorProjectDoc } from "@/lib/editor/project";
 import { defaultEditorAudio } from "@/lib/editor/audio";
 import { generateCaptions } from "@/lib/captions";
+import { refineTranscriptWords } from "@/lib/transcribe.functions";
 import { applyBrandKitToDoc } from "@/lib/brand-kit";
 import { defaultPreEdit, type PreEdit } from "@/lib/preedit";
 import { ensureTranscript, saveTranscript } from "@/lib/editor/transcript.service";
@@ -327,6 +328,29 @@ function EditorPage() {
     return created;
   }, [addLayers, doc]);
 
+  /** Traduz para pt-BR e pontua a transcrição mantendo o tempo por palavra. */
+  const refineTranscript = useCallback(
+    async (base: TranscriptDoc): Promise<TranscriptDoc> => {
+      const live = base.words;
+      if (!live.length) return base;
+      const size = 250;
+      const out = [...live];
+      for (let i = 0; i < live.length; i += size) {
+        const slice = live.slice(i, i + size);
+        setTranscribeProgress(`Traduzindo e pontuando ${Math.min(i + size, live.length)}/${live.length}`);
+        const res = await refineTranscriptWords({
+          data: { words: slice.map((w) => w.word), language: "português do Brasil" },
+        });
+        res.words.forEach((word, j) => {
+          const target = out[i + j];
+          if (target) out[i + j] = { ...target, word };
+        });
+      }
+      return { ...base, language: "pt-BR", words: out };
+    },
+    [],
+  );
+
   const generateTranscript = useCallback(async () => {
     const file = getSourceFile(videoId);
     if (!file) {
@@ -337,20 +361,44 @@ function EditorPage() {
     setTranscribeProgress("Preparando áudio…");
     try {
       const cues = await generateCaptions(file, {
-        language: "pt",
         onProgress: ({ done, total }) => setTranscribeProgress(`Transcrevendo ${done}/${total}`),
       });
       const next = transcriptFromCues(videoId, cues, "pt-BR");
       setTranscript(next);
       ensureCaptionLayer();
-      toast.success("Transcrição pronta para editar.");
+      try {
+        const refined = await refineTranscript(next);
+        setTranscript(refined);
+        toast.success("Legenda pronta em português, com pontuação.");
+      } catch (err) {
+        toast.warning(
+          err instanceof Error ? err.message : "Transcrição pronta, mas não consegui revisar o português agora.",
+        );
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível transcrever o vídeo.");
     } finally {
       setTranscribing(false);
       setTranscribeProgress("");
     }
-  }, [ensureCaptionLayer, videoId]);
+  }, [ensureCaptionLayer, refineTranscript, videoId]);
+
+  /** Botão do painel de roteiro: revisar uma transcrição já existente. */
+  const translateTranscript = useCallback(async () => {
+    if (!transcript.words.length) return;
+    setTranscribing(true);
+    try {
+      const refined = await refineTranscript(transcript);
+      setTranscript(refined);
+      toast.success("Roteiro traduzido e pontuado.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não consegui revisar o roteiro agora.");
+    } finally {
+      setTranscribing(false);
+      setTranscribeProgress("");
+    }
+  }, [refineTranscript, transcript]);
+
 
   const applyTemplate = useCallback(
     (template: VideoTemplateRecord) => {
@@ -598,6 +646,7 @@ function EditorPage() {
                 generating={transcribing}
                 generateProgress={transcribeProgress}
                 hasMedia={Boolean(src)}
+                onRefine={() => void translateTranscript()}
               />
             ) : (
               <StylesPanel
