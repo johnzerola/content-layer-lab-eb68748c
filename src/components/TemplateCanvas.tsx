@@ -127,6 +127,7 @@ export function TemplateCanvas({
   debugGrid = 3,
   debugSafeArea = true,
   debugBoxes = true,
+  uiOverlay = null,
 }: {
   template: Template;
   selected?: SelId | null;
@@ -153,6 +154,8 @@ export function TemplateCanvas({
   debugGrid?: number;
   debugSafeArea?: boolean;
   debugBoxes?: boolean;
+  /** simula a interface do app (TikTok/IG/Shorts) por cima da prévia — nunca entra na exportação */
+  uiOverlay?: PlatformUI | null;
 }) {
 
 
