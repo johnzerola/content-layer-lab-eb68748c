@@ -3395,7 +3395,7 @@ function Home() {
               </div>
             </section>
 
-            <section className="panel flex max-h-[70vh] flex-col p-5">
+            <section className="panel rise-in flex max-h-[calc(100dvh-9rem)] flex-col p-5 lg:sticky lg:top-4">
               <div className="mb-3 flex items-center justify-between">
                 <p className="font-semibold">Vídeos ({items.length})</p>
                 <button
