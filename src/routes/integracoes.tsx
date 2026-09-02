@@ -36,6 +36,7 @@ import {
   diagnoseFacebookIntegration,
   syncMetaAccounts,
 } from "@/lib/facebook-oauth.functions";
+import { beginInstagramOAuth } from "@/lib/meta-oauth.functions";
 import {
   beginYoutubeOAuth,
   refreshYoutubeChannel,
@@ -99,7 +100,7 @@ const META_PLATFORMS: Array<{
     platform: "instagram",
     name: "Instagram",
     description:
-      "Reels, Feed e Stories. A autorização é feita pelo Facebook (o Instagram Profissional precisa estar vinculado a uma Página).",
+      "Reels, Feed e Stories via OAuth do Instagram. Use para contas profissionais e criadores em modo profissional.",
     icon: Instagram,
   },
   {
@@ -126,6 +127,7 @@ function IntegrationsPage() {
   const [busy, setBusy] = useState<PlatformKey | null>(null);
 
   const startFacebook = useServerFn(beginFacebookOAuth);
+  const startInstagram = useServerFn(beginInstagramOAuth);
   const startYoutube = useServerFn(beginYoutubeOAuth);
   const syncYoutube = useServerFn(syncYoutubeChannels);
   const refreshChannel = useServerFn(refreshYoutubeChannel);
@@ -194,8 +196,15 @@ function IntegrationsPage() {
           window.location.href = response.authorizationUrl;
           return;
         }
-        // O mesmo Facebook Login autoriza a Página e a conta Instagram
-        // profissional vinculada a ela.
+        if (platform === "instagram") {
+          const response = await startInstagram();
+          if (!response.ok) {
+            toast.error(response.error);
+            return;
+          }
+          window.location.href = response.authorizationUrl;
+          return;
+        }
         const response = await startFacebook({ data: { forceClassic: true } });
 
         if (!response.ok) {
@@ -232,7 +241,7 @@ function IntegrationsPage() {
         setBusy(null);
       }
     },
-    [startFacebook, startYoutube],
+    [startFacebook, startInstagram, startYoutube],
   );
 
   const disconnect = useCallback(
@@ -360,7 +369,9 @@ function IntegrationsPage() {
   const youtubeAccounts = accounts.filter((account) => account.platform === "youtube");
   const hasMetaAccounts = facebookAccounts.length + instagramAccounts.length > 0;
   const hasYoutubeAccounts = youtubeAccounts.length > 0;
-  const syncingMeta = busy === "facebook" || busy === "instagram";
+  const connectingFacebook = busy === "facebook";
+  const connectingInstagram = busy === "instagram";
+  const syncingMeta = connectingFacebook || connectingInstagram;
 
   return (
     <AppShell
@@ -400,18 +411,32 @@ function IntegrationsPage() {
               )}
               <Button
                 type="button"
-                disabled={syncingMeta}
+                disabled={connectingFacebook}
                 onClick={() => setAccountSwitchProvider("meta")}
                 className="min-h-10 shrink-0"
               >
-                {syncingMeta ? (
+                {connectingFacebook ? (
                   <Loader2 className="size-4 animate-spin" />
-                ) : hasMetaAccounts ? (
+                ) : facebookAccounts.length > 0 ? (
                   <RefreshCw className="size-4" />
                 ) : (
                   <Facebook className="size-4" />
                 )}
-                {hasMetaAccounts ? "Adicionar/selecionar canais Meta" : "Conectar Meta"}
+                {facebookAccounts.length > 0 ? "Adicionar/selecionar Páginas" : "Conectar Facebook/Páginas"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={connectingInstagram}
+                onClick={() => void connect("instagram")}
+                className="min-h-10 shrink-0"
+              >
+                {connectingInstagram ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Instagram className="size-4" />
+                )}
+                {instagramAccounts.length > 0 ? "Adicionar Instagram" : "Conectar Instagram"}
               </Button>
               {hasMetaAccounts && (
                 <Button

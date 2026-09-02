@@ -64,10 +64,10 @@ function InstagramOAuthCallback() {
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">{result.message}</p>
             <Link
-              to="/agenda"
+              to="/integracoes"
               className="mt-5 inline-flex rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground"
             >
-              Voltar para a Agenda
+              Ver contas conectadas
             </Link>
           </>
         )}
