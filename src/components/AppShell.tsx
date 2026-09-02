@@ -133,6 +133,7 @@ const MODES: ModeDef[] = [
 /** rotas fixas fora do estúdio — quando ativas, as ferramentas não ficam destacadas */
 const ROUTE_PATHS = [
   "/templates",
+  "/estudio",
   "/live",
   "/biblioteca",
   "/agenda",
@@ -287,6 +288,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           />
         ))}
         {routeLink("/cortes", "Corte IA & Cortes", Scissors, expanded, close)}
+        {routeLink("/estudio", "Estúdio de gravação", Radio, expanded, close)}
         {routeLink("/fotos", "FotoViral", Images, expanded, close)}
       </nav>
 

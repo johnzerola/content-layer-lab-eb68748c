@@ -747,12 +747,26 @@ function EditorPage() {
               </div>
             )}
             {tool === "estilos" && (
-              <div className="space-y-2 text-sm">
-                <p className="font-medium">Galeria de estilos</p>
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  Os templates completos, cores e tipografias estão abertos no painel à esquerda.
-                </p>
-              </div>
+              <StylesPanel
+                presetId={doc.captionPresetId}
+                style={captionLayer?.style ?? captionPreset.style}
+                onApplyPreset={(preset) => {
+                  patchDoc({ captionPresetId: preset.id }, "preset-legenda");
+                  const target = captionLayer ?? ensureCaptionLayer();
+                  if (target) updateLayer(target.id, { presetId: preset.id, style: preset.style } as Partial<TemplateLayer>);
+                }}
+                onStyleChange={(patch) => {
+                  const target = captionLayer ?? ensureCaptionLayer();
+                  if (!target) return;
+                  updateLayer(target.id, { style: { ...target.style, ...patch } } as Partial<TemplateLayer>);
+                }}
+                onApplyTransition={(kind) =>
+                  patchPre(
+                    { transIn: { ...pre.transIn, kind }, transOut: { ...pre.transOut, kind } },
+                    "template-estilo",
+                  )
+                }
+              />
             )}
             {tool === "animacao" && (
               <div className="space-y-4">
