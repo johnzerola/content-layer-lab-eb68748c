@@ -160,6 +160,35 @@ function ProfileCard({ p }: { p: ProfileStats }) {
           )}
         </div>
 
+        <div className="rounded-xl border border-border bg-surface-2 p-3">
+          <p className="mono-label pb-2">Horários de postagem</p>
+          {p.upcomingSlots.length ? (
+            <ul className="flex flex-col gap-1.5">
+              {p.upcomingSlots.map((s) => (
+                <li key={`${s.at}-${s.kind}`} className="flex items-center gap-2 text-[12px]">
+                  <CalendarClock className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                  <span className="tabular-nums text-foreground">
+                    {new Date(s.at).toLocaleString("pt-BR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  <span className="truncate text-muted-foreground">
+                    {KIND_LABEL[s.kind] ?? s.kind}
+                    {s.status === "processando" ? " · publicando" : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-[12px] text-muted-foreground">
+              Sem horários futuros — agende um lote para este perfil.
+            </p>
+          )}
+        </div>
+
         {p.byKind.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {p.byKind.map((k) => (
