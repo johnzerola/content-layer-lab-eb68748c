@@ -29,6 +29,7 @@ import {
   CopyPlus,
 } from "lucide-react";
 import { QuickPreviewModal } from "@/components/QuickPreviewModal";
+import { PLATFORM_UI_OPTIONS, type PlatformUI } from "@/components/PlatformUIOverlay";
 import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
 
 import { Button } from "@/components/ui/button";
@@ -2448,6 +2449,28 @@ function Home() {
                         >
                           <Crop className="mr-1 inline size-3" /> ajustar corte
                         </button>
+                        <select
+                          value={uiGrid}
+                          title="Simula a interface do app sobre o vídeo para posicionar legenda e branding fora das áreas cobertas"
+                          onChange={(e) => {
+                            const v = e.target.value as PlatformUI | "off";
+                            setUiGrid(v);
+                            try {
+                              localStorage.setItem("vv_ui_grid", v);
+                            } catch {}
+                          }}
+                          className={`rounded-md border px-2 py-1 font-mono text-[10px] ${
+                            uiGrid !== "off"
+                              ? "border-primary/60 bg-primary/15 text-primary"
+                              : "border-border bg-background text-muted-foreground"
+                          }`}
+                        >
+                          {PLATFORM_UI_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
                         {variants > 1 && (
                           <select
                             value={variantIdx}
