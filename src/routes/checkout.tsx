@@ -30,10 +30,32 @@ export const Route = createFileRoute("/checkout")({
 
 function CheckoutPage() {
   return (
-    <main className="mx-auto max-w-4xl px-5 py-10">
-      <Link to="/vendas" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+    <main className="page-in mx-auto max-w-4xl px-5 py-10">
+      <Link
+        to="/vendas"
+        className="inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
         <ArrowLeft className="size-4" /> Voltar para os planos
       </Link>
+
+      {/* onde estou: vendas → conta → pagamento → estúdio */}
+      <ol className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[12px]">
+        {["Planos", "Conta", "Pagamento", "Estúdio"].map((s, i) => (
+          <li key={s} className="flex items-center gap-2">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${
+                i <= 2
+                  ? "border-[var(--primary-subtle)] bg-[var(--primary-subtle)] text-primary"
+                  : "border-border text-[var(--muted-2)]"
+              }`}
+            >
+              <span className="font-mono text-[10px]">{i + 1}</span>
+              {s}
+            </span>
+            {i < 3 && <span className="text-[var(--muted-2)]">→</span>}
+          </li>
+        ))}
+      </ol>
       <RequireAuth
         title="Crie sua conta para assinar"
         description="O cadastro leva 10 segundos. Depois você escolhe o plano e entra no sistema."

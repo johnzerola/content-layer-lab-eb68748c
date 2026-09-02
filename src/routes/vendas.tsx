@@ -279,7 +279,7 @@ function Hero() {
             <Link
               to="/checkout"
               search={{ plano: "creator" }}
-              className="group inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-transform hover:-translate-y-0.5"
+              className="aurora aurora-on group inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground transition-transform duration-[var(--dur-base)] ease-[cubic-bezier(0.2,0.8,0.2,1)] hover:-translate-y-0.5"
             >
               Processar meu primeiro lote
               <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
@@ -503,18 +503,27 @@ function Plans() {
     <section id="planos" className="relative z-10 mx-auto max-w-6xl px-5 py-20 md:py-28">
       <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
         <SectionHead tag="planos" title="Preço fixo, volume livre." />
-        <div className="inline-flex items-center gap-1 self-start rounded-xl border border-border p-1">
+        <div
+          role="tablist"
+          aria-label="Periodicidade"
+          className="relative grid w-[15.5rem] shrink-0 grid-cols-2 self-start rounded-xl border border-border bg-surface p-1"
+        >
+          <span
+            aria-hidden
+            className="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-lg bg-primary transition-transform duration-[220ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+            style={{ transform: annual ? "translateX(100%)" : "none" }}
+          />
           {[
             { l: "Mensal", v: false },
             { l: "Anual −20%", v: true },
           ].map((o) => (
             <button
               key={o.l}
+              role="tab"
+              aria-selected={annual === o.v}
               onClick={() => setAnnual(o.v)}
-              className={`rounded-lg px-4 py-2 text-xs font-medium transition-colors ${
-                annual === o.v
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
+              className={`relative z-10 min-h-10 rounded-lg px-4 text-xs font-medium transition-colors ${
+                annual === o.v ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {o.l}
@@ -530,8 +539,8 @@ function Plans() {
           return (
             <article
               key={p.name}
-              className={`panel relative flex flex-col p-6 ${
-                p.featured ? "border-primary/40 shadow-[var(--shadow-glow)] lg:-mt-4 lg:pb-8" : ""
+              className={`panel aurora relative flex flex-col p-6 ${
+                p.featured ? "aurora-on border-transparent lg:-mt-4 lg:pb-8" : ""
               }`}
             >
               <div className="flex items-center justify-between">
@@ -543,7 +552,12 @@ function Plans() {
                 </span>
               </div>
               <p className="mt-5 flex items-end gap-1.5">
-                <span className="font-display text-4xl font-semibold tracking-tight">R$ {value}</span>
+                <span
+                  key={value}
+                  className="pop-in font-display text-4xl font-semibold tracking-tight"
+                >
+                  R$ {value}
+                </span>
                 <span className="pb-1.5 text-xs text-muted-foreground">/mês</span>
               </p>
               <ul className="mt-6 space-y-2.5">
@@ -557,7 +571,7 @@ function Plans() {
               <Link
                 to="/checkout"
                 search={{ plano: p.name.toLowerCase() }}
-                className={`mt-8 inline-flex h-11 items-center justify-center rounded-xl text-sm font-semibold transition-transform hover:-translate-y-px ${
+                className={`mt-8 inline-flex min-h-11 items-center justify-center rounded-xl text-sm font-semibold transition-transform duration-[var(--dur-base)] hover:-translate-y-px ${
                   p.featured
                     ? "bg-primary text-primary-foreground"
                     : "border border-border text-foreground hover:bg-surface"
@@ -647,7 +661,7 @@ function FinalCta() {
           <Link
             to="/checkout"
             search={{ plano: "creator" }}
-            className="mt-9 inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-7 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-transform hover:-translate-y-0.5"
+            className="aurora aurora-on mt-9 inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-7 text-sm font-semibold text-primary-foreground transition-transform duration-[var(--dur-base)] ease-[cubic-bezier(0.2,0.8,0.2,1)] hover:-translate-y-0.5"
           >
             Abrir o estúdio agora <ArrowRight className="size-4" />
           </Link>
