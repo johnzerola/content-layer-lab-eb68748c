@@ -233,7 +233,11 @@ function EditorPage() {
         coverUrl: doc.media.posterUrl,
         duration: doc.media.duration,
       });
-      patchDoc({ composition, templateId: template.id }, "aplicar-template");
+      const kit = doc.brandKit;
+      patchDoc(
+        { composition: kit ? applyBrandKitToDoc(composition, kit) : composition, templateId: template.id },
+        "aplicar-template",
+      );
     },
     [doc, patchDoc],
   );

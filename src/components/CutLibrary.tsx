@@ -20,6 +20,7 @@ import {
   type LibraryCut,
 } from "@/lib/editor/cuts.service";
 import { applyTemplateToVideo } from "@/lib/video-template/bindings";
+import { applyBrandKitToDoc, loadBrandKit } from "@/lib/brand-kit";
 import { listMyTemplates } from "@/lib/video-template/service";
 import { renderTemplateProject, templateRenderSupported } from "@/lib/editor/render-template";
 import type { VideoTemplateRecord } from "@/lib/video-template/types";
@@ -118,7 +119,10 @@ export function CutLibrary({
     }
     setRenders((r) => ({ ...r, [cut.rowId]: { status: "rendering", progress: 0 } }));
     try {
-      const doc = applyTemplateToVideo(template.template_data, cutAsSource(cut, `cut://${cut.id}`));
+      const doc = applyBrandKitToDoc(
+        applyTemplateToVideo(template.template_data, cutAsSource(cut, `cut://${cut.id}`)),
+        loadBrandKit(),
+      );
       const blob = await renderTemplateProject({
         doc,
         file,
