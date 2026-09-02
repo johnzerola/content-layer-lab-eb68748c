@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AudioLines,
@@ -78,7 +78,7 @@ import type { CaptionCue } from "@/lib/captions";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/base";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -765,7 +765,7 @@ export function VideoStudio({
                   {g.group}
                 </span>
                 {g.items.map((t) => (
-                  <React.Fragment key={t.id}>
+                  <Fragment key={t.id}>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
@@ -788,7 +788,7 @@ export function VideoStudio({
                         <p>{t.label} ({t.shortcut})</p>
                       </TooltipContent>
                     </Tooltip>
-                  </TooltipProvider>
+                  </Fragment>
                 ))}
                 <Separator className="my-2 hidden opacity-20 md:block" />
               </div>
