@@ -37,7 +37,7 @@ const Clip = memo(function Clip({
   duration: number;
   selected: boolean;
   onSelect: () => void;
-  onTrim?: (id: string, startTime: number, endTime: number) => void;
+  onTrim?: ((id: string, startTime: number, endTime: number) => void) | undefined;
 }) {
   const start = Math.max(0, layer.startTime);
   const end = layer.endTime ?? duration;
