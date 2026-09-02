@@ -59,7 +59,7 @@ import { AISuggestPanel } from "@/components/AISuggestPanel";
 import { AITemplateStudio } from "@/components/AITemplateStudio";
 import { applyLook } from "@/lib/looks";
 
-import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
+import { currentUser, onAuth, pullTemplates, type CloudUser } from "@/lib/cloud";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
 import { AutoScheduleModal } from "@/components/AutoScheduleModal";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
@@ -78,6 +78,7 @@ import {
   fitCanvasToSource,
   orientationOf,
   loadTemplates,
+  saveTemplates,
   duplicateTemplate,
   migrate,
   PLATFORM_PRESETS,
