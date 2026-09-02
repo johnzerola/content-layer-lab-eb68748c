@@ -100,7 +100,15 @@ Input.displayName = "Input";
 /* ----------------------------------------------------------------- Tooltip */
 
 const TooltipProvider = TooltipPrimitive.Provider;
-const Tooltip = TooltipPrimitive.Root;
+/** Root que já provê o Provider — evita erro quando não há provider acima. */
+const Tooltip = ({
+  delayDuration = 200,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Root>) => (
+  <TooltipPrimitive.Provider delayDuration={delayDuration}>
+    <TooltipPrimitive.Root delayDuration={delayDuration} {...props} />
+  </TooltipPrimitive.Provider>
+);
 const TooltipTrigger = TooltipPrimitive.Trigger;
 
 const TooltipContent = React.forwardRef<
