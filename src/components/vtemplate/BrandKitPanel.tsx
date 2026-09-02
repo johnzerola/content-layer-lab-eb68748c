@@ -61,12 +61,38 @@ export function BrandKitPanel({
     onChange?.(next);
   };
 
+  /** Gera paleta + tipografia a partir do logo, tudo no navegador. */
+  const generateFromLogo = async (src: string) => {
+    setGenError(null);
+    setGenerating(true);
+    try {
+      const s = await extractBrandFromLogo(src);
+      setPalette(s.palette);
+      patch({
+        primary: s.primary,
+        secondary: s.secondary,
+        text: s.text,
+        background: s.background,
+        headingFont: s.headingFont,
+        bodyFont: s.bodyFont,
+      });
+    } catch (e) {
+      setGenError(e instanceof Error ? e.message : "não consegui analisar o logo");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const pickLogo = (file: File) => {
     const reader = new FileReader();
-    reader.onload = () => patch({ logoUrl: String(reader.result) });
+    reader.onload = () => {
+      const src = String(reader.result);
+      patch({ logoUrl: src });
+      void generateFromLogo(src);
+    };
     reader.readAsDataURL(file);
   };
+
 
   /** Aplica cores e fontes da marca em todas as camadas compatíveis. */
   const applyToLayers = () => {
