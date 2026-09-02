@@ -397,6 +397,65 @@ export type Database = {
         }
         Relationships: []
       }
+      post_insights: {
+        Row: {
+          comments: number
+          created_at: string
+          fetched_at: string
+          id: string
+          impressions: number
+          likes: number
+          platform_data: Json
+          post_id: string
+          reach: number
+          saves: number
+          shares: number
+          updated_at: string
+          user_id: string
+          views: number
+        }
+        Insert: {
+          comments?: number
+          created_at?: string
+          fetched_at?: string
+          id?: string
+          impressions?: number
+          likes?: number
+          platform_data?: Json
+          post_id: string
+          reach?: number
+          saves?: number
+          shares?: number
+          updated_at?: string
+          user_id: string
+          views?: number
+        }
+        Update: {
+          comments?: number
+          created_at?: string
+          fetched_at?: string
+          id?: string
+          impressions?: number
+          likes?: number
+          platform_data?: Json
+          post_id?: string
+          reach?: number
+          saves?: number
+          shares?: number
+          updated_at?: string
+          user_id?: string
+          views?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_insights_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: true
+            referencedRelation: "scheduled_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           created_at: string
