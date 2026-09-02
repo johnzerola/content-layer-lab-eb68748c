@@ -318,6 +318,8 @@ export function drawTemplateFrame(
   images: Map<string, HTMLImageElement>,
   cues: CaptionCueLike[] = [],
   crop: SourceCrop | null = null,
+  /** correção de cor da pré-edição, aplicada só ao vídeo */
+  grade = "none",
 ) {
   const W = ctx.canvas.width;
   const H = ctx.canvas.height;
@@ -337,7 +339,11 @@ export function drawTemplateFrame(
     const a = layerAnim(layer, t);
     ctx.save();
     ctx.globalAlpha = Math.max(0, Math.min(1, layer.opacity * a.alpha));
-    ctx.filter = filterCss(layer.filter ?? doc.filter);
+    const base = filterCss(layer.filter ?? doc.filter);
+    ctx.filter =
+      layer.type === "video" && grade && grade !== "none"
+        ? [base === "none" ? "" : base, grade].filter(Boolean).join(" ")
+        : base;
     if (a.dx || a.dy) ctx.translate(a.dx * W, a.dy * H);
     if (a.scale !== 1 || a.rotate || layer.rotation) {
       ctx.translate(x + w / 2, y + h / 2);
@@ -534,8 +540,7 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
         ctx.translate(-W / 2, -H / 2);
       }
       const grade = pre ? preEditFilter(pre) : "none";
-      ctx.filter = grade && grade !== "none" ? grade : "none";
-      drawTemplateFrame(ctx, doc, tOut, video, images, cues, crop);
+      drawTemplateFrame(ctx, doc, tOut, video, images, cues, crop, grade);
       ctx.restore();
 
       const frame = new VideoFrame(canvas, { timestamp: i * frameDur, duration: frameDur });
