@@ -73,7 +73,16 @@ export function SavedProjects() {
         />
         <label className="cursor-pointer rounded-lg border border-border/60 px-3 py-1.5 text-xs">
           Reconectar vídeos
-          <input type="file" accept="video/*" multiple className="sr-only" onChange={(e) => attach(e.target.files)} />
+          <input
+            type="file"
+            accept="video/*"
+            multiple
+            className="sr-only"
+            onChange={(e) => {
+              attach(e.currentTarget.files);
+              e.currentTarget.value = "";
+            }}
+          />
         </label>
         <Link to="/editor" className="ml-auto rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground">
           Novo projeto

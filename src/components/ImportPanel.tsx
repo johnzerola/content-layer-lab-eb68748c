@@ -122,7 +122,10 @@ export function ImportPanel({
         accept={VIDEO_ACCEPT}
         multiple={flow.multiple}
         hidden
-        onChange={(e) => onFiles(e.target.files)}
+        onChange={(e) => {
+          onFiles(e.currentTarget.files);
+          e.currentTarget.value = "";
+        }}
       />
       {flow.folder && (
         <input
@@ -132,7 +135,10 @@ export function ImportPanel({
           hidden
           // @ts-expect-error atributo não tipado
           webkitdirectory=""
-          onChange={(e) => onFiles(e.target.files)}
+          onChange={(e) => {
+            onFiles(e.currentTarget.files);
+            e.currentTarget.value = "";
+          }}
         />
       )}
 

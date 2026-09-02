@@ -57,13 +57,16 @@ async function requireUserId(): Promise<string> {
 }
 
 export async function listMyTemplates(): Promise<VideoTemplateRecord[]> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user.id;
+  if (!uid) return [];
   const { data, error } = await supabase
     .from(TABLE)
     .select("*")
+    .eq("user_id", uid)
     .order("updated_at", { ascending: false });
   if (error) throw error;
-  const uid = (await supabase.auth.getUser()).data.user?.id;
-  return (data ?? []).map(toRecord).filter((t) => t.user_id === uid);
+  return (data ?? []).map(toRecord);
 }
 
 export async function listPublicTemplates(): Promise<VideoTemplateRecord[]> {

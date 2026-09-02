@@ -199,6 +199,7 @@ function EditorLauncher() {
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) void pick(f);
+                 e.currentTarget.value = "";
               }}
             />
           </label>
