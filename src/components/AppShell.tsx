@@ -131,6 +131,7 @@ const MODES: ModeDef[] = [
 
 /** rotas fixas fora do estúdio — quando ativas, as ferramentas não ficam destacadas */
 const ROUTE_PATHS = [
+  "/templates",
   "/live",
   "/biblioteca",
   "/agenda",
