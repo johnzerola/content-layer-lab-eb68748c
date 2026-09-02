@@ -451,7 +451,10 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
 
     const start = Math.max(0, Math.min(opts.cut?.start ?? 0, Math.max(0, video.duration - 0.4)));
     const end = Math.min(video.duration || start + 1, opts.cut?.end ?? video.duration);
-    const dur = Math.max(0.4, end - start);
+    const pre = opts.preedit ?? null;
+    /** Trechos mantidos: o export segue exatamente os cortes da timeline. */
+    const segs = keptSegments(pre, { start, end }, video.duration);
+    const dur = Math.max(0.4, segs.length ? segmentsDuration(segs) : end - start);
     const totalFrames = Math.max(1, Math.round(dur * fps));
 
     const images = new Map<string, HTMLImageElement>();
@@ -460,8 +463,9 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
       if (img) images.set(src, img);
     }
 
-    const audio = await renderAudioTrack(file, [{ start, end }], 1, 0, 0).catch(() => null);
+    const audio = await renderAudioTrack(file, segs.length ? segs : [{ start, end }], 1, 0, 0).catch(() => null);
     const audioCodec = audio ? await pickAudioCodec(audio.channels, audio.sampleRate) : null;
+
 
     const muxer = new Muxer({
       target: new ArrayBufferTarget(),
