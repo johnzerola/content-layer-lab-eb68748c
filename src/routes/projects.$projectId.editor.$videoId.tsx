@@ -680,6 +680,8 @@ function EditorPage() {
                     "template-estilo",
                   )
                 }
+                transition={pre.transIn.kind}
+                onApplySaved={applySavedStyle}
               />
             )}
           </div>
@@ -848,6 +850,8 @@ function EditorPage() {
                     "template-estilo",
                   )
                 }
+                transition={pre.transIn.kind}
+                onApplySaved={applySavedStyle}
               />
             )}
             {tool === "animacao" && (
