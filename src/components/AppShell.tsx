@@ -22,6 +22,7 @@ import {
   Users,
 } from "lucide-react";
 
+import { TooltipProvider } from "@/components/ui/base";
 import { PlanGate } from "@/components/PlanGate";
 import { GlobalActionBar } from "@/components/GlobalActionBar";
 import { useAccess } from "@/lib/subscription";
@@ -399,5 +400,6 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
         </div>
       </div>
     </div>
+    </TooltipProvider>
   );
 }
