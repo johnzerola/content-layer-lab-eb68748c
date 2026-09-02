@@ -1387,6 +1387,11 @@ export function VideoStudio({
                     label={key === "transIn" ? "Transição de abertura" : "Transição de saída"}
                     value={pre[key]}
                     onChange={(t) => set({ [key]: t } as Partial<PreEdit>, "transição")}
+                    onPreview={() => {
+                      const target = key === "transIn" ? start : Math.max(start, end - (pre[key]?.dur ?? 0.4) - 0.2);
+                      seek(target);
+                      void videoRef.current?.play().catch(() => undefined);
+                    }}
                   />
                 ))}
 
@@ -1412,6 +1417,12 @@ export function VideoStudio({
                           value={transitionList[i] ?? { kind: "none", dur: 0.4 }}
                           onChange={(t) => setJunction(i, t)}
                           onApplyAll={() => applyJunctionToAll(i)}
+                          onPreview={() => {
+                            const seg = segs[i + 1];
+                            if (!seg) return;
+                            seek(Math.max(start, seg.start - 0.2));
+                            void videoRef.current?.play().catch(() => undefined);
+                          }}
                         />
                       </div>
                     ))

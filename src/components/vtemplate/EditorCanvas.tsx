@@ -1,5 +1,6 @@
 /** Canvas visual do editor de templates: renderiza as camadas em coordenadas relativas. */
 import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { animationCss } from "@/lib/video-template/animations";
 import { filterToCss } from "@/lib/video-template/factory";
 import type { TemplateDoc, TemplateLayer } from "@/lib/video-template/types";
 
@@ -169,6 +170,7 @@ export function EditorCanvas({
   showSafeArea,
   snap = true,
   interactive = true,
+  animPreview,
 }: {
   doc: TemplateDoc;
   selectedId: string | null;
@@ -179,6 +181,8 @@ export function EditorCanvas({
   showSafeArea?: boolean;
   snap?: boolean;
   interactive?: boolean;
+  /** dispara a prévia da animação de uma camada: { key, layerId, slot } */
+  animPreview?: { key: number; layerId: string; slot: "animationIn" | "animationOut" | "animationLoop" } | null;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [guides, setGuides] = useState<{ axis: "x" | "y"; pos: number }[]>([]);
@@ -270,7 +274,9 @@ export function EditorCanvas({
         {ordered.map((layer) =>
           layer.visible ? (
             <div
-              key={layer.id}
+              key={
+                animPreview && animPreview.layerId === layer.id ? `${layer.id}-${animPreview.key}` : layer.id
+              }
               onPointerDown={startDrag(layer, "move")}
               className={`absolute ${interactive && !layer.locked ? "cursor-move" : ""} ${
                 selectedId === layer.id ? "outline outline-2 outline-primary" : ""
@@ -283,6 +289,10 @@ export function EditorCanvas({
                 opacity: layer.opacity,
                 transform: `rotate(${layer.rotation}deg) scaleX(${layer.flipX ? -1 : 1}) scaleY(${layer.flipY ? -1 : 1})`,
                 zIndex: layer.zIndex + 1,
+                animation:
+                  animPreview && animPreview.layerId === layer.id
+                    ? animationCss(layer[animPreview.slot], animPreview.slot === "animationLoop")
+                    : animationCss(layer.animationLoop, true),
               }}
             >
               <LayerView layer={layer} doc={doc} sampleVideoUrl={doc.sampleVideoUrl ?? null} />

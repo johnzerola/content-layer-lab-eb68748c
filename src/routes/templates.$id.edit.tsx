@@ -7,6 +7,8 @@ import { Button, Input } from "@/components/ui/base";
 import { EditorCanvas } from "@/components/vtemplate/EditorCanvas";
 import { EditorToolbar } from "@/components/vtemplate/EditorToolbar";
 import { LayerPanel } from "@/components/vtemplate/LayerPanel";
+import { AnimationPanel } from "@/components/vtemplate/AnimationPanel";
+import { BrandKitPanel } from "@/components/vtemplate/BrandKitPanel";
 import { PropertiesPanel } from "@/components/vtemplate/PropertiesPanel";
 import { TemplateCopyPanel } from "@/components/vtemplate/TemplateCopyPanel";
 import { getTemplate, updateTemplate } from "@/lib/video-template/service";
@@ -77,6 +79,9 @@ function Editor({ record }: { record: VideoTemplateRecord }) {
   const [zoom, setZoom] = useState(0.85);
   const [showGrid, setShowGrid] = useState(false);
   const [tab, setTab] = useState<"layers" | "props">("props");
+  const [animPreview, setAnimPreview] = useState<
+    { key: number; layerId: string; slot: "animationIn" | "animationOut" | "animationLoop" } | null
+  >(null);
 
   const save = useCallback(
     async (doc: TemplateDoc) => {
@@ -179,6 +184,7 @@ function Editor({ record }: { record: VideoTemplateRecord }) {
               zoom={zoom}
               showGrid={showGrid}
               showSafeArea
+              animPreview={animPreview}
             />
           </main>
 
@@ -211,6 +217,16 @@ function Editor({ record }: { record: VideoTemplateRecord }) {
                     onUpdateLayer={ed.updateLayer}
                   />
                   <PropertiesPanel layer={ed.selected} onUpdate={(p) => ed.selected && ed.updateLayer(ed.selected.id, p)} />
+                  {ed.selected && (
+                    <AnimationPanel
+                      layer={ed.selected}
+                      onUpdate={(p) => ed.selected && ed.updateLayer(ed.selected.id, p)}
+                      onPreview={(slot) =>
+                        ed.selected && setAnimPreview({ key: Date.now(), layerId: ed.selected.id, slot })
+                      }
+                    />
+                  )}
+                  <BrandKitPanel doc={ed.doc} onUpdateLayer={ed.updateLayer} />
                 </>
               )}
             </div>
@@ -222,6 +238,16 @@ function Editor({ record }: { record: VideoTemplateRecord }) {
                 onUpdateLayer={ed.updateLayer}
               />
               <PropertiesPanel layer={ed.selected} onUpdate={(p) => ed.selected && ed.updateLayer(ed.selected.id, p)} />
+              {ed.selected && (
+                <AnimationPanel
+                  layer={ed.selected}
+                  onUpdate={(p) => ed.selected && ed.updateLayer(ed.selected.id, p)}
+                  onPreview={(slot) =>
+                    ed.selected && setAnimPreview({ key: Date.now(), layerId: ed.selected.id, slot })
+                  }
+                />
+              )}
+              <BrandKitPanel doc={ed.doc} onUpdateLayer={ed.updateLayer} />
             </div>
           </aside>
         </div>
