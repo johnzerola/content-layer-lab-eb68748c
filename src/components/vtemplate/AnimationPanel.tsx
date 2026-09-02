@@ -178,7 +178,7 @@ export function AnimationPanel({
           <Field label="Direção">
             <select
               value={spec.direction ?? "normal"}
-              onChange={(e) => patch({ direction: e.target.value as AnimationSpec["direction"] })}
+              onChange={(e) => patch({ direction: e.target.value as NonNullable<AnimationSpec["direction"]> })}
               aria-label="Direção da animação"
               className="h-8 flex-1 rounded-md border border-border/70 bg-card/60 px-2 text-xs"
             >
