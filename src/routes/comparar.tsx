@@ -37,7 +37,7 @@ export const Route = createFileRoute("/comparar")({
   }),
   component: () => (
     <RouteShell>
-      <RequireAuth>
+      <RequireAuth title="Comparar layouts" description="Entre para comparar e aplicar layouts nos seus cortes.">
         <CompararPage />
       </RequireAuth>
     </RouteShell>
@@ -149,7 +149,7 @@ function Side({
         return [];
       }
     }
-    return (opt.record.data?.composition?.layers ?? []) as TemplateLayer[];
+    return (opt.record.template_data?.composition?.layers ?? []) as TemplateLayer[];
   }, [opt, brand, identity]);
 
   const kit = opt?.kind === "ready" ? ({ ...brand, ...(opt.ready.palette ?? {}) } as BrandKit) : brand;
@@ -159,7 +159,7 @@ function Side({
     if (!opt) return;
     if (opt.kind === "ready") {
       setPendingLayout(opt.id);
-      if (transition) setPendingTransition({ kind: transition.kind, dur: transition.dur });
+      if (transition) setPendingTransition({ kind: transition.kind, dur: transition.dur, applyAll: false });
     } else {
       setPendingTemplate(opt.id);
     }
