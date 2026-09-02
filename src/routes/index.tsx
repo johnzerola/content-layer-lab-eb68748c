@@ -29,6 +29,7 @@ import {
   CopyPlus,
 } from "lucide-react";
 import { QuickPreviewModal } from "@/components/QuickPreviewModal";
+import { PLATFORM_UI_OPTIONS, type PlatformUI } from "@/components/PlatformUIOverlay";
 import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
 
 import { Button } from "@/components/ui/button";
@@ -511,6 +512,14 @@ function Home() {
   const [detectMsg, setDetectMsg] = useState<string | undefined>(undefined);
   const [suggestions, setSuggestions] = useState<CleanupRegion[]>([]);
   const [compare, setCompare] = useState(false);
+  /** grade de interface (TikTok/IG/Shorts) sobre a prévia — só visual, não exporta */
+  const [uiGrid, setUiGrid] = useState<PlatformUI | "off">(() => {
+    try {
+      return (localStorage.getItem("vv_ui_grid") as PlatformUI | "off") || "off";
+    } catch {
+      return "off";
+    }
+  });
   /** mini editor de enquadramento direto na prévia */
   const [cropTune, setCropTune] = useState(false);
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -2440,6 +2449,28 @@ function Home() {
                         >
                           <Crop className="mr-1 inline size-3" /> ajustar corte
                         </button>
+                        <select
+                          value={uiGrid}
+                          title="Simula a interface do app sobre o vídeo para posicionar legenda e branding fora das áreas cobertas"
+                          onChange={(e) => {
+                            const v = e.target.value as PlatformUI | "off";
+                            setUiGrid(v);
+                            try {
+                              localStorage.setItem("vv_ui_grid", v);
+                            } catch {}
+                          }}
+                          className={`rounded-md border px-2 py-1 font-mono text-[10px] ${
+                            uiGrid !== "off"
+                              ? "border-primary/60 bg-primary/15 text-primary"
+                              : "border-border bg-background text-muted-foreground"
+                          }`}
+                        >
+                          {PLATFORM_UI_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
                         {variants > 1 && (
                           <select
                             value={variantIdx}
@@ -2475,6 +2506,7 @@ function Home() {
                         after={
                           <TemplateCanvas
                             template={previewTemplate}
+                            uiOverlay={uiGrid === "off" ? null : uiGrid}
                             interactive={false}
                             poster={selected.poster}
                             previewFile={selected.file}
@@ -2490,6 +2522,7 @@ function Home() {
                       <div className="relative mx-auto w-full max-w-[320px]">
                         <TemplateCanvas
                           template={previewTemplate}
+                          uiOverlay={uiGrid === "off" ? null : uiGrid}
                           interactive={false}
                           poster={selected.poster}
                           previewFile={selected.file}

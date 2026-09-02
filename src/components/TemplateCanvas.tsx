@@ -8,6 +8,7 @@ import {
   type Template,
 } from "@/lib/template";
 import { drawFrame, preloadImage, type DrawOpts } from "@/lib/draw";
+import { PlatformUIOverlay, type PlatformUI } from "@/components/PlatformUIOverlay";
 import { motionAt, type Variation } from "@/lib/variation";
 
 
@@ -127,6 +128,7 @@ export function TemplateCanvas({
   debugGrid = 3,
   debugSafeArea = true,
   debugBoxes = true,
+  uiOverlay = null,
 }: {
   template: Template;
   selected?: SelId | null;
@@ -153,6 +155,8 @@ export function TemplateCanvas({
   debugGrid?: number;
   debugSafeArea?: boolean;
   debugBoxes?: boolean;
+  /** simula a interface do app (TikTok/IG/Shorts) por cima da prévia — nunca entra na exportação */
+  uiOverlay?: PlatformUI | null;
 }) {
 
 
@@ -331,6 +335,8 @@ export function TemplateCanvas({
       style={{ aspectRatio: `${W}/${H}` }}
     >
       <canvas ref={canvasRef} width={W} height={H} className="block h-full w-full" />
+
+      {uiOverlay && <PlatformUIOverlay platform={uiOverlay} />}
 
       {debug && (
         <div className="pointer-events-none absolute inset-0">
