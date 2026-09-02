@@ -12,7 +12,7 @@ export const publishPostNow = createServerFn({ method: "POST" })
   .inputValidator((input: { postId: string }) => z.object({ postId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }): Promise<PublishNowResult> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { createPublishDependencies } = await import("@/lib/publish-deps.server");
+    const { createPublishDependencies, publishQueueLimits } = await import("@/lib/publish-deps.server");
     const { publishClaimedPost } = await import("@/lib/publish-queue.server");
 
     const { data: post, error } = await supabaseAdmin
@@ -28,10 +28,36 @@ export const publishPostNow = createServerFn({ method: "POST" })
     }
 
     const deps = await createPublishDependencies();
-    await supabaseAdmin
+    // Reserva o agendamento com o mesmo protocolo de lock da fila automatica,
+    // para que o cron nao publique o mesmo video em paralelo.
+    const lockId = crypto.randomUUID();
+    const staleBefore = new Date(
+      Date.now() - publishQueueLimits().lockTimeoutSeconds * 1000,
+    ).toISOString();
+    const { data: reserved } = await supabaseAdmin
       .from("scheduled_posts")
-      .update({ status: "processando", error: null, error_code: null })
-      .eq("id", post.id);
+      .update({
+        status: "processando",
+        error: null,
+        error_code: null,
+        lock_id: lockId,
+        locked_at: new Date().toISOString(),
+        next_attempt_at: null,
+      })
+      .eq("id", post.id)
+      .eq("user_id", context.userId)
+      .neq("status", "publicado")
+      .or(`lock_id.is.null,locked_at.is.null,locked_at.lt.${staleBefore}`)
+      .select("id");
+
+    if (!reserved || reserved.length === 0) {
+      return {
+        ok: false,
+        error: "Esta publicação já está sendo processada. Aguarde alguns instantes.",
+        code: "ALREADY_PROCESSING",
+      };
+    }
+
 
     let result;
     try {
