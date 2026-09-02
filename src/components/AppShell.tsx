@@ -457,13 +457,19 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           {mode === "external" || onFixedRoute ? null : (
             <section
               key={current.id}
-              className="rise-in mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4"
+              className="rise-in mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-border pb-5"
             >
               <div className="min-w-0">
-                <h2 className="font-display text-lg font-semibold tracking-tight text-foreground">
-                  {current.headline}
+                <p className="eyebrow">
+                  <span className="size-1.5 rounded-full bg-primary" aria-hidden />
+                  {current.brand}
+                  <span className="text-border">/</span>
+                  {current.tagline}
+                </p>
+                <h2 className="title-editorial mt-2">
+                  {current.headline} <span className="title-em">{current.accent}</span>
                 </h2>
-                <p className="mt-0.5 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
+                <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
                   {current.description}
                 </p>
               </div>
@@ -471,7 +477,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
                 {current.chips.slice(0, 3).map((c) => (
                   <span
                     key={c}
-                    className="rounded-md border border-border bg-surface px-2 py-1 text-[11px] text-[var(--muted-2)]"
+                    className="rounded-full border border-border bg-surface px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--muted-2)]"
                   >
                     {c}
                   </span>
