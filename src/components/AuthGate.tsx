@@ -1,9 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Loader2, LogIn } from "lucide-react";
+import { Check, Loader2, LogIn, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { currentUser, onAuth, resetPassword, signIn, signUp, type CloudUser } from "@/lib/cloud";
 import { toast } from "sonner";
+
 
 /**
  * Ferramentas que gravam no banco (CleanerIA) exigem sessão — sem ela o
