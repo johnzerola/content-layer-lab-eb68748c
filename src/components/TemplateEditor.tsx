@@ -387,9 +387,16 @@ export function TemplateEditor({
       <div className="panel glass pop-in flex h-full w-full max-w-7xl flex-col overflow-hidden">
         <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b border-border px-5 py-4">
           <div className="min-w-0">
-            <p className="mono-label text-primary">Editor visual</p>
-            <h2 className="truncate font-display text-xl font-semibold tracking-tight">
-              {t.name || "Personalizar template"}
+            <p className="eyebrow">
+              <span className="size-1.5 rounded-full bg-primary" aria-hidden />
+              Editor visual
+            </p>
+            <h2 className="title-editorial mt-1 truncate !text-[26px]">
+              {t.name || (
+                <>
+                  Personalizar <span className="title-em">template</span>
+                </>
+              )}
             </h2>
             <p className="truncate text-[12px] text-muted-foreground">
               Ajuste textos, cores e elementos — o preview atualiza em tempo real.
@@ -399,39 +406,44 @@ export function TemplateEditor({
             <button
               onClick={undo}
               disabled={!past.current.length}
-              className="btn-ghost interactive size-9 justify-center disabled:opacity-40"
+              className="btn-ghost interactive h-12 w-14 flex-col gap-0.5 disabled:opacity-40"
               title="Desfazer (Ctrl+Z)"
             >
               <Undo2 className="size-4" />
+              <span className="font-mono text-[9px] uppercase tracking-[0.1em]">desfazer</span>
             </button>
             <button
               onClick={redo}
               disabled={!future.current.length}
-              className="btn-ghost interactive size-9 justify-center disabled:opacity-40"
+              className="btn-ghost interactive h-12 w-14 flex-col gap-0.5 disabled:opacity-40"
               title="Refazer (Ctrl+Shift+Z)"
             >
               <Redo2 className="size-4" />
+              <span className="font-mono text-[9px] uppercase tracking-[0.1em]">refazer</span>
             </button>
             <button
               onClick={() => setSnap((s) => !s)}
-              className={`btn-ghost interactive size-9 justify-center ${snap ? "bg-primary/15 text-primary" : ""}`}
+              className={`btn-ghost interactive h-12 w-14 flex-col gap-0.5 ${snap ? "bg-primary/15 text-primary" : ""}`}
               title="Snap e guias de alinhamento (segure Alt para ignorar)"
             >
               <Magnet className="size-4" />
+              <span className="font-mono text-[9px] uppercase tracking-[0.1em]">snap</span>
             </button>
             <button
               onClick={() => setDebug((d) => !d)}
-              className={`btn-ghost interactive size-9 justify-center ${debug ? "bg-primary/15 text-primary" : ""}`}
+              className={`btn-ghost interactive h-12 w-14 flex-col gap-0.5 ${debug ? "bg-primary/15 text-primary" : ""}`}
               title="Modo de depuração: grade, safe areas e bounding boxes"
             >
               <Bug className="size-4" />
+              <span className="font-mono text-[9px] uppercase tracking-[0.1em]">grade</span>
             </button>
             <button
               onClick={onCancel}
-              className="btn-ghost interactive size-9 justify-center"
+              className="btn-ghost interactive h-12 w-14 flex-col gap-0.5"
               aria-label="Fechar"
             >
               <X className="size-4" />
+              <span className="font-mono text-[9px] uppercase tracking-[0.1em]">fechar</span>
             </button>
           </div>
         </header>
