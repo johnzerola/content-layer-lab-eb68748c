@@ -41,6 +41,7 @@
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-editorial: "Instrument Serif", "Iowan Old Style", Georgia, serif;
 
   --text-2xs: 0.75rem;
   --text-xs: 0.8125rem;
