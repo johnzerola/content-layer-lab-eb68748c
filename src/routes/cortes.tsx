@@ -281,6 +281,7 @@ function CutsPage() {
               }}
             />
           </label>
+          <LinkImport onFile={(f) => void pickFile(f)} />
           {file && <span className="truncate text-sm text-muted-foreground">{file.name}</span>}
           <Button onClick={() => void analyze()} disabled={!file || analyzing}>
             {analyzing ? `Analisando… ${Math.round(progress * 100)}%` : "Gerar cortes"}
