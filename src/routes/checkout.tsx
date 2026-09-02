@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, Check, CreditCard, Loader2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, CreditCard, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +49,7 @@ function CheckoutForm() {
   const navigate = useNavigate();
   const [selected, setSelected] = useState<PlanId>((planFromId(plano).id as PlanId) ?? "creator");
   const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
   const [card, setCard] = useState({ name: "", number: "", exp: "", cvv: "" });
 
   const plan = planFromId(selected);
@@ -62,8 +63,9 @@ function CheckoutForm() {
     try {
       await new Promise((r) => setTimeout(r, 1200));
       await activatePlan(selected);
+      setDone(true);
       toast.success(`Pagamento simulado aprovado — plano ${plan.name} ativo.`);
-      void navigate({ to: "/" });
+      window.setTimeout(() => void navigate({ to: "/" }), 900);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Não foi possível ativar o plano.");
     } finally {
@@ -79,10 +81,10 @@ function CheckoutForm() {
           <button
             key={p.id}
             onClick={() => setSelected(p.id)}
-            className={`w-full rounded-2xl border p-5 text-left transition ${
+            className={`aurora interactive w-full rounded-2xl border p-5 text-left transition-[border-color,background-color,transform] duration-[var(--dur-base)] ${
               selected === p.id
-                ? "border-primary/50 bg-accent shadow-[var(--shadow-glow)]"
-                : "border-border bg-surface/50 hover:bg-surface-2"
+                ? "aurora-on border-transparent bg-surface-2"
+                : "border-border bg-surface/50"
             }`}
           >
             <div className="flex items-center justify-between gap-3">
@@ -109,7 +111,15 @@ function CheckoutForm() {
         ))}
       </section>
 
-      <aside className="h-fit rounded-2xl border border-border bg-surface/60 p-5">
+      <aside
+        className={`aurora h-fit rounded-2xl border bg-surface/60 p-5 transition-[border-color] duration-[var(--dur-panel)] ${
+          done
+            ? "aurora-on aurora-success border-transparent"
+            : busy
+              ? "aurora-on aurora-boost border-transparent"
+              : "border-border focus-within:aurora-on focus-within:border-transparent"
+        }`}
+      >
         <p className="mono-label flex items-center gap-2 text-primary">
           <CreditCard className="size-3.5" /> pagamento simulado
         </p>
@@ -149,9 +159,21 @@ function CheckoutForm() {
           <span className="font-display text-xl font-semibold">R$ {plan.price}</span>
         </div>
 
-        <Button className="mt-4 w-full" disabled={busy} onClick={pay}>
-          {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
-          Pagar e entrar no sistema
+        {/* button morph: Pagar → Processando → Aprovado, mesma geometria */}
+        <Button className="mt-4 min-h-11 w-full" disabled={busy || done} onClick={pay}>
+          {done ? (
+            <>
+              <CheckCircle2 className="mr-2 size-4" /> Plano {plan.name} ativo
+            </>
+          ) : busy ? (
+            <>
+              <Loader2 className="mr-2 size-4 animate-spin" /> Processando pagamento…
+            </>
+          ) : (
+            <>
+              <CreditCard className="mr-2 size-4" /> Pagar e entrar no sistema
+            </>
+          )}
         </Button>
         <p className="mt-3 flex items-center gap-2 text-[11px] text-muted-foreground">
           <ShieldCheck className="size-3.5 text-primary" /> Integração de pagamento real ainda não conectada.
