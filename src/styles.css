@@ -329,6 +329,34 @@
   }
 }
 
+/* botão de ação principal */
+@utility btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background-color: var(--color-primary);
+  color: var(--color-primary-foreground);
+  font-weight: 600;
+  transition:
+    filter var(--dur-fast) var(--ease-out-expo),
+    box-shadow var(--dur-fast) var(--ease-out-expo);
+  &:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 0 0 3px var(--primary-subtle);
+  }
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    filter: none;
+  }
+}
+
+
 /* campo de texto padrão em painéis (input / textarea nativos) */
 @utility field {
   width: 100%;
