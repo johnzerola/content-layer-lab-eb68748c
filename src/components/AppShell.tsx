@@ -264,7 +264,8 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
     <>
       <nav className="flex flex-col gap-0.5 px-3" aria-label="Criar">
         {expanded && <p className="mono-label px-2.5 pb-1.5 pt-2">1 · Criar</p>}
-        {MODES.filter((m) => m.id !== "external").map((m) => (
+        {/* "clip" saiu daqui: Corte IA e Cortes viraram uma única área em /cortes */}
+        {MODES.filter((m) => m.id !== "external" && m.id !== "clip").map((m) => (
           <NavItem
             key={m.id}
             open={expanded}
@@ -285,6 +286,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             }
           />
         ))}
+        {routeLink("/cortes", "Corte IA & Cortes", Scissors, expanded, close)}
         {routeLink("/fotos", "FotoViral", Images, expanded, close)}
       </nav>
 
@@ -300,7 +302,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           }}
         />
         {routeLink("/templates", "Templates de vídeo", Layers, expanded, close)}
-        {routeLink("/cortes", "Cortes", Scissors, expanded, close)}
+
         {routeLink("/editor", "Editor profissional", Wand2, expanded, close)}
         {routeLink("/projetos", "Projetos", FolderKanban, expanded, close)}
         {routeLink("/biblioteca", "Resultados", History, expanded, close)}
@@ -481,7 +483,8 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <div className="hidden rounded-lg border border-border bg-surface p-0.5 sm:flex md:hidden">
-                {MODES.filter((m) => m.id !== "external").map((m) => (
+                {/* "clip" saiu daqui: Corte IA e Cortes viraram uma única área em /cortes */}
+        {MODES.filter((m) => m.id !== "external" && m.id !== "clip").map((m) => (
                   <button
                     key={m.id}
                     onClick={() => onMode(m.id)}
