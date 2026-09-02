@@ -302,6 +302,13 @@ function captionCues(doc: TemplateDoc): CaptionCueLike[] {
   );
 }
 
+export interface SourceCrop {
+  sx: number;
+  sy: number;
+  sw: number;
+  sh: number;
+}
+
 /** Desenha um frame completo do template no tempo `t` (em segundos do corte). */
 export function drawTemplateFrame(
   ctx: CanvasRenderingContext2D,
@@ -310,6 +317,7 @@ export function drawTemplateFrame(
   video: HTMLVideoElement | null,
   images: Map<string, HTMLImageElement>,
   cues: CaptionCueLike[] = [],
+  crop: SourceCrop | null = null,
 ) {
   const W = ctx.canvas.width;
   const H = ctx.canvas.height;
@@ -326,12 +334,15 @@ export function drawTemplateFrame(
     const w = (layer.width / 100) * W;
     const h = (layer.height / 100) * H;
 
+    const a = layerAnim(layer, t);
     ctx.save();
-    ctx.globalAlpha = Math.max(0, Math.min(1, layer.opacity));
+    ctx.globalAlpha = Math.max(0, Math.min(1, layer.opacity * a.alpha));
     ctx.filter = filterCss(layer.filter ?? doc.filter);
-    if (layer.rotation) {
+    if (a.dx || a.dy) ctx.translate(a.dx * W, a.dy * H);
+    if (a.scale !== 1 || a.rotate || layer.rotation) {
       ctx.translate(x + w / 2, y + h / 2);
-      ctx.rotate((layer.rotation * Math.PI) / 180);
+      if (layer.rotation || a.rotate) ctx.rotate(((layer.rotation + a.rotate) * Math.PI) / 180);
+      if (a.scale !== 1) ctx.scale(a.scale, a.scale);
       ctx.translate(-(x + w / 2), -(y + h / 2));
     }
 
@@ -340,9 +351,18 @@ export function drawTemplateFrame(
       ctx.beginPath();
       ctx.roundRect(x, y, w, h, layer.mask === "circle" ? Math.min(w, h) / 2 : layer.radius || 0);
       ctx.clip();
-      drawFit(ctx, video, video.videoWidth, video.videoHeight, x, y, w, h, layer.fit);
+      if (crop) {
+        const scale =
+          layer.fit === "contain" ? Math.min(w / crop.sw, h / crop.sh) : Math.max(w / crop.sw, h / crop.sh);
+        const dw = layer.fit === "fill" ? w : crop.sw * scale;
+        const dh = layer.fit === "fill" ? h : crop.sh * scale;
+        ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+      } else {
+        drawFit(ctx, video, video.videoWidth, video.videoHeight, x, y, w, h, layer.fit);
+      }
       ctx.restore();
     } else if (layer.type === "image" && layer.src) {
+
       const img = images.get(layer.src);
       if (img) {
         ctx.save();
