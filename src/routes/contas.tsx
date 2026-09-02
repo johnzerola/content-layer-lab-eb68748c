@@ -31,7 +31,7 @@ export const Route = createFileRoute("/contas")({
     ],
   }),
   component: () => (
-    <RequireAuth>
+    <RequireAuth title="Contas e credenciais" description="Entre na sua conta para gerenciar as credenciais.">
       <ContasPage />
     </RequireAuth>
   ),
