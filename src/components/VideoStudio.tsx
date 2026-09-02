@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AudioLines,
@@ -78,7 +78,7 @@ import type { CaptionCue } from "@/lib/captions";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/base";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -765,7 +765,7 @@ export function VideoStudio({
                   {g.group}
                 </span>
                 {g.items.map((t) => (
-                  <TooltipProvider key={t.id}>
+                  <Fragment key={t.id}>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
@@ -774,13 +774,13 @@ export function VideoStudio({
                             "group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200",
                             tab === t.id
                               ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                              : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                              : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
                           )}
                         >
                           <t.icon className={cn("size-4 shrink-0 transition-transform group-hover:scale-110", tab === t.id ? "animate-pulse" : "")} />
                           <span className="font-display text-xs font-medium">{t.label}</span>
                           {tab === t.id && (
-                            <div className="absolute left-0 top-1/2 h-4 w-1 -translate-y-1/2 rounded-full bg-white md:block hidden" />
+                            <div className="absolute left-0 top-1/2 h-4 w-1 -translate-y-1/2 rounded-full bg-primary-foreground md:block hidden" />
                           )}
                         </button>
                       </TooltipTrigger>
@@ -788,7 +788,7 @@ export function VideoStudio({
                         <p>{t.label} ({t.shortcut})</p>
                       </TooltipContent>
                     </Tooltip>
-                  </TooltipProvider>
+                  </Fragment>
                 ))}
                 <Separator className="my-2 hidden opacity-20 md:block" />
               </div>
