@@ -9,6 +9,7 @@ import {
   Palette,
   Scissors,
   Diamond,
+  Gauge,
   Shuffle,
   Sliders,
   Sparkles,
