@@ -202,6 +202,7 @@ export type Database = {
       exports: {
         Row: {
           bytes: number
+          caption: string | null
           created_at: string
           file_name: string
           id: string
@@ -209,11 +210,14 @@ export type Database = {
           platform: string | null
           seconds: number
           source_name: string | null
+          storage_path: string | null
+          thumb_url: string | null
           user_id: string
           variant: string | null
         }
         Insert: {
           bytes?: number
+          caption?: string | null
           created_at?: string
           file_name: string
           id?: string
@@ -221,11 +225,14 @@ export type Database = {
           platform?: string | null
           seconds?: number
           source_name?: string | null
+          storage_path?: string | null
+          thumb_url?: string | null
           user_id: string
           variant?: string | null
         }
         Update: {
           bytes?: number
+          caption?: string | null
           created_at?: string
           file_name?: string
           id?: string
@@ -233,6 +240,8 @@ export type Database = {
           platform?: string | null
           seconds?: number
           source_name?: string | null
+          storage_path?: string | null
+          thumb_url?: string | null
           user_id?: string
           variant?: string | null
         }
