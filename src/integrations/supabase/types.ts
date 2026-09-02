@@ -397,6 +397,48 @@ export type Database = {
         }
         Relationships: []
       }
+      manual_social_credentials: {
+        Row: {
+          access_token_ciphertext: string
+          created_at: string
+          expires_at: string | null
+          extra: Json
+          handle: string
+          id: string
+          label: string
+          platform: string
+          refresh_token_ciphertext: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token_ciphertext: string
+          created_at?: string
+          expires_at?: string | null
+          extra?: Json
+          handle?: string
+          id?: string
+          label?: string
+          platform: string
+          refresh_token_ciphertext?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token_ciphertext?: string
+          created_at?: string
+          expires_at?: string | null
+          extra?: Json
+          handle?: string
+          id?: string
+          label?: string
+          platform?: string
+          refresh_token_ciphertext?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       post_insights: {
         Row: {
           comments: number
