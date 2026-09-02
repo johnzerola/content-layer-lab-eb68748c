@@ -19,6 +19,7 @@ import {
   BarChart3,
   Shield,
   Images,
+  Users,
 } from "lucide-react";
 
 import { PlanGate } from "@/components/PlanGate";
