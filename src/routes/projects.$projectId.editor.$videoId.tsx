@@ -210,8 +210,55 @@ function EditorPage() {
     return () => URL.revokeObjectURL(objectUrl);
   }, [videoId]);
 
+  useEffect(() => {
+    void listAccounts()
+      .then(setAccounts)
+      .catch(() => undefined);
+  }, []);
+
   const cuts = useMemo(() => (cutOnRemove ? removedRanges(transcript) : []), [transcript, cutOnRemove]);
   const silences = useMemo(() => silenceRanges(transcript, 0.6), [transcript]);
+
+  /** Renderiza o corte atual no próprio editor e (opcionalmente) abre a publicação. */
+  const renderAndPublish = useCallback(
+    async (publish: boolean) => {
+      if (!doc) return;
+      if (!templateRenderSupported()) {
+        toast.error("Este navegador não suporta a renderização (WebCodecs).");
+        return;
+      }
+      const file = getSourceFile(videoId);
+      if (!file) {
+        toast.error("Carregue o vídeo de origem na barra de mídia para renderizar.");
+        return;
+      }
+      const seg = doc.preedit?.segments?.[0] ?? null;
+      setRendering(true);
+      setRenderPct(0);
+      try {
+        const blob = await renderTemplateProject({
+          doc: doc.composition,
+          file,
+          cut: seg ? { start: seg.start, end: seg.end } : null,
+          onProgress: setRenderPct,
+        });
+        const out = new File(
+          [blob],
+          `${(doc.title || "corte").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.mp4`,
+          { type: "video/mp4" },
+        );
+        setRendered(out);
+        toast.success("Corte renderizado.");
+        if (publish) setPublishOpen(true);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Falha ao renderizar o corte.");
+      } finally {
+        setRendering(false);
+      }
+    },
+    [doc, videoId],
+  );
+
 
   const patchDoc = useCallback(
     (patch: Partial<EditorProjectDoc>, label = "editar") => {
