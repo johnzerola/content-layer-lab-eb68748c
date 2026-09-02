@@ -828,6 +828,8 @@ function EditorPage() {
           onSelect={setSelectedId}
           onZoom={(z) => patchDoc({ timelineZoom: z }, "zoom")}
           onTrim={(id, startTime, endTime) => updateLayer(id, { startTime, endTime })}
+          media={src ? { name: doc.media.name ?? "vídeo", segments: pre.segments ?? [] } : null}
+
           onToggleVisible={(id) => {
             const layer = doc.composition.layers.find((l) => l.id === id);
             if (layer) updateLayer(id, { visible: !layer.visible });
