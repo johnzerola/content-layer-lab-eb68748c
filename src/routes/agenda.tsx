@@ -553,23 +553,26 @@ function AgendaPage() {
                               {STATUS_LABEL[p.status] ?? p.status}
                             </span>
                           </div>
-                          <div className="mt-3 flex justify-end gap-2 border-t border-border/50 pt-2">
+                          <div className="mt-3 flex flex-wrap justify-end gap-2 border-t border-border/50 pt-2">
                             {(p.status === "falhou" || p.status === "agendado") && (
                               <button
+                                type="button"
                                 disabled={publishingId === p.id}
                                 onClick={() => void onPublishNow(p.id)}
-                                className="flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary hover:bg-primary/20 disabled:opacity-60"
+                                aria-label={`Publicar agora: ${p.file_name ?? "vídeo"}`}
+                                className="interactive inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary/10 px-3 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-60"
                               >
                                 {publishingId === p.id ? (
-                                  <Loader2 className="size-3 animate-spin" />
+                                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
                                 ) : (
-                                  <UploadCloud className="size-3" />
+                                  <UploadCloud className="size-3.5" aria-hidden="true" />
                                 )}
                                 {publishingId === p.id ? "Publicando…" : "Publicar agora"}
                               </button>
                             )}
                             {p.status === "falhou" && (
                               <button
+                                type="button"
                                 onClick={async () => {
                                   try {
                                     await reschedulePost(
@@ -582,32 +585,35 @@ function AgendaPage() {
                                     toast.error("Falha ao re-agendar.");
                                   }
                                 }}
-                                className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
+                                aria-label={`Re-agendar ${p.file_name ?? "vídeo"}`}
+                                className="interactive inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs text-muted-foreground transition hover:text-foreground"
                               >
-                                re-agendar
+                                Re-agendar
                               </button>
                             )}
                             {p.status === "agendado" && (
-                              <>
-                                <button
-                                  onClick={async () => {
-                                    await cancelPost(p.id);
-                                    await refresh();
-                                  }}
-                                  className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
-                                >
-                                  <X className="size-3" /> cancelar
-                                </button>
-                              </>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  await cancelPost(p.id);
+                                  await refresh();
+                                }}
+                                aria-label={`Cancelar ${p.file_name ?? "vídeo"}`}
+                                className="interactive inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs text-muted-foreground transition hover:text-foreground"
+                              >
+                                <X className="size-3.5" aria-hidden="true" /> Cancelar
+                              </button>
                             )}
                             <button
+                              type="button"
                               onClick={async () => {
                                 await deletePost(p.id);
                                 await refresh();
                               }}
-                              className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground transition hover:text-red-400"
+                              aria-label={`Excluir ${p.file_name ?? "vídeo"} da agenda`}
+                              className="interactive inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs text-muted-foreground transition hover:text-red-400"
                             >
-                              <Trash2 className="size-3" /> excluir
+                              <Trash2 className="size-3.5" aria-hidden="true" /> Excluir
                             </button>
                           </div>
                         </li>
