@@ -88,6 +88,8 @@ const WordChip = memo(function WordChip({
 
 export function TranscriptPanel({ doc, onChange, currentTime, onSeek, cutOnRemove, onCutOnRemoveChange }: Props) {
   const [mode, setMode] = useState<"paragrafo" | "palavra">("paragrafo");
+  const [search, setSearch] = useState("");
+  const [hitIndex, setHitIndex] = useState(0);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
@@ -99,10 +101,24 @@ export function TranscriptPanel({ doc, onChange, currentTime, onSeek, cutOnRemov
   const fillers = useMemo(() => fillerWords(doc), [doc]);
   const liveWords = doc.words.filter((w) => !w.removed).length;
 
+  /** palavras que casam com a busca — usadas para navegar e destacar. */
+  const hits = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return [] as TranscriptWord[];
+    return doc.words.filter((w) => w.word.toLowerCase().includes(term));
+  }, [doc.words, search]);
+
   const applyRemoval = (ids: string[], label: string) => {
     if (!ids.length) return;
     onChange(removeWords(doc, ids), label);
     setNotice(cutOnRemove ? "Trecho removido da timeline." : "Palavra removida apenas da legenda.");
+  };
+
+  const gotoHit = (delta: number) => {
+    if (!hits.length) return;
+    const next = (hitIndex + delta + hits.length) % hits.length;
+    setHitIndex(next);
+    onSeek(hits[next]!.start);
   };
 
   return (
@@ -122,6 +138,46 @@ export function TranscriptPanel({ doc, onChange, currentTime, onSeek, cutOnRemov
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="flex items-center gap-1.5">
+        <input
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setHitIndex(0);
+          }}
+          placeholder="Buscar no roteiro..."
+          aria-label="Buscar no roteiro"
+          className="min-w-0 flex-1 rounded-lg border border-border/60 bg-card/60 px-2 py-1.5 text-sm"
+        />
+        <span className="w-14 text-right font-mono text-[11px] text-muted-foreground">
+          {hits.length ? `${hitIndex + 1}/${hits.length}` : "0/0"}
+        </span>
+        <button
+          type="button"
+          onClick={() => gotoHit(-1)}
+          aria-label="Ocorrência anterior"
+          className="rounded-md border border-border/60 px-2 py-1 text-xs"
+        >
+          ↑
+        </button>
+        <button
+          type="button"
+          onClick={() => gotoHit(1)}
+          aria-label="Próxima ocorrência"
+          className="rounded-md border border-border/60 px-2 py-1 text-xs"
+        >
+          ↓
+        </button>
+        <button
+          type="button"
+          onClick={() => applyRemoval(hits.map((w) => w.id), "remover-busca")}
+          disabled={!hits.length}
+          className="rounded-md border border-border/60 px-2 py-1 text-xs disabled:opacity-40"
+        >
+          Cortar todas
+        </button>
       </div>
 
       <div className="flex items-center gap-2">
@@ -152,6 +208,7 @@ export function TranscriptPanel({ doc, onChange, currentTime, onSeek, cutOnRemov
           Substituir
         </button>
       </div>
+
 
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={cutOnRemove} onChange={(e) => onCutOnRemoveChange(e.target.checked)} />
