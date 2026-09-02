@@ -347,13 +347,17 @@ function EditorPage() {
       if (target) {
         updateLayer(target.id, { presetId: preset.presetId, style: preset.style } as Partial<TemplateLayer>);
       }
+      const current = doc?.preedit ?? defaultPreEdit();
       patchPre(
-        { transIn: { ...pre.transIn, kind: preset.transition }, transOut: { ...pre.transOut, kind: preset.transition } },
+        {
+          transIn: { ...current.transIn, kind: preset.transition },
+          transOut: { ...current.transOut, kind: preset.transition },
+        },
         "estilo-salvo",
       );
       toast.success(`Estilo “${preset.name}” aplicado.`);
     },
-    [ensureCaptionLayer, patchDoc, patchPre, pre.transIn, pre.transOut, updateLayer],
+    [doc, ensureCaptionLayer, patchDoc, patchPre, updateLayer],
   );
 
   /** estilo escolhido na tela /estilos entra assim que o projeto abre */
