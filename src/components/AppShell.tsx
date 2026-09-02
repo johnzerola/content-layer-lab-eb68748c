@@ -272,10 +272,6 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
   }, [mode]);
 
   useEffect(() => {
-    setMobileNav(false);
-  }, [pathname]);
-
-  useEffect(() => {
     if (!mobileNav) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
