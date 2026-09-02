@@ -149,7 +149,7 @@ function Side({
         return [];
       }
     }
-    return (opt.record.template_data?.composition?.layers ?? []) as TemplateLayer[];
+    return (opt.record.template_data?.layers ?? []) as TemplateLayer[];
   }, [opt, brand, identity]);
 
   const kit = opt?.kind === "ready" ? ({ ...brand, ...(opt.ready.palette ?? {}) } as BrandKit) : brand;
