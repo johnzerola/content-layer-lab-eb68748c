@@ -17,6 +17,7 @@ import { Route as BibliotecaRouteImport } from './routes/biblioteca'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as ContaRouteImport } from './routes/conta'
 import { Route as CortesRouteImport } from './routes/cortes'
+import { Route as EditorRouteImport } from './routes/editor'
 import { Route as ExclusaoDeDadosRouteImport } from './routes/exclusao-de-dados'
 import { Route as FotosRouteImport } from './routes/fotos'
 import { Route as IntegracoesRouteImport } from './routes/integracoes'
@@ -91,6 +92,11 @@ const ContaRoute = ContaRouteImport.update({
 const CortesRoute = CortesRouteImport.update({
   id: '/cortes',
   path: '/cortes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EditorRoute = EditorRouteImport.update({
+  id: '/editor',
+  path: '/editor',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ExclusaoDeDadosRoute = ExclusaoDeDadosRouteImport.update({
@@ -292,6 +298,7 @@ export interface FileRoutesByFullPath {
   '/checkout': typeof CheckoutRoute
   '/conta': typeof ContaRoute
   '/cortes': typeof CortesRoute
+  '/editor': typeof EditorRoute
   '/exclusao-de-dados': typeof ExclusaoDeDadosRoute
   '/fotos': typeof FotosRoute
   '/integracoes': typeof IntegracoesRoute
@@ -337,6 +344,7 @@ export interface FileRoutesByTo {
   '/checkout': typeof CheckoutRoute
   '/conta': typeof ContaRoute
   '/cortes': typeof CortesRoute
+  '/editor': typeof EditorRoute
   '/exclusao-de-dados': typeof ExclusaoDeDadosRoute
   '/fotos': typeof FotosRoute
   '/integracoes': typeof IntegracoesRoute
@@ -383,6 +391,7 @@ export interface FileRoutesById {
   '/checkout': typeof CheckoutRoute
   '/conta': typeof ContaRoute
   '/cortes': typeof CortesRoute
+  '/editor': typeof EditorRoute
   '/exclusao-de-dados': typeof ExclusaoDeDadosRoute
   '/fotos': typeof FotosRoute
   '/integracoes': typeof IntegracoesRoute
@@ -430,6 +439,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/conta'
     | '/cortes'
+    | '/editor'
     | '/exclusao-de-dados'
     | '/fotos'
     | '/integracoes'
@@ -475,6 +485,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/conta'
     | '/cortes'
+    | '/editor'
     | '/exclusao-de-dados'
     | '/fotos'
     | '/integracoes'
@@ -520,6 +531,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/conta'
     | '/cortes'
+    | '/editor'
     | '/exclusao-de-dados'
     | '/fotos'
     | '/integracoes'
@@ -566,6 +578,7 @@ export interface RootRouteChildren {
   CheckoutRoute: typeof CheckoutRoute
   ContaRoute: typeof ContaRoute
   CortesRoute: typeof CortesRoute
+  EditorRoute: typeof EditorRoute
   ExclusaoDeDadosRoute: typeof ExclusaoDeDadosRoute
   FotosRoute: typeof FotosRoute
   IntegracoesRoute: typeof IntegracoesRoute
@@ -659,6 +672,13 @@ declare module '@tanstack/react-router' {
       path: '/cortes'
       fullPath: '/cortes'
       preLoaderRoute: typeof CortesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/editor': {
+      id: '/editor'
+      path: '/editor'
+      fullPath: '/editor'
+      preLoaderRoute: typeof EditorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/exclusao-de-dados': {
@@ -918,6 +938,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutRoute: CheckoutRoute,
   ContaRoute: ContaRoute,
   CortesRoute: CortesRoute,
+  EditorRoute: EditorRoute,
   ExclusaoDeDadosRoute: ExclusaoDeDadosRoute,
   FotosRoute: FotosRoute,
   IntegracoesRoute: IntegracoesRoute,
