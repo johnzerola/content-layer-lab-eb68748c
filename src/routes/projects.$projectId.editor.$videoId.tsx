@@ -22,6 +22,8 @@ import { TimelinePro } from "@/components/editor/TimelinePro";
 import { BatchApplyModal } from "@/components/editor/BatchApplyModal";
 import { TransitionPicker } from "@/components/editor/TransitionPicker";
 import { AudioPanel } from "@/components/editor/AudioPanel";
+import { MediaSourceBar } from "@/components/editor/MediaSourceBar";
+import { getSourceFile } from "@/lib/editor/cuts";
 import { CutPanel, FramePanel, GradePanel, LayoutPanel, TitlesPanel } from "@/components/editor/ToolPanels";
 import { EditorCanvas } from "@/components/vtemplate/EditorCanvas";
 import { AnimationPanel } from "@/components/vtemplate/AnimationPanel";
@@ -130,6 +132,7 @@ function EditorPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [localSrc, setLocalSrc] = useState<string | null>(null);
 
   const history = useEditorHistory<EditorProjectDoc | null>(null);
   const doc = history.state;
@@ -185,6 +188,15 @@ function EditorPage() {
     const t = setTimeout(() => void saveTranscript(transcript, recordId).catch(() => undefined), 1200);
     return () => clearTimeout(t);
   }, [transcript, recordId]);
+
+  /** Reaproveita o arquivo local registrado por outra tela (ViralBatch, cortes). */
+  useEffect(() => {
+    const file = getSourceFile(videoId);
+    if (!file) return;
+    const objectUrl = URL.createObjectURL(file);
+    setLocalSrc(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [videoId]);
 
   const cuts = useMemo(() => (cutOnRemove ? removedRanges(transcript) : []), [transcript, cutOnRemove]);
   const silences = useMemo(() => silenceRanges(transcript, 0.6), [transcript]);
@@ -329,7 +341,7 @@ function EditorPage() {
 
   const captionLayer = doc.composition.layers.find((l): l is CaptionLayer => l.type === "caption") ?? null;
   const captionPreset = findCaptionPreset(doc.captionPresetId);
-  const src = previewUrl(doc);
+  const src = localSrc ?? previewUrl(doc);
   const duration = doc.media.duration || transcript.duration;
   const pre = doc.preedit ?? defaultPreEdit();
   const selectedLayer = doc.composition.layers.find((l) => l.id === selectedId) ?? null;
@@ -360,6 +372,16 @@ function EditorPage() {
         <span className="text-xs text-muted-foreground">
           {saveState === "saving" ? "Salvando..." : saveState === "dirty" ? "Alterações pendentes" : "Salvo"}
         </span>
+        <MediaSourceBar
+          videoId={videoId}
+          hasMedia={Boolean(localSrc ?? previewUrl(doc))}
+          onLoaded={(file, objectUrl) => {
+            setLocalSrc(objectUrl);
+            // zera a duração para o <video> recalcular na nova mídia
+            patchDoc({ media: { ...doc.media, duration: 0 }, title: doc.title || file.name }, "midia");
+          }}
+
+        />
         <div className="ml-auto flex items-center gap-2">
           <select
             value={doc.composition.aspectRatio}

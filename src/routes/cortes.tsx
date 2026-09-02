@@ -22,6 +22,7 @@ import {
 } from "@/lib/editor/cuts";
 import { publishCuts } from "@/lib/editor/cuts.service";
 import { AiCutSuggestions } from "@/components/cuts/AiCutSuggestions";
+import { LinkImport } from "@/components/editor/LinkImport";
 import { nicheContext, NICHES } from "@/lib/viral-library";
 import { markPendingTool } from "@/lib/handoff";
 import { createInstance, listMyTemplates, updateInstance } from "@/lib/video-template/service";
@@ -281,6 +282,7 @@ function CutsPage() {
               }}
             />
           </label>
+          <LinkImport onFile={(f) => void pickFile(f)} />
           {file && <span className="truncate text-sm text-muted-foreground">{file.name}</span>}
           <Button onClick={() => void analyze()} disabled={!file || analyzing}>
             {analyzing ? `Analisando… ${Math.round(progress * 100)}%` : "Gerar cortes"}
