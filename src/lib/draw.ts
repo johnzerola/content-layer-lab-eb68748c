@@ -12,6 +12,7 @@ import {
   composeTransitions,
   cropRect,
   cropAt,
+  hasGrade,
   isFullCrop,
   preEditFilter,
   rectForCrop,
