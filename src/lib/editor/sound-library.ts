@@ -194,3 +194,37 @@ export async function searchFreeSounds(
   cache.set(key, assets);
   return assets;
 }
+
+const galleryCache = new Map<SoundKind, SoundAsset[]>();
+
+/**
+ * GALERIA PRONTA: combina todas as consultas do pacote em uma lista única
+ * (100+ itens quando o acervo responde), sem duplicatas e já com autor e
+ * licença de cada arquivo. Carrega sob demanda e fica em cache na sessão.
+ */
+export async function loadSoundGallery(kind: SoundKind): Promise<SoundAsset[]> {
+  const hit = galleryCache.get(kind);
+  if (hit) return hit;
+
+  const pack = SOUND_PACKS.find((p) => p.kind === kind);
+  if (!pack) return [];
+
+  const results = await Promise.allSettled(
+    pack.queries.map((q) => searchFreeSounds(q, kind, 30)),
+  );
+
+  const seen = new Set<string>();
+  const list: SoundAsset[] = [];
+  for (const [i, r] of results.entries()) {
+    if (r.status !== "fulfilled") continue;
+    const label = pack.queries[i] ?? pack.label;
+    for (const asset of r.value) {
+      if (seen.has(asset.id)) continue;
+      seen.add(asset.id);
+      list.push({ ...asset, categoryLabel: label });
+    }
+  }
+  if (!list.length) throw new Error("não consegui carregar a galeria de sons agora");
+  galleryCache.set(kind, list);
+  return list;
+}
