@@ -2327,45 +2327,6 @@ function Home() {
               </div>
               {selected && mode !== "limpar-ia" && (
                 <AuthGate>
-                  <AISuggestPanel
-                    captions={selected.captions}
-                    duration={selected.clip ? selected.clip.end - selected.clip.start : selected.duration}
-                    onHeadline={(text) =>
-                      setItems((p) =>
-                        p.map((x) => (x.id === selected.id ? { ...x, headline: text } : x)),
-                      )
-                    }
-                    onHeadlineBank={(lines) => setHeadlineBank(lines.join("\n"))}
-                    onCut={(cut) =>
-                      setItems((p) =>
-                        p.map((x) =>
-                          x.id === selected.id
-                            ? {
-                                ...x,
-                                clip: { start: cut.start, end: cut.end },
-                                clipTitle: cut.title || x.clipTitle,
-                                clipReason: cut.reason || x.clipReason,
-                              }
-                            : x,
-                        ),
-                      )
-                    }
-                    onLook={(lookId) =>
-                      setItems((p) =>
-                        p.map((x) =>
-                          x.id === selected.id
-                            ? {
-                                ...x,
-                                preEdit: {
-                                  ...(x.preEdit ?? defaultPreEdit()),
-                                  ...applyLook(lookId),
-                                },
-                              }
-                            : x,
-                        ),
-                      )
-                    }
-                  />
                   <AITemplateStudio
                     captions={selected.captions}
                     duration={selected.clip ? selected.clip.end - selected.clip.start : selected.duration}
