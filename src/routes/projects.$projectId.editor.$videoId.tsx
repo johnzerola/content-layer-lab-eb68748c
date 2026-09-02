@@ -596,10 +596,10 @@ function EditorPage() {
             )}
             <div className="absolute inset-0">
               <EditorCanvas
+                bare
                 doc={{
                   ...doc.composition,
                   canvas: { ...doc.composition.canvas, background: { kind: "color", color: "transparent" } },
-                  sampleVideoUrl: null,
                 }}
                 selectedId={selectedId}
                 onSelect={setSelectedId}
@@ -608,6 +608,7 @@ function EditorPage() {
                 showSafeArea
               />
             </div>
+
           </div>
 
           <div className="flex items-center gap-2 text-sm">
