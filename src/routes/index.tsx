@@ -2506,6 +2506,7 @@ function Home() {
                         after={
                           <TemplateCanvas
                             template={previewTemplate}
+                            uiOverlay={uiGrid === "off" ? null : uiGrid}
                             interactive={false}
                             poster={selected.poster}
                             previewFile={selected.file}
@@ -2521,6 +2522,7 @@ function Home() {
                       <div className="relative mx-auto w-full max-w-[320px]">
                         <TemplateCanvas
                           template={previewTemplate}
+                          uiOverlay={uiGrid === "off" ? null : uiGrid}
                           interactive={false}
                           poster={selected.poster}
                           previewFile={selected.file}
