@@ -18,7 +18,10 @@ interface Props {
   onSplit: () => void;
   /** Move/redimensiona a camada na timeline (arraste do clipe ou das bordas). */
   onTrim?: (id: string, startTime: number, endTime: number) => void;
+  /** Faixa base do vídeo importado (só apresentação). */
+  media?: { name: string; segments: TimeRange[] } | null;
 }
+
 
 function fmt(t: number): string {
   const m = Math.floor(t / 60);
