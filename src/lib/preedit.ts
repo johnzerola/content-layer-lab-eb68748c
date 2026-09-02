@@ -123,6 +123,10 @@ export function defaultPreEdit(): PreEdit {
     sepia: 0,
     grayscale: 0,
     blur: 0,
+    temp: 0,
+    vignette: 0,
+    grain: 0,
+    fade: 0,
     voiceLevel: 100,
     musicLevel: 100,
   };
