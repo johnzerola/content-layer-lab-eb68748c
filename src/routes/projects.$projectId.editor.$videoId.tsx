@@ -254,8 +254,10 @@ function EditorPage() {
           doc: doc.composition,
           file,
           cut: seg ? { start: seg.start, end: seg.end } : null,
+          preedit: doc.preedit ?? null,
           onProgress: setRenderPct,
         });
+
         const out = new File(
           [blob],
           `${(doc.title || "corte").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.mp4`,
