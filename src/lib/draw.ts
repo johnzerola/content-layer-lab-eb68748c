@@ -661,7 +661,7 @@ function drawVideoLayer(
       box: { x: number; y: number; w: number; h: number },
       mode: "cover" | "contain",
       rect: typeof cr = cr,
-      style?: { blur?: number; dim?: number; useOffset?: boolean; voiceLevel?: number; musicLevel?: number },
+      style?: { blur?: number; dim?: number; useOffset?: boolean; voiceLevel?: number; musicLevel?: number; raw?: boolean },
     ) => {
 
       const fitScale =
@@ -681,7 +681,10 @@ function drawVideoLayer(
       ctx.rect(box.x, box.y, box.w, box.h);
       ctx.clip();
       const extraBlur = style?.blur ? ` blur(${style.blur}px)` : "";
-      ctx.filter = (baseFilter === "none" ? "" : baseFilter) + extraBlur || "none";
+      // raw: fundo desfocado fica natural — os ajustes (cor, desfoque etc.)
+      // valem só para a área do vídeo em primeiro plano
+      const base = style?.raw ? "" : baseFilter === "none" ? "" : baseFilter;
+      ctx.filter = (base + extraBlur).trim() || "none";
       ctx.translate(dx + dw / 2, dy + dh / 2);
       if (rect.quarter) ctx.rotate((rect.quarter * Math.PI) / 2);
       if (pre?.flipH) ctx.scale(-1, 1);
@@ -735,7 +738,7 @@ function drawVideoLayer(
       const blurPx = Math.max(0, baseBlur * bgIntensity);
       const dimPx = dim * Math.min(1, bgIntensity);
       if (!blurPx) {
-        paint(target, "cover", full, { dim: dimPx, useOffset: false });
+        paint(target, "cover", full, { dim: dimPx, useOffset: false, raw: true });
         return;
       }
 
@@ -747,7 +750,6 @@ function drawVideoLayer(
         bw,
         bh,
         blurPx.toFixed(1),
-        baseFilter,
         zoom.toFixed(3),
         full.quarter,
         pre?.flipH ? 1 : 0,
@@ -770,13 +772,12 @@ function drawVideoLayer(
         bc = bc && bc.width === bw && bc.height === bh ? bc : makeCanvas(bw, bh);
         const bctx = bc.getContext("2d") as CanvasRenderingContext2D | null;
         if (!bctx) {
-          paint(target, "cover", full, { blur: blurPx, dim: dimPx, useOffset: false });
+          paint(target, "cover", full, { blur: blurPx, dim: dimPx, useOffset: false, raw: true });
           return;
         }
         bctx.clearRect(0, 0, bw, bh);
-        bctx.filter =
-          ((baseFilter === "none" ? "" : baseFilter) +
-            ` blur(${Math.max(1, blurPx * scale).toFixed(2)}px)`).trim();
+        // fundo sem os ajustes de cor — eles valem só para a área do vídeo
+        bctx.filter = `blur(${Math.max(1, blurPx * scale).toFixed(2)}px)`;
         const fit = Math.max(bw / full.ew, bh / full.eh) * zoom;
         const dw = full.ew * fit;
         const dh = full.eh * fit;
