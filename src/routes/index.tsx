@@ -27,7 +27,10 @@ import {
   CloudCog,
   LayoutTemplate,
   CopyPlus,
+  CheckCircle2,
+  Users,
 } from "lucide-react";
+
 import { QuickPreviewModal } from "@/components/QuickPreviewModal";
 import { CaptionWorkbench } from "@/components/CaptionWorkbench";
 import { PLATFORM_UI_OPTIONS, type PlatformUI } from "@/components/PlatformUIOverlay";
