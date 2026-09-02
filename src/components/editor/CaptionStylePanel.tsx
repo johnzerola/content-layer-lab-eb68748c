@@ -1,10 +1,12 @@
 /** Galeria de estilos de legenda com preview real e ajustes finos. */
 import { useMemo, useState } from "react";
 import {
+  CAPTION_ANIMATIONS,
   CAPTION_CATEGORIES,
   filterCaptionPresets,
   findCaptionPreset,
   type CaptionCategory,
+  type CaptionAnimation,
   type CaptionPreset,
 } from "@/lib/editor/caption-styles";
 import type { CaptionLayerStyle } from "@/lib/video-template/types";
@@ -16,8 +18,9 @@ interface Props {
   onStyleChange: (patch: Partial<CaptionLayerStyle>) => void;
 }
 
-function PreviewLine({ style }: { style: CaptionLayerStyle }) {
+function PreviewLine({ style, animation }: { style: CaptionLayerStyle; animation?: CaptionAnimation }) {
   const words = ["SEU", "VÍDEO", "VIRAL"];
+  const anim = animation && animation !== "none" ? `cap-anim-${animation}` : "";
   return (
     <div
       className="flex flex-wrap items-center justify-center gap-1 rounded-lg px-2 py-3"
@@ -26,7 +29,9 @@ function PreviewLine({ style }: { style: CaptionLayerStyle }) {
       {words.map((w, i) => (
         <span
           key={w}
+          className={i === 1 ? anim : undefined}
           style={{
+            display: "inline-block",
             fontFamily: style.fontFamily,
             fontWeight: style.fontWeight,
             fontSize: 18,
