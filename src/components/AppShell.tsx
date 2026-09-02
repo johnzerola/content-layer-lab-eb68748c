@@ -327,20 +327,60 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
   );
 
   const brandBlock = (expanded: boolean) => (
-    <div className={`flex items-center gap-2.5 px-4 py-4 ${expanded ? "" : "justify-center px-0"}`}>
-      <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary font-display text-[13px] font-semibold text-primary-foreground">
-        {current.mark}
-      </div>
-      {expanded && (
-        <div className="min-w-0">
-          <p className="truncate font-display text-[15px] font-semibold tracking-tight text-foreground">
-            {current.brand}
-          </p>
-          <p className="truncate text-[11px] text-[var(--muted-2)]">{current.tagline}</p>
+    <div className={expanded ? "px-3 pb-1 pt-3" : "px-0 py-3"}>
+      <div
+        className={`flex items-center gap-2.5 rounded-xl transition-colors ${
+          expanded
+            ? "border border-border bg-surface px-3 py-2.5"
+            : "justify-center px-0 py-0"
+        }`}
+      >
+        <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary font-display text-[13px] font-semibold text-primary-foreground">
+          {current.mark}
         </div>
-      )}
+        {expanded && (
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-display text-[14px] font-semibold tracking-tight text-foreground">
+              {current.brand}
+            </p>
+            <p className="truncate font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--muted-2)]">
+              {current.tagline}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
+
+  /** cartão da conta no rodapé da sidebar */
+  const userCard = (expanded: boolean) => {
+    const email = (user?.email as string | undefined) ?? "";
+    const initial = (email.charAt(0) || "?").toUpperCase();
+    if (!signedIn) return null;
+    return (
+      <Link
+        to="/conta"
+        title={email || "Conta"}
+        className={`flex items-center gap-2.5 rounded-xl border border-border bg-surface transition-colors hover:border-[var(--border-hover)] ${
+          expanded ? "px-2.5 py-2" : "justify-center px-0 py-2"
+        }`}
+      >
+        <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-surface-3 font-mono text-[11px] text-foreground">
+          {initial}
+        </span>
+        {expanded && (
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[12px] font-medium text-foreground">
+              {email || "Minha conta"}
+            </span>
+            <span className="block truncate font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--muted-2)]">
+              {plan.credits === null ? "ilimitado" : `${sub?.credits ?? 0} créditos`}
+            </span>
+          </span>
+        )}
+      </Link>
+    );
+  };
 
   return (
     <TooltipProvider delayDuration={350}>
@@ -353,7 +393,8 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
         {brandBlock(open)}
         {navSections(open)}
 
-        <div className="mt-auto p-3">
+        <div className="mt-auto flex flex-col gap-2 p-3">
+          {userCard(open)}
           <button
             onClick={() => setOpen((v) => !v)}
             aria-label={open ? "Recolher menu" : "Expandir menu"}
@@ -398,6 +439,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
               </button>
             </div>
             {navSections(true, () => setMobileNav(false))}
+            <div className="mt-auto px-3 pt-4">{userCard(true)}</div>
           </div>
         </div>
       )}
@@ -415,6 +457,19 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
               >
                 <Menu className="size-5" />
               </button>
+
+              <nav
+                aria-label="Trilha"
+                className="hidden min-w-0 shrink items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--muted-2)] lg:flex"
+              >
+                <span className="text-foreground">VaiViral</span>
+                <span className="text-border">/</span>
+                <span className="truncate">
+                  {onFixedRoute
+                    ? (pathname.split("/")[1] ?? "").replace(/-/g, " ") || "estúdio"
+                    : current.brand}
+                </span>
+              </nav>
 
               <GlobalActionBar className="max-w-md" />
             </div>
@@ -440,14 +495,20 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
                   title="Plano e créditos"
                   className="hidden items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[12px] text-muted-foreground transition hover:border-[var(--border-hover)] hover:text-foreground sm:inline-flex"
                 >
-                  <span className="text-foreground">{plan.name}</span>
-                  <span className="text-[var(--muted-2)]">·</span>
-                  {plan.credits === null ? "ilimitado" : `${sub.credits} créditos`}
+                  <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-foreground">
+                    {plan.name}
+                  </span>
+                  <span className="text-border">/</span>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.1em]">
+                    {plan.credits === null ? "ilimitado" : `${sub.credits} créditos`}
+                  </span>
                 </Link>
               )}
               <span className="hidden items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[12px] text-muted-foreground sm:inline-flex">
                 <span className="size-1.5 rounded-full bg-success" aria-hidden />
-                {count} vídeo{count === 1 ? "" : "s"}
+                <span className="font-mono text-[10px] uppercase tracking-[0.1em]">
+                  {count} vídeo{count === 1 ? "" : "s"}
+                </span>
               </span>
             </div>
           </div>
