@@ -765,7 +765,7 @@ export function VideoStudio({
                   {g.group}
                 </span>
                 {g.items.map((t) => (
-                  <TooltipProvider key={t.id}>
+                  <React.Fragment key={t.id}>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
@@ -774,13 +774,13 @@ export function VideoStudio({
                             "group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200",
                             tab === t.id
                               ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                              : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                              : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
                           )}
                         >
                           <t.icon className={cn("size-4 shrink-0 transition-transform group-hover:scale-110", tab === t.id ? "animate-pulse" : "")} />
                           <span className="font-display text-xs font-medium">{t.label}</span>
                           {tab === t.id && (
-                            <div className="absolute left-0 top-1/2 h-4 w-1 -translate-y-1/2 rounded-full bg-white md:block hidden" />
+                            <div className="absolute left-0 top-1/2 h-4 w-1 -translate-y-1/2 rounded-full bg-primary-foreground md:block hidden" />
                           )}
                         </button>
                       </TooltipTrigger>
