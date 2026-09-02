@@ -1,10 +1,12 @@
 /** Galeria de estilos de legenda com preview real e ajustes finos. */
 import { useMemo, useState } from "react";
 import {
+  CAPTION_ANIMATIONS,
   CAPTION_CATEGORIES,
   filterCaptionPresets,
   findCaptionPreset,
   type CaptionCategory,
+  type CaptionAnimation,
   type CaptionPreset,
 } from "@/lib/editor/caption-styles";
 import type { CaptionLayerStyle } from "@/lib/video-template/types";
@@ -16,8 +18,9 @@ interface Props {
   onStyleChange: (patch: Partial<CaptionLayerStyle>) => void;
 }
 
-function PreviewLine({ style }: { style: CaptionLayerStyle }) {
+function PreviewLine({ style, animation }: { style: CaptionLayerStyle; animation?: CaptionAnimation }) {
   const words = ["SEU", "VÍDEO", "VIRAL"];
+  const anim = animation && animation !== "none" ? `cap-anim-${animation}` : "";
   return (
     <div
       className="flex flex-wrap items-center justify-center gap-1 rounded-lg px-2 py-3"
@@ -26,7 +29,9 @@ function PreviewLine({ style }: { style: CaptionLayerStyle }) {
       {words.map((w, i) => (
         <span
           key={w}
+          className={i === 1 ? anim : undefined}
           style={{
+            display: "inline-block",
             fontFamily: style.fontFamily,
             fontWeight: style.fontWeight,
             fontSize: 18,
@@ -53,6 +58,7 @@ export function CaptionStylePanel({ presetId, style, onApplyPreset, onStyleChang
   const [query, setQuery] = useState("");
   const presets = useMemo(() => filterCaptionPresets(category, query), [category, query]);
   const current = findCaptionPreset(presetId);
+  const [animation, setAnimation] = useState<CaptionAnimation>(current.animation);
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-hidden">
@@ -88,7 +94,7 @@ export function CaptionStylePanel({ presetId, style, onApplyPreset, onStyleChang
               p.id === presetId ? "border-primary" : "border-border/50 hover:border-primary/50"
             }`}
           >
-            <PreviewLine style={p.style} />
+            <PreviewLine style={p.style} animation={p.animation} />
             <div className="mt-1 flex items-baseline justify-between gap-2">
               <span className="text-sm font-medium">{p.name}</span>
               <span className="text-[11px] text-muted-foreground">{p.animation}</span>
@@ -100,6 +106,24 @@ export function CaptionStylePanel({ presetId, style, onApplyPreset, onStyleChang
 
       <div className="space-y-2 rounded-xl border border-border/50 bg-card/40 p-3 text-xs">
         <p className="font-medium">Ajustes de “{current.name}”</p>
+        <label className="flex items-center justify-between gap-2">
+          Animação
+          <select
+            value={animation}
+            onChange={(e) => setAnimation(e.target.value as CaptionAnimation)}
+            className="rounded-md border border-border/60 bg-card/60 px-2 py-1"
+            aria-label="Animação da legenda"
+          >
+            {CAPTION_ANIMATIONS.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="rounded-lg bg-black/40 p-1">
+          <PreviewLine style={style} animation={animation} />
+        </div>
         <label className="flex items-center justify-between gap-2">
           Tamanho
           <input

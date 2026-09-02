@@ -443,6 +443,7 @@ function EditorPage() {
           onSeek={seek}
           onSelect={setSelectedId}
           onZoom={(z) => patchDoc({ timelineZoom: z }, "zoom")}
+          onTrim={(id, startTime, endTime) => updateLayer(id, { startTime, endTime })}
           onToggleVisible={(id) => {
             const layer = doc.composition.layers.find((l) => l.id === id);
             if (layer) updateLayer(id, { visible: !layer.visible });

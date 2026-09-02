@@ -16,6 +16,8 @@ interface Props {
   onToggleVisible: (id: string) => void;
   onToggleLock: (id: string) => void;
   onSplit: () => void;
+  /** Move/redimensiona a camada na timeline (arraste do clipe ou das bordas). */
+  onTrim?: (id: string, startTime: number, endTime: number) => void;
 }
 
 function fmt(t: number): string {
@@ -29,11 +31,13 @@ const Clip = memo(function Clip({
   duration,
   selected,
   onSelect,
+  onTrim,
 }: {
   layer: TemplateLayer;
   duration: number;
   selected: boolean;
   onSelect: () => void;
+  onTrim?: ((id: string, startTime: number, endTime: number) => void) | undefined;
 }) {
   const start = Math.max(0, layer.startTime);
   const end = layer.endTime ?? duration;
@@ -47,17 +51,75 @@ const Clip = memo(function Clip({
         : layer.type === "text"
           ? "bg-[oklch(0.62_0.16_290)]/50"
           : "bg-[oklch(0.62_0.14_180)]/45";
+
+  const drag = useCallback(
+    (mode: "move" | "start" | "end") => (e: React.PointerEvent) => {
+      if (!onTrim || layer.locked || !duration) return;
+      e.stopPropagation();
+      e.preventDefault();
+      const rail = (e.currentTarget as HTMLElement).parentElement?.parentElement;
+      const railWidth = rail?.getBoundingClientRect().width ?? 1;
+      const originX = e.clientX;
+      const s0 = start;
+      const e0 = end;
+      const move = (ev: PointerEvent) => {
+        const delta = ((ev.clientX - originX) / railWidth) * duration;
+        let ns = s0;
+        let ne = e0;
+        if (mode === "move") {
+          const shift = Math.min(Math.max(delta, -s0), duration - e0);
+          ns = s0 + shift;
+          ne = e0 + shift;
+        } else if (mode === "start") {
+          ns = Math.min(Math.max(0, s0 + delta), e0 - 0.2);
+        } else {
+          ne = Math.max(Math.min(duration, e0 + delta), s0 + 0.2);
+        }
+        onTrim(layer.id, Number(ns.toFixed(3)), Number(ne.toFixed(3)));
+      };
+      const up = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    },
+    [duration, end, layer.id, layer.locked, onTrim, start],
+  );
+
+  const hasAnim = Boolean(layer.animationIn || layer.animationOut || layer.animationLoop);
+
   return (
-    <button
-      type="button"
-      onClick={onSelect}
+    <div
       style={{ left: `${left}%`, width: `${width}%` }}
-      className={`absolute top-1 h-7 truncate rounded-md border px-2 text-left text-[11px] ${tone} ${
+      className={`absolute top-1 h-7 rounded-md border ${tone} ${
         selected ? "border-primary ring-1 ring-primary" : "border-white/10"
       } ${layer.visible ? "" : "opacity-40"}`}
     >
-      {layer.name}
-    </button>
+      <button
+        type="button"
+        onClick={onSelect}
+        onPointerDown={drag("move")}
+        className="h-full w-full cursor-grab truncate px-3 text-left text-[11px] active:cursor-grabbing"
+      >
+        {hasAnim ? "✦ " : ""}
+        {layer.name}
+      </button>
+      {onTrim && !layer.locked && (
+        <>
+          <span
+            role="presentation"
+            onPointerDown={drag("start")}
+            className="absolute inset-y-0 left-0 w-2 cursor-ew-resize rounded-l-md bg-white/25"
+          />
+          <span
+            role="presentation"
+            onPointerDown={drag("end")}
+            className="absolute inset-y-0 right-0 w-2 cursor-ew-resize rounded-r-md bg-white/25"
+          />
+        </>
+      )}
+    </div>
   );
 });
 
@@ -74,6 +136,7 @@ export function TimelinePro({
   onToggleVisible,
   onToggleLock,
   onSplit,
+  onTrim,
 }: Props) {
   const trackRef = useRef<HTMLDivElement | null>(null);
 
@@ -176,6 +239,7 @@ export function TimelinePro({
                     duration={duration}
                     selected={layer.id === selectedId}
                     onSelect={() => onSelect(layer.id)}
+                    onTrim={onTrim}
                   />
                 </div>
               </div>
