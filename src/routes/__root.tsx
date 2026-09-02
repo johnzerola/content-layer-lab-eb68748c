@@ -16,6 +16,8 @@ import { Toaster } from "../components/ui/sonner";
 import { TooltipProvider } from "../components/ui/tooltip";
 import { BatchProgressDock } from "../components/BatchProgressDock";
 import { CommandPalette } from "../components/CommandPalette";
+import { installSessionScope } from "../lib/session-scope";
+
 
 
 function NotFoundComponent() {
