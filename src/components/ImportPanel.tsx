@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import { FolderOpen, Link as LinkIcon, Upload } from "lucide-react";
+import { useRef, useState } from "react";
+import { FolderOpen, Link as LinkIcon, Upload, CheckCircle2, Info } from "lucide-react";
 import { Button, Input, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/base";
 import { VIDEO_ACCEPT } from "@/lib/media";
 import { FLOWS, type Mode } from "@/lib/flows";
@@ -30,53 +30,89 @@ export function ImportPanel({
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
+  const dragDepth = useRef(0);
+  const [dragging, setDragging] = useState(false);
   const flow = FLOWS[mode].import;
 
   return (
     <section
+      onDragEnter={(e) => {
+        e.preventDefault();
+        dragDepth.current += 1;
+        setDragging(true);
+      }}
       onDragOver={(e) => e.preventDefault()}
+      onDragLeave={() => {
+        dragDepth.current = Math.max(0, dragDepth.current - 1);
+        if (dragDepth.current === 0) setDragging(false);
+      }}
       onDrop={(e) => {
         e.preventDefault();
+        dragDepth.current = 0;
+        setDragging(false);
         onFiles(e.dataTransfer.files);
       }}
-      className="panel rise-in border-dashed p-10 text-center transition-colors duration-[var(--dur-fast)] hover:border-[var(--border-hover)] hover:bg-surface-2/40"
+      aria-label="Importar vídeos"
+      className={`panel rise-in relative overflow-hidden border-dashed p-0 transition-[border-color,background-color,box-shadow] duration-[var(--dur-base)] hover:border-[var(--border-hover)] ${
+        dragging ? "drop-active" : ""
+      }`}
     >
-      <div className="mx-auto grid size-12 place-items-center rounded-xl bg-[var(--primary-subtle)] ring-1 ring-[var(--primary-subtle)]">
-        <Upload className="size-5 text-primary" />
-      </div>
-      <p className="mt-4 font-display text-lg font-semibold">
-        <span className="step-num mr-2">{flow.step}</span>
-        {flow.title}
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground">{flow.hint}</p>
-      {count > 0 && (
-        <p className="pop-in mt-2 inline-block rounded-md border border-border bg-surface-2 px-2 py-0.5 text-xs text-primary">
-          {count} vídeo(s) na fila do {FLOWS[mode].brand}
-        </p>
-      )}
+      {/* cabeçalho / dropzone */}
+      <div className="px-6 py-10 text-center sm:px-10">
+        <div
+          className={`mx-auto grid size-14 place-items-center rounded-2xl bg-[var(--primary-subtle)] ring-1 ring-[var(--primary-subtle)] transition-transform duration-[var(--dur-base)] ${
+            dragging ? "scale-110" : ""
+          } ${count === 0 ? "pulse-ring" : ""}`}
+        >
+          <Upload
+            className={`size-6 text-primary transition-transform duration-[var(--dur-base)] ${
+              dragging ? "-translate-y-0.5" : ""
+            }`}
+          />
+        </div>
 
-      <div className="mt-5 flex justify-center gap-2">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="outline" onClick={() => inputRef.current?.click()}>
-              <Upload className="size-4" />
-              {flow.filesLabel}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Ou arraste e solte os arquivos aqui</TooltipContent>
-        </Tooltip>
-        {flow.folder && (
+        <h2 className="mt-5 font-display text-2xl font-semibold tracking-tight">
+          <span className="step-num mr-2 align-middle">{flow.step}</span>
+          {dragging ? "Solte os arquivos para importar" : flow.title}
+        </h2>
+        <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground">
+          {flow.hint}
+        </p>
+
+        {count > 0 && (
+          <p
+            key={count}
+            className="pop-in mt-4 inline-flex items-center gap-1.5 rounded-full border border-[var(--primary-subtle)] bg-[var(--primary-subtle)] px-3 py-1 text-xs font-medium text-primary"
+          >
+            <CheckCircle2 className="size-3.5" />
+            {count} vídeo(s) na fila do {FLOWS[mode].brand}
+          </p>
+        )}
+
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="outline" onClick={() => folderRef.current?.click()}>
-                <FolderOpen className="size-4" />
-                Selecionar pasta
+              <Button onClick={() => inputRef.current?.click()}>
+                <Upload className="size-4" />
+                {flow.filesLabel}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Importa todos os vídeos da pasta de uma vez</TooltipContent>
+            <TooltipContent>Ou arraste e solte os arquivos aqui</TooltipContent>
           </Tooltip>
-        )}
+          {flow.folder && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" onClick={() => folderRef.current?.click()}>
+                  <FolderOpen className="size-4" />
+                  Selecionar pasta
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Importa todos os vídeos da pasta de uma vez</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
       </div>
+
       <input
         ref={inputRef}
         type="file"
@@ -98,43 +134,76 @@ export function ImportPanel({
       )}
 
       {flow.link ? (
-        <div className="mx-auto mt-6 max-w-xl border-t border-border pt-5">
-          <p className="mono-label">ou cole o link do vídeo</p>
-          <div className="mt-2 flex gap-2">
-            <Input
-              value={linkUrl}
-              onChange={(e) => onLinkUrl(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && onImportLink()}
-              placeholder={flow.linkPlaceholder}
-              className="flex-1 text-xs"
-              aria-label="Link do vídeo"
-            />
-            <Button onClick={onImportLink} loading={linkBusy} disabled={!linkUrl.trim()}>
-              {!linkBusy && <LinkIcon className="size-4" />}
-              {linkBusy ? "Baixando…" : "Importar"}
-            </Button>
-          </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-            {flow.linkHint} usa o arquivo original público disponibilizado pela plataforma, quando existente.
-          </p>
-          {linkMsg && <p className="mt-2 text-[12px] text-muted-foreground">{linkMsg}</p>}
-          {linkBlocked && (
-            <div className="mx-auto mt-3 max-w-xl rounded-lg border border-border bg-muted/30 p-3 text-left">
-              <p className="text-[12px] uppercase tracking-wider text-primary">como importar mesmo assim</p>
-              <ol className="mt-2 space-y-1 text-[12px] leading-relaxed text-muted-foreground">
-                <li>1. confirme que o post é público e que você tem permissão para usar o vídeo</li>
-                <li>2. arraste o arquivo aqui em cima, ou use "{flow.filesLabel}"</li>
-                <li>3. links diretos de arquivo (.mp4, .mov, .webm, .mkv, .m4v...) importam normalmente</li>
-                <li>4. conteúdo privado, live, playlist ou protegido por DRM não pode ser importado</li>
-              </ol>
+        <div className="border-t border-border bg-surface-2/40 px-6 py-6 text-left sm:px-10">
+          <div className="mx-auto max-w-2xl">
+            <p className="mono-label">ou cole o link do vídeo</p>
+            <div className="mt-2.5 flex flex-col gap-2 sm:flex-row">
+              <Input
+                value={linkUrl}
+                onChange={(e) => onLinkUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && onImportLink()}
+                placeholder={flow.linkPlaceholder}
+                className="flex-1 text-sm"
+                aria-label="Link do vídeo"
+              />
+              <Button
+                onClick={onImportLink}
+                loading={linkBusy}
+                disabled={!linkUrl.trim()}
+                className="sm:w-36"
+              >
+                {!linkBusy && <LinkIcon className="size-4" />}
+                {linkBusy ? "Baixando…" : "Importar"}
+              </Button>
             </div>
-          )}
+
+            {linkBusy && (
+              <p className="mt-2.5 flex items-center gap-1 text-xs text-primary">
+                baixando o arquivo
+                <span className="typing-dot">·</span>
+                <span className="typing-dot [animation-delay:150ms]">·</span>
+                <span className="typing-dot [animation-delay:300ms]">·</span>
+              </p>
+            )}
+
+            <p className="mt-2.5 flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
+              <Info className="mt-0.5 size-3.5 shrink-0" />
+              <span>
+                {flow.linkHint} usa o arquivo original público disponibilizado pela plataforma,
+                quando existente.
+              </span>
+            </p>
+
+            {linkMsg && !linkBusy && (
+              <p className="pop-in mt-2.5 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted-foreground">
+                {linkMsg}
+              </p>
+            )}
+
+            {linkBlocked && (
+              <div className="pop-in mt-3 rounded-xl border border-border bg-surface p-4">
+                <p className="mono-label text-primary">como importar mesmo assim</p>
+                <ol className="mt-2.5 space-y-1.5 text-xs leading-relaxed text-muted-foreground">
+                  <li>1. confirme que o post é público e que você tem permissão para usar o vídeo</li>
+                  <li>2. arraste o arquivo aqui em cima, ou use "{flow.filesLabel}"</li>
+                  <li>3. links diretos de arquivo (.mp4, .mov, .webm, .mkv, .m4v...) importam normalmente</li>
+                  <li>4. conteúdo privado, live, playlist ou protegido por DRM não pode ser importado</li>
+                </ol>
+              </div>
+            )}
+          </div>
         </div>
       ) : (
-        <p className="mx-auto mt-6 max-w-xl border-t border-border pt-5 text-[11px] leading-relaxed text-muted-foreground">
-          a limpeza roda no arquivo original: importe o vídeo já baixado para preservar a qualidade máxima.
-          {linkMsg && <span className="mt-2 block text-[11px]">{linkMsg}</span>}
-        </p>
+        <div className="border-t border-border bg-surface-2/40 px-6 py-5 text-left sm:px-10">
+          <p className="mx-auto flex max-w-2xl items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
+            <Info className="mt-0.5 size-3.5 shrink-0" />
+            <span>
+              a limpeza roda no arquivo original: importe o vídeo já baixado para preservar a
+              qualidade máxima.
+              {linkMsg && <span className="mt-1.5 block">{linkMsg}</span>}
+            </span>
+          </p>
+        </div>
       )}
     </section>
   );
