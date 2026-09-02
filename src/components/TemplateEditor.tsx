@@ -438,22 +438,29 @@ export function TemplateEditor({
 
         <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto p-5 lg:grid-cols-[minmax(0,1fr)_400px]">
 
-          <div className="space-y-3">
-            <TemplateCanvas
-              template={t}
-              selected={selected}
-              onSelect={setSelected}
-              onChange={setT}
-              snap={snap}
-              debug={debug}
-              debugGrid={debugGrid}
-              debugSafeArea={debugSafe}
-              debugBoxes={debugBoxes}
-              drawOpts={adOpts}
-              motionVar={adPreview ? adVariation : null}
-              speed={adPreview ? adVariation.speed : 1}
-
-            />
+          <div className="space-y-3 lg:sticky lg:top-0 lg:self-start">
+            <div className="flex items-center justify-between gap-2">
+              <p className="mono-label">Preview em tempo real</p>
+              <span className="mono-label rounded-full border border-border px-2 py-0.5 text-muted-foreground">
+                {(t.canvasW ?? 1080)}×{(t.canvasH ?? 1920)}
+              </span>
+            </div>
+            <div className="rounded-2xl border border-border bg-surface-2/50 p-3">
+              <TemplateCanvas
+                template={t}
+                selected={selected}
+                onSelect={setSelected}
+                onChange={setT}
+                snap={snap}
+                debug={debug}
+                debugGrid={debugGrid}
+                debugSafeArea={debugSafe}
+                debugBoxes={debugBoxes}
+                drawOpts={adOpts}
+                motionVar={adPreview ? adVariation : null}
+                speed={adPreview ? adVariation.speed : 1}
+              />
+            </div>
 
             {debug ? <DebugPanel
               t={t}
@@ -471,9 +478,9 @@ export function TemplateEditor({
             )}
           </div>
 
-
-          <div className="space-y-4 lg:max-h-[62vh] lg:overflow-y-auto lg:pr-1">
+          <div className="space-y-4 lg:max-h-[70vh] lg:overflow-y-auto lg:pr-1">
             <Field label="Nome do template">
+
               <input className={inputCls} value={t.name} onChange={(e) => setT({ ...t, name: e.target.value })} />
             </Field>
 
