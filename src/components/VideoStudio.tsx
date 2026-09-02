@@ -63,6 +63,7 @@ import {
   type PreEdit,
   type Transition,
 } from "@/lib/preedit";
+import { LOOKS, applyLook, lookPreviewFilter } from "@/lib/looks";
 
 import { translateWords } from "@/lib/translate.functions";
 import { detectSpeechSegments } from "@/lib/silence";
