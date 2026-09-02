@@ -81,6 +81,16 @@ export interface PreEdit {
   grayscale: number;
   /** px */
   blur: number;
+  /** temperatura de cor: -1 (frio/azulado) a 1 (quente/dourado) */
+  temp?: number;
+  /** vinheta escura nas bordas: 0..1 */
+  vignette?: number;
+  /** granulado de filme (pontinhos): 0..1 */
+  grain?: number;
+  /** preto lavado / névoa de filme: 0..1 */
+  fade?: number;
+  /** id do estilo de edição aplicado (só informativo) */
+  look?: string;
   /** 0..150 (%) */
   voiceLevel?: number;
   /** 0..150 (%) */
