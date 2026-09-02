@@ -35,9 +35,10 @@ export const generateNarration = createServerFn({ method: "POST" })
         voice: data.voice,
         speed: data.speed,
         response_format: "mp3",
-        instructions:
-          data.instructions ??
-          "Narre em português do Brasil, com energia de vídeo curto, dicção clara e ritmo natural.",
+        // a voz é sempre pt-BR: o tom escolhido é acrescentado ao idioma, nunca o substitui
+        instructions: `Fale em português do Brasil (pt-BR), com dicção clara e pronúncia brasileira natural. ${
+          data.instructions ?? "Use energia de vídeo curto e ritmo natural."
+        }`,
       }),
     });
 
