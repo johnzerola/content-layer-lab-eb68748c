@@ -33,7 +33,7 @@ function Frame({ children, label }: { children: React.ReactNode; label: string }
   return (
     <div className="pointer-events-none absolute inset-0 select-none text-white">
       {children}
-      <span className="absolute top-1 left-1 rounded bg-black/70 px-1 font-mono text-[9px] text-warn">
+      <span className="absolute top-[8%] left-1 rounded bg-black/70 px-1 font-mono text-[9px] text-warn">
         UI do app · {label}
       </span>
     </div>
