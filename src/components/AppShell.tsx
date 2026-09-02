@@ -396,9 +396,15 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
         <header className="sticky top-0 z-[20] border-b border-border bg-[color-mix(in_srgb,var(--background)_88%,transparent)] backdrop-blur-md">
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 sm:px-6">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-primary md:hidden">
-                <current.icon className="size-4" />
-              </span>
+              <button
+                type="button"
+                aria-label="Abrir menu"
+                onClick={() => setMobileNav(true)}
+                className="grid size-11 shrink-0 place-items-center rounded-lg bg-surface-2 text-primary transition hover:bg-surface-3 md:hidden"
+              >
+                <Menu className="size-5" />
+              </button>
+
               <GlobalActionBar className="max-w-md" />
             </div>
             <div className="flex shrink-0 items-center gap-2">
