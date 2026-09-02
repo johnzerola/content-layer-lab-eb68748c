@@ -195,7 +195,7 @@ function AgendaPage() {
       map.set(key, [...(map.get(key) ?? []), p]);
     }
     return [...map.entries()];
-  }, [posts]);
+  }, [visiblePosts]);
 
   async function onAddAccount() {
     setLinkingAccount(true);
