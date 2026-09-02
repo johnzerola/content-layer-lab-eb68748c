@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { RequireAuth } from "@/components/RequireAuth";
+import { RouteShell } from "@/components/RouteShell";
 import { Button, Input } from "@/components/ui/base";
 import { Label } from "@/components/ui/label";
 import { createTemplateDoc } from "@/lib/video-template/factory";
@@ -50,7 +51,8 @@ function NewTemplatePage() {
   };
 
   return (
-    <RequireAuth title="Criar template" description="Entre na sua conta para criar templates.">
+    <RouteShell>
+      <RequireAuth title="Criar template" description="Entre na sua conta para criar templates.">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-6">
           <header>
             <h1 className="text-2xl font-semibold tracking-tight">Criar template</h1>
@@ -105,6 +107,7 @@ function NewTemplatePage() {
             </Button>
           </div>
         </div>
-    </RequireAuth>
+      </RequireAuth>
+    </RouteShell>
   );
 }

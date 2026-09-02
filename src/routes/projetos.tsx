@@ -266,7 +266,10 @@ function ProjectsPage() {
               accept="video/*"
               multiple
               className="sr-only"
-              onChange={(e) => attachFiles(e.target.files)}
+              onChange={(e) => {
+                attachFiles(e.currentTarget.files);
+                e.currentTarget.value = "";
+              }}
             />
           </label>
         </div>

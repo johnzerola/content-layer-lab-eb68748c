@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { RequireAuth } from "@/components/RequireAuth";
+import { RouteShell } from "@/components/RouteShell";
 import { Button, Input } from "@/components/ui/base";
 import { TemplateCard } from "@/components/vtemplate/TemplateCard";
 import { ApplyTemplateModal } from "@/components/vtemplate/ApplyTemplateModal";
@@ -65,7 +66,8 @@ function TemplatesPage() {
   }, [tab, mine, publics, cat, q]);
 
   return (
-    <RequireAuth title="Templates de vídeo" description="Entre na sua conta para criar e aplicar templates.">
+    <RouteShell>
+      <RequireAuth title="Templates de vídeo" description="Entre na sua conta para criar e aplicar templates.">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 sm:p-6">
           <header className="flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -163,6 +165,7 @@ function TemplatesPage() {
           open={!!applyTo}
           onOpenChange={(v) => !v && setApplyTo(null)}
         />
-    </RequireAuth>
+      </RequireAuth>
+    </RouteShell>
   );
 }
