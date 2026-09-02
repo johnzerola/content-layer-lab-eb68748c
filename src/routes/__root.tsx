@@ -16,6 +16,8 @@ import { Toaster } from "../components/ui/sonner";
 import { TooltipProvider } from "../components/ui/tooltip";
 import { BatchProgressDock } from "../components/BatchProgressDock";
 import { CommandPalette } from "../components/CommandPalette";
+import { installSessionScope } from "../lib/session-scope";
+
 
 
 function NotFoundComponent() {
@@ -127,6 +129,11 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  // cada conta tem seu próprio workspace local (lote, templates, preferências)
+  useEffect(() => installSessionScope(), []);
+
+
 
   return (
     <QueryClientProvider client={queryClient}>

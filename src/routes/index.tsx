@@ -59,7 +59,7 @@ import { AISuggestPanel } from "@/components/AISuggestPanel";
 import { AITemplateStudio } from "@/components/AITemplateStudio";
 import { applyLook } from "@/lib/looks";
 
-import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
+import { currentUser, onAuth, pullTemplates, type CloudUser } from "@/lib/cloud";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
 import { AutoScheduleModal } from "@/components/AutoScheduleModal";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
@@ -78,6 +78,7 @@ import {
   fitCanvasToSource,
   orientationOf,
   loadTemplates,
+  saveTemplates,
   duplicateTemplate,
   migrate,
   PLATFORM_PRESETS,
@@ -372,6 +373,23 @@ function Home() {
     void currentUser().then(setUser);
     return onAuth(setUser);
   }, []);
+
+  // ao entrar, restaura os templates da própria conta (cada login tem o seu acervo)
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    void pullTemplates(loadTemplates())
+      .then((list) => {
+        if (!alive || !list.length) return;
+        saveTemplates(list);
+        setTemplates(list);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [user?.id]);
+
   const [editing, setEditing] = useState(false);
   const [studioId, setStudioId] = useState<string | null>(null);
   const [quickId, setQuickId] = useState<string | null>(null);
