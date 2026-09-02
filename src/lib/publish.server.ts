@@ -17,6 +17,8 @@ export type PublishInput = {
   idempotencyKey?: string;
   /** Container Meta já criado numa tentativa anterior; evita duplicar a mídia. */
   pendingContainerId?: string | null;
+  /** Tipo de credencial Meta: Login do Instagram (graph.instagram.com) ou Página do Facebook (graph.facebook.com). */
+  metaTokenKind?: "instagram_login" | "facebook_page";
 };
 
 export type PublishResult =
@@ -282,9 +284,11 @@ async function publishAyrshare(input: PublishInput): Promise<PublishResult> {
  */
 async function publishMeta(input: PublishInput): Promise<PublishResult> {
   const credentials = globalMetaCredentials();
-  const usesPageToken = Boolean(input.providerAccessToken);
+  // Login do Instagram: Bearer no graph.instagram.com; token de Página: access_token no graph.facebook.com.
+  const instagramLogin = input.metaTokenKind === "instagram_login";
+  const usesPageToken = Boolean(input.providerAccessToken) && !instagramLogin;
   const token = input.providerAccessToken ?? credentials?.accessToken;
-  const igId = usesPageToken ? input.providerAccountId : credentials?.igUserId;
+  const igId = usesPageToken || instagramLogin ? input.providerAccountId : credentials?.igUserId;
   if (!token || !igId) {
     return {
       ok: false,

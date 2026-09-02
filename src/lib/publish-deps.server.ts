@@ -67,7 +67,7 @@ export async function createPublishDependencies(): Promise<QueueDependencies> {
         try {
           const refreshToken = decryptSocialToken(data.refresh_token_ciphertext);
           const refreshed = await refreshYoutubeAccessToken({ refreshToken });
-          return refreshed.accessToken ?? null;
+          return refreshed.accessToken ? { accessToken: refreshed.accessToken } : null;
         } catch {
           return null;
         }
@@ -75,13 +75,17 @@ export async function createPublishDependencies(): Promise<QueueDependencies> {
       if (connection.provider !== "meta") return null;
       const { data, error } = await supabaseAdmin
         .from("social_connection_credentials")
-        .select("access_token_ciphertext,expires_at")
+        .select("access_token_ciphertext,expires_at,token_kind")
         .eq("connection_id", connection.id)
         .maybeSingle();
       if (error || !data) return null;
-      return resolveMetaAccessToken({
+      const tokenKind = (data as { token_kind?: string | null }).token_kind === "instagram_login"
+        ? ("instagram_login" as const)
+        : ("facebook_page" as const);
+      const accessToken = await resolveMetaAccessToken({
         ciphertext: data.access_token_ciphertext,
         expiresAt: data.expires_at,
+        tokenKind,
         persistRefresh: async (ciphertext, expiresAt) => {
           const { error: credentialError } = await supabaseAdmin
             .from("social_connection_credentials")
@@ -94,6 +98,7 @@ export async function createPublishDependencies(): Promise<QueueDependencies> {
           if (credentialError || connectionError) throw new Error("credential refresh persistence failed");
         },
       });
+      return { accessToken, tokenKind };
     },
     loadPendingContainerId: async (postId) => {
       const { data, error } = await supabaseAdmin
