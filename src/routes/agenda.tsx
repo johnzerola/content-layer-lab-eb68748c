@@ -175,9 +175,18 @@ function AgendaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  const visiblePosts = useMemo(() => {
+    if (!selectedDay) return posts;
+    return posts.filter((p) => {
+      const d = new Date(p.scheduled_at);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      return key === selectedDay;
+    });
+  }, [posts, selectedDay]);
+
   const grouped = useMemo(() => {
     const map = new Map<string, ScheduledPost[]>();
-    for (const p of posts) {
+    for (const p of visiblePosts) {
       const key = new Date(p.scheduled_at).toLocaleDateString("pt-BR", {
         weekday: "short",
         day: "2-digit",
