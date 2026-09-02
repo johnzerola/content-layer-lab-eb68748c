@@ -140,7 +140,9 @@ export function TimelinePro({
   onToggleLock,
   onSplit,
   onTrim,
+  media,
 }: Props) {
+
   const trackRef = useRef<HTMLDivElement | null>(null);
 
   const seekFromEvent = useCallback(
