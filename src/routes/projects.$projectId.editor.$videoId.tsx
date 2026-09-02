@@ -139,6 +139,12 @@ function EditorPage() {
   const [loadAttempt, setLoadAttempt] = useState(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [localSrc, setLocalSrc] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<SocialAccount[]>([]);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [rendered, setRendered] = useState<File | null>(null);
+  const [rendering, setRendering] = useState(false);
+  const [renderPct, setRenderPct] = useState(0);
+
 
   const history = useEditorHistory<EditorProjectDoc | null>(null);
   const doc = history.state;
