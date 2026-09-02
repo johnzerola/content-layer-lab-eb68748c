@@ -267,7 +267,7 @@ function ProfilesPage() {
             return (
               <section key={g.label} className="space-y-3">
                 <h2 className="mono-label">{g.label}</h2>
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div className="stack-in grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {items.map((p) => (
                     <ProfileCard key={p.id} p={p} />
                   ))}

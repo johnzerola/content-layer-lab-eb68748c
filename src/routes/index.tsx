@@ -2763,7 +2763,7 @@ function Home() {
                   const total = Math.max(1, items.length);
                   const pct = Math.round((readyCount / total) * 100);
                   return (
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="stack-in grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                       <div className="panel rise-in space-y-3 p-4">
                         <div className="flex items-center justify-between gap-2">
                           <p className="mono-label">Lote atual</p>
