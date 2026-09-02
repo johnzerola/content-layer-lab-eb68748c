@@ -150,13 +150,12 @@ export const READY_TEMPLATES: ReadyTemplate[] = [
       const k = kitOf(b);
       const out: TemplateLayer[] = [];
       ["Primeiro ponto", "Segundo ponto", "Terceiro ponto"].forEach((t, i) => {
-        const pill = shape([...l, ...out], { name: `Item ${i + 1}`, x: 8, y: 30 + i * 9, width: 84, height: 7, fill: `${k.background}d9`, radius: 14, animationIn: anim("slideRight", 0.45, i * 0.25) } as Partial<TemplateLayer>);
+        const y = 30 + i * 9;
+        const pill = shape([...l, ...out], { name: `Item ${i + 1}`, x: 8, y, width: 84, height: 7, fill: `${k.background}d9`, radius: 14, animationIn: anim("slideRight", 0.45, i * 0.25) } as Partial<TemplateLayer>);
         out.push(pill);
         out.push(
-          text([...l, ...out], { name: `Texto ${i + 1}`, text: t, x: 11, y: 31.2, width: 78, height: 5, fontSize: 40, fontWeight: 700, align: "left", fontFamily: k.bodyFont, color: k.text, animationIn: anim("fadeIn", 0.4, i * 0.25 + 0.1), y2: 0 } as unknown as Partial<TemplateLayer> & { text: string }),
+          text([...l, ...out], { name: `Texto ${i + 1}`, text: t, x: 11, y: y + 1.2, width: 78, height: 5, fontSize: 40, fontWeight: 700, align: "left", fontFamily: k.bodyFont, color: k.text, animationIn: anim("fadeIn", 0.4, i * 0.25 + 0.1) } as Partial<TemplateLayer> & { text: string }),
         );
-        const last = out[out.length - 1] as TemplateLayer;
-        (last as { y: number }).y = 31.2 + i * 9;
       });
       return out;
     },
