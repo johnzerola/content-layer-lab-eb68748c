@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Layers,
   Palette,
@@ -33,6 +33,7 @@ import { GlobalActionBar } from "@/components/GlobalActionBar";
 import { ProcessSteps } from "@/components/ProcessSteps";
 import { useAccess } from "@/lib/subscription";
 import { planFromId } from "@/lib/plan";
+import { markPendingShellMode } from "@/lib/handoff";
 
 export type AppMode = "lote" | "clip" | "limpar" | "limpar-ia" | "external";
 
@@ -136,12 +137,17 @@ const MODES: ModeDef[] = [
 const ROUTE_PATHS = [
   "/templates",
   "/estilos",
+  "/editor",
+  "/projects",
+  "/projetos",
   "/estudio",
+  "/cortes",
   "/live",
   "/biblioteca",
   "/agenda",
   "/perfis",
   "/contas",
+  "/conta",
   "/integracoes",
   "/armazenamento",
   "/metricas",
@@ -220,6 +226,8 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
   const { signedIn, sub, isAdmin } = useAccess();
   const plan = planFromId(sub?.plan);
   const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const navigating = useRouterState({ select: (r) => r.status === "pending" });
+  const navigate = useNavigate();
   const onFixedRoute = ROUTE_PATHS.some((p) => pathname.startsWith(p));
 
   useEffect(() => {
@@ -238,6 +246,34 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
     root.classList.add(`theme-${mode}`);
   }, [mode]);
 
+  useEffect(() => {
+    setMobileNav(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileNav) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileNav(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [mobileNav]);
+
+  const openTool = (nextMode: AppMode) => {
+    if (nextMode === "external") return;
+    if (onFixedRoute) {
+      markPendingShellMode(nextMode);
+      void navigate({ to: "/" });
+      return;
+    }
+    onMode(nextMode);
+  };
+
   const routeLink = (
     to: string,
     label: string,
@@ -250,6 +286,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
       to={to as any}
       title={label}
       onClick={close}
+      preload="intent"
       aria-current={pathname.startsWith(to) ? "page" : undefined}
       className={`flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors duration-150 ${
         pathname.startsWith(to)
@@ -279,7 +316,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             hint={expanded ? m.hint : undefined}
             icon={m.icon}
             onClick={() => {
-              onMode(m.id);
+              openTool(m.id);
               close?.();
             }}
             badge={
@@ -463,6 +500,15 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-[20] border-b border-border bg-[color-mix(in_srgb,var(--background)_88%,transparent)] backdrop-blur-md">
+          {navigating && (
+            <div
+              className="absolute inset-x-0 top-0 h-0.5 overflow-hidden bg-primary/15"
+              role="progressbar"
+              aria-label="Carregando página"
+            >
+              <span className="block h-full w-1/3 animate-pulse bg-primary" />
+            </div>
+          )}
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 sm:px-6">
             <div className="flex min-w-0 items-center gap-3">
               <button
@@ -495,7 +541,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
         {MODES.filter((m) => m.id !== "external" && m.id !== "clip").map((m) => (
                   <button
                     key={m.id}
-                    onClick={() => onMode(m.id)}
+                    onClick={() => openTool(m.id)}
                     aria-label={m.brand}
                     className={`grid size-9 place-items-center rounded-md transition ${
                       m.id === mode ? "bg-surface-3 text-primary" : "text-muted-foreground"
