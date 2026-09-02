@@ -24,7 +24,12 @@ import { BatchApplyModal } from "@/components/editor/BatchApplyModal";
 import { TransitionPicker } from "@/components/editor/TransitionPicker";
 import { AudioPanel } from "@/components/editor/AudioPanel";
 import { MediaSourceBar } from "@/components/editor/MediaSourceBar";
+import { BulkScheduleModal } from "@/components/BulkScheduleModal";
+import { listAccounts, type SocialAccount } from "@/lib/social";
+import { renderTemplateProject, templateRenderSupported } from "@/lib/editor/render-template";
+import { toast } from "sonner";
 import { getSourceFile } from "@/lib/editor/cuts";
+
 import { CutPanel, FramePanel, GradePanel, LayoutPanel, TitlesPanel } from "@/components/editor/ToolPanels";
 import { EditorCanvas } from "@/components/vtemplate/EditorCanvas";
 import { AnimationPanel } from "@/components/vtemplate/AnimationPanel";
