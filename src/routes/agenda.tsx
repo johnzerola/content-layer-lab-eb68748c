@@ -352,14 +352,15 @@ function AgendaPage() {
                       </span>
 
                       <button
+                        type="button"
                         onClick={async () => {
                           await removeAccount(a.id);
                           await refresh();
                         }}
                         aria-label={`Remover @${a.username}`}
-                        className="rounded-lg p-1.5 text-muted-foreground transition hover:text-red-400"
+                        className="interactive grid size-11 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:text-red-400"
                       >
-                        <Trash2 className="size-4" />
+                        <Trash2 className="size-4" aria-hidden="true" />
                       </button>
                     </li>
                   ))}
