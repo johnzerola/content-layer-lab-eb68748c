@@ -47,6 +47,7 @@ function StudioPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const elapsedRef = useRef(0);
   const [status, setStatus] = useState<RecorderState>("idle");
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [cameraId, setCameraId] = useState("");
@@ -95,14 +96,21 @@ function StudioPage() {
   };
 
   useEffect(() => () => {
-    recorderRef.current?.stop();
+    if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
     stopStream();
+  }, []);
+
+  useEffect(() => () => {
     if (capture) URL.revokeObjectURL(capture.url);
   }, [capture]);
 
   useEffect(() => {
     if (status !== "recording") return;
-    const timer = window.setInterval(() => setElapsed((value) => value + 1), 1000);
+    const timer = window.setInterval(() => setElapsed((value) => {
+      const next = value + 1;
+      elapsedRef.current = next;
+      return next;
+    }), 1000);
     return () => window.clearInterval(timer);
   }, [status]);
 
@@ -134,11 +142,12 @@ function StudioPage() {
         const url = URL.createObjectURL(blob);
         setCapture((previous) => {
           if (previous) URL.revokeObjectURL(previous.url);
-          return { blob, url, duration: elapsed };
+          return { blob, url, duration: elapsedRef.current };
         });
         setStatus("review");
       };
       setElapsed(0);
+      elapsedRef.current = 0;
       recorder.start(500);
       setStatus("recording");
     } catch {
