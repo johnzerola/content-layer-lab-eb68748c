@@ -878,16 +878,25 @@ function drawVideoLayer(
     }
     ctx.filter = "none";
 
-    // estilo de edição: temperatura, preto lavado, vinheta e granulado
-    paintGrade(ctx, { x: v.x, y: v.y, w: v.w, h: v.h }, pre, opts?.time ?? 0);
+    // estilo de edição: temperatura, preto lavado, vinheta e granulado —
+    // apenas na área real do vídeo (não no fundo desfocado/barras)
+    const gb = dest
+      ? {
+          x: Math.max(v.x, dest.dx),
+          y: Math.max(v.y, dest.dy),
+          w: Math.min(v.x + v.w, dest.dx + dest.dw) - Math.max(v.x, dest.dx),
+          h: Math.min(v.y + v.h, dest.dy + dest.dh) - Math.max(v.y, dest.dy),
+        }
+      : { x: v.x, y: v.y, w: v.w, h: v.h };
+    if (gb.w > 0 && gb.h > 0) paintGrade(ctx, gb, pre, opts?.time ?? 0);
 
     if (opts?.noise) {
       ctx.globalAlpha = Math.min(0.12, opts.noise);
       ctx.globalCompositeOperation = "overlay";
       const pat = ctx.createPattern(getNoiseTile(), "repeat");
-      if (pat) {
+      if (pat && gb.w > 0 && gb.h > 0) {
         ctx.fillStyle = pat;
-        ctx.fillRect(v.x, v.y, v.w, v.h);
+        ctx.fillRect(gb.x, gb.y, gb.w, gb.h);
       }
       ctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = 1;
