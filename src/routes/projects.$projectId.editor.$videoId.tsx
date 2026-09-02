@@ -61,6 +61,8 @@ function EditorPage() {
   const [saveState, setSaveState] = useState<"idle" | "dirty" | "saving" | "saved">("idle");
   const [batchOpen, setBatchOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const history = useEditorHistory<EditorProjectDoc | null>(null);
@@ -70,13 +72,25 @@ function EditorPage() {
     let alive = true;
     void (async () => {
       try {
+        setLoading(true);
+        setLoadError(null);
         const record = await openProjectForVideo(projectId, videoId);
         const tr = await ensureTranscript(videoId);
         if (!alive) return;
         setRecordId(record.id);
         history.reset(record.doc, "load");
         setTranscript(tr);
-        setTemplates(await listMyTemplates());
+        void listMyTemplates()
+          .then((items) => {
+            if (alive) setTemplates(items);
+          })
+          .catch(() => {
+            if (alive) setTemplates([]);
+          });
+      } catch (error) {
+        if (alive) {
+          setLoadError(error instanceof Error ? error.message : "Não foi possível abrir este projeto.");
+        }
       } finally {
         if (alive) setLoading(false);
       }
@@ -85,7 +99,7 @@ function EditorPage() {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, videoId]);
+  }, [projectId, videoId, loadAttempt]);
 
   /** Autosave com debounce — nunca escreve a cada frame de arraste. */
   useEffect(() => {
@@ -190,8 +204,33 @@ function EditorPage() {
     else v.pause();
   }, [playing]);
 
-  if (loading || !doc) {
+  if (loading) {
     return <div className="grid h-dvh place-items-center text-sm text-muted-foreground">Carregando editor…</div>;
+  }
+
+  if (loadError || !doc) {
+    return (
+      <div className="grid h-dvh place-items-center bg-background px-6 text-foreground">
+        <div className="max-w-md text-center">
+          <h1 className="text-xl font-semibold">Não foi possível abrir o editor</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {loadError ?? "O projeto não retornou dados válidos."}
+          </p>
+          <div className="mt-5 flex justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => setLoadAttempt((attempt) => attempt + 1)}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            >
+              Tentar novamente
+            </button>
+            <Link to="/" className="rounded-lg border border-border px-4 py-2 text-sm font-medium">
+              Voltar ao painel
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const captionLayer = doc.composition.layers.find((l): l is CaptionLayer => l.type === "caption") ?? null;
