@@ -390,8 +390,10 @@ function Home() {
     };
   }, [user?.id]);
 
+  const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
   const [studioId, setStudioId] = useState<string | null>(null);
+
   const [quickId, setQuickId] = useState<string | null>(null);
 
   const [libraryOpen, setLibraryOpen] = useState(false);
