@@ -33,10 +33,14 @@
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-warn: var(--warn);
+  --color-success: var(--success);
+  --color-social-meta: var(--social-meta);
+  --color-social-tiktok: var(--social-tiktok);
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", ui-sans-serif, system-ui, sans-serif;
 }
+
 
 :root {
   --radius: 0.75rem;
