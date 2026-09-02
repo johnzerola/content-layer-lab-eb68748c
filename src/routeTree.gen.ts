@@ -15,6 +15,7 @@ import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as ArmazenamentoRouteImport } from './routes/armazenamento'
 import { Route as BibliotecaRouteImport } from './routes/biblioteca'
 import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as CompararRouteImport } from './routes/comparar'
 import { Route as ContaRouteImport } from './routes/conta'
 import { Route as ContasRouteImport } from './routes/contas'
 import { Route as CortesRouteImport } from './routes/cortes'
@@ -85,6 +86,11 @@ const BibliotecaRoute = BibliotecaRouteImport.update({
 const CheckoutRoute = CheckoutRouteImport.update({
   id: '/checkout',
   path: '/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompararRoute = CompararRouteImport.update({
+  id: '/comparar',
+  path: '/comparar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContaRoute = ContaRouteImport.update({
@@ -314,6 +320,7 @@ export interface FileRoutesByFullPath {
   '/armazenamento': typeof ArmazenamentoRoute
   '/biblioteca': typeof BibliotecaRoute
   '/checkout': typeof CheckoutRoute
+  '/comparar': typeof CompararRoute
   '/conta': typeof ContaRoute
   '/contas': typeof ContasRoute
   '/cortes': typeof CortesRoute
@@ -363,6 +370,7 @@ export interface FileRoutesByTo {
   '/armazenamento': typeof ArmazenamentoRoute
   '/biblioteca': typeof BibliotecaRoute
   '/checkout': typeof CheckoutRoute
+  '/comparar': typeof CompararRoute
   '/conta': typeof ContaRoute
   '/contas': typeof ContasRoute
   '/cortes': typeof CortesRoute
@@ -413,6 +421,7 @@ export interface FileRoutesById {
   '/armazenamento': typeof ArmazenamentoRoute
   '/biblioteca': typeof BibliotecaRoute
   '/checkout': typeof CheckoutRoute
+  '/comparar': typeof CompararRoute
   '/conta': typeof ContaRoute
   '/contas': typeof ContasRoute
   '/cortes': typeof CortesRoute
@@ -464,6 +473,7 @@ export interface FileRouteTypes {
     | '/armazenamento'
     | '/biblioteca'
     | '/checkout'
+    | '/comparar'
     | '/conta'
     | '/contas'
     | '/cortes'
@@ -513,6 +523,7 @@ export interface FileRouteTypes {
     | '/armazenamento'
     | '/biblioteca'
     | '/checkout'
+    | '/comparar'
     | '/conta'
     | '/contas'
     | '/cortes'
@@ -562,6 +573,7 @@ export interface FileRouteTypes {
     | '/armazenamento'
     | '/biblioteca'
     | '/checkout'
+    | '/comparar'
     | '/conta'
     | '/contas'
     | '/cortes'
@@ -612,6 +624,7 @@ export interface RootRouteChildren {
   ArmazenamentoRoute: typeof ArmazenamentoRoute
   BibliotecaRoute: typeof BibliotecaRoute
   CheckoutRoute: typeof CheckoutRoute
+  CompararRoute: typeof CompararRoute
   ContaRoute: typeof ContaRoute
   ContasRoute: typeof ContasRoute
   CortesRoute: typeof CortesRoute
@@ -697,6 +710,13 @@ declare module '@tanstack/react-router' {
       path: '/checkout'
       fullPath: '/checkout'
       preLoaderRoute: typeof CheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/comparar': {
+      id: '/comparar'
+      path: '/comparar'
+      fullPath: '/comparar'
+      preLoaderRoute: typeof CompararRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/conta': {
@@ -996,6 +1016,7 @@ const rootRouteChildren: RootRouteChildren = {
   ArmazenamentoRoute: ArmazenamentoRoute,
   BibliotecaRoute: BibliotecaRoute,
   CheckoutRoute: CheckoutRoute,
+  CompararRoute: CompararRoute,
   ContaRoute: ContaRoute,
   ContasRoute: ContasRoute,
   CortesRoute: CortesRoute,
