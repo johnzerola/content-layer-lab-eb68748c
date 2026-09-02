@@ -1118,8 +1118,39 @@ function Home() {
     [capBusyId, capLang, setItems],
   );
 
+  /**
+   * Abre o vídeo direto no editor profissional. O arquivo local fica
+   * registrado em memória para o editor conseguir tocar a mídia, e o id do
+   * projeto é reaproveitado para reabrir sempre o mesmo documento.
+   */
+  const openProEditor = useCallback(
+    (id: string) => {
+      const item = itemsRef.current.find((i) => i.id === id);
+      if (!item) return;
+      const key = `vaiviral.pro-editor.${id}`;
+      let projectId = "";
+      try {
+        projectId = localStorage.getItem(key) ?? "";
+      } catch {
+        projectId = "";
+      }
+      if (!projectId) {
+        projectId = crypto.randomUUID();
+        try {
+          localStorage.setItem(key, projectId);
+        } catch {
+          /* modo privado: segue com id de sessão */
+        }
+      }
+      registerSourceFile(id, item.file);
+      void navigate({ to: "/projects/$projectId/editor/$videoId", params: { projectId, videoId: id } });
+    },
+    [navigate],
+  );
+
   const selected = items.find((i) => i.id === selectedId) ?? null;
   const studioItem = studioId ? (items.find((i) => i.id === studioId) ?? null) : null;
+
   const quickItem = quickId ? (items.find((i) => i.id === quickId) ?? null) : null;
   const capEditorItem = capEditor ? (items.find((i) => i.id === capEditor) ?? null) : null;
 
