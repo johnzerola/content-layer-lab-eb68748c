@@ -50,9 +50,7 @@ const Clip = memo(function Clip({
         ? "bg-[oklch(0.62_0.18_30)]/50"
         : layer.type === "text"
           ? "bg-[oklch(0.62_0.16_290)]/50"
-          : layer.type === "audio"
-            ? "bg-[oklch(0.68_0.16_140)]/45"
-            : "bg-[oklch(0.62_0.14_180)]/45";
+          : "bg-[oklch(0.62_0.14_180)]/45";
 
   const drag = useCallback(
     (mode: "move" | "start" | "end") => (e: React.PointerEvent) => {
