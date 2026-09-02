@@ -10,6 +10,14 @@ import {
 } from "@/lib/editor/audio";
 import { NARRATION_VOICES, generateNarration } from "@/lib/tts.functions";
 
+const NARRATION_TONES: { id: string; label: string; prompt: string }[] = [
+  { id: "viral", label: "Viral / energia alta", prompt: "Narre em português do Brasil com energia alta de vídeo curto, ritmo acelerado e ênfase nas primeiras palavras." },
+  { id: "natural", label: "Natural / conversa", prompt: "Narre em português do Brasil de forma natural e conversacional, como se estivesse explicando para um amigo." },
+  { id: "documental", label: "Documental / sério", prompt: "Narre em português do Brasil com tom documental, pausado, grave e confiante." },
+  { id: "suave", label: "Suave / calmo", prompt: "Narre em português do Brasil com tom calmo, suave e acolhedor, com pausas confortáveis." },
+  { id: "anuncio", label: "Anúncio / vendas", prompt: "Narre em português do Brasil como locutor de anúncio, entusiasmado e persuasivo, destacando os benefícios." },
+];
+
 interface Props {
   audio: EditorAudio | undefined;
   onChange: (next: EditorAudio, label?: string) => void;
@@ -34,6 +42,8 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime }: Pr
   const [recording, setRecording] = useState(false);
   const [text, setText] = useState(scriptText.slice(0, 600));
   const [voice, setVoice] = useState(NARRATION_VOICES[0]!.id);
+  const [tone, setTone] = useState(NARRATION_TONES[0]!.id);
+  const [speed, setSpeed] = useState(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,11 +92,14 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime }: Pr
     setBusy(true);
     setError(null);
     try {
-      const out = await generateNarration({ data: { text: text.trim(), voice, speed: 1 } });
+      const instructions = NARRATION_TONES.find((t) => t.id === tone)?.prompt;
+      const out = await generateNarration({
+        data: { text: text.trim(), voice, speed, ...(instructions ? { instructions } : {}) },
+      });
       addClip(
         createAudioClip({
           kind: "voice",
-          name: "Narração IA",
+          name: `Narração IA · ${NARRATION_TONES.find((t) => t.id === tone)?.label ?? tone}`,
           url: out.dataUrl,
           startTime: currentTime,
           volume: 1,
