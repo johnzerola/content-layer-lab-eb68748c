@@ -2465,7 +2465,9 @@ function Home() {
                             setUiGrid(v);
                             try {
                               localStorage.setItem("vv_ui_grid", v);
-                            } catch {}
+                            } catch {
+                              // Local storage can be disabled in private or embedded browser contexts.
+                            }
                           }}
                           className={`rounded-md border px-2 py-1 text-[11px] ${
                             uiGrid !== "off"

@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { mediaProxyTicket, workerResolveMedia } from "@/lib/cleaner.server";
+import { mediaProxyTicket, workerBase, workerResolveMedia } from "@/lib/cleaner.server";
 import { safeRemoteUrl } from "@/lib/remote-url";
 import { assertSafeRemoteUrl } from "@/lib/remote-url.server";
 
@@ -22,6 +22,10 @@ export interface ResolvedVideo {
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+
+export function shouldTryWorkerResolver(platform: string, host: string, workerConfigured: boolean) {
+  return workerConfigured && platform !== host;
+}
 
 function pickMeta(html: string, keys: string[]) {
   for (const key of keys) {
@@ -67,9 +71,9 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
     const platform = platformOf(host);
 
     // O worker usa yt-dlp atualizado e e a fonte principal para posts publicos.
-    // Mantemos os resolvedores abaixo como fallback enquanto o worker antigo
-    // ainda nao tiver recebido esta versao.
-    if (platform !== host && !cobaltConfigured()) {
+    // Cobalt e os resolvedores diretos ficam como fallback, nunca como bloqueio.
+    const workerConfigured = Boolean(workerBase());
+    if (shouldTryWorkerResolver(platform, host, workerConfigured)) {
       try {
         const media = await workerResolveMedia(target.toString());
         const ticket = mediaProxyTicket(media.url, media.headers);
@@ -209,9 +213,9 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
       source: host,
       blocked: needsService,
       message: needsService
-        ? cobaltConfigured()
-          ? `Não consegui obter esse vídeo do ${platform} (pode ser privado, restrito por idade ou indisponível). Baixe o arquivo e arraste aqui.`
-          : `Não consegui baixar esse vídeo do ${platform} pelos serviços públicos (pode estar privado ou com restrição). Configure um resolvedor próprio (COBALT_API_URL) para importar sempre, ou baixe o arquivo e arraste aqui.`
+        ? workerConfigured || cobaltConfigured()
+          ? `Não consegui obter esse vídeo do ${platform} pelo motor configurado (pode estar privado, restrito por idade, sem permissão ou indisponível). Baixe o arquivo e arraste aqui.`
+          : `Não consegui baixar esse vídeo do ${platform} porque nenhum motor robusto de importação está configurado. Defina CLEANER_WORKER_URL/CLEANER_WORKER_SECRET ou COBALT_API_URL no Lovable, ou baixe o arquivo e arraste aqui.`
         : "Não encontrei um arquivo de vídeo nessa página. Cole um link direto do arquivo ou envie o vídeo.",
     };
 
