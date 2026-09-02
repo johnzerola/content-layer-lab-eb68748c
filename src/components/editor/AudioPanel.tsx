@@ -1,13 +1,13 @@
 /** Mixagem: música de fundo, áudio original, gravação e narração por IA. */
 import { useRef, useState } from "react";
-import { Mic, Music, Sparkles, Square, Trash2, Upload } from "lucide-react";
+import { Mic, Sparkles, Square, Trash2, Upload } from "lucide-react";
 import {
-  STOCK_MUSIC,
   createAudioClip,
   defaultEditorAudio,
   type AudioClip,
   type EditorAudio,
 } from "@/lib/editor/audio";
+
 import { NARRATION_VOICES, generateNarration } from "@/lib/tts.functions";
 import { SoundLibrary } from "@/components/editor/SoundLibrary";
 
@@ -196,35 +196,31 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime }: Pr
         />
         <div className="mt-2">
           <SoundLibrary
-            onAdd={(asset) =>
-              addClip(
-                createAudioClip({
-                  kind: asset.kind === "sfx" ? "sfx" : "music",
-                  name: asset.name,
-                  url: asset.url,
-                  startTime: asset.kind === "sfx" ? currentTime : 0,
-                  volume: asset.kind === "sfx" ? 1 : 0.6,
-                  fadeIn: asset.kind === "sfx" ? 0 : 0.5,
-                  fadeOut: asset.kind === "sfx" ? 0 : 0.8,
-                }),
-              )
-            }
+            onAdd={(asset) => {
+              const isSfx = asset.kind === "sfx";
+              const clip = createAudioClip({
+                kind: isSfx ? "sfx" : "music",
+                name: asset.name,
+                url: asset.url,
+                startTime: isSfx ? currentTime : 0,
+                volume: isSfx ? 1 : 0.6,
+                fadeIn: isSfx ? 0 : 0.5,
+                fadeOut: isSfx ? 0 : 0.8,
+                loop: !isSfx,
+              });
+              // música de fundo entra já com ducking sob a fala
+              onChange(
+                {
+                  ...state,
+                  tracks: [...state.tracks, clip],
+                  duckUnderSpeech: isSfx ? state.duckUnderSpeech : true,
+                },
+                "add-audio",
+              );
+            }}
           />
         </div>
-        <div className="mt-2 grid gap-1.5">
-          {STOCK_MUSIC.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => addClip(createAudioClip({ kind: "music", name: m.name, url: m.url }))}
-              className="flex items-center gap-2 rounded-lg border border-border/50 px-2 py-1.5 text-left text-xs hover:border-primary/60"
-            >
-              <Music className="h-3.5 w-3.5 text-primary" />
-              <span className="flex-1">{m.name}</span>
-              <span className="font-mono text-[10px] text-muted-foreground">{m.mood}</span>
-            </button>
-          ))}
-        </div>
+
       </section>
 
 

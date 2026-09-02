@@ -24,7 +24,12 @@ import { BatchApplyModal } from "@/components/editor/BatchApplyModal";
 import { TransitionPicker } from "@/components/editor/TransitionPicker";
 import { AudioPanel } from "@/components/editor/AudioPanel";
 import { MediaSourceBar } from "@/components/editor/MediaSourceBar";
+import { BulkScheduleModal } from "@/components/BulkScheduleModal";
+import { listAccounts, type SocialAccount } from "@/lib/social";
+import { renderTemplateProject, templateRenderSupported } from "@/lib/editor/render-template";
+import { toast } from "sonner";
 import { getSourceFile } from "@/lib/editor/cuts";
+
 import { CutPanel, FramePanel, GradePanel, LayoutPanel, TitlesPanel } from "@/components/editor/ToolPanels";
 import { EditorCanvas } from "@/components/vtemplate/EditorCanvas";
 import { AnimationPanel } from "@/components/vtemplate/AnimationPanel";
@@ -134,6 +139,12 @@ function EditorPage() {
   const [loadAttempt, setLoadAttempt] = useState(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [localSrc, setLocalSrc] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<SocialAccount[]>([]);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [rendered, setRendered] = useState<File | null>(null);
+  const [rendering, setRendering] = useState(false);
+  const [renderPct, setRenderPct] = useState(0);
+
 
   const history = useEditorHistory<EditorProjectDoc | null>(null);
   const doc = history.state;
@@ -199,8 +210,55 @@ function EditorPage() {
     return () => URL.revokeObjectURL(objectUrl);
   }, [videoId]);
 
+  useEffect(() => {
+    void listAccounts()
+      .then(setAccounts)
+      .catch(() => undefined);
+  }, []);
+
   const cuts = useMemo(() => (cutOnRemove ? removedRanges(transcript) : []), [transcript, cutOnRemove]);
   const silences = useMemo(() => silenceRanges(transcript, 0.6), [transcript]);
+
+  /** Renderiza o corte atual no próprio editor e (opcionalmente) abre a publicação. */
+  const renderAndPublish = useCallback(
+    async (publish: boolean) => {
+      if (!doc) return;
+      if (!templateRenderSupported()) {
+        toast.error("Este navegador não suporta a renderização (WebCodecs).");
+        return;
+      }
+      const file = getSourceFile(videoId);
+      if (!file) {
+        toast.error("Carregue o vídeo de origem na barra de mídia para renderizar.");
+        return;
+      }
+      const seg = doc.preedit?.segments?.[0] ?? null;
+      setRendering(true);
+      setRenderPct(0);
+      try {
+        const blob = await renderTemplateProject({
+          doc: doc.composition,
+          file,
+          cut: seg ? { start: seg.start, end: seg.end } : null,
+          onProgress: setRenderPct,
+        });
+        const out = new File(
+          [blob],
+          `${(doc.title || "corte").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.mp4`,
+          { type: "video/mp4" },
+        );
+        setRendered(out);
+        toast.success("Corte renderizado.");
+        if (publish) setPublishOpen(true);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Falha ao renderizar o corte.");
+      } finally {
+        setRendering(false);
+      }
+    },
+    [doc, videoId],
+  );
+
 
   const patchDoc = useCallback(
     (patch: Partial<EditorProjectDoc>, label = "editar") => {
@@ -402,11 +460,37 @@ function EditorPage() {
           </select>
           <button
             type="button"
+            onClick={() => void renderAndPublish(false)}
+            disabled={rendering}
+            className="rounded-lg border border-border/60 px-3 py-1.5 text-sm disabled:opacity-50"
+          >
+            {rendering ? `Renderizando ${Math.round(renderPct * 100)}%` : "Renderizar"}
+          </button>
+          {rendered && (
+            <a
+              href={URL.createObjectURL(rendered)}
+              download={rendered.name}
+              className="rounded-lg border border-border/60 px-3 py-1.5 text-sm"
+            >
+              Baixar MP4
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={() => void renderAndPublish(true)}
+            disabled={rendering}
+            className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          >
+            Renderizar e publicar
+          </button>
+          <button
+            type="button"
             onClick={() => setBatchOpen(true)}
-            className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground"
+            className="rounded-lg border border-primary/50 px-3 py-1.5 text-sm font-medium text-primary"
           >
             Aplicar em lote
           </button>
+
         </div>
       </header>
 
@@ -771,6 +855,17 @@ function EditorPage() {
         initialTemplateId={doc.templateId}
         targets={[{ videoId: doc.videoId, cutId: doc.cutId, title: doc.title, videoUrl: doc.media.originalUrl }]}
       />
+
+      <BulkScheduleModal
+        open={publishOpen}
+        onClose={() => setPublishOpen(false)}
+        accounts={accounts}
+        items={rendered ? [{ file: rendered, caption: doc.hook || doc.title }] : []}
+        hideFilePicker
+        subtitle="Publique este corte renderizado sem sair do editor."
+        onDone={() => setPublishOpen(false)}
+      />
+
     </div>
   );
 }
