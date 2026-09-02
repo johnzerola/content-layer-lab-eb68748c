@@ -2328,8 +2328,123 @@ function Home() {
                       )
                     }
                   />
+                  <AITemplateStudio
+                    captions={selected.captions}
+                    duration={selected.clip ? selected.clip.end - selected.clip.start : selected.duration}
+                    onBrand={(plan) => {
+                      const capY =
+                        plan.captions.position === "top"
+                          ? 240
+                          : plan.captions.position === "middle"
+                            ? 860
+                            : 1420;
+                      const preset = CAPTION_PRESETS.find((p) => p.id === plan.captions.preset);
+                      setActive((t) => ({
+                        ...t,
+                        background: plan.brand.background || t.background,
+                        headline: {
+                          ...t.headline,
+                          text: plan.brand.headline || t.headline.text,
+                          ...(plan.brand.palette[0] ? { color: plan.brand.palette[0] } : {}),
+                        },
+                        cta: { ...t.cta, text: plan.brand.cta || t.cta.text },
+                        captions: {
+                          ...(t.captions ?? defaultCaptions()),
+                          ...(preset?.style ?? {}),
+                          visible: true,
+                          y: capY,
+                          color: plan.captions.color,
+                          activeColor: plan.captions.activeColor,
+                          maxWords: plan.captions.maxWords,
+                          uppercase: plan.captions.uppercase,
+                        },
+                      }));
+                      if (plan.brand.headline) {
+                        setItems((p) =>
+                          p.map((x) =>
+                            x.id === selected.id ? { ...x, headline: plan.brand.headline } : x,
+                          ),
+                        );
+                      }
+                      setItems((p) =>
+                        p.map((x) => ({
+                          ...x,
+                          preEdit: { ...(x.preEdit ?? defaultPreEdit()), layout: plan.layout },
+                        })),
+                      );
+                    }}
+                    onVariations={(vars) => {
+                      if (!vars.length) return;
+                      setActive((t) => ({
+                        ...t,
+                        antiDup: {
+                          ...(t.antiDup ?? defaultAntiDup()),
+                          auto: true,
+                          zoom: vars[0]!.zoom,
+                          motion: vars[0]!.motion,
+                        },
+                      }));
+                      setItems((p) =>
+                        p.map((x, i) => {
+                          const v = vars[i % vars.length]!;
+                          return {
+                            ...x,
+                            preEdit: {
+                              ...(x.preEdit ?? defaultPreEdit()),
+                              ...applyLook(v.look),
+                            },
+                          };
+                        }),
+                      );
+                    }}
+                    onCuts={(cuts) => {
+                      if (!cuts.length) return;
+                      const src = selected;
+                      const created: Item[] = cuts.map((c) => ({
+                        id: crypto.randomUUID(),
+                        file: src.file,
+                        poster: src.poster,
+                        w: src.w,
+                        h: src.h,
+                        duration: src.duration || c.end,
+                        headline: c.headline || src.headline,
+                        offsetX: src.offsetX,
+                        offsetY: src.offsetY,
+                        clip: { start: c.start, end: c.end },
+                        score: c.score,
+                        clipTitle: c.title,
+                        clipReason: c.reason,
+                        status: "pendente" as Status,
+                        progress: 0,
+                        ...(src.preEdit ? { preEdit: src.preEdit } : {}),
+                      }));
+                      setItems((p) => [...p.filter((x) => x.id !== src.id), ...created]);
+                      setSelectedId(created[0]?.id ?? null);
+                      void (async () => {
+                        for (const c of created) {
+                          try {
+                            const meta = await grabPoster(src.file, (c.clip?.start ?? 0) + 0.5);
+                            setItems((prev) =>
+                              prev.map((x) => (x.id === c.id ? { ...x, poster: meta.url } : x)),
+                            );
+                          } catch {
+                            /* mantém a miniatura do vídeo original */
+                          }
+                        }
+                      })();
+                    }}
+                    onCleanup={(ids) => {
+                      const regions = ids
+                        .map((id) => CLEANUP_PRESETS.find((p) => p.id === id))
+                        .filter(Boolean)
+                        .map((p) => makeCleanupRegion(p!.region));
+                      if (!regions.length) return;
+                      setActive((t) => ({ ...t, cleanup: [...(t.cleanup ?? []), ...regions] }));
+                    }}
+                  />
                 </AuthGate>
               )}
+
               {mode === "limpar-ia" && selected ? (
 
                 <AuthGate>
