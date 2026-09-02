@@ -43,6 +43,8 @@ type ModeDef = {
   mark: string;
   tagline: string;
   headline: string;
+  /** palavra de destaque em serifa itálica, ao fim do título */
+  accent: string;
   description: string;
   chips: string[];
   icon: typeof Layers;
@@ -57,7 +59,8 @@ const MODES: ModeDef[] = [
     brand: "ViralBatch",
     mark: "VB",
     tagline: "branding em massa",
-    headline: "Um template, centenas de vídeos prontos",
+    headline: "Um template, centenas de vídeos",
+    accent: "prontos",
     description:
       "Monte o layout uma vez — avatar, nome, headline, CTA e marca d'água — e aplique em todo o lote com variações antiduplicidade.",
     chips: ["editor de template", "variações 3–5x", "branding automático", "ZIP por plataforma"],
@@ -71,7 +74,8 @@ const MODES: ModeDef[] = [
     brand: "CorteIA",
     mark: "CI",
     tagline: "clipagem inteligente",
-    headline: "Ache os melhores momentos sozinho",
+    headline: "Ache os melhores momentos",
+    accent: "sozinho",
     description:
       "A IA lê energia de fala e movimento, pontua cada trecho e devolve os cortes prontos — sem template, sem branding, só o vídeo limpo no formato vertical.",
     chips: ["score viral", "duração min/máx", "reordenar cortes", "export direto"],
@@ -85,7 +89,8 @@ const MODES: ModeDef[] = [
     brand: "LimpaVídeo",
     mark: "LV",
     tagline: "restauração de quadro",
-    headline: "Apague textos e marcas d'água",
+    headline: "Apague textos e",
+    accent: "marcas d'água",
     description:
       "Detecção automática das áreas fixas + reconstrução por inpainting (Telea) para tirar texto e logo sem borrão, mantendo o enquadramento original.",
     chips: ["detecção automática", "inpainting HQ", "antes / depois", "sem zoom"],
@@ -99,7 +104,8 @@ const MODES: ModeDef[] = [
     brand: "CleanerIA",
     mark: "CI",
     tagline: "inpainting profissional",
-    headline: "Remoção Profissional com ProPainter",
+    headline: "Remoção profissional com",
+    accent: "ProPainter",
     description:
       "Módulo de alta fidelidade para reconstrução temporal profunda. Ideal para vídeos complexos onde a restauração local não é suficiente.",
     chips: ["ProPainter engine", "processamento configurável", "temporal tracking", "4K support"],
@@ -113,7 +119,8 @@ const MODES: ModeDef[] = [
     brand: "VaiViral",
     mark: "VV",
     tagline: "clipagem em tempo real",
-    headline: "Cortes Automáticos de Lives",
+    headline: "Cortes automáticos de",
+    accent: "lives",
     description:
       "Monitore transmissões do X, Kick e TikTok e gere cortes automáticos baseados em IA sem precisar de templates.",
     chips: ["monitoramento HLS", "score viral IA", "exportação rápida"],
