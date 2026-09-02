@@ -2697,8 +2697,26 @@ function Home() {
                 {user ? <CloudRenderPanel tool={mode} /> : null}
 
 
+                {/* pipeline: leitura rápida do estado do lote */}
+                {items.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {[
+                      { label: "Na fila", value: items.filter((i) => i.status === "na fila").length, tone: "text-muted-foreground" },
+                      { label: "Processando", value: items.filter((i) => i.status === "processando").length, tone: "text-primary" },
+                      { label: "Prontos", value: readyCount, tone: "text-success" },
+                      { label: "Erros", value: items.filter((i) => i.status === "erro").length, tone: "text-destructive" },
+                    ].map((s) => (
+                      <div key={s.label} className="rounded-xl border border-border bg-surface-2 px-3 py-2">
+                        <p className={`font-display text-xl leading-none ${s.tone}`}>{s.value}</p>
+                        <p className="mono-label mt-1">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* progresso do lote: fonte única (mesmo estado do dock global) */}
                 {(running || batchItems.length > 0) && <BatchProgressCard />}
+
 
                 {/* relatório do lote */}
                 {report && !running && (
