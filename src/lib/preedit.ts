@@ -228,8 +228,15 @@ export function hasPreEdit(p?: PreEdit | null) {
     p.hue !== 0 ||
     p.sepia > 0 ||
     p.grayscale > 0 ||
-    p.blur > 0
+    p.blur > 0 ||
+    hasGrade(p)
   );
+}
+
+/** true quando o estilo de edição (vinheta, grão, fade, temperatura) muda o quadro. */
+export function hasGrade(p?: PreEdit | null) {
+  if (!p) return false;
+  return Boolean((p.temp ?? 0) || (p.vignette ?? 0) > 0 || (p.grain ?? 0) > 0 || (p.fade ?? 0) > 0);
 }
 
 /** Filtro CSS/canvas combinando a pré-edição com o ajuste anti-duplicidade. */
