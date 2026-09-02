@@ -50,21 +50,47 @@ export interface ButtonProps
   asChild?: boolean;
   /** mostra spinner e bloqueia cliques enquanto a ação roda */
   loading?: boolean;
+  /** liga a linguagem Aurora: borda viva no hover/foco e acelerada durante o loading */
+  aurora?: boolean;
+  /** confirmação: borda verde após a ação concluir */
+  auroraState?: "idle" | "success" | "error";
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, loading = false, children, disabled, ...props }, ref) => {
+  (
+    {
+      className,
+      variant,
+      size,
+      asChild = false,
+      loading = false,
+      aurora = false,
+      auroraState = "idle",
+      children,
+      disabled,
+      ...props
+    },
+    ref,
+  ) => {
     const Comp = asChild ? Slot : "button";
+    const auroraCls = aurora
+      ? cn(
+          "aurora aurora-hover",
+          loading && "aurora-on aurora-boost",
+          auroraState === "success" && "aurora-on aurora-success",
+          auroraState === "error" && "aurora-on aurora-error",
+        )
+      : undefined;
     if (asChild) {
       return (
-        <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props}>
+        <Comp className={cn(buttonVariants({ variant, size, className }), auroraCls)} ref={ref} {...props}>
           {children}
         </Comp>
       );
     }
     return (
       <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
+        className={cn(buttonVariants({ variant, size, className }), auroraCls)}
         ref={ref}
         disabled={disabled || loading}
         aria-busy={loading || undefined}
