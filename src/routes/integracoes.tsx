@@ -401,7 +401,7 @@ function IntegrationsPage() {
               <Button
                 type="button"
                 disabled={syncingMeta}
-                onClick={() => void connect("facebook")}
+                onClick={() => setAccountSwitchProvider("meta")}
                 className="min-h-10 shrink-0"
               >
                 {syncingMeta ? (
@@ -583,15 +583,16 @@ function AccountSwitchDialog({
 }) {
   const isMeta = provider === "meta";
   const activePlatform = isMeta ? "facebook" : "youtube";
-  const title = isMeta ? "Conectar outro Facebook" : "Conectar outro Google/YouTube";
+  const title = isMeta ? "Conectar Meta pelo perfil pessoal" : "Conectar outro Google/YouTube";
   const description = isMeta
-    ? "O Facebook usa a sessão aberta no navegador. Se a Jane estiver logada, saia dela ou use Entrar em outra conta antes de continuar."
+    ? "A Página pode ser o perfil ativo no Facebook, mas a autorização precisa começar pelo perfil pessoal que administra essa Página."
     : YOUTUBE_SINGLE_CHANNEL_NOTICE;
   const steps = isMeta
     ? [
-        "Abra o Facebook em outra aba e confirme se não está na Jane.",
-        "Se estiver na Jane, clique em Sair ou use Entrar em outra conta no diálogo da Meta.",
-        "Volte aqui e continue para autorizar as páginas e Instagrams do outro perfil.",
+        "Abra o menu do Facebook no canto superior direito.",
+        "Clique em Ver todos os perfis e selecione seu perfil pessoal, não a Página.",
+        "Confirme que o nome e a foto do perfil pessoal aparecem no topo do Facebook.",
+        "Volte aqui e continue para autorizar as Páginas que esse perfil administra.",
       ]
     : YOUTUBE_RECONNECT_GUIDE_STEPS;
 
@@ -619,7 +620,7 @@ function AccountSwitchDialog({
               <Button asChild variant="outline" size="sm">
                 <a href="https://www.facebook.com/" target="_blank" rel="noreferrer">
                   <ExternalLink className="size-4" />
-                  Abrir Facebook
+                  Trocar perfil no Facebook
                 </a>
               </Button>
             </>
