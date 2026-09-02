@@ -10,17 +10,17 @@ import {
 } from "@/lib/meta-oauth.server";
 
 const environment = {
-  META_APP_ID: "app-123",
-  META_APP_SECRET: "server-only-secret",
-  META_REDIRECT_URI: "https://app.example/integracoes/instagram/callback",
+  INSTAGRAM_APP_ID: "ig-app-123",
+  INSTAGRAM_APP_SECRET: "server-only-secret",
+  INSTAGRAM_REDIRECT_URI: "https://app.example/integracoes/instagram/callback",
   META_GRAPH_VERSION: "v26.0",
 } as NodeJS.ProcessEnv;
 
 describe("Instagram OAuth", () => {
   it("creates the official authorization URL with required publishing scopes", () => {
     const url = new URL(instagramAuthorizationUrl("user-123", environment));
-    expect(url.origin + url.pathname).toBe("https://www.instagram.com/oauth/authorize");
-    expect(url.searchParams.get("client_id")).toBe("app-123");
+    expect(url.origin + url.pathname).toBe("https://api.instagram.com/oauth/authorize");
+    expect(url.searchParams.get("client_id")).toBe("ig-app-123");
     expect(url.searchParams.get("redirect_uri")).toBe(
       "https://app.example/integracoes/instagram/callback",
     );
@@ -30,6 +30,19 @@ describe("Instagram OAuth", () => {
       "instagram_business_content_publish",
     ]);
     expect(url.toString()).not.toContain("server-only-secret");
+  });
+
+  it("derives the Instagram callback when only the Facebook callback env is set", () => {
+    const url = new URL(
+      instagramAuthorizationUrl("user-123", {
+        ...environment,
+        INSTAGRAM_REDIRECT_URI: "",
+        META_REDIRECT_URI: "https://app.example/integracoes/facebook/callback",
+      }),
+    );
+    expect(url.searchParams.get("redirect_uri")).toBe(
+      "https://app.example/integracoes/instagram/callback",
+    );
   });
 
   it("binds state to the authenticated user and expiry", () => {

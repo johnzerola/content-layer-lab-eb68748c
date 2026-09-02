@@ -3,7 +3,7 @@ import { metaGraphBase } from "@/lib/meta.server";
 import { MetaLinkError, normalizeInstagramHandle } from "@/lib/social-linking.server";
 
 const OAUTH_TTL_MS = 10 * 60 * 1000;
-const INSTAGRAM_AUTH_URL = "https://www.instagram.com/oauth/authorize";
+const INSTAGRAM_AUTH_URL = "https://api.instagram.com/oauth/authorize";
 const INSTAGRAM_TOKEN_URL = "https://api.instagram.com/oauth/access_token";
 const INSTAGRAM_LONG_TOKEN_URL = "https://graph.instagram.com/access_token";
 const INSTAGRAM_REFRESH_TOKEN_URL = "https://graph.instagram.com/refresh_access_token";
@@ -29,16 +29,22 @@ function base64Url(value: string | Buffer): string {
 }
 
 function oauthConfiguration(environment: NodeJS.ProcessEnv = process.env): OAuthConfiguration {
-  const appId = environment["META_APP_ID"]?.trim();
-  const appSecret = environment["META_APP_SECRET"]?.trim();
-  const explicitRedirect = environment["META_REDIRECT_URI"]?.trim();
+  const appId = environment["INSTAGRAM_APP_ID"]?.trim();
+  const appSecret = environment["INSTAGRAM_APP_SECRET"]?.trim();
+  const explicitRedirect =
+    environment["INSTAGRAM_REDIRECT_URI"]?.trim() ||
+    environment["META_INSTAGRAM_REDIRECT_URI"]?.trim() ||
+    environment["META_REDIRECT_URI"]?.trim().replace(
+      "/integracoes/facebook/callback",
+      "/integracoes/instagram/callback",
+    );
   const siteUrl = environment["PUBLIC_SITE_URL"]?.trim().replace(/\/$/, "");
   const redirectUri = explicitRedirect || (siteUrl ? `${siteUrl}/integracoes/instagram/callback` : "");
 
   if (!appId || !appSecret || !redirectUri) {
     throw new MetaLinkError(
       "SERVER_CONFIG_MISSING",
-      "O login do Instagram ainda não está configurado no servidor.",
+      "O login do Instagram ainda não está configurado. Defina INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET e INSTAGRAM_REDIRECT_URI no servidor.",
     );
   }
   return { appId, appSecret, redirectUri };
