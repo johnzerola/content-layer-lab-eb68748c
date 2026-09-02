@@ -701,6 +701,56 @@ export type Database = {
         }
         Relationships: []
       }
+      template_instances: {
+        Row: {
+          created_at: string
+          cut_id: string | null
+          id: string
+          instance_data: Json
+          label: string | null
+          project_id: string | null
+          template_id: string | null
+          template_version: number | null
+          updated_at: string
+          user_id: string
+          video_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          cut_id?: string | null
+          id?: string
+          instance_data?: Json
+          label?: string | null
+          project_id?: string | null
+          template_id?: string | null
+          template_version?: number | null
+          updated_at?: string
+          user_id: string
+          video_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          cut_id?: string | null
+          id?: string
+          instance_data?: Json
+          label?: string | null
+          project_id?: string | null
+          template_id?: string | null
+          template_version?: number | null
+          updated_at?: string
+          user_id?: string
+          video_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_instances_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "video_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       template_versions: {
         Row: {
           created_at: string
@@ -781,6 +831,69 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      video_templates: {
+        Row: {
+          aspect_ratio: string
+          canvas_height: number
+          canvas_width: number
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          status: string
+          tags: string[]
+          template_data: Json
+          template_version: number
+          thumbnail_url: string | null
+          updated_at: string
+          usage_count: number
+          user_id: string
+          visibility: string
+          workspace_id: string | null
+        }
+        Insert: {
+          aspect_ratio?: string
+          canvas_height?: number
+          canvas_width?: number
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          status?: string
+          tags?: string[]
+          template_data?: Json
+          template_version?: number
+          thumbnail_url?: string | null
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+          visibility?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          aspect_ratio?: string
+          canvas_height?: number
+          canvas_width?: number
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          status?: string
+          tags?: string[]
+          template_data?: Json
+          template_version?: number
+          thumbnail_url?: string | null
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+          visibility?: string
+          workspace_id?: string | null
         }
         Relationships: []
       }

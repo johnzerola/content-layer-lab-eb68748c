@@ -25,10 +25,12 @@ import { Route as McpRouteImport } from './routes/mcp'
 import { Route as MetricasRouteImport } from './routes/metricas'
 import { Route as PerfisRouteImport } from './routes/perfis'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
+import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as VendasRouteImport } from './routes/vendas'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as TemplatesNewRouteImport } from './routes/templates.new'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as ApiPublicCleanerCallbackRouteImport } from './routes/api/public/cleaner-callback'
@@ -41,6 +43,7 @@ import { Route as IntegracoesFacebookCallbackRouteImport } from './routes/integr
 import { Route as IntegracoesInstagramCallbackRouteImport } from './routes/integracoes_.instagram.callback'
 import { Route as IntegracoesTiktokCallbackRouteImport } from './routes/integracoes_.tiktok.callback'
 import { Route as IntegracoesYoutubeCallbackRouteImport } from './routes/integracoes_.youtube.callback'
+import { Route as TemplatesIdEditRouteImport } from './routes/templates.$id.edit'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
 import { Route as ApiPublicHooksSyncSocialRouteImport } from './routes/api/public/hooks/sync-social'
 import { Route as ApiPublicMetaDataDeletionRouteImport } from './routes/api/public/meta.data-deletion'
@@ -126,6 +129,11 @@ const PrivacidadeRoute = PrivacidadeRouteImport.update({
   path: '/privacidade',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TemplatesRoute = TemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TermosRoute = TermosRouteImport.update({
   id: '/termos',
   path: '/termos',
@@ -148,6 +156,11 @@ const Char91DotwellKnownChar93OauthProtectedResourceRoute =
     path: '/.well-known/oauth-protected-resource',
     getParentRoute: () => rootRouteImport,
   } as any)
+const TemplatesNewRoute = TemplatesNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => TemplatesRoute,
+} as any)
 const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   id: '/.lovable/oauth/consent',
   path: '/.lovable/oauth/consent',
@@ -214,6 +227,11 @@ const IntegracoesYoutubeCallbackRoute =
     path: '/integracoes/youtube/callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const TemplatesIdEditRoute = TemplatesIdEditRouteImport.update({
+  id: '/$id/edit',
+  path: '/$id/edit',
+  getParentRoute: () => TemplatesRoute,
+} as any)
 const ApiPublicHooksPublishDueRoute =
   ApiPublicHooksPublishDueRouteImport.update({
     id: '/api/public/hooks/publish-due',
@@ -256,10 +274,12 @@ export interface FileRoutesByFullPath {
   '/metricas': typeof MetricasRoute
   '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/templates': typeof TemplatesRouteWithChildren
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/templates/new': typeof TemplatesNewRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
@@ -272,6 +292,7 @@ export interface FileRoutesByFullPath {
   '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/integracoes/youtube/callback': typeof IntegracoesYoutubeCallbackRoute
+  '/templates/$id/edit': typeof TemplatesIdEditRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/hooks/sync-social': typeof ApiPublicHooksSyncSocialRoute
   '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
@@ -294,10 +315,12 @@ export interface FileRoutesByTo {
   '/metricas': typeof MetricasRoute
   '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/templates': typeof TemplatesRouteWithChildren
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/templates/new': typeof TemplatesNewRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
@@ -310,6 +333,7 @@ export interface FileRoutesByTo {
   '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/integracoes/youtube/callback': typeof IntegracoesYoutubeCallbackRoute
+  '/templates/$id/edit': typeof TemplatesIdEditRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/hooks/sync-social': typeof ApiPublicHooksSyncSocialRoute
   '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
@@ -333,10 +357,12 @@ export interface FileRoutesById {
   '/metricas': typeof MetricasRoute
   '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/templates': typeof TemplatesRouteWithChildren
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/templates/new': typeof TemplatesNewRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
@@ -349,6 +375,7 @@ export interface FileRoutesById {
   '/integracoes_/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes_/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
   '/integracoes_/youtube/callback': typeof IntegracoesYoutubeCallbackRoute
+  '/templates/$id/edit': typeof TemplatesIdEditRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/hooks/sync-social': typeof ApiPublicHooksSyncSocialRoute
   '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
@@ -373,10 +400,12 @@ export interface FileRouteTypes {
     | '/metricas'
     | '/perfis'
     | '/privacidade'
+    | '/templates'
     | '/termos'
     | '/vendas'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/templates/new'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/cleaner-callback'
@@ -389,6 +418,7 @@ export interface FileRouteTypes {
     | '/integracoes/instagram/callback'
     | '/integracoes/tiktok/callback'
     | '/integracoes/youtube/callback'
+    | '/templates/$id/edit'
     | '/api/public/hooks/publish-due'
     | '/api/public/hooks/sync-social'
     | '/api/public/meta/data-deletion'
@@ -411,10 +441,12 @@ export interface FileRouteTypes {
     | '/metricas'
     | '/perfis'
     | '/privacidade'
+    | '/templates'
     | '/termos'
     | '/vendas'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/templates/new'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/cleaner-callback'
@@ -427,6 +459,7 @@ export interface FileRouteTypes {
     | '/integracoes/instagram/callback'
     | '/integracoes/tiktok/callback'
     | '/integracoes/youtube/callback'
+    | '/templates/$id/edit'
     | '/api/public/hooks/publish-due'
     | '/api/public/hooks/sync-social'
     | '/api/public/meta/data-deletion'
@@ -449,10 +482,12 @@ export interface FileRouteTypes {
     | '/metricas'
     | '/perfis'
     | '/privacidade'
+    | '/templates'
     | '/termos'
     | '/vendas'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/templates/new'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/cleaner-callback'
@@ -465,6 +500,7 @@ export interface FileRouteTypes {
     | '/integracoes_/instagram/callback'
     | '/integracoes_/tiktok/callback'
     | '/integracoes_/youtube/callback'
+    | '/templates/$id/edit'
     | '/api/public/hooks/publish-due'
     | '/api/public/hooks/sync-social'
     | '/api/public/meta/data-deletion'
@@ -488,6 +524,7 @@ export interface RootRouteChildren {
   MetricasRoute: typeof MetricasRoute
   PerfisRoute: typeof PerfisRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
+  TemplatesRoute: typeof TemplatesRouteWithChildren
   TermosRoute: typeof TermosRoute
   VendasRoute: typeof VendasRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
@@ -624,6 +661,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrivacidadeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/templates': {
+      id: '/templates'
+      path: '/templates'
+      fullPath: '/templates'
+      preLoaderRoute: typeof TemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/termos': {
       id: '/termos'
       path: '/termos'
@@ -651,6 +695,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/.well-known/oauth-protected-resource'
       preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/templates/new': {
+      id: '/templates/new'
+      path: '/new'
+      fullPath: '/templates/new'
+      preLoaderRoute: typeof TemplatesNewRouteImport
+      parentRoute: typeof TemplatesRoute
     }
     '/.lovable/oauth/consent': {
       id: '/.lovable/oauth/consent'
@@ -736,6 +787,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IntegracoesYoutubeCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/templates/$id/edit': {
+      id: '/templates/$id/edit'
+      path: '/$id/edit'
+      fullPath: '/templates/$id/edit'
+      preLoaderRoute: typeof TemplatesIdEditRouteImport
+      parentRoute: typeof TemplatesRoute
+    }
     '/api/public/hooks/publish-due': {
       id: '/api/public/hooks/publish-due'
       path: '/api/public/hooks/publish-due'
@@ -767,6 +825,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface TemplatesRouteChildren {
+  TemplatesNewRoute: typeof TemplatesNewRoute
+  TemplatesIdEditRoute: typeof TemplatesIdEditRoute
+}
+
+const TemplatesRouteChildren: TemplatesRouteChildren = {
+  TemplatesNewRoute: TemplatesNewRoute,
+  TemplatesIdEditRoute: TemplatesIdEditRoute,
+}
+
+const TemplatesRouteWithChildren = TemplatesRoute._addFileChildren(
+  TemplatesRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -784,6 +856,7 @@ const rootRouteChildren: RootRouteChildren = {
   MetricasRoute: MetricasRoute,
   PerfisRoute: PerfisRoute,
   PrivacidadeRoute: PrivacidadeRoute,
+  TemplatesRoute: TemplatesRouteWithChildren,
   TermosRoute: TermosRoute,
   VendasRoute: VendasRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,

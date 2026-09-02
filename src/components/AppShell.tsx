@@ -131,6 +131,7 @@ const MODES: ModeDef[] = [
 
 /** rotas fixas fora do estúdio — quando ativas, as ferramentas não ficam destacadas */
 const ROUTE_PATHS = [
+  "/templates",
   "/live",
   "/biblioteca",
   "/agenda",
@@ -297,6 +298,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             close?.();
           }}
         />
+        {routeLink("/templates", "Templates de vídeo", Layers, expanded, close)}
         {routeLink("/biblioteca", "Resultados", History, expanded, close)}
         {routeLink("/armazenamento", "Armazenamento", HardDrive, expanded, close)}
         <NavItem
