@@ -1,6 +1,6 @@
 import { useRef } from "react";
-import { Link as LinkIcon, Upload } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { FolderOpen, Link as LinkIcon, Upload } from "lucide-react";
+import { Button, Input, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/base";
 import { VIDEO_ACCEPT } from "@/lib/media";
 import { FLOWS, type Mode } from "@/lib/flows";
 
