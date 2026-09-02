@@ -32,6 +32,7 @@ export function ImportPanel({
   const folderRef = useRef<HTMLInputElement>(null);
   const dragDepth = useRef(0);
   const [dragging, setDragging] = useState(false);
+  const [dropped, setDropped] = useState(false);
   const flow = FLOWS[mode].import;
 
   return (
@@ -50,12 +51,14 @@ export function ImportPanel({
         e.preventDefault();
         dragDepth.current = 0;
         setDragging(false);
+        setDropped(true);
+        window.setTimeout(() => setDropped(false), 700);
         onFiles(e.dataTransfer.files);
       }}
       aria-label="Importar vídeos"
-      className={`panel rise-in relative overflow-hidden border-dashed p-0 transition-[border-color,background-color,box-shadow] duration-[var(--dur-base)] hover:border-[var(--border-hover)] ${
-        dragging ? "drop-active" : ""
-      }`}
+      className={`panel aurora rise-in relative overflow-hidden border-dashed p-0 transition-[border-color,background-color,box-shadow] duration-[var(--dur-base)] hover:border-[var(--border-hover)] ${
+        dragging ? "aurora-on drop-active" : ""
+      } ${dropped ? "aurora-sweep" : ""}`}
     >
       {/* cabeçalho / dropzone */}
       <div className="px-6 py-10 text-center sm:px-10">
@@ -73,7 +76,7 @@ export function ImportPanel({
 
         <h2 className="mt-5 font-display text-2xl font-semibold tracking-tight">
           <span className="step-num mr-2 align-middle">{flow.step}</span>
-          {dragging ? "Solte os arquivos para importar" : flow.title}
+          {dragging ? "Solte para importar os vídeos" : flow.title}
         </h2>
         <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground">
           {flow.hint}
