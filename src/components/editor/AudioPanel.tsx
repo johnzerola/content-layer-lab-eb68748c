@@ -205,7 +205,7 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime }: Pr
           placeholder="Texto que a voz vai narrar…"
           className="w-full rounded-lg border border-border/60 bg-card/60 p-2 text-xs"
         />
-        <div className="mt-1.5 flex items-center gap-2">
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
           <select
             value={voice}
             onChange={(e) => setVoice(e.target.value)}
@@ -218,15 +218,42 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime }: Pr
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            onClick={() => void narrate()}
-            disabled={busy || !text.trim()}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+          <select
+            value={tone}
+            onChange={(e) => setTone(e.target.value)}
+            aria-label="Tom da narração"
+            className="rounded-md border border-border/60 bg-card/60 px-2 py-1 text-xs"
           >
-            <Sparkles className="h-3.5 w-3.5" /> {busy ? "Gerando…" : "Gerar voz"}
-          </button>
+            {NARRATION_TONES.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
         </div>
+        <Row label="Velocidade">
+          <input
+            type="range"
+            min={0.6}
+            max={1.6}
+            step={0.05}
+            value={speed}
+            onChange={(e) => setSpeed(Number(e.target.value))}
+            className="min-w-0 flex-1"
+          />
+          <span className="w-10 text-right font-mono text-[11px]">{speed.toFixed(2)}x</span>
+        </Row>
+        <button
+          type="button"
+          onClick={() => void narrate()}
+          disabled={busy || !text.trim()}
+          className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-2.5 py-2 text-xs font-medium text-primary-foreground disabled:opacity-50"
+        >
+          <Sparkles className="h-3.5 w-3.5" /> {busy ? "Gerando…" : "Gerar narração"}
+        </button>
+        <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+          A voz entra como clipe na trilha a partir do tempo atual ({currentTime.toFixed(1)}s).
+        </p>
         {error && <p className="mt-1.5 text-[11px] text-destructive">{error}</p>}
       </section>
 
