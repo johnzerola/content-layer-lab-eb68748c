@@ -9,7 +9,21 @@ export interface PreCrop {
   h: number;
 }
 
-export type TransitionKind = "none" | "fade" | "zoom" | "slide-up" | "slide-left" | "whip";
+export type TransitionKind =
+  | "none"
+  | "fade"
+  | "zoom"
+  | "zoom-out"
+  | "slide-up"
+  | "slide-down"
+  | "slide-left"
+  | "slide-right"
+  | "whip"
+  | "whip-vertical"
+  | "punch"
+  | "drift"
+  | "swing"
+  | "flash";
 
 export interface Transition {
   kind: TransitionKind;
@@ -294,12 +308,28 @@ export function applyTransition(kind: TransitionKind, k: number, outward = false
       return { alpha: e, scale: 1, dx: 0, dy: 0 };
     case "zoom":
       return { alpha: e, scale: 1 + (1 - e) * 0.18, dx: 0, dy: 0 };
+    case "zoom-out":
+      return { alpha: e, scale: 1 - (1 - e) * 0.16, dx: 0, dy: 0 };
     case "slide-up":
       return { alpha: e, scale: 1, dx: 0, dy: dir * (1 - e) * 0.25 };
+    case "slide-down":
+      return { alpha: e, scale: 1, dx: 0, dy: -dir * (1 - e) * 0.25 };
     case "slide-left":
       return { alpha: e, scale: 1, dx: dir * (1 - e) * 0.25, dy: 0 };
+    case "slide-right":
+      return { alpha: e, scale: 1, dx: -dir * (1 - e) * 0.25, dy: 0 };
     case "whip":
       return { alpha: e, scale: 1 + (1 - e) * 0.06, dx: dir * (1 - e) * 0.4, dy: 0 };
+    case "whip-vertical":
+      return { alpha: e, scale: 1 + (1 - e) * 0.06, dx: 0, dy: dir * (1 - e) * 0.4 };
+    case "punch":
+      return { alpha: e, scale: 1 + Math.sin(e * Math.PI) * 0.12, dx: 0, dy: 0 };
+    case "drift":
+      return { alpha: e, scale: 1 + (1 - e) * 0.04, dx: dir * (1 - e) * 0.08, dy: (1 - e) * 0.05 };
+    case "swing":
+      return { alpha: e, scale: 1, dx: dir * Math.sin((1 - e) * Math.PI * 1.5) * 0.12, dy: 0 };
+    case "flash":
+      return { alpha: Math.min(1, e * 1.6), scale: 1 + (1 - e) * 0.02, dx: 0, dy: 0 };
     default:
       return NO_TRANSITION;
   }
@@ -399,6 +429,14 @@ export const TRANSITIONS: { id: TransitionKind; label: string }[] = [
   { id: "slide-up", label: "Subir" },
   { id: "slide-left", label: "Deslizar" },
   { id: "whip", label: "Whip" },
+  { id: "zoom-out", label: "Zoom out" },
+  { id: "slide-down", label: "Descer" },
+  { id: "slide-right", label: "Deslizar →" },
+  { id: "whip-vertical", label: "Whip vertical" },
+  { id: "punch", label: "Punch" },
+  { id: "drift", label: "Drift" },
+  { id: "swing", label: "Swing" },
+  { id: "flash", label: "Flash" },
 ];
 
 export const CROP_PRESETS: { id: string; label: string; ratio: number | null }[] = [

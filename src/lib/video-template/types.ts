@@ -54,6 +54,10 @@ export interface AnimationSpec {
   duration: number;
   delay: number;
   easing: Easing;
+  /** multiplicador de velocidade (1 = normal) */
+  speed?: number;
+  /** sentido da animação */
+  direction?: "normal" | "reverse" | "alternate";
 }
 
 /** Filtro real: valores numéricos, nunca só o nome do preset. */
