@@ -1095,6 +1095,7 @@ function Home() {
   const selected = items.find((i) => i.id === selectedId) ?? null;
   const studioItem = studioId ? (items.find((i) => i.id === studioId) ?? null) : null;
   const quickItem = quickId ? (items.find((i) => i.id === quickId) ?? null) : null;
+  const capEditorItem = capEditor ? (items.find((i) => i.id === capEditor) ?? null) : null;
 
 
   const antiDup = active.antiDup ?? defaultAntiDup();
