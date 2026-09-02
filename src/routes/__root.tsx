@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { ActivityDock } from "../components/ActivityDock";
 import { Toaster } from "../components/ui/sonner";
+import { TooltipProvider } from "../components/ui/tooltip";
 import { BatchProgressDock } from "../components/BatchProgressDock";
 import { CommandPalette } from "../components/CommandPalette";
 
@@ -129,13 +130,14 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
-      <CommandPalette />
-      <ActivityDock />
-      <BatchProgressDock />
-      <Toaster />
-
+      <TooltipProvider delayDuration={200}>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+        <CommandPalette />
+        <ActivityDock />
+        <BatchProgressDock />
+        <Toaster />
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }
