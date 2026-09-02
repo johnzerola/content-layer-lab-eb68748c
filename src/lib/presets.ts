@@ -1,4 +1,12 @@
-import { createTemplate, defaultCaptions, type Template } from "./template";
+import {
+  createTemplate,
+  defaultCaptions,
+  type ExtraLayer,
+  type Template,
+  type TextLayer,
+} from "./template";
+
+export type PresetCategory = "Fofoca" | "Notícia" | "Podcast" | "Viral" | "UGC" | "Minimal";
 
 export interface StarterPreset {
   id: string;
@@ -6,6 +14,7 @@ export interface StarterPreset {
   tag: string;
   description: string;
   accent: string;
+  category?: PresetCategory;
   build: () => Template;
 }
 
@@ -15,6 +24,68 @@ const base = (name: string, patch: (t: Template) => void): Template => {
   t.updatedAt = Date.now();
   return t;
 };
+
+/* ------------------------------------------------------------------ */
+/* Formas simples (SVG embutido) usadas como camadas de imagem          */
+/* ------------------------------------------------------------------ */
+
+const svgUrl = (inner: string) =>
+  `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none">${inner}</svg>`,
+  )}`;
+
+const rectSvg = (fill: string, radius = 0) =>
+  svgUrl(`<rect x="0" y="0" width="100" height="100" rx="${radius}" ry="${radius}" fill="${fill}"/>`);
+
+const splitSvg = (left: string, right: string) =>
+  svgUrl(
+    `<rect x="0" y="0" width="50" height="100" fill="${left}"/><rect x="50" y="0" width="50" height="100" fill="${right}"/>`,
+  );
+
+const gradSvg = (from: string, to: string) =>
+  svgUrl(
+    `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs><rect width="100" height="100" fill="url(#g)"/>`,
+  );
+
+/** Camada de forma (retângulo/pílula/gradiente) desenhada como imagem. */
+const shape = (
+  label: string,
+  src: string,
+  box: { x: number; y: number; w: number; h: number },
+  o: { z?: number; opacity?: number } = {},
+): ExtraLayer => ({
+  id: crypto.randomUUID(),
+  label,
+  x: box.x,
+  y: box.y,
+  w: box.w,
+  h: box.h,
+  visible: true,
+  rotation: 0,
+  z: o.z ?? 5,
+  src,
+  opacity: o.opacity ?? 1,
+  round: false,
+});
+
+/** Camada livre de texto. */
+const label = (labelName: string, o: Partial<TextLayer> & { text: string }): ExtraLayer => ({
+  id: crypto.randomUUID(),
+  label: labelName,
+  x: 90,
+  y: 200,
+  w: 900,
+  h: 90,
+  visible: true,
+  rotation: 0,
+  z: 110,
+  color: "#ffffff",
+  size: 46,
+  weight: "800",
+  align: "center",
+  font: "Inter, sans-serif",
+  ...o,
+});
 
 export const STARTER_PRESETS: StarterPreset[] = [
   {
