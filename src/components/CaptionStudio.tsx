@@ -13,7 +13,7 @@ interface Props {
   onChange: (patch: Partial<CaptionStyle>) => void;
   cues?: CaptionCue[] | undefined;
   fonts?: CustomFont[] | undefined;
-  onAddFont?: (f: CustomFont) => void;
+  onAddFont?: ((f: CustomFont) => void) | undefined;
   /** esconde a mini-prévia (usada quando já existe prévia grande ao lado) */
   hidePreview?: boolean;
 }
