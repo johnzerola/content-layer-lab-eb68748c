@@ -51,7 +51,7 @@ export function EmptyState({
           {steps.map((s, i) => (
             <li
               key={s.title}
-              className="interactive stack-in rounded-xl border border-border bg-surface-2/60 p-4 text-left"
+              className="interactive rise-in rounded-xl border border-border bg-surface-2/60 p-4 text-left"
               style={{ animationDelay: `${i * 60}ms` }}
             >
               <div className="flex items-center gap-2">
