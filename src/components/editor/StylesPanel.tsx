@@ -7,7 +7,7 @@ import { useState } from "react";
 import { CaptionStylePanel } from "@/components/editor/CaptionStylePanel";
 import { CAPTION_PRESETS, type CaptionPreset } from "@/lib/editor/caption-styles";
 import { STYLE_TEMPLATES, type StyleTemplate } from "@/lib/editor/style-templates";
-import type { TransitionKind } from "@/lib/preedit";
+import { TRANSITIONS, type TransitionKind } from "@/lib/preedit";
 import type { CaptionLayerStyle } from "@/lib/video-template/types";
 
 export interface StylePalette {
@@ -38,6 +38,24 @@ export const STYLE_FONTS: { id: string; label: string; family: string; weight: n
   { id: "arial", label: "Clássica", family: "Arial Black, sans-serif", weight: 900 },
 ];
 
+/** Animação em loop de cada transição na miniatura (keyframes em styles.css). */
+const TRANSITION_PREVIEW: Record<string, string> = {
+  none: "",
+  fade: "tp-fade",
+  flash: "tp-flash",
+  zoom: "tp-zoom",
+  "zoom-out": "tp-zoomout",
+  punch: "tp-punch",
+  "slide-up": "tp-up",
+  "slide-down": "tp-down",
+  "slide-left": "tp-left",
+  "slide-right": "tp-right",
+  whip: "tp-whip",
+  "whip-vertical": "tp-whipv",
+  drift: "tp-drift",
+  swing: "tp-swing",
+};
+
 interface Props {
   presetId: string;
   style: CaptionLayerStyle;
@@ -48,7 +66,7 @@ interface Props {
 }
 
 export function StylesPanel({ presetId, style, onApplyPreset, onStyleChange, onApplyTransition }: Props) {
-  const [section, setSection] = useState<"templates" | "estilos" | "cores" | "tipografia">("templates");
+  const [section, setSection] = useState<"templates" | "estilos" | "cores" | "tipografia" | "efeitos">("templates");
   const [appliedId, setAppliedId] = useState<string | null>(null);
 
   /** Um clique configura cores, tipografia, animação da legenda e transição. */
