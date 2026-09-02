@@ -128,6 +128,11 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  // cada conta tem seu próprio workspace local (lote, templates, preferências)
+  useEffect(() => installSessionScope(), []);
+
+
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delayDuration={200}>
