@@ -29,6 +29,7 @@ import {
   CopyPlus,
 } from "lucide-react";
 import { QuickPreviewModal } from "@/components/QuickPreviewModal";
+import { CaptionWorkbench } from "@/components/CaptionWorkbench";
 import { PLATFORM_UI_OPTIONS, type PlatformUI } from "@/components/PlatformUIOverlay";
 import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
 
@@ -508,6 +509,7 @@ function Home() {
   const [capBusyId, setCapBusyId] = useState<string | null>(null);
   // transcreve automaticamente no lote quando a legenda está ativa
   const [autoCap, setAutoCap] = useState(true);
+  const [capEditor, setCapEditor] = useState<string | null>(null);
   const [detecting, setDetecting] = useState(false);
   const [detectMsg, setDetectMsg] = useState<string | undefined>(undefined);
   const [suggestions, setSuggestions] = useState<CleanupRegion[]>([]);
@@ -1093,6 +1095,7 @@ function Home() {
   const selected = items.find((i) => i.id === selectedId) ?? null;
   const studioItem = studioId ? (items.find((i) => i.id === studioId) ?? null) : null;
   const quickItem = quickId ? (items.find((i) => i.id === quickId) ?? null) : null;
+  const capEditorItem = capEditor ? (items.find((i) => i.id === capEditor) ?? null) : null;
 
 
   const antiDup = active.antiDup ?? defaultAntiDup();
@@ -2933,18 +2936,38 @@ function Home() {
                     )}
 
                     {!!selected.captions?.length && (
-                      <div className="mt-3 border-t border-border pt-3">
-                        <p className="mono-label mb-2">Timeline · ajuste palavra por palavra</p>
-                        <CaptionTimeline
-                          file={selected.file}
-                          cues={selected.captions}
-                          onChange={(cues) =>
-                            setItems((p) =>
-                              p.map((x) => (x.id === selected.id ? { ...x, captions: cues } : x)),
-                            )
-                          }
-                        />
+                      <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 p-2.5">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-mono text-[11px] text-primary">
+                            Editor de legendas · prévia grande, correção de texto e sincronia
+                          </p>
+                          <p className="font-mono text-[10px] text-muted-foreground">
+                            arraste a legenda na tela, corrija erros e alinhe com a fala.
+                          </p>
+                        </div>
+                        <Button size="sm" onClick={() => setCapEditor(selected.id)}>
+                          <Captions className="mr-1 size-4" /> Abrir editor
+                        </Button>
                       </div>
+                    )}
+
+                    {!!selected.captions?.length && (
+                      <details className="mt-3 border-t border-border pt-3">
+                        <summary className="mono-label cursor-pointer">
+                          Timeline avançada · ajuste palavra por palavra
+                        </summary>
+                        <div className="mt-2">
+                          <CaptionTimeline
+                            file={selected.file}
+                            cues={selected.captions}
+                            onChange={(cues) =>
+                              setItems((p) =>
+                                p.map((x) => (x.id === selected.id ? { ...x, captions: cues } : x)),
+                              )
+                            }
+                          />
+                        </div>
+                      </details>
                     )}
 
                     <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
@@ -3625,6 +3648,26 @@ function Home() {
               toast.success("Edição aplicada — vale no preview e na exportação");
             }
           }}
+        />
+      )}
+
+      {!!capEditorItem?.captions?.length && (
+        <CaptionWorkbench
+          file={capEditorItem.file}
+          cues={capEditorItem.captions}
+          style={active.captions ?? defaultCaptions()}
+          fonts={active.fonts}
+          onAddFont={(f) => setActive((t) => ({ ...t, fonts: [...(t.fonts ?? []), f] }))}
+          onCues={(cues) =>
+            setItems((p) => p.map((x) => (x.id === capEditorItem.id ? { ...x, captions: cues } : x)))
+          }
+          onStyle={(patch) =>
+            setActive((t) => ({
+              ...t,
+              captions: { ...(t.captions ?? defaultCaptions()), ...patch, visible: true },
+            }))
+          }
+          onClose={() => setCapEditor(null)}
         />
       )}
 
