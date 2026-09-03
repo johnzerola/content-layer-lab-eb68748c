@@ -599,6 +599,8 @@ def run_pipeline(
     auto_protect = bool(opts.get("protect_subject", True))
     key_step = int(opts.get("key_step", 4))
     verify_on = bool(opts.get("verify", True))
+    composite_on = bool(opts.get("composite", True))
+    preview_seconds = min(60.0, max(0.0, float(opts.get("preview_seconds") or 0)))
 
     job_path = safe_job_dir(SETTINGS.storage_dir, job_id)
     cancel_path = job_path / ".cancel"
@@ -606,7 +608,9 @@ def run_pipeline(
     job_dir = str(job_path)
     input_path = str(job_path / "input.mp4")
     tmp_path = str(job_path / "video_only.mp4")
-    output_path = str(job_path / "output.mp4")
+    is_preview = preview_seconds > 0
+    output_path = str(job_path / ("preview.mp4" if is_preview else "output.mp4"))
+    result_path = f"/v1/jobs/{job_id}/preview" if is_preview else f"/v1/jobs/{job_id}/result"
     callback_seq = int(read_state(job_path).get("callback_seq", 0))
 
     def emit(progress: float, stage: str, status: str = "processing", **extra) -> None:
