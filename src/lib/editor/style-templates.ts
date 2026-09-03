@@ -1,11 +1,13 @@
 /**
- * TEMPLATES DE ESTILO COMPLETO: cada item junta paleta de cores, tipografia,
- * preset de legenda, animação da legenda e transição do corte. Aplicar um
- * template configura tudo de uma vez no editor — só apresentação, nenhuma
- * regra de negócio nova.
+ * TEMPLATES DE ESTILO COMPLETO — derivados dos LAYOUTS REAIS do editor
+ * (`READY_TEMPLATES`). Cada item usa a paleta, a tipografia e a transição
+ * exatas do layout correspondente, então aplicar aqui e aplicar o layout
+ * produzem o mesmo visual. Só apresentação, nenhuma regra de negócio nova.
  */
 import type { CaptionAnimation } from "@/lib/editor/caption-styles";
 import type { TransitionKind } from "@/lib/preedit";
+import { READY_TEMPLATES } from "@/lib/editor/template-presets";
+import { DEFAULT_BRAND_KIT } from "@/lib/brand-kit";
 
 export interface StyleTemplate {
   id: string;
@@ -13,172 +15,76 @@ export interface StyleTemplate {
   hint: string;
   /** preset de legenda usado como base */
   presetId: string;
-  /** [texto, destaque, contorno] */
+  /** [texto, destaque, contorno/fundo] */
   colors: [string, string, string];
   fontFamily: string;
   fontWeight: number;
   uppercase: boolean;
   animation: CaptionAnimation;
   transition: TransitionKind;
-  /** classes de gradiente do card */
+  /** gradiente do card (CSS pronto — cores reais do layout) */
   gradient: string;
 }
 
-export const STYLE_TEMPLATES: StyleTemplate[] = [
-  {
-    id: "viral-hook",
-    label: "Viral Hook",
-    hint: "hook agressivo, corte seco",
-    presetId: "punch-yellow",
-    colors: ["#ffffff", "#ffd93d", "#000000"],
-    fontFamily: "Outfit, sans-serif",
-    fontWeight: 900,
-    uppercase: true,
-    animation: "bounce",
-    transition: "punch",
-    gradient: "from-amber-400/70 to-rose-500/40",
-  },
-  {
-    id: "tiktok-neon",
-    label: "TikTok Neon",
-    hint: "ciano e rosa, ritmo rápido",
-    presetId: "verde-impacto",
-    colors: ["#ffffff", "#25f4ee", "#fe2c55"],
-    fontFamily: "Figtree, sans-serif",
-    fontWeight: 800,
-    uppercase: true,
-    animation: "pop",
-    transition: "whip",
-    gradient: "from-cyan-400/70 to-pink-500/40",
-  },
-  {
-    id: "podcast-clean",
-    label: "Podcast Clean",
-    hint: "leitura confortável",
-    presetId: "podcast-bold",
-    colors: ["#ffffff", "#7c5cff", "#0b0b12"],
-    fontFamily: "Figtree, sans-serif",
-    fontWeight: 700,
-    uppercase: false,
-    animation: "fade",
-    transition: "fade",
-    gradient: "from-primary/60 to-indigo-500/30",
-  },
-  {
-    id: "news-urgente",
-    label: "Notícia Urgente",
-    hint: "manchete e caixa escura",
-    presetId: "subtitle-box",
-    colors: ["#ffffff", "#ff3b30", "#0a0a0a"],
-    fontFamily: "Arial Black, sans-serif",
-    fontWeight: 900,
-    uppercase: true,
-    animation: "slide",
-    transition: "slide-up",
-    gradient: "from-red-500/60 to-slate-700/40",
-  },
-  {
-    id: "cinema-serif",
-    label: "Cinema",
-    hint: "editorial, transição suave",
-    presetId: "minimal-white",
-    colors: ["#f6f1e7", "#e0b872", "#000000"],
-    fontFamily: "Instrument Serif, Georgia, serif",
-    fontWeight: 600,
-    uppercase: false,
-    animation: "fade",
-    transition: "drift",
-    gradient: "from-amber-200/50 to-stone-700/40",
-  },
-  {
-    id: "gaming-glow",
-    label: "Gaming Glow",
-    hint: "verde neon com brilho",
-    presetId: "verde-impacto",
-    colors: ["#eaffff", "#39ff14", "#04120a"],
-    fontFamily: "JetBrains Mono, monospace",
-    fontWeight: 700,
-    uppercase: true,
-    animation: "glow",
-    transition: "zoom",
-    gradient: "from-emerald-400/70 to-lime-500/30",
-  },
-  {
-    id: "business-pro",
-    label: "Business Pro",
-    hint: "sóbrio para institucional",
-    presetId: "subtitle-box",
-    colors: ["#ffffff", "#4cc9f0", "#06121b"],
-    fontFamily: "Figtree, sans-serif",
-    fontWeight: 600,
-    uppercase: false,
-    animation: "fade",
-    transition: "slide-left",
-    gradient: "from-sky-400/60 to-slate-800/40",
-  },
-  {
-    id: "retro-pop",
-    label: "Retrô Pop",
-    hint: "anos 90, cores quentes",
-    presetId: "clean-bold",
-    colors: ["#fdf0d5", "#ef476f", "#20123a"],
-    fontFamily: "Impact, sans-serif",
-    fontWeight: 900,
-    uppercase: true,
-    animation: "shake",
-    transition: "swing",
-    gradient: "from-rose-400/70 to-purple-600/40",
-  },
-  {
-    id: "minimal-mono",
-    label: "Minimal Mono",
-    hint: "preto e branco discreto",
-    presetId: "minimal-white",
-    colors: ["#ffffff", "#c9c9c9", "#000000"],
-    fontFamily: "Figtree, sans-serif",
-    fontWeight: 600,
-    uppercase: false,
-    animation: "fade",
-    transition: "fade",
-    gradient: "from-zinc-300/50 to-zinc-800/40",
-  },
-  {
-    id: "hype-trap",
-    label: "Hype Trap",
-    hint: "beat forte, karaokê",
-    presetId: "rainbow-flow",
-    colors: ["#ffffff", "#ff5da2", "#0a0410"],
-    fontFamily: "Outfit, sans-serif",
-    fontWeight: 900,
-    uppercase: true,
-    animation: "scale",
-    transition: "zoom-out",
-    gradient: "from-fuchsia-500/70 to-violet-700/40",
-  },
-  {
-    id: "story-emocional",
-    label: "Emocional",
-    hint: "depoimentos e histórias",
-    presetId: "clean-bold",
-    colors: ["#fff7f2", "#ffb4a2", "#160b09"],
-    fontFamily: "Instrument Serif, Georgia, serif",
-    fontWeight: 600,
-    uppercase: false,
-    animation: "typewriter",
-    transition: "fade",
-    gradient: "from-orange-300/60 to-rose-500/30",
-  },
-  {
-    id: "ice-tech",
-    label: "Ice Tech",
-    hint: "tecnologia e tutoriais",
-    presetId: "clean-bold",
-    colors: ["#f4faff", "#4cc9f0", "#081018"],
-    fontFamily: "JetBrains Mono, monospace",
-    fontWeight: 700,
-    uppercase: true,
-    animation: "slide",
-    transition: "slide-right",
-    gradient: "from-cyan-300/60 to-blue-700/40",
-  },
+const VALID_TRANSITIONS: TransitionKind[] = [
+  "none",
+  "fade",
+  "zoom",
+  "zoom-out",
+  "slide-up",
+  "slide-down",
+  "slide-left",
+  "slide-right",
+  "whip",
+  "whip-vertical",
+  "punch",
+  "drift",
+  "swing",
+  "flash",
 ];
+
+function toTransition(kind: string | undefined): TransitionKind {
+  const found = VALID_TRANSITIONS.find((k) => k === kind);
+  if (found) return found;
+  if (kind?.startsWith("whip")) return "whip";
+  return "fade";
+}
+
+/** legenda e animação que combinam com cada layout real */
+const CAPTION_OF: Record<string, { presetId: string; animation: CaptionAnimation; uppercase: boolean; weight: number }> = {
+  "hook-topo": { presetId: "punch-yellow", animation: "bounce", uppercase: true, weight: 900 },
+  "fato-fake": { presetId: "verde-impacto", animation: "pop", uppercase: true, weight: 900 },
+  "handle-cta": { presetId: "clean-bold", animation: "pop", uppercase: true, weight: 800 },
+  "lower-third": { presetId: "minimal-white", animation: "fade", uppercase: false, weight: 700 },
+  "barra-progresso": { presetId: "clean-bold", animation: "fade", uppercase: false, weight: 700 },
+  "titulo-caixa": { presetId: "subtitle-box", animation: "slide", uppercase: true, weight: 900 },
+  "marca-canto": { presetId: "minimal-white", animation: "fade", uppercase: false, weight: 600 },
+  "legenda-hook-3": { presetId: "clean-bold", animation: "slide", uppercase: true, weight: 800 },
+  "quote-editorial": { presetId: "minimal-white", animation: "fade", uppercase: false, weight: 700 },
+  contagem: { presetId: "punch-yellow", animation: "bounce", uppercase: true, weight: 900 },
+  "cta-inscreva": { presetId: "punch-yellow", animation: "pop", uppercase: true, weight: 900 },
+  "faixa-lateral": { presetId: "verde-impacto", animation: "slide", uppercase: true, weight: 900 },
+};
+
+export const STYLE_TEMPLATES: StyleTemplate[] = READY_TEMPLATES.map((t) => {
+  const palette = { ...DEFAULT_BRAND_KIT, ...(t.palette ?? {}) };
+  const caption = CAPTION_OF[t.id] ?? {
+    presetId: "clean-bold",
+    animation: "pop" as CaptionAnimation,
+    uppercase: true,
+    weight: 800,
+  };
+  return {
+    id: t.id,
+    label: t.label,
+    hint: t.hint,
+    presetId: caption.presetId,
+    colors: [palette.text, palette.primary, palette.background] as [string, string, string],
+    fontFamily: palette.headingFont,
+    fontWeight: caption.weight,
+    uppercase: caption.uppercase,
+    animation: caption.animation,
+    transition: toTransition(t.transition?.kind),
+    gradient: `linear-gradient(135deg, ${palette.primary} 0%, ${palette.background} 78%)`,
+  } satisfies StyleTemplate;
+});
