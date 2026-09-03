@@ -55,7 +55,8 @@ async function registerFonts(fonts?: { name: string; dataUrl: string }[]) {
   for (const f of fonts ?? []) {
     if (registeredFonts.has(f.name)) continue;
     try {
-      const face = new FontFace(f.name, `url(${f.dataUrl})`);
+      // faixa ampla de peso: o canvas pede "800 60px Familia" e precisa casar
+      const face = new FontFace(f.name, `url(${f.dataUrl})`, { weight: "100 900" });
       await face.load();
       store.add(face);
       registeredFonts.add(f.name);
