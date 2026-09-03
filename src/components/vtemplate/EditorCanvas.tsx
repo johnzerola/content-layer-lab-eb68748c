@@ -2,7 +2,8 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { animationCss } from "@/lib/video-template/animations";
 import { filterToCss } from "@/lib/video-template/factory";
-import type { TemplateDoc, TemplateLayer } from "@/lib/video-template/types";
+import type { StickerLayer, TemplateDoc, TemplateLayer } from "@/lib/video-template/types";
+import { drawSticker, type StickerId } from "@/lib/editor/stickers";
 
 type Handle = "move" | "nw" | "ne" | "sw" | "se" | "rotate";
 
@@ -21,6 +22,40 @@ function bgStyle(doc: TemplateDoc): React.CSSProperties {
       return { background: "#000" };
   }
 }
+
+/** Prévia do sticker: usa a mesma função de desenho da exportação. */
+const StickerPreview = memo(function StickerPreview({ layer }: { layer: StickerLayer }) {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    let raf = 0;
+    const t0 = performance.now();
+    const loop = () => {
+      const box = canvas.getBoundingClientRect();
+      const w = Math.max(2, Math.round(box.width));
+      const h = Math.max(2, Math.round(box.height));
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      ctx.clearRect(0, 0, w, h);
+      drawSticker(ctx, layer.stickerId as StickerId, 0, 0, w, h, {
+        t: (performance.now() - t0) / 1000,
+        color: layer.color,
+        accent: layer.accent,
+        text: layer.text,
+        fontFamily: layer.fontFamily,
+        speed: layer.speed || 1,
+      });
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [layer]);
+  return <canvas ref={ref} className="h-full w-full" />;
+});
 
 const LayerView = memo(function LayerView({
   layer,
@@ -128,6 +163,10 @@ const LayerView = memo(function LayerView({
         }}
       />
     );
+  }
+
+  if (layer.type === "sticker") {
+    return <StickerPreview layer={layer} />;
   }
 
   // caption

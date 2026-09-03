@@ -9,6 +9,7 @@ const TYPE_LABEL: Record<TemplateLayer["type"], string> = {
   video: "Vídeo",
   shape: "Forma",
   caption: "Legenda",
+  sticker: "Sticker",
 };
 
 export function LayerPanel({
