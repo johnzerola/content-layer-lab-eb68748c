@@ -203,7 +203,7 @@ class RenderCreateRequest(BaseModel):
 
 @app.get("/v1/health")
 async def health():
-    propainter = propainter_status()
+    propainter = propainter_status(require_cuda=os.getenv("PROPAINTER_ALLOW_CPU", "0") != "1")
     diffueraser = diffueraser_status()
     disk = shutil.disk_usage(SETTINGS.storage_dir)
     return {
