@@ -4,11 +4,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
   CalendarClock,
   Facebook,
   Instagram,
   Loader2,
   Plus,
+  RefreshCw,
   Trash2,
   UploadCloud,
   X,
@@ -45,6 +47,13 @@ import {
 
 import { beginInstagramOAuth } from "@/lib/meta-oauth.functions";
 import { publishPostNow } from "@/lib/publish.functions";
+import { getSocialProfiles } from "@/lib/profiles.functions";
+import {
+  connectionHealth,
+  connectionValidAt,
+  friendlyPublishError,
+  type ConnectionHealth,
+} from "@/lib/social-health";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 
 export const Route = createFileRoute("/agenda")({
