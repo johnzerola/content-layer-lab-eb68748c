@@ -214,7 +214,12 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime }: Pr
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (!f) return;
-            addClip(createAudioClip({ kind: "music", name: f.name, url: URL.createObjectURL(f) }));
+            setError(null);
+            toPersistentUrl(f)
+              .then((url) => addClip(createAudioClip({ kind: "music", name: f.name, url })))
+              .catch((err: unknown) =>
+                setError(err instanceof Error ? err.message : "Falha ao carregar o áudio."),
+              );
             e.target.value = "";
           }}
         />
