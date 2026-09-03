@@ -316,7 +316,7 @@ export function drawTemplateFrame(
   ctx: CanvasRenderingContext2D,
   doc: TemplateDoc,
   t: number,
-  video: HTMLVideoElement | null,
+  video: FrameSource | HTMLVideoElement | null,
   images: Map<string, HTMLImageElement>,
   cues: CaptionCueLike[] = [],
   crop: SourceCrop | null = null,
