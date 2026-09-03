@@ -279,6 +279,14 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont, hidePre
             onChange={(v) => onChange({ maxLines: v })}
           />
           <Range
+            label="Sincronia (s)"
+            value={style.offset ?? 0}
+            min={-1}
+            max={1}
+            step={0.05}
+            onChange={(v) => onChange({ offset: v })}
+          />
+          <Range
             label="Altura da linha"
             value={style.lineHeight ?? 1.2}
             min={0.9}
