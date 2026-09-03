@@ -356,7 +356,8 @@ export function drawTemplateFrame(
       ctx.translate(-(x + w / 2), -(y + h / 2));
     }
 
-    if (layer.type === "video" && video && video.videoWidth) {
+    const src = frameSource(video);
+    if (layer.type === "video" && src) {
       ctx.save();
       ctx.beginPath();
       ctx.roundRect(x, y, w, h, layer.mask === "circle" ? Math.min(w, h) / 2 : layer.radius || 0);
