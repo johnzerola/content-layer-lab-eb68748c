@@ -1251,7 +1251,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 </div>
               ))}
             </div>
+            </>
           )}
+
           {masks.length > 0 && (
             <Button
               variant="ghost"
