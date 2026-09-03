@@ -626,6 +626,21 @@ function AgendaPage() {
                   </span>
                 </label>
 
+                {scheduleWarning && (
+                  <p
+                    role="status"
+                    className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs leading-relaxed text-amber-200"
+                  >
+                    <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                    <span>
+                      {scheduleWarning}{" "}
+                      <Link to="/integracoes" className="underline underline-offset-2">
+                        Reconectar agora
+                      </Link>
+                    </span>
+                  </p>
+                )}
+
                 <button
                   onClick={onSchedule}
                   disabled={sending}
