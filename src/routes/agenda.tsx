@@ -369,6 +369,71 @@ function AgendaPage() {
           </div>
         )}
 
+        {user && (connectionAlerts.length > 0 || failedPosts.length > 0) && (
+          <div className="mb-6 flex flex-col gap-3">
+            {connectionAlerts.length > 0 && (
+              <div
+                role="status"
+                className="flex flex-wrap items-start gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4"
+              >
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-400" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-amber-300">
+                    {connectionAlerts.length === 1
+                      ? "Uma conta precisa ser reconectada"
+                      : `${connectionAlerts.length} contas precisam ser reconectadas`}
+                  </p>
+                  <ul className="mt-1 flex flex-col gap-0.5 text-xs text-amber-200/80">
+                    {connectionAlerts.map(({ account, state }) => (
+                      <li key={account.id}>
+                        {socialAccountTitle(account)} — {state.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <Link
+                  to="/integracoes"
+                  className="interactive inline-flex min-h-11 items-center rounded-xl border border-amber-500/40 px-3 text-xs font-medium text-amber-200"
+                >
+                  Reconectar
+                </Link>
+              </div>
+            )}
+
+            {failedPosts.length > 0 && (
+              <div
+                role="status"
+                className="flex flex-wrap items-start gap-3 rounded-2xl border border-red-500/40 bg-red-500/10 p-4"
+              >
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-400" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-red-300">
+                    {failedPosts.length === 1
+                      ? "1 publicação falhou"
+                      : `${failedPosts.length} publicações falharam`}
+                  </p>
+                  <p className="mt-1 text-xs text-red-200/80">
+                    {friendlyPublishError(failedPosts[0]?.error_code, failedPosts[0]?.error)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void onRetryAllFailed()}
+                  disabled={retryingAll}
+                  className="interactive inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-red-500/40 px-3 text-xs font-medium text-red-200 disabled:opacity-60"
+                >
+                  {retryingAll ? (
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <RefreshCw className="size-3.5" aria-hidden="true" />
+                  )}
+                  Tentar todas de novo
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {user && (
           <div className="grid gap-6 lg:grid-cols-[1fr_1.15fr]">
             <div className="flex flex-col gap-6">
