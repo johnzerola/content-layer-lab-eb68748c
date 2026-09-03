@@ -78,6 +78,7 @@ export type ScheduledPost = {
   status: string;
   attempts: number;
   error: string | null;
+  error_code?: string | null;
   published_at: string | null;
   permalink: string | null;
 };
@@ -226,7 +227,7 @@ export async function listPosts(limit = 200): Promise<ScheduledPost[]> {
   const { data, error } = await supabase
     .from("scheduled_posts")
     .select(
-      "id,account_id,kind,caption,video_url,video_path,media_type,file_name,scheduled_at,status,attempts,error,published_at,permalink",
+      "id,account_id,kind,caption,video_url,video_path,media_type,file_name,scheduled_at,status,attempts,error,error_code,published_at,permalink",
     )
     .order("scheduled_at", { ascending: true })
     .limit(limit);
