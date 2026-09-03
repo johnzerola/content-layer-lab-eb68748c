@@ -246,7 +246,7 @@ const LAYOUT_STYLE: Record<string, { palette: Partial<BrandKit>; transition: { k
   },
   "fato-fake": {
     palette: { primary: "#e5253c", secondary: "#12a150", text: "#ffffff", background: "#0b0b12", headingFont: "Archivo Black", bodyFont: "Inter" },
-    transition: { kind: "whip-left", dur: 0.3 },
+    transition: { kind: "whip", dur: 0.3 },
   },
   "handle-cta": {
     palette: { primary: "#7c5cff", secondary: "#22d3ee", text: "#ffffff", background: "#0b0b16", headingFont: "Bebas Neue", bodyFont: "Figtree" },

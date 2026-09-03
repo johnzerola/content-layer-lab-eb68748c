@@ -235,9 +235,10 @@ export function StylesPanel({
                 }`}
               >
                 <span
-                  className={`flex h-16 items-center justify-center bg-gradient-to-br ${t.gradient}`}
-                  style={{ background: t.colors[2] }}
+                  className="flex h-16 items-center justify-center"
+                  style={{ backgroundImage: t.gradient, background: undefined }}
                 >
+
                   <span
                     className="px-1 text-center text-[13px] leading-tight"
                     style={{

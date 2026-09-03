@@ -43,9 +43,15 @@ import { MediaSourceBar } from "@/components/editor/MediaSourceBar";
 import { BulkScheduleModal } from "@/components/BulkScheduleModal";
 import { listAccounts, type SocialAccount } from "@/lib/social";
 import { renderTemplateProject, templateRenderSupported } from "@/lib/editor/render-template";
-import { exportScale, loadExportQuality } from "@/lib/editor/export-quality";
+import {
+  EXPORT_QUALITIES,
+  exportScale,
+  loadExportQuality,
+  saveExportQuality,
+  type ExportQuality,
+} from "@/lib/editor/export-quality";
 import { toast } from "sonner";
-import { getSourceFile } from "@/lib/editor/cuts";
+import { loadSourceFile } from "@/lib/editor/cuts";
 
 import { CutPanel, FramePanel, GradePanel, LayoutPanel, TitlesPanel } from "@/components/editor/ToolPanels";
 import { EditorCanvas } from "@/components/vtemplate/EditorCanvas";
@@ -174,6 +180,9 @@ function EditorPage() {
   const [renderPct, setRenderPct] = useState(0);
   const [transcribing, setTranscribing] = useState(false);
   const [transcribeProgress, setTranscribeProgress] = useState("");
+  const [quality, setQuality] = useState<ExportQuality>("1080");
+
+  useEffect(() => setQuality(loadExportQuality()), []);
 
 
   const history = useEditorHistory<EditorProjectDoc | null>(null);
@@ -231,13 +240,23 @@ function EditorPage() {
     return () => clearTimeout(t);
   }, [transcript, recordId]);
 
-  /** Reaproveita o arquivo local registrado por outra tela (ViralBatch, cortes). */
+  /**
+   * Reaproveita o arquivo local registrado por outra tela (ViralBatch, cortes)
+   * e, se a página foi recarregada, recupera o vídeo guardado no navegador.
+   */
   useEffect(() => {
-    const file = getSourceFile(videoId);
-    if (!file) return;
-    const objectUrl = URL.createObjectURL(file);
-    setLocalSrc(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
+    let objectUrl: string | null = null;
+    let alive = true;
+    void (async () => {
+      const file = await loadSourceFile(videoId);
+      if (!file || !alive) return;
+      objectUrl = URL.createObjectURL(file);
+      setLocalSrc(objectUrl);
+    })();
+    return () => {
+      alive = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [videoId]);
 
   useEffect(() => {
@@ -257,7 +276,7 @@ function EditorPage() {
         toast.error("Este navegador não suporta a renderização (WebCodecs).");
         return;
       }
-      const file = getSourceFile(videoId);
+      const file = await loadSourceFile(videoId);
       if (!file) {
         toast.error("Carregue o vídeo de origem na barra de mídia para renderizar.");
         return;
@@ -274,7 +293,7 @@ function EditorPage() {
           file,
           cut: seg ? { start: seg.start, end: seg.end } : null,
           preedit: doc.preedit ?? null,
-          scale: exportScale(loadExportQuality()),
+          scale: exportScale(quality),
           onProgress: setRenderPct,
         });
 
@@ -292,7 +311,7 @@ function EditorPage() {
         setRendering(false);
       }
     },
-    [doc, videoId],
+    [doc, quality, videoId],
   );
 
 
@@ -491,7 +510,7 @@ function EditorPage() {
   );
 
   const generateTranscript = useCallback(async () => {
-    const file = getSourceFile(videoId);
+    const file = await loadSourceFile(videoId);
     if (!file) {
       toast.error("Carregue o vídeo para gerar a transcrição.");
       return;
@@ -640,9 +659,9 @@ function EditorPage() {
     .join(" ");
 
   return (
-    <div className="flex h-dvh flex-col bg-background text-foreground">
+    <div className="flex min-h-dvh flex-col bg-background text-foreground lg:h-dvh">
       {/* HEADER */}
-      <header className="flex flex-wrap items-center gap-2 border-b border-border/60 px-3 py-2">
+      <header className="flex flex-wrap items-center gap-2 border-b border-border/60 px-2 py-2 sm:px-3">
         <Link to="/" className="font-semibold tracking-tight">
           VaiViral
         </Link>
@@ -671,7 +690,7 @@ function EditorPage() {
           }}
 
         />
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <select
             value={doc.composition.aspectRatio}
             onChange={(e) =>
@@ -687,6 +706,22 @@ function EditorPage() {
             <option value="16:9">16:9</option>
             <option value="1:1">1:1</option>
             <option value="4:5">4:5</option>
+          </select>
+          <select
+            value={quality}
+            onChange={(e) => {
+              const next = e.target.value as ExportQuality;
+              setQuality(next);
+              saveExportQuality(next);
+            }}
+            className="rounded-md border border-border/60 bg-card/60 px-2 py-1 text-xs"
+            aria-label="Qualidade da exportação"
+          >
+            {EXPORT_QUALITIES.map((q) => (
+              <option key={q.id} value={q.id}>
+                {q.label}
+              </option>
+            ))}
           </select>
           <button
             type="button"
@@ -726,10 +761,10 @@ function EditorPage() {
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[76px_320px_1fr_330px]">
         {/* BARRA DE FERRAMENTAS */}
-        <nav aria-label="Ferramentas do editor" className="hidden min-h-0 flex-col gap-3 overflow-y-auto border-r border-border/60 py-3 lg:flex">
+        <nav aria-label="Ferramentas do editor" className="order-2 flex min-h-0 shrink-0 flex-row gap-3 overflow-x-auto border-b border-border/60 px-2 py-2 lg:order-none lg:flex-col lg:overflow-x-visible lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-0 lg:py-3">
           {TOOL_GROUPS.map((group) => (
-            <div key={group.title} className="space-y-1">
-              <p className="px-1 text-center font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
+            <div key={group.title} className="flex shrink-0 flex-row items-center gap-1 lg:block lg:space-y-1">
+              <p className="hidden px-1 text-center font-mono text-[9px] uppercase tracking-wide text-muted-foreground lg:block">
                 {group.title}
               </p>
               {group.tools.map((t) => {
@@ -745,7 +780,7 @@ function EditorPage() {
                       if (t.id === "estilos") setLeftTab("estilos");
                     }}
                     aria-pressed={active}
-                    className={`mx-auto flex w-16 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] transition-colors ${
+                    className={`mx-auto flex w-16 shrink-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] transition-colors ${
                       active ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-card/70 hover:text-foreground"
                     }`}
                   >
@@ -759,7 +794,7 @@ function EditorPage() {
         </nav>
 
         {/* PAINEL ESQUERDO */}
-        <aside className="hidden min-h-0 flex-col border-r border-border/60 p-3 lg:flex">
+        <aside className="order-3 flex max-h-[60vh] min-h-0 flex-col overflow-hidden border-t border-border/60 p-3 lg:order-none lg:max-h-none lg:border-r lg:border-t-0">
           <div className="mb-3 flex rounded-lg border border-border/60 p-0.5 text-sm">
             {(["texto", "estilos"] as const).map((t) => (
               <button
@@ -817,7 +852,7 @@ function EditorPage() {
         </aside>
 
         {/* CANVAS */}
-        <main className="flex min-h-0 flex-col items-center justify-center gap-3 overflow-hidden bg-black/30 p-4">
+        <main className="order-1 flex min-h-[56vh] min-w-0 flex-col items-center justify-center gap-3 overflow-hidden bg-black/30 p-2 sm:p-4 lg:order-none lg:min-h-0">
           <div className="relative h-full max-h-full overflow-hidden rounded-xl bg-black" style={{ aspectRatio: "9 / 16" }}>
             {src ? (
               <video
@@ -867,7 +902,7 @@ function EditorPage() {
         </main>
 
         {/* PAINEL CONTEXTUAL */}
-        <aside className="hidden min-h-0 flex-col border-l border-border/60 p-3 lg:flex">
+        <aside className="order-4 flex max-h-[60vh] min-h-0 flex-col overflow-hidden border-t border-border/60 p-3 lg:order-none lg:max-h-none lg:border-l lg:border-t-0">
           <p className="mb-2 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
             {TOOL_GROUPS.flatMap((g) => g.tools).find((t) => t.id === tool)?.label}
           </p>
@@ -1161,7 +1196,7 @@ function EditorPage() {
       )}
 
       {/* TIMELINE */}
-      <div className="h-56 shrink-0">
+      <div className="order-5 h-44 shrink-0 lg:h-56">
 
         <TimelinePro
           duration={duration}
