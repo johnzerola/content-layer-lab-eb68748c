@@ -282,7 +282,7 @@ function EditorPage() {
         toast.error("Este navegador não suporta a renderização (WebCodecs).");
         return;
       }
-      const file = await loadSourceFile(videoId);
+      const file = await loadSourceFile(videoId, doc.media.storagePath ?? null);
       if (!file) {
         toast.error("Carregue o vídeo de origem na barra de mídia para renderizar.");
         return;
@@ -300,6 +300,8 @@ function EditorPage() {
           cut: seg ? { start: seg.start, end: seg.end } : null,
           preedit: doc.preedit ?? null,
           scale: exportScale(quality),
+          onQualityDrop: (h) =>
+            toast.info(`Este aparelho não aguentou a resolução escolhida — exportando em ${h}p.`),
           onProgress: setRenderPct,
         });
 
@@ -754,13 +756,13 @@ function EditorPage() {
             {rendering ? `Renderizando ${Math.round(renderPct * 100)}%` : "Renderizar"}
           </button>
           {rendered && (
-            <a
-              href={URL.createObjectURL(rendered)}
-              download={rendered.name}
+            <button
+              type="button"
+              onClick={() => void saveRenderedVideo(rendered)}
               className="rounded-lg border border-border/60 px-3 py-1.5 text-sm"
             >
               Baixar MP4
-            </a>
+            </button>
           )}
           <button
             type="button"
