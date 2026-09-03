@@ -662,7 +662,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               localUrl ?? (job?.status === "completed" ? (job.result_url ?? job.preview_url ?? src) : src)
             }
 
-            controls={job?.status === "completed"}
+            controls={!!localUrl || job?.status === "completed"}
             playsInline
             muted
             preload="auto"
