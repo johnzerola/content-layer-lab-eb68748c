@@ -148,7 +148,11 @@ export async function runLocalClean(opts: LocalCleanOptions): Promise<Blob> {
   first?.frame.close();
   probe.close();
 
-  const duration = Math.max(0.5, Math.min(sourceDuration || 5, opts.seconds ?? sourceDuration || 5));
+  const duration = Math.max(
+    0.5,
+    Math.min(sourceDuration || 5, opts.seconds ?? (sourceDuration || 5)),
+  );
+
   const fps = 30;
 
   const plate = await buildPlate(
