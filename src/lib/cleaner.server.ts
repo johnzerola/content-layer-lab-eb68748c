@@ -220,33 +220,77 @@ async function call<T>(path: string, init: RequestInit & { jobId?: string } = {}
   }
 }
 
+type HealthDiagnosis =
+  | "not_configured"
+  | "edge_blocked"
+  | "unauthorized"
+  | "unreachable"
+  | "bad_response";
+
+const DIAGNOSIS_ACTION: Record<HealthDiagnosis, string> = {
+  not_configured: "Defina CLEANER_WORKER_PUBLIC_URL com o domínio HTTPS do worker GPU.",
+  edge_blocked:
+    "A borda (Cloudflare) recusou o acesso — use um domínio HTTPS válido, nunca um IP direto.",
+  unauthorized: "Credenciais do worker inválidas — revise CLEANER_WORKER_SECRET.",
+  unreachable: "O worker não respondeu a tempo — verifique se a instância GPU está ligada.",
+  bad_response: "O endereço respondeu algo que não é a API do worker — confira a URL.",
+};
+
+function isIpHost(base: string): boolean {
+  try {
+    const host = new URL(base).hostname;
+    return /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.startsWith("[");
+  } catch {
+    return false;
+  }
+}
+
+function diagnose(body: string, status?: number): HealthDiagnosis {
+  if (/error code:\s*1003/i.test(body) || /direct ip access/i.test(body)) return "edge_blocked";
+  if (status === 401 || status === 403) return "unauthorized";
+  if (/^<!doctype html/i.test(body.trim()) || /<html[\s>]/i.test(body)) return "bad_response";
+  if (status && status >= 500) return "unreachable";
+  return "bad_response";
+}
+
+function offline(diagnosis: HealthDiagnosis, reason: string) {
+  return {
+    online: false as const,
+    diagnosis,
+    reason,
+    action: DIAGNOSIS_ACTION[diagnosis],
+  };
+}
+
 export async function workerHealth() {
   const base = workerBase();
-  if (!base) return { online: false as const, reason: "CLEANER_WORKER_URL nao configurada" };
+  if (!base) return offline("not_configured", "CLEANER_WORKER_URL nao configurada");
+  if (isIpHost(base)) {
+    return offline("edge_blocked", "endereço do worker aponta para um IP direto");
+  }
   try {
     const response = await fetch(`${base}/v1/health`, { signal: AbortSignal.timeout(12_000) });
 
     const responseBody = await response.text();
     if (!response.ok) {
-      return {
-        online: false as const,
-        reason: compactWorkerError(responseBody, response.status),
-      };
+      return offline(
+        diagnose(responseBody, response.status),
+        compactWorkerError(responseBody, response.status),
+      );
     }
     try {
       const parsed = JSON.parse(responseBody) as Record<string, unknown>;
       legacyTokenCache = parsed["version"] === "1.0.0";
       return { online: true as const, ...parsed };
     } catch {
-      return { online: false as const, reason: compactWorkerError(responseBody) };
+      return offline(diagnose(responseBody), compactWorkerError(responseBody));
     }
   } catch (error: unknown) {
-    return {
-      online: false as const,
-      reason: error instanceof Error ? error.message : "sem resposta",
-    };
+    const message = error instanceof Error ? error.message : "sem resposta";
+    return offline(/timeout|abort/i.test(message) ? "unreachable" : "unreachable", message);
   }
 }
+
 
 export async function workerResolveMedia(url: string) {
   const base = workerBase();
