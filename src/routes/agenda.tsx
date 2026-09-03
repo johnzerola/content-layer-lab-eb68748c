@@ -116,7 +116,11 @@ function AgendaPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [health, setHealth] = useState<Record<string, ConnectionHealth>>({});
+  const [tokenExpiry, setTokenExpiry] = useState<Record<string, string | null>>({});
+  const [retryingAll, setRetryingAll] = useState(false);
   const runPublishNow = useServerFn(publishPostNow);
+  const loadProfiles = useServerFn(getSocialProfiles);
 
   useEffect(() => {
     if (!file) {
