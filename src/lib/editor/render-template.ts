@@ -9,6 +9,7 @@ import { pickAudioCodec, pickBitrate, pickVideoCodec } from "@/lib/encode-preset
 import { renderAudioTrack } from "@/lib/audio-track";
 import { cleanMp4Metadata } from "@/lib/mp4meta";
 import { bgSleep } from "@/lib/keepalive";
+import { FrameReader, type DecodedFrame } from "@/lib/decode";
 import {
   composeTransitions,
   cropRect,
@@ -157,6 +158,19 @@ function layerAnim(layer: TemplateLayer, t: number): AnimState {
   return s;
 }
 
+
+/** Fonte de imagem do corte: elemento <video> ou quadro decodificado (WebCodecs). */
+export interface FrameSource {
+  el: CanvasImageSource;
+  width: number;
+  height: number;
+}
+
+function frameSource(v: FrameSource | HTMLVideoElement | null): FrameSource | null {
+  if (!v) return null;
+  if ("el" in v) return v.width && v.height ? v : null;
+  return v.videoWidth ? { el: v, width: v.videoWidth, height: v.videoHeight } : null;
+}
 
 function drawFit(
   ctx: CanvasRenderingContext2D,
@@ -316,7 +330,7 @@ export function drawTemplateFrame(
   ctx: CanvasRenderingContext2D,
   doc: TemplateDoc,
   t: number,
-  video: HTMLVideoElement | null,
+  video: FrameSource | HTMLVideoElement | null,
   images: Map<string, HTMLImageElement>,
   cues: CaptionCueLike[] = [],
   crop: SourceCrop | null = null,
@@ -356,7 +370,8 @@ export function drawTemplateFrame(
       ctx.translate(-(x + w / 2), -(y + h / 2));
     }
 
-    if (layer.type === "video" && video && video.videoWidth) {
+    const src = frameSource(video);
+    if (layer.type === "video" && src) {
       ctx.save();
       ctx.beginPath();
       ctx.roundRect(x, y, w, h, layer.mask === "circle" ? Math.min(w, h) / 2 : layer.radius || 0);
@@ -366,9 +381,9 @@ export function drawTemplateFrame(
           layer.fit === "contain" ? Math.min(w / crop.sw, h / crop.sh) : Math.max(w / crop.sw, h / crop.sh);
         const dw = layer.fit === "fill" ? w : crop.sw * scale;
         const dh = layer.fit === "fill" ? h : crop.sh * scale;
-        ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+        ctx.drawImage(src.el, crop.sx, crop.sy, crop.sw, crop.sh, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
       } else {
-        drawFit(ctx, video, video.videoWidth, video.videoHeight, x, y, w, h, layer.fit);
+        drawFit(ctx, src.el, src.width, src.height, x, y, w, h, layer.fit);
       }
       ctx.restore();
     } else if (layer.type === "image" && layer.src) {
@@ -522,16 +537,16 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
         setTimeout(finish, 3000);
       });
 
-    for (let i = 0; i < totalFrames; i++) {
+    const srcAt = (i: number) => (segs.length ? srcTimeAt(segs, i / fps) : start + i / fps);
+
+    /** Desenha e codifica um quadro de saída a partir da fonte já posicionada. */
+    const emit = async (i: number, tSrc: number, source: FrameSource) => {
       if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
       if (encoderError) throw encoderError;
       const tOut = i / fps;
-      // tempo no vídeo original respeitando os trechos mantidos
-      const tSrc = segs.length ? srcTimeAt(segs, tOut) : start + tOut;
-      await seekTo(tSrc);
 
       // recorte/zoom vindo dos keyframes de enquadramento
-      const rect = pre ? cropRect(pre, video.videoWidth, video.videoHeight, tSrc) : null;
+      const rect = pre ? cropRect(pre, source.width, source.height, tSrc) : null;
       const crop = rect ? { sx: rect.sx, sy: rect.sy, sw: rect.sw, sh: rect.sh } : null;
 
       // transições de abertura/saída + emendas entre trechos
@@ -551,7 +566,7 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
         ctx.translate(-W / 2, -H / 2);
       }
       const grade = pre ? preEditFilter(pre) : "none";
-      drawTemplateFrame(ctx, doc, tOut, video, images, cues, crop, grade, { width: W, height: H });
+      drawTemplateFrame(ctx, doc, tOut, source, images, cues, crop, grade, { width: W, height: H });
       ctx.restore();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
 
@@ -560,7 +575,49 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
       frame.close();
       while (encoder.encodeQueueSize > 6) await bgSleep(2);
       if (i % 3 === 0) opts.onProgress?.(Math.min(0.96, i / totalFrames));
+    };
+
+    let done = 0;
+
+    // Caminho turbo: decodifica o arquivo direto (WebCodecs), sem 1 seek por
+    // quadro — tipicamente 5–10x mais rápido que a busca precisa.
+    const reader = await FrameReader.open(file).catch(() => null);
+    if (reader) {
+      let cur: DecodedFrame | null = null;
+      try {
+        await reader.seek(Math.max(0, srcAt(0) - 0.05));
+        for (let i = 0; i < totalFrames; i++) {
+          const tSrc = srcAt(i);
+          // avança a decodificação até o quadro que cobre este instante
+          while (!cur || cur.time + cur.duration <= tSrc) {
+            const nxt = await reader.read();
+            if (!nxt) break;
+            cur?.frame.close();
+            cur = nxt;
+          }
+          if (!cur) break;
+          // salto para trás (emendas fora de ordem): volta ao caminho preciso
+          if (cur.time > tSrc + 0.5) break;
+          await emit(i, tSrc, { el: cur.frame, width: cur.frame.displayWidth, height: cur.frame.displayHeight });
+          done = i + 1;
+        }
+      } catch (err) {
+        if ((err as Error)?.name === "AbortError") throw err;
+        // qualquer falha na decodificação direta: segue pela busca precisa
+      } finally {
+        cur?.frame.close();
+        reader.close();
+      }
     }
+
+    // Busca precisa: fallback determinístico (formatos não suportados, emendas
+    // fora de ordem ou falha do decodificador).
+    for (let i = done; i < totalFrames; i++) {
+      const tSrc = srcAt(i);
+      await seekTo(tSrc);
+      await emit(i, tSrc, { el: video, width: video.videoWidth, height: video.videoHeight });
+    }
+
 
     await encoder.flush();
     encoder.close();
