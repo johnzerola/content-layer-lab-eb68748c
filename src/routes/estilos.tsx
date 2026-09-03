@@ -168,6 +168,17 @@ function EstilosPage() {
           )}
         </div>
 
+        {tab === "legenda" && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Template de legenda próprio: escreva os blocos, ajuste a duração de cada um e aplique junto com qualquer
+              layout. Não depende do painel de legendas do editor.
+            </p>
+            <CaptionTemplateStudio />
+          </div>
+        )}
+
+
           {tab === "templates" && (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
