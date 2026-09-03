@@ -15,6 +15,7 @@ import { READY_TEMPLATES } from "@/lib/editor/template-presets";
 import { DEFAULT_ANIM_IDENTITY, loadAnimIdentity, saveAnimIdentity, type AnimIdentity } from "@/lib/editor/animation-library";
 import { DEFAULT_BRAND_KIT, loadBrandKit, type BrandKit } from "@/lib/brand-kit";
 import { TransitionPicker } from "@/components/editor/TransitionPicker";
+import { CaptionTemplateStudio } from "@/components/editor/CaptionTemplateStudio";
 import { listMyTemplates, listPublicTemplates } from "@/lib/video-template/service";
 import type { VideoTemplateRecord } from "@/lib/video-template/types";
 import type { Transition } from "@/lib/preedit";
@@ -80,7 +81,9 @@ function fromTemplate(id: string): Omit<SavedStylePreset, "id" | "createdAt"> | 
 
 function EstilosPage() {
   const [mine, setMine] = useState<SavedStylePreset[]>([]);
-  const [tab, setTab] = useState<"layouts" | "templates" | "transicoes" | "prontos" | "meus" | "paletas" | "tipografia">("layouts");
+  const [tab, setTab] = useState<
+    "layouts" | "legenda" | "templates" | "transicoes" | "prontos" | "meus" | "paletas" | "tipografia"
+  >("layouts");
   const [videoTemplates, setVideoTemplates] = useState<VideoTemplateRecord[]>([]);
   const [trans, setTrans] = useState<Transition>({ kind: "fade", dur: 0.4 });
   const [identity, setIdentity] = useState<AnimIdentity>(DEFAULT_ANIM_IDENTITY);
@@ -135,7 +138,7 @@ function EstilosPage() {
         </header>
 
         <div className="flex flex-wrap items-center gap-2">
-          {(["layouts", "templates", "transicoes", "prontos", "meus", "paletas", "tipografia"] as const).map((t) => (
+          {(["layouts", "legenda", "templates", "transicoes", "prontos", "meus", "paletas", "tipografia"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -146,6 +149,8 @@ function EstilosPage() {
             >
               {t === "meus"
                 ? `Meus estilos (${mine.length})`
+                : t === "legenda"
+                ? "Template de legenda"
                 : t === "templates"
                   ? `Templates de vídeo (${videoTemplates.length})`
                   : t === "transicoes"
@@ -163,6 +168,17 @@ function EstilosPage() {
             />
           )}
         </div>
+
+        {tab === "legenda" && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Template de legenda próprio: escreva os blocos, ajuste a duração de cada um e aplique junto com qualquer
+              layout. Não depende do painel de legendas do editor.
+            </p>
+            <CaptionTemplateStudio />
+          </div>
+        )}
+
 
           {tab === "templates" && (
           <div className="space-y-3">

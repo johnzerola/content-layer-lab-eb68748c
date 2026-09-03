@@ -25,6 +25,10 @@ import { RenderReport } from "@/components/editor/RenderReport";
 import { READY_TEMPLATES } from "@/lib/editor/template-presets";
 import { loadAnimIdentity } from "@/lib/editor/animation-library";
 import {
+  buildCaptionTemplateLayers,
+  takePendingCaptionTemplate,
+} from "@/lib/editor/caption-template";
+import {
   takePendingLayout,
   takePendingStyle,
   takePendingTemplate,
@@ -447,6 +451,19 @@ function EditorPage() {
     );
     toast.success("Transição aplicada aos cortes.");
   }, [doc, patchPre]);
+
+  /** template de legenda autoral escolhido em /estilos (texto + duração) */
+  const pendingCaptionTplApplied = useRef(false);
+  useEffect(() => {
+    if (pendingCaptionTplApplied.current || !doc) return;
+    const tpl = takePendingCaptionTemplate();
+    if (!tpl) return;
+    pendingCaptionTplApplied.current = true;
+    const layers = buildCaptionTemplateLayers(tpl, doc.composition.layers);
+    if (!layers.length) return;
+    addLayers(layers as TemplateLayer[], `legenda-${tpl.id}`);
+    toast.success(`Template de legenda “${tpl.name}” aplicado.`);
+  }, [addLayers, doc]);
 
 
 
