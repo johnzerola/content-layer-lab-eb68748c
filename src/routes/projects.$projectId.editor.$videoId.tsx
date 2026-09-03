@@ -183,7 +183,7 @@ function EditorPage() {
   const [leftTab, setLeftTab] = useState<"texto" | "estilos">("texto");
   const [tool, setTool] = useState<ToolId>("corte");
   const [joinIndex, setJoinIndex] = useState<number | null>(null);
-  const [templateTab, setTemplateTab] = useState<"prontos" | "meus">("prontos");
+  const [templateTab, setTemplateTab] = useState<"prontos" | "meus" | "cortes">("prontos");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [playing, setPlaying] = useState(false);
