@@ -25,6 +25,10 @@ import { RenderReport } from "@/components/editor/RenderReport";
 import { READY_TEMPLATES } from "@/lib/editor/template-presets";
 import { loadAnimIdentity } from "@/lib/editor/animation-library";
 import {
+  buildCaptionTemplateLayers,
+  takePendingCaptionTemplate,
+} from "@/lib/editor/caption-template";
+import {
   takePendingLayout,
   takePendingStyle,
   takePendingTemplate,
