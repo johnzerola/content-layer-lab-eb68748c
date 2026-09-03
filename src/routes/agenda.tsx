@@ -4,11 +4,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
   CalendarClock,
   Facebook,
   Instagram,
   Loader2,
   Plus,
+  RefreshCw,
   Trash2,
   UploadCloud,
   X,
@@ -45,6 +47,13 @@ import {
 
 import { beginInstagramOAuth } from "@/lib/meta-oauth.functions";
 import { publishPostNow } from "@/lib/publish.functions";
+import { getSocialProfiles } from "@/lib/profiles.functions";
+import {
+  connectionHealth,
+  connectionValidAt,
+  friendlyPublishError,
+  type ConnectionHealth,
+} from "@/lib/social-health";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 
 export const Route = createFileRoute("/agenda")({
@@ -107,7 +116,11 @@ function AgendaPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [health, setHealth] = useState<Record<string, ConnectionHealth>>({});
+  const [tokenExpiry, setTokenExpiry] = useState<Record<string, string | null>>({});
+  const [retryingAll, setRetryingAll] = useState(false);
   const runPublishNow = useServerFn(publishPostNow);
+  const loadProfiles = useServerFn(getSocialProfiles);
 
   useEffect(() => {
     if (!file) {
@@ -160,6 +173,24 @@ function AgendaPage() {
     } finally {
       setLoading(false);
     }
+    try {
+      const profiles = await loadProfiles();
+      const nextHealth: Record<string, ConnectionHealth> = {};
+      const nextExpiry: Record<string, string | null> = {};
+      for (const prof of profiles) {
+        nextHealth[prof.id] = connectionHealth({
+          connectionStatus: prof.connectionStatus,
+          tokenExpiresAt: prof.tokenExpiresAt,
+          accountStatus: prof.status,
+        });
+        nextExpiry[prof.id] = prof.tokenExpiresAt;
+      }
+      setHealth(nextHealth);
+      setTokenExpiry(nextExpiry);
+    } catch {
+      /* saúde das conexões é informativa; a agenda continua utilizável */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId]);
 
   useEffect(() => {
@@ -197,6 +228,48 @@ function AgendaPage() {
     }
     return [...map.entries()];
   }, [visiblePosts]);
+
+  const failedPosts = useMemo(() => posts.filter((p) => p.status === "falhou"), [posts]);
+
+  const connectionAlerts = useMemo(
+    () =>
+      accounts
+        .map((a) => ({ account: a, state: health[a.id] }))
+        .filter(
+          (row): row is { account: SocialAccount; state: ConnectionHealth } =>
+            !!row.state && (row.state.level === "warn" || row.state.level === "expired"),
+        ),
+    [accounts, health],
+  );
+
+  const scheduleWarning = useMemo(() => {
+    if (!accountId) return null;
+    const state = health[accountId];
+    if (state && (state.level === "expired" || state.level === "missing")) return state.message;
+    const at = new Date(when);
+    if (!Number.isFinite(at.getTime())) return null;
+    if (!connectionValidAt(tokenExpiry[accountId], at)) {
+      return "A conexão desta conta expira antes do horário escolhido. Reconecte-a para o post publicar.";
+    }
+    if (state?.level === "warn") return state.message;
+    return null;
+  }, [accountId, health, tokenExpiry, when]);
+
+  async function onRetryAllFailed() {
+    if (!failedPosts.length) return;
+    setRetryingAll(true);
+    try {
+      await Promise.all(
+        failedPosts.map((p) => reschedulePost(p.id, new Date(Date.now() + 60 * 1000))),
+      );
+      toast.success(`${failedPosts.length} publicação(ões) reenviada(s) para a fila.`);
+      await refresh();
+    } catch {
+      toast.error("Não foi possível reenviar todas as publicações.");
+    } finally {
+      setRetryingAll(false);
+    }
+  }
 
   async function onAddAccount() {
     setLinkingAccount(true);
@@ -296,6 +369,71 @@ function AgendaPage() {
           </div>
         )}
 
+        {user && (connectionAlerts.length > 0 || failedPosts.length > 0) && (
+          <div className="mb-6 flex flex-col gap-3">
+            {connectionAlerts.length > 0 && (
+              <div
+                role="status"
+                className="flex flex-wrap items-start gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4"
+              >
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-400" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-amber-300">
+                    {connectionAlerts.length === 1
+                      ? "Uma conta precisa ser reconectada"
+                      : `${connectionAlerts.length} contas precisam ser reconectadas`}
+                  </p>
+                  <ul className="mt-1 flex flex-col gap-0.5 text-xs text-amber-200/80">
+                    {connectionAlerts.map(({ account, state }) => (
+                      <li key={account.id}>
+                        {socialAccountTitle(account)} — {state.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <Link
+                  to="/integracoes"
+                  className="interactive inline-flex min-h-11 items-center rounded-xl border border-amber-500/40 px-3 text-xs font-medium text-amber-200"
+                >
+                  Reconectar
+                </Link>
+              </div>
+            )}
+
+            {failedPosts.length > 0 && (
+              <div
+                role="status"
+                className="flex flex-wrap items-start gap-3 rounded-2xl border border-red-500/40 bg-red-500/10 p-4"
+              >
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-400" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-red-300">
+                    {failedPosts.length === 1
+                      ? "1 publicação falhou"
+                      : `${failedPosts.length} publicações falharam`}
+                  </p>
+                  <p className="mt-1 text-xs text-red-200/80">
+                    {friendlyPublishError(failedPosts[0]?.error_code, failedPosts[0]?.error)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void onRetryAllFailed()}
+                  disabled={retryingAll}
+                  className="interactive inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-red-500/40 px-3 text-xs font-medium text-red-200 disabled:opacity-60"
+                >
+                  {retryingAll ? (
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <RefreshCw className="size-3.5" aria-hidden="true" />
+                  )}
+                  Tentar todas de novo
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {user && (
           <div className="grid gap-6 lg:grid-cols-[1fr_1.15fr]">
             <div className="flex flex-col gap-6">
@@ -336,8 +474,23 @@ function AgendaPage() {
                         )}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">
-                          {socialAccountTitle(a)}
+                        <span className="flex items-center gap-2">
+                          <span className="min-w-0 truncate text-sm font-medium">
+                            {socialAccountTitle(a)}
+                          </span>
+                          {health[a.id]?.badge && (
+                            <Link
+                              to="/integracoes"
+                              title={health[a.id]?.message ?? undefined}
+                              className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+                                health[a.id]?.level === "warn"
+                                  ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
+                                  : "border-red-500/40 bg-red-500/10 text-red-300"
+                              }`}
+                            >
+                              {health[a.id]?.badge}
+                            </Link>
+                          )}
                         </span>
                         <span className="block truncate text-[11px] text-muted-foreground">
                           {socialAccountDetail(a)}
@@ -473,6 +626,21 @@ function AgendaPage() {
                   </span>
                 </label>
 
+                {scheduleWarning && (
+                  <p
+                    role="status"
+                    className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs leading-relaxed text-amber-200"
+                  >
+                    <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                    <span>
+                      {scheduleWarning}{" "}
+                      <Link to="/integracoes" className="underline underline-offset-2">
+                        Reconectar agora
+                      </Link>
+                    </span>
+                  </p>
+                )}
+
                 <button
                   onClick={onSchedule}
                   disabled={sending}
@@ -538,11 +706,16 @@ function AgendaPage() {
                                   {p.caption}
                                 </p>
                               )}
-                              {p.error && (
+                              {(p.error || p.error_code) && (
                                 <div className="mt-2 rounded-lg border border-red-500/20 bg-red-500/5 p-2">
-                                  <p className="text-[11px] leading-tight text-red-400">
-                                    ERRO: {p.error}
+                                  <p className="text-[11px] leading-tight text-red-300">
+                                    {friendlyPublishError(p.error_code, p.error)}
                                   </p>
+                                  {p.error && (
+                                    <p className="mt-1 text-[10px] leading-tight text-muted-foreground">
+                                      Detalhe técnico: {p.error}
+                                    </p>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -578,7 +751,7 @@ function AgendaPage() {
                                   try {
                                     await reschedulePost(
                                       p.id,
-                                      new Date(Date.now() + 5 * 60 * 1000),
+                                      new Date(Date.now() + 60 * 1000),
                                     );
                                     toast.success("Publicação reenviada para a fila.");
                                     await refresh();
@@ -586,10 +759,10 @@ function AgendaPage() {
                                     toast.error("Falha ao re-agendar.");
                                   }
                                 }}
-                                aria-label={`Re-agendar ${p.file_name ?? "vídeo"}`}
+                                aria-label={`Tentar de novo: ${p.file_name ?? "vídeo"}`}
                                 className="interactive inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs text-muted-foreground transition hover:text-foreground"
                               >
-                                Re-agendar
+                                <RefreshCw className="size-3.5" aria-hidden="true" /> Tentar de novo
                               </button>
                             )}
                             {p.status === "agendado" && (
