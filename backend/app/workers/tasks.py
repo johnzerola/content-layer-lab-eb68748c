@@ -425,6 +425,10 @@ def _run_official_pipeline(
         info.height,
         info.fps,
     )
+    if composite_on:
+        normalized_video = _composite_step(
+            input_path, normalized_video, mask_dir, info.fps, job_dir, emit
+        )
     emit(91, "validando resultado", "refining")
     if verify_on:
         segments, metrics = _audit_video(normalized_video, mask_dir, info.fps)
@@ -449,6 +453,7 @@ def _run_diffusion_pipeline(
     verify_on: bool,
     emit,
     cancel_file: Optional[str] = None,
+    composite_on: bool = True,
 ) -> tuple[List[Dict], dict, int]:
     mask_dir = os.path.join(job_dir, "masks")
     mask_video = os.path.join(job_dir, "masks.mp4")
