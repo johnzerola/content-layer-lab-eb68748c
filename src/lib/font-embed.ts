@@ -87,17 +87,19 @@ async function fetchFamily(family: string): Promise<CustomFont[]> {
       const res = await fetch(css);
       if (res.ok) {
         const text = await res.text();
-        // o primeiro src woff2 já cobre latin; pesos diferentes viram sintéticos
-        const seen = new Set<string>();
-        for (const m of text.matchAll(/src:\s*url\((https:\/\/[^)]+\.woff2)\)/g)) {
-          const url = m[1]!;
-          if (seen.has(url)) continue;
-          seen.add(url);
+        // um arquivo por peso, sempre o bloco latin — é o que o canvas mede
+        const byWeight = new Map<string, string>();
+        for (const block of text.split("@font-face")) {
+          const url = /src:\s*url\((https:\/\/[^)]+\.woff2)\)/.exec(block)?.[1];
+          if (!url) continue;
+          const isLatin = !/unicode-range/.test(block) || /U\+0000-00FF/i.test(block);
+          if (!isLatin) continue;
+          const weight = /font-weight:\s*([^;]+);/.exec(block)?.[1]?.trim() ?? "400";
+          if (!byWeight.has(weight)) byWeight.set(weight, url);
+        }
+        for (const [weight, url] of byWeight) {
           const dataUrl = await toDataUrl(url);
-          if (dataUrl) {
-            faces.push({ name: family, dataUrl });
-            break; // um arquivo por família mantém a mensagem leve
-          }
+          if (dataUrl) faces.push({ name: family, dataUrl, weight });
         }
       }
     } catch {

@@ -33,7 +33,7 @@ export interface RenderRequest {
   audio?: AudioPcm | null | undefined;
   envelope?: Envelope | null | undefined;
   images?: { src: string; bitmap: ImageBitmap }[] | undefined;
-  fonts?: { name: string; dataUrl: string }[] | undefined;
+  fonts?: { name: string; dataUrl: string; weight?: string }[] | undefined;
 }
 
 export type WorkerRequest = RenderRequest | { type: "cancel"; id: number };
@@ -49,17 +49,18 @@ export type WorkerResponse =
 const cancelled = new Set<number>();
 const registeredFonts = new Set<string>();
 
-async function registerFonts(fonts?: { name: string; dataUrl: string }[]) {
+async function registerFonts(fonts?: { name: string; dataUrl: string; weight?: string }[]) {
   const store = (globalThis as unknown as { fonts?: { add: (f: FontFace) => void } }).fonts;
   if (!store) return;
   for (const f of fonts ?? []) {
-    if (registeredFonts.has(f.name)) continue;
+    const key = `${f.name}::${f.weight ?? "*"}`;
+    if (registeredFonts.has(key)) continue;
     try {
       // faixa ampla de peso: o canvas pede "800 60px Familia" e precisa casar
-      const face = new FontFace(f.name, `url(${f.dataUrl})`, { weight: "100 900" });
+      const face = new FontFace(f.name, `url(${f.dataUrl})`, { weight: f.weight ?? "100 900" });
       await face.load();
       store.add(face);
-      registeredFonts.add(f.name);
+      registeredFonts.add(key);
     } catch {
       /* segue com a fonte padrão */
     }
