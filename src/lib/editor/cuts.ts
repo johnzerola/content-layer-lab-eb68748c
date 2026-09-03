@@ -3,7 +3,9 @@
  * arquivo de origem, usado pela renderização real dos projetos.
  */
 import type { Clip } from "@/lib/clips";
+import { persistSourceFile, readSourceFile } from "@/lib/editor/media-store";
 import type { BindableVideoSource } from "@/lib/video-template/types";
+
 
 export interface CutRecord {
   id: string;
