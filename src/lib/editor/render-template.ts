@@ -536,16 +536,16 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
         setTimeout(finish, 3000);
       });
 
-    for (let i = 0; i < totalFrames; i++) {
+    const srcAt = (i: number) => (segs.length ? srcTimeAt(segs, i / fps) : start + i / fps);
+
+    /** Desenha e codifica um quadro de saída a partir da fonte já posicionada. */
+    const emit = async (i: number, tSrc: number, source: FrameSource) => {
       if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
       if (encoderError) throw encoderError;
       const tOut = i / fps;
-      // tempo no vídeo original respeitando os trechos mantidos
-      const tSrc = segs.length ? srcTimeAt(segs, tOut) : start + tOut;
-      await seekTo(tSrc);
 
       // recorte/zoom vindo dos keyframes de enquadramento
-      const rect = pre ? cropRect(pre, video.videoWidth, video.videoHeight, tSrc) : null;
+      const rect = pre ? cropRect(pre, source.width, source.height, tSrc) : null;
       const crop = rect ? { sx: rect.sx, sy: rect.sy, sw: rect.sw, sh: rect.sh } : null;
 
       // transições de abertura/saída + emendas entre trechos
