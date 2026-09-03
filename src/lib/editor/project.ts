@@ -68,6 +68,7 @@ export function createEditorProject(
     cta: "",
     language: "pt-BR",
     media: {
+      storagePath: media?.storagePath ?? null,
       originalUrl: media?.originalUrl ?? null,
       proxyUrl: media?.proxyUrl ?? null,
       posterUrl: media?.posterUrl ?? null,
