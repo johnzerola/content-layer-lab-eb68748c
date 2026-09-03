@@ -401,8 +401,6 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     }
   };
 
-  useEffect(() => () => localCancel.current === false && undefined, []);
-
   const startUpload = async () => {
 
     if (!health?.online) {
