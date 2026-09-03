@@ -38,8 +38,7 @@ function FallbackPanel({ props }: { props: ImportPanelProps }) {
         multiple
         className="hidden"
         onChange={(e) => {
-          const files = e.target.files ? Array.from(e.target.files) : [];
-          if (files.length) props.onFiles(files);
+          props.onFiles(e.target.files);
           e.target.value = "";
         }}
       />
@@ -51,8 +50,7 @@ function FallbackPanel({ props }: { props: ImportPanelProps }) {
         multiple
         className="hidden"
         onChange={(e) => {
-          const files = e.target.files ? Array.from(e.target.files) : [];
-          if (files.length) props.onFiles(files);
+          props.onFiles(e.target.files);
           e.target.value = "";
         }}
       />
