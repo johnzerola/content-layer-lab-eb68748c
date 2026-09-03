@@ -229,6 +229,48 @@ function AgendaPage() {
     return [...map.entries()];
   }, [visiblePosts]);
 
+  const failedPosts = useMemo(() => posts.filter((p) => p.status === "falhou"), [posts]);
+
+  const connectionAlerts = useMemo(
+    () =>
+      accounts
+        .map((a) => ({ account: a, state: health[a.id] }))
+        .filter(
+          (row): row is { account: SocialAccount; state: ConnectionHealth } =>
+            !!row.state && (row.state.level === "warn" || row.state.level === "expired"),
+        ),
+    [accounts, health],
+  );
+
+  const scheduleWarning = useMemo(() => {
+    if (!accountId) return null;
+    const state = health[accountId];
+    if (state && (state.level === "expired" || state.level === "missing")) return state.message;
+    const at = new Date(when);
+    if (!Number.isFinite(at.getTime())) return null;
+    if (!connectionValidAt(tokenExpiry[accountId], at)) {
+      return "A conexão desta conta expira antes do horário escolhido. Reconecte-a para o post publicar.";
+    }
+    if (state?.level === "warn") return state.message;
+    return null;
+  }, [accountId, health, tokenExpiry, when]);
+
+  async function onRetryAllFailed() {
+    if (!failedPosts.length) return;
+    setRetryingAll(true);
+    try {
+      await Promise.all(
+        failedPosts.map((p) => reschedulePost(p.id, new Date(Date.now() + 60 * 1000))),
+      );
+      toast.success(`${failedPosts.length} publicação(ões) reenviada(s) para a fila.`);
+      await refresh();
+    } catch {
+      toast.error("Não foi possível reenviar todas as publicações.");
+    } finally {
+      setRetryingAll(false);
+    }
+  }
+
   async function onAddAccount() {
     setLinkingAccount(true);
     try {
