@@ -751,7 +751,7 @@ function AgendaPage() {
                                   try {
                                     await reschedulePost(
                                       p.id,
-                                      new Date(Date.now() + 5 * 60 * 1000),
+                                      new Date(Date.now() + 60 * 1000),
                                     );
                                     toast.success("Publicação reenviada para a fila.");
                                     await refresh();
