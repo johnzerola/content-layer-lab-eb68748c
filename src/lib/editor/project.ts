@@ -14,6 +14,8 @@ export const EDITOR_PROJECT_MODE = "video-editor";
 export const EDITOR_PROJECT_VERSION = 1;
 
 export interface EditorMedia {
+  /** caminho do arquivo de origem no armazenamento da conta (abre em qualquer aparelho) */
+  storagePath?: string | null;
   /** mídia original usada no render final */
   originalUrl: string | null;
   /** versão leve (360p/540p) usada apenas no preview do editor */
