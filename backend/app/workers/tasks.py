@@ -734,6 +734,7 @@ def run_pipeline(
                 verify_on,
                 emit,
                 str(cancel_path),
+                composite_on,
             )
             engine_name = "propainter-official"
             pass_count = 1
@@ -768,7 +769,7 @@ def run_pipeline(
             "status": "completed",
             "progress": 100,
             "stage": "concluído",
-            "result_url": f"/v1/jobs/{job_id}/result",
+            result_key: result_path,
             "detections": regions,
             "segments": segments,
             "metrics": {
@@ -783,6 +784,8 @@ def run_pipeline(
                 "enhance": opts.get("enhance", {"mode": "hq"}),
                 "dynamic_masks": dynamic,
                 "subject_protection": auto_protect,
+                "composite": composite_on,
+                "preview": is_preview,
             },
             "probe": {
                 "width": info.width, "height": info.height,
