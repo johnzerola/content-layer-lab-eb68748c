@@ -173,6 +173,24 @@ function AgendaPage() {
     } finally {
       setLoading(false);
     }
+    try {
+      const profiles = await loadProfiles();
+      const nextHealth: Record<string, ConnectionHealth> = {};
+      const nextExpiry: Record<string, string | null> = {};
+      for (const prof of profiles) {
+        nextHealth[prof.id] = connectionHealth({
+          connectionStatus: prof.connectionStatus,
+          tokenExpiresAt: prof.tokenExpiresAt,
+          accountStatus: prof.status,
+        });
+        nextExpiry[prof.id] = prof.tokenExpiresAt;
+      }
+      setHealth(nextHealth);
+      setTokenExpiry(nextExpiry);
+    } catch {
+      /* saúde das conexões é informativa; a agenda continua utilizável */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId]);
 
   useEffect(() => {
