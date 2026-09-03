@@ -296,7 +296,7 @@ export function CaptionTemplateStudio() {
       <div className="space-y-2">
         <div
           className="relative mx-auto w-full max-w-[280px] overflow-hidden rounded-2xl border border-border/60 bg-[#0b0b10]"
-          style={{ aspectRatio: "9 / 16" }}
+          style={{ aspectRatio: "9 / 16", containerType: "inline-size" }}
         >
           <div className="absolute inset-x-0 top-0 h-1 bg-primary/60" style={{ width: `${(time / total) * 100}%` }} />
           {current && (
@@ -310,12 +310,12 @@ export function CaptionTemplateStudio() {
                 style={{
                   fontFamily: s.fontFamily,
                   fontWeight: s.fontWeight,
-                  fontSize: `${s.fontSize / 11}px`,
+                  fontSize: `${(s.fontSize / 1080) * 100}cqw`,
                   lineHeight: 1.15,
                   color: s.color,
                   background: s.background ?? "transparent",
-                  padding: s.background ? `${s.padding / 4}px ${s.padding / 2}px` : 0,
-                  borderRadius: `${s.radius / 2}px`,
+                  padding: s.background ? `${(s.padding / 1080) * 60}cqw ${(s.padding / 1080) * 120}cqw` : 0,
+                  borderRadius: `${(s.radius / 1080) * 100}cqw`,
                   textTransform: s.uppercase ? "uppercase" : "none",
                   textShadow: "0 2px 8px rgba(0,0,0,.55)",
                 }}
