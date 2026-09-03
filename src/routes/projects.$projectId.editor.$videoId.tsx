@@ -43,7 +43,13 @@ import { MediaSourceBar } from "@/components/editor/MediaSourceBar";
 import { BulkScheduleModal } from "@/components/BulkScheduleModal";
 import { listAccounts, type SocialAccount } from "@/lib/social";
 import { renderTemplateProject, templateRenderSupported } from "@/lib/editor/render-template";
-import { exportScale, loadExportQuality } from "@/lib/editor/export-quality";
+import {
+  EXPORT_QUALITIES,
+  exportScale,
+  loadExportQuality,
+  saveExportQuality,
+  type ExportQuality,
+} from "@/lib/editor/export-quality";
 import { toast } from "sonner";
 import { loadSourceFile } from "@/lib/editor/cuts";
 
@@ -174,6 +180,9 @@ function EditorPage() {
   const [renderPct, setRenderPct] = useState(0);
   const [transcribing, setTranscribing] = useState(false);
   const [transcribeProgress, setTranscribeProgress] = useState("");
+  const [quality, setQuality] = useState<ExportQuality>("1080");
+
+  useEffect(() => setQuality(loadExportQuality()), []);
 
 
   const history = useEditorHistory<EditorProjectDoc | null>(null);
@@ -284,7 +293,7 @@ function EditorPage() {
           file,
           cut: seg ? { start: seg.start, end: seg.end } : null,
           preedit: doc.preedit ?? null,
-          scale: exportScale(loadExportQuality()),
+          scale: exportScale(quality),
           onProgress: setRenderPct,
         });
 
@@ -302,7 +311,7 @@ function EditorPage() {
         setRendering(false);
       }
     },
-    [doc, videoId],
+    [doc, quality, videoId],
   );
 
 
