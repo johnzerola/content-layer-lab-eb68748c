@@ -2287,7 +2287,7 @@ function Home() {
           </section>
         )}
 
-        <ImportPanel
+        <ImportPanelSafe
           mode={mode}
           count={items.length}
           onFiles={(f) => void addFiles(f)}
