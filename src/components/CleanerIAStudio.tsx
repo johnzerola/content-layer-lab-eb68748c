@@ -381,10 +381,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         file: item.file,
         masks: usable,
         seconds: previewOnly ? 5 : undefined,
+        advanced,
         onProgress: (p) => setLocalProgress(Math.round(p * 100)),
         onPhase: setLocalPhase,
         isCancelled: () => localCancel.current,
       });
+
       const url = URL.createObjectURL(blob);
       setLocalUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
