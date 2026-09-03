@@ -441,6 +441,7 @@ export type Database = {
       }
       post_insights: {
         Row: {
+          clicks: number
           comments: number
           created_at: string
           fetched_at: string
@@ -452,11 +453,13 @@ export type Database = {
           reach: number
           saves: number
           shares: number
+          source: string
           updated_at: string
           user_id: string
           views: number
         }
         Insert: {
+          clicks?: number
           comments?: number
           created_at?: string
           fetched_at?: string
@@ -468,11 +471,13 @@ export type Database = {
           reach?: number
           saves?: number
           shares?: number
+          source?: string
           updated_at?: string
           user_id: string
           views?: number
         }
         Update: {
+          clicks?: number
           comments?: number
           created_at?: string
           fetched_at?: string
@@ -484,6 +489,7 @@ export type Database = {
           reach?: number
           saves?: number
           shares?: number
+          source?: string
           updated_at?: string
           user_id?: string
           views?: number
@@ -752,8 +758,10 @@ export type Database = {
           permalink: string | null
           provider_container_id: string | null
           provider_post_id: string | null
+          publish_meta: Json
           published_at: string | null
           scheduled_at: string
+          scheduled_timezone: string | null
           status: string
           updated_at: string
           user_id: string
@@ -777,8 +785,10 @@ export type Database = {
           permalink?: string | null
           provider_container_id?: string | null
           provider_post_id?: string | null
+          publish_meta?: Json
           published_at?: string | null
           scheduled_at?: string
+          scheduled_timezone?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -802,8 +812,10 @@ export type Database = {
           permalink?: string | null
           provider_container_id?: string | null
           provider_post_id?: string | null
+          publish_meta?: Json
           published_at?: string | null
           scheduled_at?: string
+          scheduled_timezone?: string | null
           status?: string
           updated_at?: string
           user_id?: string

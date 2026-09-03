@@ -55,6 +55,15 @@ import {
   type ConnectionHealth,
 } from "@/lib/social-health";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
+import {
+  TIMEZONE_OPTIONS,
+  browserTimezone,
+  formatInTimezone,
+  isValidTimezone,
+  timezoneLabel,
+  utcToWallTime,
+  wallTimeToUtc,
+} from "@/lib/schedule-timezone";
 
 export const Route = createFileRoute("/agenda")({
   component: GuardedAgendaPage,
@@ -111,6 +120,10 @@ function AgendaPage() {
   const [kind, setKind] = useState<PostKind>("reels");
   const [caption, setCaption] = useState("");
   const [when, setWhen] = useState(() => localInput(new Date(Date.now() + 60 * 60 * 1000)));
+  const [timezone, setTimezone] = useState(() => browserTimezone());
+  const [ytTitle, setYtTitle] = useState("");
+  const [ytDescription, setYtDescription] = useState("");
+  const [ytTags, setYtTags] = useState("");
   const [consent, setConsent] = useState(false);
   const [sending, setSending] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);

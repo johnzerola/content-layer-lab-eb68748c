@@ -100,6 +100,29 @@ export async function createPublishDependencies(): Promise<QueueDependencies> {
       });
       return { accessToken, tokenKind };
     },
+    loadPublishMeta: async (postId) => {
+      const { data, error } = await supabaseAdmin
+        .from("scheduled_posts")
+        .select("publish_meta")
+        .eq("id", postId)
+        .maybeSingle();
+      if (error) return null;
+      const meta = (data as { publish_meta?: { youtube?: Record<string, unknown> } | null } | null)
+        ?.publish_meta;
+      const youtube = meta?.youtube;
+      if (!youtube || typeof youtube !== "object") return null;
+      return {
+        ...(typeof youtube["title"] === "string" ? { title: youtube["title"] } : {}),
+        ...(typeof youtube["description"] === "string" ? { description: youtube["description"] } : {}),
+        ...(Array.isArray(youtube["tags"])
+          ? { tags: (youtube["tags"] as unknown[]).filter((t): t is string => typeof t === "string") }
+          : {}),
+        ...(typeof youtube["captionsSrt"] === "string" ? { captionsSrt: youtube["captionsSrt"] } : {}),
+        ...(typeof youtube["captionsLanguage"] === "string"
+          ? { captionsLanguage: youtube["captionsLanguage"] }
+          : {}),
+      };
+    },
     loadPendingContainerId: async (postId) => {
       const { data, error } = await supabaseAdmin
         .from("scheduled_posts")
