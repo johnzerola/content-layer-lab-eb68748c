@@ -474,8 +474,23 @@ function AgendaPage() {
                         )}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">
-                          {socialAccountTitle(a)}
+                        <span className="flex items-center gap-2">
+                          <span className="min-w-0 truncate text-sm font-medium">
+                            {socialAccountTitle(a)}
+                          </span>
+                          {health[a.id]?.badge && (
+                            <Link
+                              to="/integracoes"
+                              title={health[a.id]?.message ?? undefined}
+                              className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+                                health[a.id]?.level === "warn"
+                                  ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
+                                  : "border-red-500/40 bg-red-500/10 text-red-300"
+                              }`}
+                            >
+                              {health[a.id]?.badge}
+                            </Link>
+                          )}
                         </span>
                         <span className="block truncate text-[11px] text-muted-foreground">
                           {socialAccountDetail(a)}
