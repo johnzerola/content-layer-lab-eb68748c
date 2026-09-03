@@ -944,7 +944,7 @@ function EditorPage() {
               composition={doc.composition}
               preedit={pre}
               effects={(doc.composition.effects ?? []) as ClipEffect[]}
-              clip={null}
+              clip={duration > 0 ? { start: 0, end: duration } : null}
               onTimeUpdate={setCurrentTime}
               onLoadedMetadata={(video) => {
                 if (!doc.media.duration) {
