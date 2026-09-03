@@ -76,6 +76,18 @@ def _feather(mask: np.ndarray, radius: int = 3) -> np.ndarray:
     return np.clip(soft * 1.25, 0.0, 1.0)
 
 
+def _bbox(mask: np.ndarray, margin: int = 24) -> Optional[Tuple[int, int, int, int]]:
+    ys, xs = np.where(mask > 0)
+    if ys.size == 0:
+        return None
+    height, width = mask.shape[:2]
+    y0 = max(0, int(ys.min()) - margin)
+    y1 = min(height, int(ys.max()) + 1 + margin)
+    x0 = max(0, int(xs.min()) - margin)
+    x1 = min(width, int(xs.max()) + 1 + margin)
+    return y0, y1, x0, x1
+
+
 class TemporalBackgroundExposureEngine(InpaintingEngine):
     """Global-motion temporal harvesting — the CPU-efficient default."""
 
@@ -84,6 +96,49 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
     def __init__(self, max_samples: int = _MAX_SAMPLES, feather: int = 3):
         self.max_samples = max(4, max_samples)
         self.feather = feather
+        # Windows of a static shot repeat the same hole: caching the exemplar
+        # plate keeps the expensive block matching out of the per-window budget.
+        self._plate_cache: Optional[tuple] = None
+        self._alpha_cache: Optional[tuple] = None
+
+    def _alpha_for(self, mask: np.ndarray) -> np.ndarray:
+        key = (mask.shape, int(mask.sum()), bytes(mask[::16, ::16].tobytes()))
+        if self._alpha_cache and self._alpha_cache[0] == key:
+            return self._alpha_cache[1]
+        alpha = _feather(mask, self.feather)[..., None]
+        self._alpha_cache = (key, alpha)
+        return alpha
+
+    def _fill_unseen(self, plate: np.ndarray, unseen: np.ndarray) -> np.ndarray:
+        """Exemplar fill limited to the hole neighbourhood, with a shot cache."""
+        box = _bbox(unseen, margin=48)
+        if box is None:
+            return plate
+        y0, y1, x0, x1 = box
+        crop = plate[y0:y1, x0:x1]
+        hole = unseen[y0:y1, x0:x1]
+        signature = (box, int(hole.sum()))
+        cached = self._plate_cache
+        if cached and cached[0] == signature:
+            ring = hole == 0
+            if ring.any():
+                delta = float(
+                    np.mean(
+                        np.abs(
+                            crop[ring].astype(np.float32) - cached[1][ring].astype(np.float32)
+                        )
+                    )
+                )
+                if delta < 6.0:
+                    out = plate.copy()
+                    out[y0:y1, x0:x1] = cached[2]
+                    return out
+        filled_crop = patch_fill(crop, hole, patch=21, search=72)
+        self._plate_cache = (signature, crop.copy(), filled_crop.copy())
+        out = plate.copy()
+        out[y0:y1, x0:x1] = filled_crop
+        return out
+
 
     def process(self, frames: np.ndarray, masks: np.ndarray) -> np.ndarray:
         count = len(frames)
