@@ -693,7 +693,7 @@ def run_pipeline(
         if not regions:
             raise ValueError("nenhuma área para remover foi detectada ou marcada")
 
-        official = propainter_status()
+        official = propainter_status(require_cuda=os.getenv("PROPAINTER_ALLOW_CPU", "0") != "1")
         diffusion = diffueraser_status()
         allow_fallback = os.getenv("CLEANER_ALLOW_CLASSIC_FALLBACK", "0") == "1"
         if preset == "max" and diffusion.ready:
