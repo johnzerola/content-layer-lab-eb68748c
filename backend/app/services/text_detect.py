@@ -16,11 +16,34 @@ _detector_kind = "uninitialized"
 _detector_tried = False
 
 
+def _try_rapidocr():
+    """RapidOCR (ONNXRuntime / PP-OCR models) — detection only, CPU friendly."""
+    try:
+        from rapidocr_onnxruntime import RapidOCR  # type: ignore
+    except Exception:
+        try:
+            from rapidocr import RapidOCR  # type: ignore
+        except Exception as exc:  # pragma: no cover - optional dependency
+            print(f"[text_detect] RapidOCR unavailable ({exc})")
+            return None
+    try:
+        return RapidOCR()
+    except Exception as exc:  # pragma: no cover
+        print(f"[text_detect] RapidOCR failed to start ({exc})")
+        return None
+
+
 def _get_detector():
     global _detector, _detector_kind, _detector_tried
     if _detector_tried:
         return _detector
     _detector_tried = True
+    if os.getenv("CLEANER_OCR_ENGINE", "rapidocr").lower() == "rapidocr":
+        rapid = _try_rapidocr()
+        if rapid is not None:
+            _detector = rapid
+            _detector_kind = "rapidocr-onnx"
+            return _detector
     try:
         # PaddleOCR 3.x direct detector. Recognition is intentionally omitted:
         # masks need geometry, not the transcription.
@@ -49,11 +72,45 @@ def _get_detector():
 def detector_status(load: bool = False) -> dict:
     if load:
         _get_detector()
+    available = (
+        _detector is not None
+        or importlib.util.find_spec("rapidocr_onnxruntime") is not None
+        or importlib.util.find_spec("rapidocr") is not None
+        or importlib.util.find_spec("paddleocr") is not None
+    )
     return {
-        "ready": _detector is not None or importlib.util.find_spec("paddleocr") is not None,
+        "ready": available,
         "engine": _detector_kind if _detector_tried else "not-loaded",
         "model": os.getenv("CLEANER_TEXT_DETECTOR", "PP-OCRv5_server_det"),
     }
+
+
+def _boxes_rapidocr(frame: np.ndarray) -> List[Box]:
+    detector = _detector
+    if detector is None:
+        return []
+    try:
+        result = detector(frame, use_det=True, use_cls=False, use_rec=False)
+    except TypeError:
+        result = detector(frame)
+    except Exception as exc:
+        print(f"[text_detect] rapidocr inference failed ({exc})")
+        return []
+    boxes_raw: Any = None
+    if isinstance(result, tuple):
+        boxes_raw = result[0]
+    else:
+        boxes_raw = getattr(result, "boxes", None)
+        if boxes_raw is None:
+            boxes_raw = result
+    boxes: List[Box] = []
+    for item in boxes_raw or []:
+        pts = item[0] if (isinstance(item, (list, tuple)) and len(item) == 3) else item
+        arr = np.asarray(pts, dtype=np.float32)
+        if arr.ndim == 2 and arr.shape[0] >= 4:
+            boxes.append(cv2.boundingRect(arr.astype(np.int32)))
+    return boxes
+
 
 
 def _result_payload(item: Any) -> Any:
