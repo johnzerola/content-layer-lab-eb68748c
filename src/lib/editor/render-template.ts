@@ -9,6 +9,7 @@ import { pickAudioCodec, pickBitrate, pickVideoCodec } from "@/lib/encode-preset
 import { renderAudioTrack } from "@/lib/audio-track";
 import { cleanMp4Metadata } from "@/lib/mp4meta";
 import { bgSleep } from "@/lib/keepalive";
+import { FrameReader, type DecodedFrame } from "@/lib/decode";
 import {
   composeTransitions,
   cropRect,
