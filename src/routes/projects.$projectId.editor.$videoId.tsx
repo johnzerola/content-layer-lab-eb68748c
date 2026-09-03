@@ -69,6 +69,7 @@ import { saveRenderedVideo } from "@/lib/editor/download";
 
 import { CutPanel, FramePanel, GradePanel, LayoutPanel, TitlesPanel } from "@/components/editor/ToolPanels";
 import { EditorCanvas } from "@/components/vtemplate/EditorCanvas";
+import { MediaStage } from "@/components/editor/MediaStage";
 import { AnimationPanel } from "@/components/vtemplate/AnimationPanel";
 import { AnimationLibrary } from "@/components/editor/AnimationLibrary";
 import { BrandKitPanel } from "@/components/vtemplate/BrandKitPanel";
@@ -928,27 +929,24 @@ function EditorPage() {
         {/* CANVAS */}
         <main className="order-1 flex min-h-[56vh] min-w-0 flex-col items-center justify-center gap-3 overflow-hidden bg-black/30 p-2 sm:p-4 lg:order-none lg:min-h-0">
           <div className="relative h-full max-h-full overflow-hidden rounded-xl bg-black" style={{ aspectRatio: "9 / 16" }}>
-            {src ? (
-              <video
-                ref={videoRef}
-                src={src}
-                playsInline
-                className="absolute inset-0 h-full w-full object-contain"
-                onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-                onLoadedMetadata={(e) => {
-                  if (!doc.media.duration) {
-                    patchDoc({ media: { ...doc.media, duration: e.currentTarget.duration } }, "duracao");
-                  }
-                }}
-              />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-xs text-muted-foreground">
-                Nenhuma mídia carregada. Use “Carregar vídeo” ou cole um link na barra superior.
-              </div>
-            )}
+            <MediaStage
+              videoRef={videoRef}
+              src={src}
+              composition={doc.composition}
+              preedit={pre}
+              effects={(doc.composition.effects ?? []) as ClipEffect[]}
+              clip={null}
+              onTimeUpdate={setCurrentTime}
+              onLoadedMetadata={(video) => {
+                if (!doc.media.duration) {
+                  patchDoc({ media: { ...doc.media, duration: video.duration } }, "duracao");
+                }
+              }}
+            />
             <div className="absolute inset-0">
               <EditorCanvas
                 bare
+                hideMedia
                 doc={{
                   ...doc.composition,
                   canvas: { ...doc.composition.canvas, background: { kind: "color", color: "transparent" } },

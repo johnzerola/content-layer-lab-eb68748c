@@ -61,11 +61,16 @@ const LayerView = memo(function LayerView({
   layer,
   doc,
   sampleVideoUrl,
+  hideMedia,
 }: {
   layer: TemplateLayer;
   doc: TemplateDoc;
   sampleVideoUrl: string | null;
+  hideMedia?: boolean | undefined;
 }) {
+  // o palco em canvas já desenha o vídeo com a pré-edição aplicada:
+  // aqui a camada vira só uma área invisível de seleção/arraste.
+  if (hideMedia && layer.type === "video") return <div className="h-full w-full" />;
   const scale = doc.canvas.height / 100; // px por 1% de altura
   const common: React.CSSProperties = {
     width: "100%",
@@ -211,6 +216,7 @@ export function EditorCanvas({
   interactive = true,
   animPreview,
   bare,
+  hideMedia,
 }: {
   doc: TemplateDoc;
   selectedId: string | null;
@@ -223,6 +229,8 @@ export function EditorCanvas({
   interactive?: boolean;
   /** remove o preenchimento/sombra para sobrepor exatamente uma mídia atrás */
   bare?: boolean;
+  /** não desenha a camada de vídeo (quem desenha é o palco em canvas atrás) */
+  hideMedia?: boolean;
   /** dispara a prévia da animação de uma camada: { key, layerId, slot } */
   animPreview?: { key: number; layerId: string; slot: "animationIn" | "animationOut" | "animationLoop" } | null;
 }) {
@@ -310,7 +318,7 @@ export function EditorCanvas({
           height: `${Math.round(zoom * 100)}%`,
           maxWidth: "100%",
           containerType: "size",
-          ...bgStyle(doc),
+          ...(hideMedia ? { background: "transparent" } : bgStyle(doc)),
           filter: filterToCss(doc.filter),
         }}
       >
@@ -339,7 +347,12 @@ export function EditorCanvas({
                     : animationCss(layer.animationLoop, true),
               }}
             >
-              <LayerView layer={layer} doc={doc} sampleVideoUrl={doc.sampleVideoUrl ?? null} />
+              <LayerView
+                layer={layer}
+                doc={doc}
+                sampleVideoUrl={doc.sampleVideoUrl ?? null}
+                hideMedia={hideMedia}
+              />
               {interactive && selectedId === layer.id && !layer.locked && (
                 <>
                   {(["nw", "ne", "sw", "se"] as Handle[]).map((h) => (

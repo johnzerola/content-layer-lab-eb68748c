@@ -12,9 +12,9 @@ import { renderAudioTrack } from "@/lib/audio-track";
 import { cleanMp4Metadata } from "@/lib/mp4meta";
 import { bgSleep } from "@/lib/keepalive";
 import { FrameReader, type DecodedFrame } from "@/lib/decode";
+import { drawMediaFrame, mediaFrameFromPre, type MediaFrame } from "@/lib/editor/media-frame";
 import {
   composeTransitions,
-  cropRect,
   keptSegments,
   preEditFilter,
   segmentTransitionAt,
@@ -322,12 +322,7 @@ function captionCues(doc: TemplateDoc): CaptionCueLike[] {
   );
 }
 
-export interface SourceCrop {
-  sx: number;
-  sy: number;
-  sw: number;
-  sh: number;
-}
+export type SourceCrop = MediaFrame;
 
 /** Desenha um frame completo do template no tempo `t` (em segundos do corte). */
 export function drawTemplateFrame(
@@ -384,11 +379,13 @@ export function drawTemplateFrame(
       ctx.roundRect(x, y, w, h, layer.mask === "circle" ? Math.min(w, h) / 2 : layer.radius || 0);
       ctx.clip();
       if (crop) {
-        const scale =
-          layer.fit === "contain" ? Math.min(w / crop.sw, h / crop.sh) : Math.max(w / crop.sw, h / crop.sh);
-        const dw = layer.fit === "fill" ? w : crop.sw * scale;
-        const dh = layer.fit === "fill" ? h : crop.sh * scale;
-        ctx.drawImage(src.el, crop.sx, crop.sy, crop.sw, crop.sh, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+        drawMediaFrame(
+          ctx,
+          src.el,
+          crop,
+          { x, y, w, h, fit: layer.fit ?? "cover", radius: layer.radius || 0, circle: layer.mask === "circle" },
+          grade,
+        );
       } else {
         drawFit(ctx, src.el, src.width, src.height, x, y, w, h, layer.fit);
       }
@@ -580,8 +577,7 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
       const tOut = i / fps;
 
       // recorte/zoom vindo dos keyframes de enquadramento
-      const rect = pre ? cropRect(pre, source.width, source.height, tSrc) : null;
-      const crop = rect ? { sx: rect.sx, sy: rect.sy, sw: rect.sw, sh: rect.sh } : null;
+      const crop = pre ? mediaFrameFromPre(pre, source.width, source.height, tSrc) : null;
 
       // transições de abertura/saída + emendas entre trechos
       const tr: TransitionState = composeTransitions(
