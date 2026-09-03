@@ -65,6 +65,17 @@ export function socialAccountDetail(account: SocialAccount): string {
 
 export type MediaType = "video" | "image";
 
+/** Metadados extras enviados ao provedor (hoje usados pelo YouTube). */
+export type PublishMeta = {
+  youtube?: {
+    title?: string;
+    description?: string;
+    tags?: string[];
+    captionsSrt?: string;
+    captionsLanguage?: string;
+  };
+};
+
 export type ScheduledPost = {
   id: string;
   account_id: string | null;
@@ -75,12 +86,15 @@ export type ScheduledPost = {
   media_type: MediaType;
   file_name: string | null;
   scheduled_at: string;
+  scheduled_timezone?: string | null;
+  publish_meta?: PublishMeta | null;
   status: string;
   attempts: number;
   error: string | null;
   error_code?: string | null;
   published_at: string | null;
   permalink: string | null;
+  provider_post_id?: string | null;
 };
 
 export const STATUS_LABEL: Record<string, string> = {
@@ -169,6 +183,10 @@ export type NewPost = {
   consent?: boolean;
   /** Medidas do arquivo, quando conhecidas, para validar limites da plataforma. */
   media?: MediaSpec;
+  /** Fuso escolhido pelo usuário (IANA). O instante salvo continua em UTC. */
+  timezone?: string;
+  /** Título/descrição/tags/legenda para o YouTube. */
+  publishMeta?: PublishMeta;
 };
 
 export async function schedulePost(p: NewPost) {
@@ -211,6 +229,8 @@ export async function schedulePost(p: NewPost) {
       kind: p.kind,
       caption: p.caption,
       scheduled_at: p.scheduledAt.toISOString(),
+      scheduled_timezone: p.timezone ?? null,
+      publish_meta: (p.publishMeta ?? {}) as never,
       video_path: p.videoPath ?? null,
       video_url: p.videoUrl ?? null,
       file_name: p.fileName ?? null,
@@ -227,7 +247,7 @@ export async function listPosts(limit = 200): Promise<ScheduledPost[]> {
   const { data, error } = await supabase
     .from("scheduled_posts")
     .select(
-      "id,account_id,kind,caption,video_url,video_path,media_type,file_name,scheduled_at,status,attempts,error,error_code,published_at,permalink",
+      "id,account_id,kind,caption,video_url,video_path,media_type,file_name,scheduled_at,scheduled_timezone,publish_meta,status,attempts,error,error_code,published_at,permalink,provider_post_id",
     )
     .order("scheduled_at", { ascending: true })
     .limit(limit);

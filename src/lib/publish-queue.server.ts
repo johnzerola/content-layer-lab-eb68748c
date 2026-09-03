@@ -56,6 +56,8 @@ export type QueueDependencies = {
   loadProviderAccessToken?: (connection: PublishingConnection) => Promise<ProviderCredential | null>;
   /** Container Meta pendente de uma tentativa anterior, para não reenviar o vídeo. */
   loadPendingContainerId?: (postId: string) => Promise<string | null>;
+  /** Metadados extras do agendamento (título/descrição/tags/legenda do YouTube). */
+  loadPublishMeta?: (postId: string) => Promise<PublishInput["youtube"] | null>;
   createSignedUrl: (videoPath: string, expiresInSeconds: number) => Promise<string>;
   removeStorageObject?: (videoPath: string) => Promise<void>;
   publish: (input: PublishInput) => Promise<PublishResult>;
@@ -129,6 +131,8 @@ export async function publishClaimedPost(post: ClaimedPost, deps: QueueDependenc
     return failure("MEDIA_NOT_FOUND", "O agendamento não possui um vídeo.");
   }
 
+  const youtubeMeta = deps.loadPublishMeta ? await deps.loadPublishMeta(post.id) : null;
+
   const pendingContainerId = deps.loadPendingContainerId
     ? await deps.loadPendingContainerId(post.id)
     : null;
@@ -147,6 +151,7 @@ export async function publishClaimedPost(post: ClaimedPost, deps: QueueDependenc
     ...(credential?.tokenKind ? { metaTokenKind: credential.tokenKind } : {}),
     idempotencyKey: post.id,
     ...(pendingContainerId ? { pendingContainerId } : {}),
+    ...(youtubeMeta ? { youtube: youtubeMeta } : {}),
   });
 }
 

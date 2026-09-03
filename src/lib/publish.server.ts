@@ -19,6 +19,14 @@ export type PublishInput = {
   pendingContainerId?: string | null;
   /** Tipo de credencial Meta: Login do Instagram (graph.instagram.com) ou Página do Facebook (graph.facebook.com). */
   metaTokenKind?: "instagram_login" | "facebook_page";
+  /** Metadados específicos do YouTube definidos na Agenda. */
+  youtube?: {
+    title?: string;
+    description?: string;
+    tags?: string[];
+    captionsSrt?: string;
+    captionsLanguage?: string;
+  };
 };
 
 export type PublishResult =
@@ -74,12 +82,68 @@ function youtubePrivacyStatus(): "private" | "public" | "unlisted" {
 }
 
 function youtubeTitle(input: PublishInput): string {
+  const explicit = input.youtube?.title?.trim();
+  if (explicit) return explicit.replace(/\s+/g, " ").slice(0, 100);
   const firstCaptionLine = input.caption
     .split(/\r?\n/)
     .map((line) => line.replace(/#[\p{L}\p{N}_-]+/gu, "").trim())
     .find(Boolean);
   const title = firstCaptionLine || input.username || "Video";
   return title.replace(/\s+/g, " ").slice(0, 100);
+}
+
+function youtubeDescription(input: PublishInput): string {
+  const explicit = input.youtube?.description?.trim();
+  return (explicit || input.caption).slice(0, 5000);
+}
+
+/** Tags explícitas ou hashtags da legenda; o YouTube limita o total a 500 caracteres. */
+function youtubeTags(input: PublishInput): string[] {
+  const explicit = (input.youtube?.tags ?? [])
+    .map((tag) => tag.replace(/^#/, "").trim())
+    .filter(Boolean);
+  const fromCaption = Array.from(input.caption.matchAll(/#([\p{L}\p{N}_-]{2,})/gu)).map((m) => m[1]!);
+  const unique: string[] = [];
+  let total = 0;
+  for (const tag of [...explicit, ...fromCaption]) {
+    const value = tag.slice(0, 60);
+    if (unique.some((t) => t.toLowerCase() === value.toLowerCase())) continue;
+    if (total + value.length + 1 > 480) break;
+    unique.push(value);
+    total += value.length + 1;
+  }
+  return unique;
+}
+
+/** Envia a faixa de legendas (SRT) do post; falha aqui não invalida o vídeo publicado. */
+async function uploadYoutubeCaptions(
+  token: string,
+  videoId: string,
+  srt: string,
+  language: string,
+): Promise<void> {
+  const metadata = JSON.stringify({
+    snippet: { videoId, language, name: "Legenda", isDraft: false },
+  });
+  const boundary = `vv${crypto.randomUUID()}`;
+  const body =
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n` +
+    `--${boundary}\r\nContent-Type: application/octet-stream\r\n\r\n${srt}\r\n` +
+    `--${boundary}--\r\n`;
+  const response = await fetch(
+    "https://www.googleapis.com/upload/youtube/v3/captions?part=snippet&uploadType=multipart",
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": `multipart/related; boundary=${boundary}`,
+      },
+      body,
+    },
+  );
+  if (!response.ok) {
+    console.warn("youtube_captions_upload_failed", response.status, await response.text().catch(() => ""));
+  }
 }
 
 export function activeProvider(requested?: SocialProvider): "ayrshare" | "meta" | "youtube" | "tiktok" | null {
@@ -186,7 +250,8 @@ async function publishYoutube(input: PublishInput): Promise<PublishResult> {
       body: JSON.stringify({
         snippet: {
           title: youtubeTitle(input),
-          description: input.caption.slice(0, 5000),
+          description: youtubeDescription(input),
+          tags: youtubeTags(input),
           categoryId: "22",
         },
         status: {
@@ -227,6 +292,16 @@ async function publishYoutube(input: PublishInput): Promise<PublishResult> {
     const providerPostId = nestedString(uploadPayload, ["id"]);
     if (!uploadResponse.ok || !providerPostId) {
       return providerFailure("YouTube publicar", uploadResponse.status, uploadPayload);
+    }
+
+    const captionsSrt = input.youtube?.captionsSrt?.trim();
+    if (captionsSrt) {
+      await uploadYoutubeCaptions(
+        token,
+        providerPostId,
+        captionsSrt,
+        input.youtube?.captionsLanguage || "pt-BR",
+      ).catch(() => undefined);
     }
 
     return {

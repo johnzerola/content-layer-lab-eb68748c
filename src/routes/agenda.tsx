@@ -41,6 +41,7 @@ import {
   socialAccountTitle,
   uploadPostVideo,
   type PostKind,
+  type PublishMeta,
   type ScheduledPost,
   type SocialAccount,
 } from "@/lib/social";
@@ -55,6 +56,15 @@ import {
   type ConnectionHealth,
 } from "@/lib/social-health";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
+import {
+  TIMEZONE_OPTIONS,
+  browserTimezone,
+  formatInTimezone,
+  isValidTimezone,
+  timezoneLabel,
+  utcToWallTime,
+  wallTimeToUtc,
+} from "@/lib/schedule-timezone";
 
 export const Route = createFileRoute("/agenda")({
   component: GuardedAgendaPage,
@@ -111,6 +121,10 @@ function AgendaPage() {
   const [kind, setKind] = useState<PostKind>("reels");
   const [caption, setCaption] = useState("");
   const [when, setWhen] = useState(() => localInput(new Date(Date.now() + 60 * 60 * 1000)));
+  const [timezone, setTimezone] = useState(() => browserTimezone());
+  const [ytTitle, setYtTitle] = useState("");
+  const [ytDescription, setYtDescription] = useState("");
+  const [ytTags, setYtTags] = useState("");
   const [consent, setConsent] = useState(false);
   const [sending, setSending] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -246,7 +260,7 @@ function AgendaPage() {
     if (!accountId) return null;
     const state = health[accountId];
     if (state && (state.level === "expired" || state.level === "missing")) return state.message;
-    const at = new Date(when);
+    const at = wallTimeToUtc(when, timezone);
     if (!Number.isFinite(at.getTime())) return null;
     if (!connectionValidAt(tokenExpiry[accountId], at)) {
       return "A conexão desta conta expira antes do horário escolhido. Reconecte-a para o post publicar.";
@@ -311,14 +325,32 @@ function AgendaPage() {
       toast.error("Escolha o vídeo que será publicado.");
       return;
     }
+    const at = wallTimeToUtc(when, timezone);
+    if (!Number.isFinite(at.getTime())) {
+      toast.error("Escolha uma data e hora válidas.");
+      return;
+    }
     setSending(true);
     try {
       const up = await uploadPostVideo(file, file.name);
+      const isYoutube = selectedAccount?.platform === "youtube";
+      const ytMeta: NonNullable<PublishMeta["youtube"]> = {};
+      if (ytTitle.trim()) ytMeta.title = ytTitle.trim();
+      if (ytDescription.trim()) ytMeta.description = ytDescription.trim();
+      const tags = ytTags
+        .split(/[,\n]/)
+        .map((t) => t.trim().replace(/^#/, ""))
+        .filter(Boolean);
+      if (tags.length) ytMeta.tags = tags;
+      const publishMeta: PublishMeta | undefined =
+        isYoutube && Object.keys(ytMeta).length ? { youtube: ytMeta } : undefined;
       await schedulePost({
         accountId: accountId || null,
         kind,
         caption,
-        scheduledAt: new Date(when),
+        scheduledAt: at,
+        timezone,
+        ...(publishMeta ? { publishMeta } : {}),
         videoPath: up.path,
         videoUrl: up.url,
         fileName: file.name,
@@ -327,7 +359,17 @@ function AgendaPage() {
       setFile(null);
       setCaption("");
       setConsent(false);
-      toast.success("Publicação agendada.");
+      setYtTitle("");
+      setYtDescription("");
+      setYtTags("");
+      toast.success(
+        `Publicação agendada para ${formatInTimezone(at, timezone, {
+          day: "2-digit",
+          month: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        })} (${timezoneLabel(timezone)}).`,
+      );
       await refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao agendar.");
@@ -603,15 +645,77 @@ function AgendaPage() {
                   />
                 </label>
 
-                <label className="mt-3 flex flex-col gap-1.5">
-                  <span className="mono-label">Data e hora</span>
-                  <input
-                    type="datetime-local"
-                    value={when}
-                    onChange={(e) => setWhen(e.target.value)}
-                    className="rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm outline-none"
-                  />
-                </label>
+                {selectedAccount?.platform === "youtube" && (
+                  <div className="mt-3 flex flex-col gap-3 rounded-xl border border-border bg-surface-2 p-3">
+                    <span className="mono-label text-primary">Detalhes do YouTube</span>
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs text-muted-foreground">Título (até 100 caracteres)</span>
+                      <input
+                        value={ytTitle}
+                        maxLength={100}
+                        onChange={(e) => setYtTitle(e.target.value)}
+                        placeholder="Se vazio, usamos a 1ª linha da legenda"
+                        className="rounded-lg border border-border bg-surface-1 px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs text-muted-foreground">Descrição</span>
+                      <textarea
+                        value={ytDescription}
+                        rows={3}
+                        onChange={(e) => setYtDescription(e.target.value)}
+                        placeholder="Se vazio, usamos a legenda"
+                        className="resize-none rounded-lg border border-border bg-surface-1 px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs text-muted-foreground">Tags (separadas por vírgula)</span>
+                      <input
+                        value={ytTags}
+                        onChange={(e) => setYtTags(e.target.value)}
+                        placeholder="cortes, podcast, viral"
+                        className="rounded-lg border border-border bg-surface-1 px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
+                      />
+                    </label>
+                  </div>
+                )}
+
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1.5">
+                    <span className="mono-label">Data e hora</span>
+                    <input
+                      type="datetime-local"
+                      value={when}
+                      onChange={(e) => setWhen(e.target.value)}
+                      className="rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm outline-none"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="mono-label">Fuso horário</span>
+                    <select
+                      value={timezone}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        if (!isValidTimezone(next)) return;
+                        // mantém o mesmo instante ao trocar o fuso
+                        const instant = wallTimeToUtc(when, timezone);
+                        setTimezone(next);
+                        if (Number.isFinite(instant.getTime())) setWhen(utcToWallTime(instant, next));
+                      }}
+                      className="rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm outline-none"
+                    >
+                      {Array.from(new Set([timezone, ...TIMEZONE_OPTIONS])).map((tz) => (
+                        <option key={tz} value={tz}>
+                          {timezoneLabel(tz)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Publicamos no horário exato deste fuso, sem depender do fuso do servidor.
+                </p>
+
 
                 <label className="mt-3 flex items-start gap-2 rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
                   <input
@@ -691,11 +795,11 @@ function AgendaPage() {
                       {list.map((p) => (
                         <li key={p.id} className="rounded-xl border border-border bg-surface-2 p-3">
                           <div className="flex items-start gap-3">
-                            <span className="shrink-0 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground">
-                              {new Date(p.scheduled_at).toLocaleTimeString("pt-BR", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
+                            <span
+                              className="shrink-0 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground"
+                              title={timezoneLabel(p.scheduled_timezone || timezone)}
+                            >
+                              {formatInTimezone(p.scheduled_at, p.scheduled_timezone || timezone)}
                             </span>
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-medium">
