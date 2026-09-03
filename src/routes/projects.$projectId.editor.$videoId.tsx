@@ -328,6 +328,22 @@ function EditorPage() {
     [history],
   );
 
+  /**
+   * Cópia do vídeo na conta: enviada uma única vez, em segundo plano. É o que
+   * permite abrir o mesmo projeto em outro aparelho e continuar editando.
+   */
+  const uploadedRef = useRef(false);
+  useEffect(() => {
+    if (!doc || doc.media.storagePath || uploadedRef.current) return;
+    uploadedRef.current = true;
+    void (async () => {
+      const file = await loadSourceFile(videoId);
+      if (!file) return;
+      const path = await uploadSourceFile(videoId, file).catch(() => null);
+      if (path) patchDoc({ media: { ...doc.media, storagePath: path } }, "mídia na nuvem");
+    })();
+  }, [doc, patchDoc, videoId]);
+
   /** Pré-edição (corte, enquadramento, cor, layout) — mesma estrutura do estúdio. */
   const patchPre = useCallback(
     (patch: Partial<PreEdit>, label = "preedit") => {
