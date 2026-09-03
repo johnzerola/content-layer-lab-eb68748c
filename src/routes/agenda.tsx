@@ -759,10 +759,10 @@ function AgendaPage() {
                                     toast.error("Falha ao re-agendar.");
                                   }
                                 }}
-                                aria-label={`Re-agendar ${p.file_name ?? "vídeo"}`}
+                                aria-label={`Tentar de novo: ${p.file_name ?? "vídeo"}`}
                                 className="interactive inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs text-muted-foreground transition hover:text-foreground"
                               >
-                                Re-agendar
+                                <RefreshCw className="size-3.5" aria-hidden="true" /> Tentar de novo
                               </button>
                             )}
                             {p.status === "agendado" && (
