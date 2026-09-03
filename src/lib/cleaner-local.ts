@@ -293,7 +293,13 @@ async function buildSegmentPlate(
     frame = await reader.read();
   }
   frame?.frame.close();
-  if (samples.length < 2) return samples.length ? new ImageData(samples[0]!, roi.w, roi.h) : null;
+  if (samples.length < 2) {
+    if (!samples.length) return null;
+    const single = new ImageData(roi.w, roi.h);
+    single.data.set(samples[0]!);
+    return single;
+  }
+
   return medianPlate(samples, roi.w, roi.h);
 }
 
