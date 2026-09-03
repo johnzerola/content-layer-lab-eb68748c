@@ -27,6 +27,24 @@ interface Props {
   currentTime: number;
 }
 
+/** Limite de segurança para embutir o áudio no documento do projeto (~20 MB). */
+const MAX_INLINE_AUDIO = 20 * 1024 * 1024;
+
+/** Converte o arquivo/gravação em data URL para persistir no projeto salvo. */
+function toPersistentUrl(blob: Blob): Promise<string> {
+  if (blob.size > MAX_INLINE_AUDIO) {
+    return Promise.reject(
+      new Error("Áudio muito grande para salvar no projeto (máx. 20 MB). Comprima o arquivo."),
+    );
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Não foi possível ler o áudio."));
+    reader.readAsDataURL(blob);
+  });
+}
+
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex items-center gap-2 py-1 text-xs">
