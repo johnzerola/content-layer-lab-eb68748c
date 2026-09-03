@@ -41,6 +41,7 @@ import {
   socialAccountTitle,
   uploadPostVideo,
   type PostKind,
+  type PublishMeta,
   type ScheduledPost,
   type SocialAccount,
 } from "@/lib/social";
