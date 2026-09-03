@@ -158,8 +158,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         setJob((prev) => ({ ...(prev as CleanerJob), ...status }));
         if (status.status === "completed") {
           setPolling(false);
-          if (status.result_url) onComplete(status.result_url);
-          toast.success("Vídeo limpo com sucesso.");
+          if (status.result_url) {
+            onComplete(status.result_url);
+            toast.success("Vídeo limpo com sucesso.");
+          } else if (status.preview_url) {
+            toast.success("Prévia de 5s pronta — confira e processe o vídeo completo.");
+          }
         } else if (status.status === "cancelled") {
           setPolling(false);
           toast.info("Processamento cancelado.");
@@ -502,7 +506,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     }
   };
 
-  const handleProcess = async () => {
+  const handleProcess = async (preview = false) => {
     if (!job?.id) return;
     if (!inputReady) {
       toast.error("O vídeo ainda não foi confirmado no motor. Reenvie o arquivo.");
@@ -512,13 +516,19 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       toast.error("Marque ao menos uma área ou use Detectar.");
       return;
     }
+    if (!preview && !creditsAvailable) {
+      toast.error(
+        `Créditos insuficientes: este vídeo custa ${creditsNeeded} crédito(s). Faça upgrade do plano.`,
+      );
+      return;
+    }
     try {
       const headers = await cloudAuthHeaders();
       await processJob({
         data: {
           id: job.id,
           mode,
-          preset,
+          preset: preview ? "fast" : preset,
           masks,
           options: {
             dynamic: dynamicMask,
@@ -529,13 +539,19 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             enhance: enhanceOutput ? { mode: "hq", scale: 1 } : { mode: "off" },
             crf: enhanceOutput ? 14 : 16,
             key_step: dynamicMask ? 3 : 8,
+            ...(preview ? { preview_seconds: 5 } : {}),
           },
         },
         headers,
       });
+      if (!preview && !isAdmin && !planUnlimited) {
+        void consumeCredits(creditsNeeded);
+      }
       setPolling(true);
       setJob((prev) => (prev ? { ...prev, status: "inpainting", progress: 1 } : prev));
-      toast.success("Reconstrução iniciada no motor de IA.");
+      toast.success(
+        preview ? "Gerando prévia de 5 segundos…" : "Reconstrução iniciada no motor de IA.",
+      );
     } catch (e) {
       toast.error(`Erro ao iniciar: ${e instanceof Error ? e.message : "desconhecido"}`);
     }
