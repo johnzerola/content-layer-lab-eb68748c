@@ -357,7 +357,54 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     setDraft(null);
   };
 
+  /** Fallback sem GPU: reconstrói o fundo no navegador (mais lento, sem blur). */
+  const runLocal = async (previewOnly: boolean) => {
+    if (!localCleanSupported()) {
+      toast.error("Este navegador não suporta o modo local (requer WebCodecs).");
+      return;
+    }
+    const usable = masks.filter((m) => m.role === "remove" && m.enabled !== false);
+    if (!usable.length) {
+      toast.error("Marque ao menos uma área para remover antes de processar localmente.");
+      return;
+    }
+    localCancel.current = false;
+    setLocalBusy(true);
+    setLocalProgress(0);
+    setLocalPhase("iniciando");
+    try {
+      const blob = await runLocalClean({
+        file: item.file,
+        masks: usable,
+        seconds: previewOnly ? 5 : undefined,
+        onProgress: (p) => setLocalProgress(Math.round(p * 100)),
+        onPhase: setLocalPhase,
+        isCancelled: () => localCancel.current,
+      });
+      const url = URL.createObjectURL(blob);
+      setLocalUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return url;
+      });
+      if (!previewOnly) onComplete(url);
+      toast.success(
+        previewOnly
+          ? "Prévia local de 5s pronta."
+          : "Vídeo limpo localmente — confira o resultado no player.",
+      );
+    } catch (e) {
+      if ((e as DOMException)?.name === "AbortError") toast.info("Processamento local cancelado.");
+      else toast.error(e instanceof Error ? e.message : "Falha no processamento local");
+    } finally {
+      setLocalBusy(false);
+      setLocalPhase("");
+    }
+  };
+
+  useEffect(() => () => localCancel.current === false && undefined, []);
+
   const startUpload = async () => {
+
     if (!health?.online) {
       toast.error("Motor de IA offline — configure o processamento local.");
       return;
