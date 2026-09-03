@@ -301,7 +301,8 @@ export function drawCaptions(
   if (!group || !group.length) return;
 
   const groupStart = group[0]?.start ?? 0;
-  const activeIdx = group.findIndex((w) => time >= w.start && time <= w.end);
+  let activeIdx = -1;
+  for (let i = 0; i < group.length; i++) if (time >= (group[i]?.start ?? 0)) activeIdx = i;
   const shown = s.mode === "word" ? [group[Math.max(0, activeIdx)]!] : group;
 
   // animação de entrada do bloco
