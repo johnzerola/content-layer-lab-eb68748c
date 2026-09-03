@@ -158,6 +158,19 @@ function layerAnim(layer: TemplateLayer, t: number): AnimState {
 }
 
 
+/** Fonte de imagem do corte: elemento <video> ou quadro decodificado (WebCodecs). */
+export interface FrameSource {
+  el: CanvasImageSource;
+  width: number;
+  height: number;
+}
+
+function frameSource(v: FrameSource | HTMLVideoElement | null): FrameSource | null {
+  if (!v) return null;
+  if ("el" in v) return v.width && v.height ? v : null;
+  return v.videoWidth ? { el: v, width: v.videoWidth, height: v.videoHeight } : null;
+}
+
 function drawFit(
   ctx: CanvasRenderingContext2D,
   src: CanvasImageSource,
