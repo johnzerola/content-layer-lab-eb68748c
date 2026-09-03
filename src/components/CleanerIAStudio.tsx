@@ -1056,14 +1056,27 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           </div>
 
           {!job || !inputReady ? (
-            <Button
-              className="w-full shadow-glow"
-              onClick={startUpload}
-              disabled={!health?.online || uploading}
-            >
-              <Upload className="mr-2 size-4" /> {job ? "Reenviar vídeo" : "Enviar para IA"}
-            </Button>
+            health && !health.online ? (
+              <Button
+                className="w-full"
+                variant="secondary"
+                onClick={() => runLocal(false)}
+                disabled={localBusy}
+              >
+                <Wand2 className="mr-2 size-4" />
+                {localBusy ? "Processando local…" : "Processar no modo local"}
+              </Button>
+            ) : (
+              <Button
+                className="w-full shadow-glow"
+                onClick={startUpload}
+                disabled={!health?.online || uploading}
+              >
+                <Upload className="mr-2 size-4" /> {job ? "Reenviar vídeo" : "Enviar para IA"}
+              </Button>
+            )
           ) : job.status === "completed" && !previewDone ? (
+
             <a
               href={job.result_url ?? "#"}
               download
