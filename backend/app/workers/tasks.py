@@ -611,6 +611,7 @@ def run_pipeline(
     is_preview = preview_seconds > 0
     output_path = str(job_path / ("preview.mp4" if is_preview else "output.mp4"))
     result_path = f"/v1/jobs/{job_id}/preview" if is_preview else f"/v1/jobs/{job_id}/result"
+    result_key = "preview_url" if is_preview else "result_url"
     callback_seq = int(read_state(job_path).get("callback_seq", 0))
 
     def emit(progress: float, stage: str, status: str = "processing", **extra) -> None:
