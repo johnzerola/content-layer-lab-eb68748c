@@ -452,6 +452,19 @@ function EditorPage() {
     toast.success("Transição aplicada aos cortes.");
   }, [doc, patchPre]);
 
+  /** template de legenda autoral escolhido em /estilos (texto + duração) */
+  const pendingCaptionTplApplied = useRef(false);
+  useEffect(() => {
+    if (pendingCaptionTplApplied.current || !doc) return;
+    const tpl = takePendingCaptionTemplate();
+    if (!tpl) return;
+    pendingCaptionTplApplied.current = true;
+    const layers = buildCaptionTemplateLayers(tpl, doc.composition.layers);
+    if (!layers.length) return;
+    addLayers(layers as TemplateLayer[], `legenda-${tpl.id}`);
+    toast.success(`Template de legenda “${tpl.name}” aplicado.`);
+  }, [addLayers, doc]);
+
 
 
   /** Traduz para pt-BR e pontua a transcrição mantendo o tempo por palavra. */
