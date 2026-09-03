@@ -126,8 +126,15 @@ function wordsFor(text: string, seg: Segment): CaptionWord[] {
   if (!parts.length) return [];
   const weights = parts.map((p) => p.length + 1.5);
   const total = weights.reduce((a, b) => a + b, 0);
-  const dur = Math.max(0.2, seg.end - seg.start);
-  let t = seg.start;
+  // o segmento vem com respiro (-0,12s antes e +0,2s depois) só para o áudio
+  // enviado à transcrição; as palavras precisam cair sobre a fala real, senão
+  // a legenda aparece atrasada
+  const span = Math.max(0.2, seg.end - seg.start);
+  const padHead = Math.min(0.12, span * 0.12);
+  const padTail = Math.min(0.2, span * 0.18);
+  const core = Math.max(0.2, span - padHead - padTail);
+  const dur = core;
+  let t = seg.start + padHead;
   return parts.map((p, i) => {
     const d = (weights[i]! / total) * dur;
     const w = { start: t, end: t + d, text: p };
