@@ -32,6 +32,7 @@ import { Route as MetricasRouteImport } from './routes/metricas'
 import { Route as PerfisRouteImport } from './routes/perfis'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as ProjetosRouteImport } from './routes/projetos'
+import { Route as RemoverRouteImport } from './routes/remover'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as VendasRouteImport } from './routes/vendas'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
@@ -171,6 +172,11 @@ const PrivacidadeRoute = PrivacidadeRouteImport.update({
 const ProjetosRoute = ProjetosRouteImport.update({
   id: '/projetos',
   path: '/projetos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RemoverRoute = RemoverRouteImport.update({
+  id: '/remover',
+  path: '/remover',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermosRoute = TermosRouteImport.update({
@@ -337,6 +343,7 @@ export interface FileRoutesByFullPath {
   '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
   '/projetos': typeof ProjetosRoute
+  '/remover': typeof RemoverRoute
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
@@ -387,6 +394,7 @@ export interface FileRoutesByTo {
   '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
   '/projetos': typeof ProjetosRoute
+  '/remover': typeof RemoverRoute
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
@@ -438,6 +446,7 @@ export interface FileRoutesById {
   '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
   '/projetos': typeof ProjetosRoute
+  '/remover': typeof RemoverRoute
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
@@ -490,6 +499,7 @@ export interface FileRouteTypes {
     | '/perfis'
     | '/privacidade'
     | '/projetos'
+    | '/remover'
     | '/termos'
     | '/vendas'
     | '/.mcp/list-tools'
@@ -540,6 +550,7 @@ export interface FileRouteTypes {
     | '/perfis'
     | '/privacidade'
     | '/projetos'
+    | '/remover'
     | '/termos'
     | '/vendas'
     | '/.mcp/list-tools'
@@ -590,6 +601,7 @@ export interface FileRouteTypes {
     | '/perfis'
     | '/privacidade'
     | '/projetos'
+    | '/remover'
     | '/termos'
     | '/vendas'
     | '/.mcp/list-tools'
@@ -641,6 +653,7 @@ export interface RootRouteChildren {
   PerfisRoute: typeof PerfisRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   ProjetosRoute: typeof ProjetosRoute
+  RemoverRoute: typeof RemoverRoute
   TermosRoute: typeof TermosRoute
   VendasRoute: typeof VendasRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
@@ -829,6 +842,13 @@ declare module '@tanstack/react-router' {
       path: '/projetos'
       fullPath: '/projetos'
       preLoaderRoute: typeof ProjetosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/remover': {
+      id: '/remover'
+      path: '/remover'
+      fullPath: '/remover'
+      preLoaderRoute: typeof RemoverRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/termos': {
@@ -1033,6 +1053,7 @@ const rootRouteChildren: RootRouteChildren = {
   PerfisRoute: PerfisRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   ProjetosRoute: ProjetosRoute,
+  RemoverRoute: RemoverRoute,
   TermosRoute: TermosRoute,
   VendasRoute: VendasRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
