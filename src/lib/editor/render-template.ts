@@ -5,6 +5,8 @@
  * é lido pelo intervalo escolhido (CUT_VIDEO). Saída padrão: 1080x1920.
  */
 import { ArrayBufferTarget, Muxer } from "mp4-muxer";
+import { drawSticker, type StickerId } from "@/lib/editor/stickers";
+import { applyEffectOverlay, applyEffectTransform, type ClipEffect } from "@/lib/editor/effects";
 import { pickAudioCodec, pickBitrate, pickVideoCodec } from "@/lib/encode-presets";
 import { renderAudioTrack } from "@/lib/audio-track";
 import { cleanMp4Metadata } from "@/lib/mp4meta";
@@ -343,6 +345,9 @@ export function drawTemplateFrame(
 ) {
   const W = space?.width ?? ctx.canvas.width;
   const H = space?.height ?? ctx.canvas.height;
+  const effects = (doc.effects ?? []) as ClipEffect[];
+  ctx.save();
+  applyEffectTransform(ctx, effects, t, W, H);
   ctx.save();
   ctx.filter = "none";
   paintBackground(ctx, doc, W, H, images);
@@ -404,6 +409,16 @@ export function drawTemplateFrame(
       drawText(ctx, layer, x, y, w, h);
     } else if (layer.type === "shape") {
       drawShape(ctx, layer, x, y, w, h);
+    } else if (layer.type === "sticker") {
+      ctx.filter = "none";
+      drawSticker(ctx, layer.stickerId as StickerId, x, y, w, h, {
+        t: t - layer.startTime,
+        color: layer.color,
+        accent: layer.accent,
+        text: layer.text,
+        fontFamily: layer.fontFamily,
+        speed: layer.speed || 1,
+      });
     } else if (layer.type === "caption") {
       const cue = cues.find((c) => t >= c.start && t <= c.end);
       if (cue) {
@@ -441,6 +456,8 @@ export function drawTemplateFrame(
     }
     ctx.restore();
   }
+  ctx.restore();
+  applyEffectOverlay(ctx, effects, t, W, H);
 }
 
 function collectImageSources(doc: TemplateDoc): string[] {

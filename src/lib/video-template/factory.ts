@@ -8,6 +8,7 @@ import {
   type FilterValues,
   type ImageLayer,
   type ShapeLayer,
+  type StickerLayer,
   type TemplateDoc,
   type TemplateLayer,
   type TextLayer,
@@ -162,6 +163,31 @@ export function createShapeLayer(layers: TemplateLayer[], shape: ShapeLayer["sha
     radius: 24,
     width: 40,
     height: 10,
+  };
+}
+
+/** Sticker de chamada para ação; o desenho vem de `drawSticker`. */
+export function createStickerLayer(
+  layers: TemplateLayer[],
+  stickerId: string,
+  patch: Partial<StickerLayer> = {},
+): StickerLayer {
+  return {
+    ...base("sticker", "Sticker", nextZ(layers)),
+    type: "sticker",
+    stickerId,
+    text: "",
+    color: "#7c5cff",
+    accent: "#ffffff",
+    fontFamily: "Outfit",
+    speed: 1,
+    x: 20,
+    y: 74,
+    width: 60,
+    height: 12,
+    startTime: 0,
+    endTime: null,
+    ...patch,
   };
 }
 

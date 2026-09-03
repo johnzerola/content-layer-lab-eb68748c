@@ -13,6 +13,9 @@ import {
   Shuffle,
   Sliders,
   Sparkles,
+  Zap,
+  AudioLines,
+  BadgeCheck,
   Stamp,
   Type,
   Wand2,
@@ -41,6 +44,11 @@ import { BatchApplyModal } from "@/components/editor/BatchApplyModal";
 import { TransitionPicker } from "@/components/editor/TransitionPicker";
 import { AudioPanel } from "@/components/editor/AudioPanel";
 import { VoicePanel } from "@/components/editor/VoicePanel";
+import { StickerPanel } from "@/components/editor/StickerPanel";
+import { EffectsPanel } from "@/components/editor/EffectsPanel";
+import { SilencePanel } from "@/components/editor/SilencePanel";
+import type { ClipEffect } from "@/lib/editor/effects";
+import type { StickerLayer } from "@/lib/video-template/types";
 import { MediaSourceBar } from "@/components/editor/MediaSourceBar";
 import { BulkScheduleModal } from "@/components/BulkScheduleModal";
 import { listAccounts, type SocialAccount } from "@/lib/social";
@@ -123,7 +131,10 @@ type ToolId =
   | "templates"
   | "render"
   | "brand"
-  | "camada";
+  | "camada"
+  | "stickers"
+  | "efeitos"
+  | "silencio";
 
 const TOOL_GROUPS: { title: string; tools: { id: ToolId; label: string; icon: typeof Crop }[] }[] = [
   {
@@ -133,6 +144,8 @@ const TOOL_GROUPS: { title: string; tools: { id: ToolId; label: string; icon: ty
       { id: "enquadrar", label: "Enquadrar", icon: Crop },
       { id: "transicoes", label: "Transições", icon: Shuffle },
       { id: "keyframes", label: "Keyframes", icon: Diamond },
+      { id: "efeitos", label: "Efeitos", icon: Zap },
+      { id: "silencio", label: "Silêncio", icon: AudioLines },
       { id: "render", label: "Render real", icon: Gauge },
     ],
   },
@@ -145,6 +158,7 @@ const TOOL_GROUPS: { title: string; tools: { id: ToolId; label: string; icon: ty
       { id: "estilos", label: "Estilos", icon: Palette },
       { id: "templates", label: "Templates", icon: Layers },
       { id: "brand", label: "Brand Kit", icon: Stamp },
+      { id: "stickers", label: "Stickers", icon: BadgeCheck },
     ],
   },
   {
@@ -1000,6 +1014,45 @@ function EditorPage() {
             )}
             {tool === "render" && (
               <RenderReport preedit={pre} duration={duration} currentTime={currentTime} onSeek={seek} />
+            )}
+            {tool === "stickers" && (
+              <StickerPanel
+                layers={doc.composition.layers}
+                selected={
+                  (doc.composition.layers.find((l) => l.id === selectedId && l.type === "sticker") as
+                    | StickerLayer
+                    | undefined) ?? null
+                }
+                brandColor={doc.brandKit?.primary ?? "#7c5cff"}
+                brandAccent={doc.brandKit?.secondary ?? "#ffffff"}
+                onAdd={(layer) => {
+                  addLayers([layer], "adicionar-sticker");
+                  setSelectedId(layer.id);
+                }}
+                onUpdate={(id, patch) => updateLayer(id, patch as Partial<TemplateLayer>)}
+              />
+            )}
+            {tool === "efeitos" && (
+              <EffectsPanel
+                effects={(doc.composition.effects ?? []) as ClipEffect[]}
+                currentTime={currentTime}
+                duration={duration}
+                onChange={(next) =>
+                  history.set(
+                    (d) => (d ? { ...d, composition: { ...d.composition, effects: next } } : d),
+                    "efeitos",
+                  )
+                }
+              />
+            )}
+            {tool === "silencio" && (
+              <SilencePanel
+                getFile={() => loadSourceFile(videoId, doc.media.storagePath ?? null)}
+                onApply={(keep) => {
+                  patchPre({ segments: keep.map((r) => ({ start: r.start, end: r.end })) });
+                  toast.success(`${keep.length} trechos de fala mantidos.`);
+                }}
+              />
             )}
             {tool === "layout" && <LayoutPanel preedit={pre} onChange={patchPre} />}
             {tool === "ajustes" && <GradePanel preedit={pre} onChange={patchPre} />}

@@ -36,7 +36,7 @@ export const BINDING_LABELS: Record<BindingType, string> = {
   CUSTOM: "Personalizado",
 };
 
-export type LayerType = "text" | "image" | "video" | "shape" | "caption";
+export type LayerType = "text" | "image" | "video" | "shape" | "caption" | "sticker";
 
 export type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
 
@@ -185,7 +185,20 @@ export interface CaptionLayer extends BaseLayer {
   style: CaptionLayerStyle;
 }
 
-export type TemplateLayer = TextLayer | ImageLayer | VideoLayer | ShapeLayer | CaptionLayer;
+/** Chamada para ação animada, desenhada em vetor (ver `src/lib/editor/stickers.ts`). */
+export interface StickerLayer extends BaseLayer {
+  type: "sticker";
+  stickerId: string;
+  /** texto do sticker (@perfil, nome do canal, contagem…) */
+  text: string;
+  color: string;
+  accent: string;
+  fontFamily: string;
+  /** multiplicador da velocidade da animação */
+  speed: number;
+}
+
+export type TemplateLayer = TextLayer | ImageLayer | VideoLayer | ShapeLayer | CaptionLayer | StickerLayer;
 
 export type TemplateBackground =
   | { kind: "none" }
@@ -205,6 +218,8 @@ export interface TemplateDoc {
   };
   filter: FilterValues;
   layers: TemplateLayer[];
+  /** efeitos de clipe aplicados ao quadro inteiro (ver `src/lib/editor/effects.ts`) */
+  effects?: unknown[];
   /** vídeo apenas de prévia durante a criação — nunca vira conteúdo final */
   sampleVideoUrl?: string | null;
   settings?: Record<string, unknown>;
