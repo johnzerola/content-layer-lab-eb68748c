@@ -259,7 +259,7 @@ function AgendaPage() {
     if (!accountId) return null;
     const state = health[accountId];
     if (state && (state.level === "expired" || state.level === "missing")) return state.message;
-    const at = new Date(when);
+    const at = wallTimeToUtc(when, timezone);
     if (!Number.isFinite(at.getTime())) return null;
     if (!connectionValidAt(tokenExpiry[accountId], at)) {
       return "A conexão desta conta expira antes do horário escolhido. Reconecte-a para o post publicar.";
