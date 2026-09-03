@@ -37,13 +37,20 @@ function compactWorkerError(body: string, status?: number): string {
 
 export function workerBase(): string | null {
   const url = process.env["CLEANER_WORKER_URL"];
-  return url ? normalizeBase(url) : null;
+  const publicUrl = process.env["CLEANER_WORKER_PUBLIC_URL"];
+  // O runtime serverless bloqueia subrequisições em http://; quando existe uma
+  // URL pública https, ela é sempre preferida para as chamadas de controle.
+  if (url && /^http:\/\//i.test(url) && publicUrl && /^https:\/\//i.test(publicUrl)) {
+    return normalizeBase(publicUrl);
+  }
+  return url ? normalizeBase(url) : publicUrl ? normalizeBase(publicUrl) : null;
 }
 
 export function workerPublicBase(): string | null {
   const url = process.env["CLEANER_WORKER_PUBLIC_URL"];
   return url ? normalizeBase(url) : workerBase();
 }
+
 
 function secret(): string {
   const value = process.env["CLEANER_WORKER_SECRET"] ?? "";
