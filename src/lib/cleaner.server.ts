@@ -224,7 +224,8 @@ export async function workerHealth() {
   const base = workerBase();
   if (!base) return { online: false as const, reason: "CLEANER_WORKER_URL nao configurada" };
   try {
-    const response = await fetch(`${base}/v1/health`);
+    const response = await fetch(`${base}/v1/health`, { signal: AbortSignal.timeout(12_000) });
+
     const responseBody = await response.text();
     if (!response.ok) {
       return {
