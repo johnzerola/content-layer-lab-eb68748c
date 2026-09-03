@@ -1122,7 +1122,18 @@ export function drawFrame(
     push(t.captions.z, 70, () => drawCaptions(ctx, t.captions!, cues, time));
   }
 
-  jobs.sort((a, b) => a.z - b.z || a.i - b.i).forEach((j) => j.run());
+  // cada camada desenha isolada: espelho/rotação do vídeo nunca vaza para
+  // legendas, textos ou marca d'água
+  jobs
+    .sort((a, b) => a.z - b.z || a.i - b.i)
+    .forEach((j) => {
+      ctx.save();
+      try {
+        j.run();
+      } finally {
+        ctx.restore();
+      }
+    });
   if (animating) ctx.restore();
   ctx.restore();
 }
