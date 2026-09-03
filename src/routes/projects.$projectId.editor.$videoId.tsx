@@ -16,6 +16,7 @@ import {
   Stamp,
   Type,
   Wand2,
+  Mic,
 } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { TranscriptPanel } from "@/components/editor/TranscriptPanel";
@@ -39,6 +40,7 @@ import { TimelinePro } from "@/components/editor/TimelinePro";
 import { BatchApplyModal } from "@/components/editor/BatchApplyModal";
 import { TransitionPicker } from "@/components/editor/TransitionPicker";
 import { AudioPanel } from "@/components/editor/AudioPanel";
+import { VoicePanel } from "@/components/editor/VoicePanel";
 import { MediaSourceBar } from "@/components/editor/MediaSourceBar";
 import { BulkScheduleModal } from "@/components/BulkScheduleModal";
 import { listAccounts, type SocialAccount } from "@/lib/social";
@@ -51,7 +53,9 @@ import {
   type ExportQuality,
 } from "@/lib/editor/export-quality";
 import { toast } from "sonner";
-import { loadSourceFile } from "@/lib/editor/cuts";
+import { loadSourceFile, registerSourceFile } from "@/lib/editor/cuts";
+import { uploadSourceFile } from "@/lib/editor/media-cloud";
+import { saveRenderedVideo } from "@/lib/editor/download";
 
 import { CutPanel, FramePanel, GradePanel, LayoutPanel, TitlesPanel } from "@/components/editor/ToolPanels";
 import { EditorCanvas } from "@/components/vtemplate/EditorCanvas";
@@ -114,6 +118,7 @@ type ToolId =
   | "texto"
   | "estilos"
   | "audio"
+  | "voz"
   | "titulos"
   | "templates"
   | "render"
@@ -147,6 +152,7 @@ const TOOL_GROUPS: { title: string; tools: { id: ToolId; label: string; icon: ty
     tools: [
       { id: "texto", label: "Texto", icon: Type },
       { id: "audio", label: "Áudio", icon: Music4 },
+      { id: "voz", label: "Voz", icon: Mic },
       { id: "titulos", label: "Títulos", icon: Type },
       { id: "camada", label: "Camada", icon: Sparkles },
     ],
@@ -248,7 +254,7 @@ function EditorPage() {
     let objectUrl: string | null = null;
     let alive = true;
     void (async () => {
-      const file = await loadSourceFile(videoId);
+      const file = await loadSourceFile(videoId, doc?.media.storagePath ?? null);
       if (!file || !alive) return;
       objectUrl = URL.createObjectURL(file);
       setLocalSrc(objectUrl);
@@ -257,7 +263,7 @@ function EditorPage() {
       alive = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [videoId]);
+  }, [videoId, doc?.media.storagePath]);
 
   useEffect(() => {
     void listAccounts()
@@ -1063,6 +1069,14 @@ function EditorPage() {
               <AudioPanel
                 audio={doc.audio ?? defaultEditorAudio()}
                 onChange={(next, label) => patchDoc({ audio: next }, label ?? "audio")}
+                scriptText={scriptText}
+                currentTime={currentTime}
+              />
+            )}
+            {tool === "voz" && (
+              <VoicePanel
+                audio={doc.audio ?? defaultEditorAudio()}
+                onChange={(next, label) => patchDoc({ audio: next }, label ?? "voz")}
                 scriptText={scriptText}
                 currentTime={currentTime}
               />
