@@ -10,6 +10,7 @@ import {
   cutAsSource,
   cutDuration,
   getSourceFile,
+  loadSourceFile,
   registerSourceFile,
   type CutRecord,
 } from "@/lib/editor/cuts";
@@ -120,7 +121,7 @@ export function CutLibrary({
       toast.error("Este navegador não suporta a renderização (WebCodecs).");
       return;
     }
-    const file = getSourceFile(cut.sourceId);
+    const file = await loadSourceFile(cut.sourceId);
     if (!file) {
       toast.error(`Reconecte o vídeo “${cut.sourceName}” para renderizar.`);
       fileRef.current?.click();

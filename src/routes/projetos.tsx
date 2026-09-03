@@ -10,7 +10,7 @@ import { attachInstanceProject, deleteInstance, listInstances, updateInstance } 
 import { createEditorProject } from "@/lib/editor/project";
 import { createEditorProjectRecord, getEditorProject } from "@/lib/editor/project.service";
 import { renderTemplateProject, templateRenderSupported } from "@/lib/editor/render-template";
-import { getSourceFile, readCutBinding, registerSourceFile } from "@/lib/editor/cuts";
+import { getSourceFile, loadSourceFile, readCutBinding, registerSourceFile } from "@/lib/editor/cuts";
 import type { TemplateInstanceRecord } from "@/lib/video-template/types";
 
 export const Route = createFileRoute("/projetos")({
@@ -98,7 +98,7 @@ function ProjectsPage() {
 
   const renderOne = useCallback(async (item: TemplateInstanceRecord, signal?: AbortSignal) => {
     const cut = readCutBinding(item.instance_data.settings);
-    const file = cut ? getSourceFile(cut.sourceId) : null;
+    const file = cut ? await loadSourceFile(cut.sourceId) : null;
     if (!cut || !file) {
       setRenders((r) => ({
         ...r,
