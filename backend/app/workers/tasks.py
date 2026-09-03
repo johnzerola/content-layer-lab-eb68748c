@@ -487,6 +487,10 @@ def _run_diffusion_pipeline(
         info.height,
         info.fps,
     )
+    if composite_on:
+        normalized_video = _composite_step(
+            input_path, normalized_video, mask_dir, info.fps, job_dir, emit
+        )
     emit(92, "validando resultado", "refining")
     if verify_on:
         segments, metrics = _audit_video(normalized_video, mask_dir, info.fps)
