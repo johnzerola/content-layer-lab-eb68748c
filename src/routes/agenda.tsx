@@ -651,15 +651,77 @@ function AgendaPage() {
                   />
                 </label>
 
-                <label className="mt-3 flex flex-col gap-1.5">
-                  <span className="mono-label">Data e hora</span>
-                  <input
-                    type="datetime-local"
-                    value={when}
-                    onChange={(e) => setWhen(e.target.value)}
-                    className="rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm outline-none"
-                  />
-                </label>
+                {selectedAccount?.platform === "youtube" && (
+                  <div className="mt-3 flex flex-col gap-3 rounded-xl border border-border bg-surface-2 p-3">
+                    <span className="mono-label text-primary">Detalhes do YouTube</span>
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs text-muted-foreground">Título (até 100 caracteres)</span>
+                      <input
+                        value={ytTitle}
+                        maxLength={100}
+                        onChange={(e) => setYtTitle(e.target.value)}
+                        placeholder="Se vazio, usamos a 1ª linha da legenda"
+                        className="rounded-lg border border-border bg-surface-1 px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs text-muted-foreground">Descrição</span>
+                      <textarea
+                        value={ytDescription}
+                        rows={3}
+                        onChange={(e) => setYtDescription(e.target.value)}
+                        placeholder="Se vazio, usamos a legenda"
+                        className="resize-none rounded-lg border border-border bg-surface-1 px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs text-muted-foreground">Tags (separadas por vírgula)</span>
+                      <input
+                        value={ytTags}
+                        onChange={(e) => setYtTags(e.target.value)}
+                        placeholder="cortes, podcast, viral"
+                        className="rounded-lg border border-border bg-surface-1 px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
+                      />
+                    </label>
+                  </div>
+                )}
+
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1.5">
+                    <span className="mono-label">Data e hora</span>
+                    <input
+                      type="datetime-local"
+                      value={when}
+                      onChange={(e) => setWhen(e.target.value)}
+                      className="rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm outline-none"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="mono-label">Fuso horário</span>
+                    <select
+                      value={timezone}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        if (!isValidTimezone(next)) return;
+                        // mantém o mesmo instante ao trocar o fuso
+                        const instant = wallTimeToUtc(when, timezone);
+                        setTimezone(next);
+                        if (Number.isFinite(instant.getTime())) setWhen(utcToWallTime(instant, next));
+                      }}
+                      className="rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm outline-none"
+                    >
+                      {Array.from(new Set([timezone, ...TIMEZONE_OPTIONS])).map((tz) => (
+                        <option key={tz} value={tz}>
+                          {timezoneLabel(tz)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Publicamos no horário exato deste fuso, sem depender do fuso do servidor.
+                </p>
+
 
                 <label className="mt-3 flex items-start gap-2 rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
                   <input
