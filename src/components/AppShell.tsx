@@ -155,6 +155,8 @@ const ROUTE_PATHS = [
   "/admin",
   "/fotos",
   "/limpar-ia",
+  "/remover",
+
 ] as const;
 
 interface Props {
