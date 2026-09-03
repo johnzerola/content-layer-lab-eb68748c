@@ -1095,7 +1095,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 on: cropClean,
                 set: setCropClean,
                 title: "Legenda por recorte limpo",
-                hint: "Remove legendas dinâmicas reenquadrando como no teste aprovado",
+                hint: "Reenquadra para fora da legenda — usado só quando nenhuma área é marcada",
+
               },
               {
                 key: "enh",
