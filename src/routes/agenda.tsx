@@ -706,11 +706,16 @@ function AgendaPage() {
                                   {p.caption}
                                 </p>
                               )}
-                              {p.error && (
+                              {(p.error || p.error_code) && (
                                 <div className="mt-2 rounded-lg border border-red-500/20 bg-red-500/5 p-2">
-                                  <p className="text-[11px] leading-tight text-red-400">
-                                    ERRO: {p.error}
+                                  <p className="text-[11px] leading-tight text-red-300">
+                                    {friendlyPublishError(p.error_code, p.error)}
                                   </p>
+                                  {p.error && (
+                                    <p className="mt-1 text-[10px] leading-tight text-muted-foreground">
+                                      Detalhe técnico: {p.error}
+                                    </p>
+                                  )}
                                 </div>
                               )}
                             </div>
