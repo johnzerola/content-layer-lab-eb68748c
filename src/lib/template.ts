@@ -106,6 +106,8 @@ export interface CaptionStyle extends BoxLayer {
   boxBorderColor?: string;
   /** espessura da borda da caixa de fundo, em px do canvas 1080 */
   boxBorderWidth?: number;
+  /** sincronia da legenda em segundos: negativo adianta, positivo atrasa */
+  offset?: number;
 }
 
 
@@ -366,6 +368,7 @@ export function defaultCaptions(): CaptionStyle {
     highlightColor: "#c6f24e",
     maxLines: 2,
     lineHeight: 1.2,
+    offset: 0,
   };
 
 }

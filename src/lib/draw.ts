@@ -278,21 +278,31 @@ export function drawCaptions(
   ctx: CanvasRenderingContext2D,
   s: CaptionStyle,
   cues: CaptionCue[],
-  time: number,
+  rawTime: number,
 ) {
   if (!s.visible || !cues.length) return;
-  const cue = cues.find((c) => time >= c.start && time <= c.end);
+  // sincronia: a legenda entra um pouco antes da fala (percepção de "no tempo"),
+  // e o usuário pode ajustar com s.offset (negativo adianta, positivo atrasa)
+  const LEAD = 0.12;
+  const time = rawTime + LEAD - (s.offset ?? 0);
+  const cue =
+    cues.find((c) => time >= c.start && time <= c.end) ??
+    // dentro de um respiro curto entre blocos, mantém a última legenda na tela
+    [...cues].reverse().find((c) => time > c.end && time - c.end <= 0.25);
   if (!cue) return;
 
   const groups = chunkWords(cue.words, Math.max(1, s.maxWords));
-  const gi = groups.findIndex(
-    (g) => time >= (g[0]?.start ?? 0) && time <= (g[g.length - 1]?.end ?? 0),
-  );
-  const group = groups[gi >= 0 ? gi : groups.length - 1];
+  // o bloco atual é o último cujo início já passou — evita "buracos" entre blocos
+  let gi = -1;
+  for (let i = 0; i < groups.length; i++) {
+    if (time >= (groups[i]![0]?.start ?? 0)) gi = i;
+  }
+  const group = groups[gi >= 0 ? gi : 0];
   if (!group || !group.length) return;
 
   const groupStart = group[0]?.start ?? 0;
-  const activeIdx = group.findIndex((w) => time >= w.start && time <= w.end);
+  let activeIdx = -1;
+  for (let i = 0; i < group.length; i++) if (time >= (group[i]?.start ?? 0)) activeIdx = i;
   const shown = s.mode === "word" ? [group[Math.max(0, activeIdx)]!] : group;
 
   // animação de entrada do bloco
@@ -1112,7 +1122,18 @@ export function drawFrame(
     push(t.captions.z, 70, () => drawCaptions(ctx, t.captions!, cues, time));
   }
 
-  jobs.sort((a, b) => a.z - b.z || a.i - b.i).forEach((j) => j.run());
+  // cada camada desenha isolada: espelho/rotação do vídeo nunca vaza para
+  // legendas, textos ou marca d'água
+  jobs
+    .sort((a, b) => a.z - b.z || a.i - b.i)
+    .forEach((j) => {
+      ctx.save();
+      try {
+        j.run();
+      } finally {
+        ctx.restore();
+      }
+    });
   if (animating) ctx.restore();
   ctx.restore();
 }
