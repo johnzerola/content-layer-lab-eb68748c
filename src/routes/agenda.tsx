@@ -704,11 +704,11 @@ function AgendaPage() {
                       {list.map((p) => (
                         <li key={p.id} className="rounded-xl border border-border bg-surface-2 p-3">
                           <div className="flex items-start gap-3">
-                            <span className="shrink-0 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground">
-                              {new Date(p.scheduled_at).toLocaleTimeString("pt-BR", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
+                            <span
+                              className="shrink-0 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground"
+                              title={timezoneLabel(p.scheduled_timezone || timezone)}
+                            >
+                              {formatInTimezone(p.scheduled_at, p.scheduled_timezone || timezone)}
                             </span>
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-medium">
