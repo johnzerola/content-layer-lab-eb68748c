@@ -324,14 +324,33 @@ function AgendaPage() {
       toast.error("Escolha o vídeo que será publicado.");
       return;
     }
+    const at = wallTimeToUtc(when, timezone);
+    if (!Number.isFinite(at.getTime())) {
+      toast.error("Escolha uma data e hora válidas.");
+      return;
+    }
     setSending(true);
     try {
       const up = await uploadPostVideo(file, file.name);
+      const isYoutube = selectedAccount?.platform === "youtube";
       await schedulePost({
         accountId: accountId || null,
         kind,
         caption,
-        scheduledAt: new Date(when),
+        scheduledAt: at,
+        timezone,
+        publishMeta: isYoutube
+          ? {
+              youtube: {
+                title: ytTitle.trim() || undefined,
+                description: ytDescription.trim() || undefined,
+                tags: ytTags
+                  .split(/[,\n]/)
+                  .map((t) => t.trim().replace(/^#/, ""))
+                  .filter(Boolean),
+              },
+            }
+          : undefined,
         videoPath: up.path,
         videoUrl: up.url,
         fileName: file.name,
@@ -340,8 +359,24 @@ function AgendaPage() {
       setFile(null);
       setCaption("");
       setConsent(false);
-      toast.success("Publicação agendada.");
+      setYtTitle("");
+      setYtDescription("");
+      setYtTags("");
+      toast.success(
+        `Publicação agendada para ${formatInTimezone(at, timezone, {
+          day: "2-digit",
+          month: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        })} (${timezoneLabel(timezone)}).`,
+      );
       await refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao agendar.");
+    } finally {
+      setSending(false);
+    }
+  }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao agendar.");
     } finally {
