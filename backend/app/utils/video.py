@@ -130,6 +130,55 @@ def ffmpeg_filter(
     return destination
 
 
+def trim_video(source: str, destination: str, seconds: float) -> str:
+    """Re-encode apenas os primeiros `seconds` segundos (corte preciso, com áudio)."""
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-i", source,
+            "-t", f"{max(0.1, seconds):.3f}",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "160k",
+            "-movflags", "+faststart",
+            destination,
+        ],
+        check=True,
+    )
+    return destination
+
+
+def composite_masked(
+    original: str,
+    inpainted: str,
+    mask_dir: str,
+    fps: float,
+    destination: str,
+) -> str:
+    """Composite seletivo: pixels do original em tudo, do inpainting só na máscara.
+
+    A máscara é suavizada (boxblur) antes do maskedmerge para evitar costura
+    visível na borda da região reconstruída.
+    """
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-i", original,
+            "-i", inpainted,
+            "-framerate", f"{fps:.6f}", "-i", os.path.join(mask_dir, "%06d.png"),
+            "-filter_complex",
+            "[2:v]boxblur=4:2[m];[0:v][1:v][m]maskedmerge[v]",
+            "-map", "[v]",
+            "-c:v", "libx264", "-preset", "slow", "-crf", "16",
+            "-pix_fmt", "yuv420p",
+            "-shortest",
+            destination,
+        ],
+        check=True,
+    )
+    return destination
+
+
 def normalize_video(
     source: str,
     destination: str,

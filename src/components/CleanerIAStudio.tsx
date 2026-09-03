@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
+  Coins,
   Eraser,
+  Eye,
   MousePointer2,
   PenTool,
   Pentagon,
@@ -12,6 +14,7 @@ import {
   Target,
   Trash2,
   Upload,
+  Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -41,6 +44,8 @@ import {
   type CleanerRegion,
 } from "@/lib/cleaner";
 import { cloudAuthHeaders } from "@/lib/cloud";
+import { consumeCredits, useAccess } from "@/lib/subscription";
+import { planFromId } from "@/lib/plan";
 
 type Props = {
   item: { id: string; file: File; poster: string | null; w: number; h: number };
@@ -80,6 +85,14 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [brushSize, setBrushSize] = useState(0.015);
+  const [workMode, setWorkMode] = useState<"auto" | "manual">("auto");
+
+  const access = useAccess();
+  const isAdmin = access?.isAdmin ?? false;
+  const creditsNeeded = Math.max(1, Math.ceil((duration || 60) / 60));
+  const planUnlimited = planFromId(access?.sub?.plan ?? null).credits === null;
+  const creditsAvailable = isAdmin || planUnlimited || (access?.sub?.credits ?? 0) >= creditsNeeded;
+  const previewDone = !!job?.preview_url && !job?.result_url && job?.status === "completed";
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -145,8 +158,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         setJob((prev) => ({ ...(prev as CleanerJob), ...status }));
         if (status.status === "completed") {
           setPolling(false);
-          if (status.result_url) onComplete(status.result_url);
-          toast.success("Vídeo limpo com sucesso.");
+          if (status.result_url) {
+            onComplete(status.result_url);
+            toast.success("Vídeo limpo com sucesso.");
+          } else if (status.preview_url) {
+            toast.success("Prévia de 5s pronta — confira e processe o vídeo completo.");
+          }
         } else if (status.status === "cancelled") {
           setPolling(false);
           toast.info("Processamento cancelado.");
@@ -489,7 +506,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     }
   };
 
-  const handleProcess = async () => {
+  const handleProcess = async (preview = false) => {
     if (!job?.id) return;
     if (!inputReady) {
       toast.error("O vídeo ainda não foi confirmado no motor. Reenvie o arquivo.");
@@ -499,13 +516,19 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       toast.error("Marque ao menos uma área ou use Detectar.");
       return;
     }
+    if (!preview && !creditsAvailable) {
+      toast.error(
+        `Créditos insuficientes: este vídeo custa ${creditsNeeded} crédito(s). Faça upgrade do plano.`,
+      );
+      return;
+    }
     try {
       const headers = await cloudAuthHeaders();
       await processJob({
         data: {
           id: job.id,
           mode,
-          preset,
+          preset: preview ? "fast" : preset,
           masks,
           options: {
             dynamic: dynamicMask,
@@ -516,13 +539,19 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             enhance: enhanceOutput ? { mode: "hq", scale: 1 } : { mode: "off" },
             crf: enhanceOutput ? 14 : 16,
             key_step: dynamicMask ? 3 : 8,
+            ...(preview ? { preview_seconds: 5 } : {}),
           },
         },
         headers,
       });
+      if (!preview && !isAdmin && !planUnlimited) {
+        void consumeCredits(creditsNeeded);
+      }
       setPolling(true);
       setJob((prev) => (prev ? { ...prev, status: "inpainting", progress: 1 } : prev));
-      toast.success("Reconstrução iniciada no motor de IA.");
+      toast.success(
+        preview ? "Gerando prévia de 5 segundos…" : "Reconstrução iniciada no motor de IA.",
+      );
     } catch (e) {
       toast.error(`Erro ao iniciar: ${e instanceof Error ? e.message : "desconhecido"}`);
     }
@@ -573,7 +602,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         >
           <video
             ref={videoRef}
-            src={job?.status === "completed" && job.result_url ? job.result_url : src}
+            src={job?.status === "completed" ? (job.result_url ?? job.preview_url ?? src) : src}
             controls={job?.status === "completed"}
             playsInline
             className="absolute inset-0 size-full object-contain z-0"
@@ -964,7 +993,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             >
               <Upload className="mr-2 size-4" /> {job ? "Reenviar vídeo" : "Enviar para IA"}
             </Button>
-          ) : job.status === "completed" ? (
+          ) : job.status === "completed" && !previewDone ? (
             <a
               href={job.result_url ?? "#"}
               download
@@ -980,21 +1009,90 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             </a>
           ) : (
             <div className="space-y-2">
+              {previewDone && (
+                <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-3">
+                  <p className="flex items-center gap-1.5 text-[11px] font-medium text-primary">
+                    <Eye className="size-3.5" /> Prévia de 5s pronta — confira no player acima.
+                  </p>
+                  <div className="flex gap-2">
+                    <a
+                      href={job?.preview_url ?? "#"}
+                      download
+                      className="interactive flex-1 rounded-lg border border-border/70 py-1.5 text-center text-xs font-medium"
+                    >
+                      Baixar prévia
+                    </a>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-xs"
+                      onClick={() => void handleProcess(true)}
+                      disabled={polling}
+                    >
+                      Refazer
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-1 rounded-xl border border-border/70 bg-background/40 p-1 text-xs font-medium">
+                <button
+                  onClick={() => setWorkMode("auto")}
+                  className={`flex items-center justify-center gap-1 rounded-lg py-1.5 transition-colors ${
+                    workMode === "auto" ? "bg-primary/15 text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  <Wand2 className="size-3.5" /> Automático
+                </button>
+                <button
+                  onClick={() => setWorkMode("manual")}
+                  className={`flex items-center justify-center gap-1 rounded-lg py-1.5 transition-colors ${
+                    workMode === "manual" ? "bg-primary/15 text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  <PenTool className="size-3.5" /> Manual
+                </button>
+              </div>
+              {workMode === "auto" ? (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleDetect}
+                  disabled={polling || !inputReady}
+                >
+                  <Target className="mr-2 size-4" /> Detectar automaticamente
+                </Button>
+              ) : (
+                <p className="rounded-lg border border-border/50 bg-background/30 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+                  Use as ferramentas à esquerda para desenhar sobre o que remover, depois gere a
+                  prévia ou processe.
+                </p>
+              )}
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={handleDetect}
+                onClick={() => void handleProcess(true)}
                 disabled={polling || !inputReady}
               >
-                <Target className="mr-2 size-4" /> Detectar
+                <Eye className="mr-2 size-4" /> Prévia (5s, grátis)
               </Button>
               <Button
                 className="w-full shadow-glow"
-                onClick={handleProcess}
-                disabled={polling || !inputReady}
+                onClick={() => void handleProcess(false)}
+                disabled={polling || !inputReady || !creditsAvailable}
               >
-                <Sparkles className="mr-2 size-4" /> Remover
+                <Sparkles className="mr-2 size-4" /> Processar completo
+                {!isAdmin && !planUnlimited && (
+                  <span className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-primary-foreground/15 px-1.5 py-0.5 text-[10px]">
+                    <Coins className="size-3" /> {creditsNeeded}
+                  </span>
+                )}
               </Button>
+              {!creditsAvailable && (
+                <p className="flex items-center gap-1.5 text-[11px] text-destructive">
+                  <AlertCircle className="size-3.5" />
+                  Créditos insuficientes ({access?.sub?.credits ?? 0} disponíveis).
+                </p>
+              )}
             </div>
           )}
         </section>

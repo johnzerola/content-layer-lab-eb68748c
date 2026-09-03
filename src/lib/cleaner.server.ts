@@ -171,7 +171,7 @@ export function workerResultUrl(pathOrUrl: unknown): string | null {
   } catch {
     return null;
   }
-  const match = /^\/v1\/jobs\/([0-9a-f-]{36})\/result$/i.exec(result.pathname);
+  const match = /^\/v1\/jobs\/([0-9a-f-]{36})\/(result|preview)$/i.exec(result.pathname);
   if (!match?.[1]) return null;
   result.searchParams.set("token", jobToken(match[1], "result", 60 * 60 * 72));
   return result.toString();

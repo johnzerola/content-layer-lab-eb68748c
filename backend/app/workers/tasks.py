@@ -47,6 +47,7 @@ from ..security import callback_signature, validate_callback_url
 from ..storage import job_dir as safe_job_dir, read_state, write_state
 from ..utils.video import (
     RawWriter,
+    composite_masked,
     ffmpeg_filter,
     masks_to_video,
     mux_audio,
@@ -54,6 +55,7 @@ from ..utils.video import (
     probe,
     read_chunk,
     read_frames,
+    trim_video,
 )
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -111,6 +113,24 @@ def _apply_postprocess(input_path: str, output_path: str, info, opts: Dict, emit
     ffmpeg_filter(source, final_path, ",".join(filters), crf=int(opts.get("crf", 14)))
     os.replace(final_path, output_path)
     return output_path
+
+
+def _composite_step(
+    input_path: str,
+    inpainted_path: str,
+    mask_dir: str,
+    fps: float,
+    job_dir: str,
+    emit,
+) -> str:
+    """Composite seletivo: fora da máscara o pixel original é preservado."""
+    composited = os.path.join(job_dir, "composited.mp4")
+    emit(90, "preservando pixels originais fora da mascara", "refining")
+    try:
+        return composite_masked(input_path, inpainted_path, mask_dir, fps, composited)
+    except Exception as exc:
+        print(f"[composite] fallback para saida integral do modelo: {exc}")
+        return inpainted_path
 
 
 def sign_payload(payload: dict, secret: str) -> str:
@@ -370,6 +390,7 @@ def _run_official_pipeline(
     verify_on: bool,
     emit,
     cancel_file: Optional[str] = None,
+    composite_on: bool = True,
 ) -> tuple[List[Dict], dict, int]:
     mask_dir = os.path.join(job_dir, "masks")
     run_dir = os.path.join(job_dir, "propainter-run")
@@ -404,6 +425,10 @@ def _run_official_pipeline(
         info.height,
         info.fps,
     )
+    if composite_on:
+        normalized_video = _composite_step(
+            input_path, normalized_video, mask_dir, info.fps, job_dir, emit
+        )
     emit(91, "validando resultado", "refining")
     if verify_on:
         segments, metrics = _audit_video(normalized_video, mask_dir, info.fps)
@@ -428,6 +453,7 @@ def _run_diffusion_pipeline(
     verify_on: bool,
     emit,
     cancel_file: Optional[str] = None,
+    composite_on: bool = True,
 ) -> tuple[List[Dict], dict, int]:
     mask_dir = os.path.join(job_dir, "masks")
     mask_video = os.path.join(job_dir, "masks.mp4")
@@ -461,6 +487,10 @@ def _run_diffusion_pipeline(
         info.height,
         info.fps,
     )
+    if composite_on:
+        normalized_video = _composite_step(
+            input_path, normalized_video, mask_dir, info.fps, job_dir, emit
+        )
     emit(92, "validando resultado", "refining")
     if verify_on:
         segments, metrics = _audit_video(normalized_video, mask_dir, info.fps)
@@ -569,6 +599,8 @@ def run_pipeline(
     auto_protect = bool(opts.get("protect_subject", True))
     key_step = int(opts.get("key_step", 4))
     verify_on = bool(opts.get("verify", True))
+    composite_on = bool(opts.get("composite", True))
+    preview_seconds = min(60.0, max(0.0, float(opts.get("preview_seconds") or 0)))
 
     job_path = safe_job_dir(SETTINGS.storage_dir, job_id)
     cancel_path = job_path / ".cancel"
@@ -576,7 +608,10 @@ def run_pipeline(
     job_dir = str(job_path)
     input_path = str(job_path / "input.mp4")
     tmp_path = str(job_path / "video_only.mp4")
-    output_path = str(job_path / "output.mp4")
+    is_preview = preview_seconds > 0
+    output_path = str(job_path / ("preview.mp4" if is_preview else "output.mp4"))
+    result_path = f"/v1/jobs/{job_id}/preview" if is_preview else f"/v1/jobs/{job_id}/result"
+    result_key = "preview_url" if is_preview else "result_url"
     callback_seq = int(read_state(job_path).get("callback_seq", 0))
 
     def emit(progress: float, stage: str, status: str = "processing", **extra) -> None:
@@ -599,6 +634,13 @@ def run_pipeline(
 
         emit(3, "analisando vídeo", "analyzing")
         info = probe(input_path)
+        if is_preview and info.duration > preview_seconds + 1:
+            emit(5, f"recortando prévia de {int(preview_seconds)}s", "analyzing")
+            trimmed = str(job_path / "input.preview.mp4")
+            trim_video(input_path, trimmed, preview_seconds)
+            input_path = trimmed
+            tmp_path = str(job_path / "video_only.preview.mp4")
+            info = probe(input_path)
         if str(opts.get("strategy", "inpaint")) == "crop-clean":
             emit(20, "reenquadrando sem legenda", "encoding")
             ffmpeg_filter(
@@ -613,7 +655,7 @@ def run_pipeline(
                 "status": "completed",
                 "progress": 100,
                 "stage": "concluÃ­do",
-                "result_url": f"/v1/jobs/{job_id}/result",
+                result_key: result_path,
                 "detections": [],
                 "segments": [],
                 "metrics": {
@@ -628,6 +670,7 @@ def run_pipeline(
                     "enhance": opts.get("enhance", {"mode": "hq"}),
                     "dynamic_masks": False,
                     "subject_protection": False,
+                    "preview": is_preview,
                 },
                 "probe": {
                     "width": info.width, "height": info.height,
@@ -667,6 +710,7 @@ def run_pipeline(
                 verify_on,
                 emit,
                 str(cancel_path),
+                composite_on,
             )
             engine_name = "diffueraser-official"
             pass_count = 2
@@ -690,6 +734,7 @@ def run_pipeline(
                 verify_on,
                 emit,
                 str(cancel_path),
+                composite_on,
             )
             engine_name = "propainter-official"
             pass_count = 1
@@ -724,7 +769,7 @@ def run_pipeline(
             "status": "completed",
             "progress": 100,
             "stage": "concluído",
-            "result_url": f"/v1/jobs/{job_id}/result",
+            result_key: result_path,
             "detections": regions,
             "segments": segments,
             "metrics": {
@@ -739,6 +784,8 @@ def run_pipeline(
                 "enhance": opts.get("enhance", {"mode": "hq"}),
                 "dynamic_masks": dynamic,
                 "subject_protection": auto_protect,
+                "composite": composite_on,
+                "preview": is_preview,
             },
             "probe": {
                 "width": info.width, "height": info.height,
