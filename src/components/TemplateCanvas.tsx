@@ -65,8 +65,8 @@ function applyRect(t: Template, id: SelId, r: Partial<Rect>): Template {
   const cur = layerOf(t, id) as (Rect & { size?: number; h?: number }) | null;
   const patch: Record<string, number> = { ...r };
   if (cur && cur.h == null && typeof cur.size === "number" && r.h != null) {
-    patch.size = Math.max(8, Math.round(r.h / 1.2));
-    delete patch.h;
+    patch["size"] = Math.max(8, Math.round(r.h / 1.2));
+    delete patch["h"];
   }
   if (isExtra(id)) {
     return {
