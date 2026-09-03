@@ -287,7 +287,9 @@ export function TemplateCanvas({
   }, [template, drawOpts, motionVar, speed, loopStart, loopEnd]);
 
 
-  const drag = (id: SelId, mode: "move" | "resize") => (e: React.PointerEvent) => {
+  const [live, setLive] = useState<{ id: SelId; r: Rect } | null>(null);
+
+  const drag = (id: SelId, mode: DragMode) => (e: React.PointerEvent) => {
     if (!interactive || !onChange) return;
     e.preventDefault();
     e.stopPropagation();
@@ -297,6 +299,8 @@ export function TemplateCanvas({
     const box = wrapRef.current!.getBoundingClientRect();
     const scale = W / box.width;
     const start = { mx: e.clientX, my: e.clientY, ...startRect };
+    const ratio = start.w / Math.max(1, start.h);
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
 
     // alvos de alinhamento: bordas/centro do canvas + bordas das outras camadas
     const others = selectableIds(template)
@@ -306,33 +310,94 @@ export function TemplateCanvas({
     const xTargets = [0, W / 2, W, 60, W - 60, ...others.flatMap((r) => [r.x, r.x + r.w / 2, r.x + r.w])];
     const yTargets = [0, H / 2, H, 60, H - 60, ...others.flatMap((r) => [r.y, r.y + r.h / 2, r.y + r.h])];
 
+    const nearest = (v: number, targets: number[], g: Guide[], axis: "x" | "y") => {
+      let best: { d: number; pos: number } | null = null;
+      for (const t of targets) {
+        const d = t - v;
+        if (Math.abs(d) <= SNAP && (!best || Math.abs(d) < Math.abs(best.d))) best = { d, pos: t };
+      }
+      if (!best) return v;
+      g.push({ axis, pos: best.pos });
+      return Math.round(best.pos);
+    };
+
     const move = (ev: PointerEvent) => {
       const dx = (ev.clientX - start.mx) * scale;
       const dy = (ev.clientY - start.my) * scale;
       const g: Guide[] = [];
+      const doSnap = snap && !ev.altKey;
+
       if (mode === "move") {
         let x = Math.round(start.x + dx);
         let y = Math.round(start.y + dy);
-        if (snap && !ev.altKey) {
+        if (doSnap) {
           x = snapValue(x, start.w, xTargets, g, "x");
           y = snapValue(y, start.h, yTargets, g, "y");
         }
+        const r = { x, y, w: start.w, h: start.h };
+        setLive({ id, r });
         onChange(applyRect(template, id, { x, y }));
       } else {
-        const w = Math.max(40, Math.round(start.w + dx));
-        const h = Math.max(30, Math.round(start.h + dy));
-        onChange(applyRect(template, id, { w, h }));
+        // redimensiona apenas pelo lado da alça: as bordas opostas ficam ancoradas
+        const west = mode.includes("w");
+        const east = mode.includes("e");
+        const north = mode.includes("n");
+        const south = mode.includes("s");
+        const fromCenter = ev.altKey;
+
+        let left = start.x;
+        let right = start.x + start.w;
+        let top = start.y;
+        let bottom = start.y + start.h;
+
+        if (east) {
+          right = start.x + start.w + dx;
+          if (doSnap) right = nearest(right, xTargets, g, "x");
+          if (fromCenter) left = start.x + start.w - (right - start.x);
+        }
+        if (west) {
+          left = start.x + dx;
+          if (doSnap) left = nearest(left, xTargets, g, "x");
+          if (fromCenter) right = start.x + (start.x + start.w - left);
+        }
+        if (south) {
+          bottom = start.y + start.h + dy;
+          if (doSnap) bottom = nearest(bottom, yTargets, g, "y");
+          if (fromCenter) top = start.y + start.h - (bottom - start.y);
+        }
+        if (north) {
+          top = start.y + dy;
+          if (doSnap) top = nearest(top, yTargets, g, "y");
+          if (fromCenter) bottom = start.y + (start.y + start.h - top);
+        }
+
+        let w = Math.max(MIN_W, Math.round(right - left));
+        let h = Math.max(MIN_H, Math.round(bottom - top));
+
+        // Shift mantém a proporção nas alças de canto
+        if (ev.shiftKey && (east || west) && (north || south)) {
+          if (w / h > ratio) w = Math.round(h * ratio);
+          else h = Math.round(w / ratio);
+        }
+
+        const x = Math.round(west ? right - w : left);
+        const y = Math.round(north ? bottom - h : top);
+        const r = { x, y, w, h };
+        setLive({ id, r });
+        onChange(applyRect(template, id, r));
       }
       setGuides(g);
     };
     const up = () => {
       setGuides([]);
+      setLive(null);
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   };
+
 
   const ids = selectableIds(template);
 
