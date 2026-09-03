@@ -551,6 +551,21 @@ async def get_result(job_id: str, background_tasks: BackgroundTasks, token: Opti
     )
 
 
+@app.get("/v1/jobs/{job_id}/preview")
+async def get_preview(job_id: str, token: Optional[str] = Query(None)):
+    """Prévia curta (ex.: 5s) — servida sem apagar o diretório do job."""
+    verify_token(job_id, token, "result")
+    directory = job_dir(SETTINGS.storage_dir, job_id)
+    path = directory / "preview.mp4"
+    if not path.is_file():
+        raise HTTPException(404, "previa ainda nao disponivel")
+    return FileResponse(
+        path,
+        media_type="video/mp4",
+        headers={"Content-Disposition": f'inline; filename="{job_id}-previa.mp4"'},
+    )
+
+
 if __name__ == "__main__":
     import uvicorn
 
