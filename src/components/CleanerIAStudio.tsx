@@ -66,6 +66,44 @@ type Tool = "select" | "rect" | "poly" | "brush" | "protect" | "erase";
 const MODES: CleanerMode[] = ["smart", "text", "watermark", "object", "passerby"];
 const PRESETS: CleanerPreset[] = ["fast", "quality", "max"];
 
+/** Caixa normalizada (0..1) de uma área, seja retângulo, polígono ou pincel. */
+function regionBox(m: CleanerRegion): { x: number; y: number; w: number; h: number } | null {
+  if (m.points && m.points.length) {
+    const xs = m.points.map((p) => p.x);
+    const ys = m.points.map((p) => p.y);
+    const r = (m.size ?? 0) / 2;
+    const x = Math.min(...xs) - r;
+    const y = Math.min(...ys) - r;
+    return { x, y, w: Math.max(...xs) + r - x, h: Math.max(...ys) + r - y };
+  }
+  if (m.w != null && m.h != null && m.x != null && m.y != null) {
+    return { x: Math.min(m.x, m.x + m.w), y: Math.min(m.y, m.y + m.h), w: Math.abs(m.w), h: Math.abs(m.h) };
+  }
+  return null;
+}
+
+/** União das áreas de remoção, com folga, para o motor focar a reconstrução. */
+function maskBounds(list: CleanerRegion[]): { x: number; y: number; w: number; h: number } | null {
+  const boxes = list.map(regionBox).filter(Boolean) as { x: number; y: number; w: number; h: number }[];
+  if (!boxes.length) return null;
+  const x0 = Math.max(0, Math.min(...boxes.map((b) => b.x)) - 0.02);
+  const y0 = Math.max(0, Math.min(...boxes.map((b) => b.y)) - 0.02);
+  const x1 = Math.min(1, Math.max(...boxes.map((b) => b.x + b.w)) + 0.02);
+  const y1 = Math.min(1, Math.max(...boxes.map((b) => b.y + b.h)) + 0.02);
+  return { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
+}
+
+function overlapsAny(m: CleanerRegion, list: CleanerRegion[]): boolean {
+  const a = regionBox(m);
+  if (!a) return false;
+  return list.some((other) => {
+    const b = regionBox(other);
+    if (!b) return false;
+    return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  });
+}
+
+
 export function CleanerIAStudio({ item, onComplete }: Props) {
   const [job, setJob] = useState<CleanerJob | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -593,18 +631,30 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     }
     try {
       const headers = await cloudAuthHeaders();
+      // Só as áreas realmente ativas vão para o motor; áreas desligadas ou de proteção
+      // que cobrem uma área de remoção anulariam o inpainting.
+      const removeMasks = masks.filter((m) => m.role === "remove" && m.enabled !== false);
+      const bbox = maskBounds(removeMasks);
+      const keepProtect = protectSubject && !bbox;
+      const sendMasks = masks
+        .filter((m) => m.enabled !== false)
+        .filter((m) => m.role !== "protect" || !overlapsAny(m, removeMasks));
+      // Com áreas marcadas o recorte é ignorado: reenquadrar não apaga legenda que
+      // fica dentro do quadro — nesse caso o certo é reconstruir o fundo.
+      const useCrop = cropClean && removeMasks.length === 0;
       await processJob({
         data: {
           id: job.id,
           mode,
           preset: preview ? "fast" : preset,
-          masks,
+          masks: sendMasks,
           options: {
             dynamic: dynamicMask,
-            protect_subject: protectSubject,
+            protect_subject: keepProtect,
             verify: verifyPass,
-            strategy: cropClean ? "crop-clean" : "inpaint",
-            crop_clean: { y: 0.26, h: 0.435 },
+            strategy: useCrop ? "crop-clean" : "inpaint",
+            ...(useCrop ? { crop_clean: { y: 0.26, h: 0.435 } } : {}),
+            ...(bbox ? { mask_bbox: bbox } : {}),
             enhance: enhanceOutput ? { mode: "hq", scale: 1 } : { mode: "off" },
             crf: enhanceOutput ? 14 : 16,
             key_step: dynamicMask ? 3 : 8,
@@ -613,6 +663,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         },
         headers,
       });
+      if (protectSubject && !keepProtect) {
+        toast.info("Proteção de pessoa desativada nesta passada para apagar as áreas marcadas.");
+      }
+
       if (!preview && !isAdmin && !planUnlimited) {
         void consumeCredits(creditsNeeded);
       }
@@ -1041,7 +1095,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 on: cropClean,
                 set: setCropClean,
                 title: "Legenda por recorte limpo",
-                hint: "Remove legendas dinâmicas reenquadrando como no teste aprovado",
+                hint: "Reenquadra para fora da legenda — usado só quando nenhuma área é marcada",
+
               },
               {
                 key: "enh",
