@@ -61,7 +61,9 @@ import {
   type ExportQuality,
 } from "@/lib/editor/export-quality";
 import { toast } from "sonner";
-import { loadSourceFile } from "@/lib/editor/cuts";
+import { loadSourceFile, registerSourceFile } from "@/lib/editor/cuts";
+import { CutGallery } from "@/components/editor/CutGallery";
+import type { LibraryCut } from "@/lib/editor/cuts.service";
 import { uploadSourceFile } from "@/lib/editor/media-cloud";
 import { saveRenderedVideo } from "@/lib/editor/download";
 
@@ -181,7 +183,7 @@ function EditorPage() {
   const [leftTab, setLeftTab] = useState<"texto" | "estilos">("texto");
   const [tool, setTool] = useState<ToolId>("corte");
   const [joinIndex, setJoinIndex] = useState<number | null>(null);
-  const [templateTab, setTemplateTab] = useState<"prontos" | "meus">("prontos");
+  const [templateTab, setTemplateTab] = useState<"prontos" | "meus" | "cortes">("prontos");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -613,6 +615,40 @@ function EditorPage() {
       );
     },
     [doc, patchDoc],
+  );
+
+  /** Aplica um corte real da biblioteca ao projeto aberto (janela, textos e mídia). */
+  const applyCut = useCallback(
+    async (cut: LibraryCut) => {
+      if (!doc) return;
+      const file = await loadSourceFile(cut.sourceId).catch(() => null);
+      if (file) {
+        registerSourceFile(videoId, file);
+        const url = URL.createObjectURL(file);
+        setLocalSrc(url);
+      }
+      history.set(
+        (d) =>
+          d
+            ? {
+                ...d,
+                cutId: cut.id,
+                title: cut.title || d.title,
+                hook: cut.caption ?? d.hook,
+                media: { ...d.media, posterUrl: cut.thumbnail ?? d.media.posterUrl },
+                preedit: {
+                  ...(d.preedit ?? defaultPreEdit()),
+                  segments: [{ start: cut.start, end: cut.end }],
+                },
+              }
+            : d,
+        "aplicar-corte",
+      );
+      setCurrentTime(cut.start);
+      if (videoRef.current) videoRef.current.currentTime = cut.start;
+      toast.success(`Corte “${cut.title}” aplicado ao projeto.`);
+    },
+    [doc, history, videoId],
   );
 
   const seek = useCallback((time: number) => {
@@ -1163,19 +1199,21 @@ function EditorPage() {
             {tool === "templates" && (
               <div className="space-y-3">
                 <div className="flex rounded-lg border border-border/60 p-0.5 text-xs">
-                  {(["prontos", "meus"] as const).map((t) => (
+                  {(["prontos", "meus", "cortes"] as const).map((t) => (
                     <button
                       key={t}
                       type="button"
                       onClick={() => setTemplateTab(t)}
                       className={`flex-1 rounded-md px-2 py-1 ${templateTab === t ? "bg-primary/20" : "text-muted-foreground"}`}
                     >
-                      {t === "prontos" ? "Prontos" : "Meus templates"}
+                      {t === "prontos" ? "Prontos" : t === "meus" ? "Meus" : "Cortes"}
                     </button>
                   ))}
                 </div>
 
-                {templateTab === "prontos" ? (
+                {templateTab === "cortes" ? (
+                  <CutGallery onApply={applyCut} />
+                ) : templateTab === "prontos" ? (
                   <div className="grid grid-cols-2 gap-2">
                     {READY_TEMPLATES.map((t) => (
                       <button
