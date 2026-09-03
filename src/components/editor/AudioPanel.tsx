@@ -27,6 +27,24 @@ interface Props {
   currentTime: number;
 }
 
+/** Limite de segurança para embutir o áudio no documento do projeto (~20 MB). */
+const MAX_INLINE_AUDIO = 20 * 1024 * 1024;
+
+/** Converte o arquivo/gravação em data URL para persistir no projeto salvo. */
+function toPersistentUrl(blob: Blob): Promise<string> {
+  if (blob.size > MAX_INLINE_AUDIO) {
+    return Promise.reject(
+      new Error("Áudio muito grande para salvar no projeto (máx. 20 MB). Comprima o arquivo."),
+    );
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Não foi possível ler o áudio."));
+    reader.readAsDataURL(blob);
+  });
+}
+
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex items-center gap-2 py-1 text-xs">
@@ -64,21 +82,27 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime }: Pr
       const rec = new MediaRecorder(stream);
       const chunks: BlobPart[] = [];
       rec.ondataavailable = (e) => chunks.push(e.data);
-      rec.onstop = () => {
+      rec.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
-        addClip(
-          createAudioClip({
-            kind: "voice",
-            name: "Narração gravada",
-            url: URL.createObjectURL(blob),
-            startTime: currentTime,
-            volume: 1,
-            fadeIn: 0,
-            fadeOut: 0.2,
-          }),
-        );
         setRecording(false);
+        try {
+          // data URL: sobrevive ao salvar/reabrir o projeto (blob: morre na sessão)
+          const url = await toPersistentUrl(blob);
+          addClip(
+            createAudioClip({
+              kind: "voice",
+              name: "Narração gravada",
+              url,
+              startTime: currentTime,
+              volume: 1,
+              fadeIn: 0,
+              fadeOut: 0.2,
+            }),
+          );
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Falha ao salvar a gravação.");
+        }
       };
       recorderRef.current = rec;
       rec.start();
@@ -190,7 +214,12 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime }: Pr
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (!f) return;
-            addClip(createAudioClip({ kind: "music", name: f.name, url: URL.createObjectURL(f) }));
+            setError(null);
+            toPersistentUrl(f)
+              .then((url) => addClip(createAudioClip({ kind: "music", name: f.name, url })))
+              .catch((err: unknown) =>
+                setError(err instanceof Error ? err.message : "Falha ao carregar o áudio."),
+              );
             e.target.value = "";
           }}
         />
