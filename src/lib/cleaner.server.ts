@@ -344,12 +344,25 @@ export async function workerProcess(input: {
   options: Record<string, unknown>;
   callbackUrl?: string | null;
 }) {
-  return call<{ status: string }>(`/v1/jobs/${input.jobId}/process`, {
-    method: "POST",
-    jobId: input.jobId,
-    body: JSON.stringify(input),
-  });
+  const send = (payload: typeof input) =>
+    call<{ status: string }>(`/v1/jobs/${input.jobId}/process`, {
+      method: "POST",
+      jobId: input.jobId,
+      body: JSON.stringify(payload),
+    });
+  try {
+    return await send(input);
+  } catch (err) {
+    // O worker pode recusar a origem do callback (ambiente de preview / domínio novo).
+    // O app acompanha por polling, então seguimos sem callback em vez de falhar.
+    const msg = String((err as Error)?.message ?? "");
+    if (input.callbackUrl && /callback origin is not allowed/i.test(msg)) {
+      return await send({ ...input, callbackUrl: null });
+    }
+    throw err;
+  }
 }
+
 
 export async function workerStatus(jobId: string) {
   const status = await call<Record<string, unknown>>(`/v1/jobs/${jobId}`, { jobId });
