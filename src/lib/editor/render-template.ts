@@ -456,15 +456,30 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
   const size = ASPECT_SIZES[doc.aspectRatio] ?? ASPECT_SIZES["9:16"];
   const W = doc.canvas.width || size.width;
   const H = doc.canvas.height || size.height;
-  // 4K/2K: o desenho continua em W x H e o canvas é ampliado por transformação
-  const q = Math.max(1, Math.min(2, opts.scale ?? 1));
-  const outW = Math.round((W * q) / 2) * 2;
-  const outH = Math.round((H * q) / 2) * 2;
+  // 4K/2K: o desenho continua em W x H e o canvas é ampliado por transformação.
+  // Celulares raramente codificam 4K: em vez de falhar, descemos um degrau de
+  // qualidade automaticamente até achar uma configuração que o aparelho aceite.
+  const wanted = Math.max(1, Math.min(2, opts.scale ?? 1));
+  const ladder = [wanted, 4 / 3, 1].filter((s, i, arr) => s <= wanted && arr.indexOf(s) === i);
+  let chosen: { q: number; picked: NonNullable<Awaited<ReturnType<typeof pickVideoCodec>>>; w: number; h: number } | null =
+    null;
+  for (const s of ladder) {
+    const w = Math.round((W * s) / 2) * 2;
+    const h = Math.round((H * s) / 2) * 2;
+    const br = pickBitrate({ width: w, height: h, fps, tier: "balanced" });
+    const p = await pickVideoCodec(w, h, br, fps, "balanced");
+    if (p) {
+      chosen = { q: s, picked: p, w, h };
+      break;
+    }
+  }
+  if (!chosen) throw new Error("Codificação de vídeo não suportada neste navegador.");
+  if (chosen.q < wanted) opts.onQualityDrop?.(chosen.h);
+  const outW = chosen.w;
+  const outH = chosen.h;
+  const picked = chosen.picked;
   const sx = outW / W;
   const sy = outH / H;
-  const bitrate = pickBitrate({ width: outW, height: outH, fps, tier: "balanced" });
-  const picked = await pickVideoCodec(outW, outH, bitrate, fps, "balanced");
-  if (!picked) throw new Error("Codificação de vídeo não suportada neste navegador.");
 
   const url = URL.createObjectURL(file);
   const video = document.createElement("video");
