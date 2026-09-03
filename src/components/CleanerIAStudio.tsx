@@ -66,6 +66,44 @@ type Tool = "select" | "rect" | "poly" | "brush" | "protect" | "erase";
 const MODES: CleanerMode[] = ["smart", "text", "watermark", "object", "passerby"];
 const PRESETS: CleanerPreset[] = ["fast", "quality", "max"];
 
+/** Caixa normalizada (0..1) de uma área, seja retângulo, polígono ou pincel. */
+function regionBox(m: CleanerRegion): { x: number; y: number; w: number; h: number } | null {
+  if (m.points && m.points.length) {
+    const xs = m.points.map((p) => p.x);
+    const ys = m.points.map((p) => p.y);
+    const r = (m.size ?? 0) / 2;
+    const x = Math.min(...xs) - r;
+    const y = Math.min(...ys) - r;
+    return { x, y, w: Math.max(...xs) + r - x, h: Math.max(...ys) + r - y };
+  }
+  if (m.w != null && m.h != null && m.x != null && m.y != null) {
+    return { x: Math.min(m.x, m.x + m.w), y: Math.min(m.y, m.y + m.h), w: Math.abs(m.w), h: Math.abs(m.h) };
+  }
+  return null;
+}
+
+/** União das áreas de remoção, com folga, para o motor focar a reconstrução. */
+function maskBounds(list: CleanerRegion[]): { x: number; y: number; w: number; h: number } | null {
+  const boxes = list.map(regionBox).filter(Boolean) as { x: number; y: number; w: number; h: number }[];
+  if (!boxes.length) return null;
+  const x0 = Math.max(0, Math.min(...boxes.map((b) => b.x)) - 0.02);
+  const y0 = Math.max(0, Math.min(...boxes.map((b) => b.y)) - 0.02);
+  const x1 = Math.min(1, Math.max(...boxes.map((b) => b.x + b.w)) + 0.02);
+  const y1 = Math.min(1, Math.max(...boxes.map((b) => b.y + b.h)) + 0.02);
+  return { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
+}
+
+function overlapsAny(m: CleanerRegion, list: CleanerRegion[]): boolean {
+  const a = regionBox(m);
+  if (!a) return false;
+  return list.some((other) => {
+    const b = regionBox(other);
+    if (!b) return false;
+    return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  });
+}
+
+
 export function CleanerIAStudio({ item, onComplete }: Props) {
   const [job, setJob] = useState<CleanerJob | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
