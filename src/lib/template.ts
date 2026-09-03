@@ -368,6 +368,7 @@ export function defaultCaptions(): CaptionStyle {
     highlightColor: "#c6f24e",
     maxLines: 2,
     lineHeight: 1.2,
+    offset: 0,
   };
 
 }
