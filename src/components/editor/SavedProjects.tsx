@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { getSourceFile, registerSourceFile } from "@/lib/editor/cuts";
+import { loadSourceFile, registerSourceFile } from "@/lib/editor/cuts";
 import { listEditorProjects, saveEditorProject, type EditorProjectRecord } from "@/lib/editor/project.service";
 
 function seconds(v?: number | null) {
@@ -22,6 +22,8 @@ export function SavedProjects() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [tick, setTick] = useState(0);
+  /** vídeos disponíveis neste navegador (memória ou armazenamento local) */
+  const [available, setAvailable] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -37,6 +39,19 @@ export function SavedProjects() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const ids = await Promise.all(
+        items.map(async (p) => ((await loadSourceFile(p.doc.videoId)) ? p.doc.videoId : null)),
+      );
+      if (alive) setAvailable(new Set(ids.filter((id): id is string => Boolean(id))));
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [items, tick]);
 
   const filtered = useMemo(
     () => items.filter((p) => !query.trim() || p.name.toLowerCase().includes(query.trim().toLowerCase())),
@@ -103,7 +118,7 @@ export function SavedProjects() {
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {filtered.map((p) => {
-          const hasFile = Boolean(getSourceFile(p.doc.videoId));
+          const hasFile = available.has(p.doc.videoId);
           const layers = p.doc.composition?.layers?.length ?? 0;
           const keys = p.doc.preedit?.keys?.length ?? 0;
           const cuts = p.doc.removedRanges?.length ?? 0;
