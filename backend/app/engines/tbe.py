@@ -202,11 +202,12 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
             )
             unseen = cv2.bitwise_and(unseen, interest)
             if unseen.max() > 0:
-                plate = patch_fill(plate, unseen)
+                plate = self._fill_unseen(plate, unseen)
                 plate_valid = cv2.bitwise_or(plate_valid, unseen)
 
 
         output: List[np.ndarray] = []
+        identity = np.eye(2, 3, dtype=np.float32)
         for index in range(count):
             hole = masks[index]
             frame = frames[index]
@@ -220,23 +221,33 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
             current = frame.copy()
             remaining = hole.copy()
             if matrix is not None and plate_valid.max() > 0:
-                inverse = cv2.invertAffineTransform(matrix)
-                local_plate = cv2.warpAffine(
-                    plate, inverse, (width, height), flags=cv2.INTER_LINEAR,
-                    borderMode=cv2.BORDER_CONSTANT,
-                )
-                local_valid = cv2.warpAffine(
-                    plate_valid, inverse, (width, height), flags=cv2.INTER_NEAREST,
-                    borderMode=cv2.BORDER_CONSTANT, borderValue=0,
-                )
+                if float(np.abs(matrix - identity).max()) < 0.02:
+                    # static shot: the plate already lives in this frame's space
+                    local_plate, local_valid = plate, plate_valid
+                else:
+                    inverse = cv2.invertAffineTransform(matrix)
+                    local_plate = cv2.warpAffine(
+                        plate, inverse, (width, height), flags=cv2.INTER_LINEAR,
+                        borderMode=cv2.BORDER_CONSTANT,
+                    )
+                    local_valid = cv2.warpAffine(
+                        plate_valid, inverse, (width, height), flags=cv2.INTER_NEAREST,
+                        borderMode=cv2.BORDER_CONSTANT, borderValue=0,
+                    )
                 fillable = cv2.bitwise_and(remaining, local_valid)
                 if fillable.max() > 0:
-                    alpha = _feather(fillable, self.feather)[..., None]
-                    current = (
-                        current.astype(np.float32) * (1.0 - alpha)
-                        + local_plate.astype(np.float32) * alpha
-                    ).astype(np.uint8)
+                    box = _bbox(fillable, margin=8)
+                    if box is not None:
+                        y0, y1, x0, x1 = box
+                        alpha = self._alpha_for(fillable)[y0:y1, x0:x1]
+                        region = current[y0:y1, x0:x1].astype(np.float32)
+                        blended = (
+                            region * (1.0 - alpha)
+                            + local_plate[y0:y1, x0:x1].astype(np.float32) * alpha
+                        )
+                        current[y0:y1, x0:x1] = blended.astype(np.uint8)
                     remaining = cv2.bitwise_and(remaining, cv2.bitwise_not(fillable))
+
             leftover = int(np.count_nonzero(remaining))
             if leftover > 0:
                 original = max(1, int(np.count_nonzero(hole)))
