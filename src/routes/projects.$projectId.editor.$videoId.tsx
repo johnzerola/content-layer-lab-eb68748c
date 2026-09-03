@@ -16,6 +16,7 @@ import {
   Stamp,
   Type,
   Wand2,
+  Mic,
 } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { TranscriptPanel } from "@/components/editor/TranscriptPanel";
@@ -39,6 +40,7 @@ import { TimelinePro } from "@/components/editor/TimelinePro";
 import { BatchApplyModal } from "@/components/editor/BatchApplyModal";
 import { TransitionPicker } from "@/components/editor/TransitionPicker";
 import { AudioPanel } from "@/components/editor/AudioPanel";
+import { VoicePanel } from "@/components/editor/VoicePanel";
 import { MediaSourceBar } from "@/components/editor/MediaSourceBar";
 import { BulkScheduleModal } from "@/components/BulkScheduleModal";
 import { listAccounts, type SocialAccount } from "@/lib/social";
@@ -52,6 +54,8 @@ import {
 } from "@/lib/editor/export-quality";
 import { toast } from "sonner";
 import { loadSourceFile } from "@/lib/editor/cuts";
+import { uploadSourceFile } from "@/lib/editor/media-cloud";
+import { saveRenderedVideo } from "@/lib/editor/download";
 
 import { CutPanel, FramePanel, GradePanel, LayoutPanel, TitlesPanel } from "@/components/editor/ToolPanels";
 import { EditorCanvas } from "@/components/vtemplate/EditorCanvas";
@@ -114,6 +118,7 @@ type ToolId =
   | "texto"
   | "estilos"
   | "audio"
+  | "voz"
   | "titulos"
   | "templates"
   | "render"
@@ -147,6 +152,7 @@ const TOOL_GROUPS: { title: string; tools: { id: ToolId; label: string; icon: ty
     tools: [
       { id: "texto", label: "Texto", icon: Type },
       { id: "audio", label: "Áudio", icon: Music4 },
+      { id: "voz", label: "Voz", icon: Mic },
       { id: "titulos", label: "Títulos", icon: Type },
       { id: "camada", label: "Camada", icon: Sparkles },
     ],
@@ -248,7 +254,7 @@ function EditorPage() {
     let objectUrl: string | null = null;
     let alive = true;
     void (async () => {
-      const file = await loadSourceFile(videoId);
+      const file = await loadSourceFile(videoId, doc?.media.storagePath ?? null);
       if (!file || !alive) return;
       objectUrl = URL.createObjectURL(file);
       setLocalSrc(objectUrl);
@@ -257,7 +263,7 @@ function EditorPage() {
       alive = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [videoId]);
+  }, [videoId, doc?.media.storagePath]);
 
   useEffect(() => {
     void listAccounts()
@@ -276,7 +282,7 @@ function EditorPage() {
         toast.error("Este navegador não suporta a renderização (WebCodecs).");
         return;
       }
-      const file = await loadSourceFile(videoId);
+      const file = await loadSourceFile(videoId, doc.media.storagePath ?? null);
       if (!file) {
         toast.error("Carregue o vídeo de origem na barra de mídia para renderizar.");
         return;
@@ -294,6 +300,8 @@ function EditorPage() {
           cut: seg ? { start: seg.start, end: seg.end } : null,
           preedit: doc.preedit ?? null,
           scale: exportScale(quality),
+          onQualityDrop: (h) =>
+            toast.info(`Este aparelho não aguentou a resolução escolhida — exportando em ${h}p.`),
           onProgress: setRenderPct,
         });
 
@@ -321,6 +329,22 @@ function EditorPage() {
     },
     [history],
   );
+
+  /**
+   * Cópia do vídeo na conta: enviada uma única vez, em segundo plano. É o que
+   * permite abrir o mesmo projeto em outro aparelho e continuar editando.
+   */
+  const uploadedRef = useRef(false);
+  useEffect(() => {
+    if (!doc || doc.media.storagePath || uploadedRef.current) return;
+    uploadedRef.current = true;
+    void (async () => {
+      const file = await loadSourceFile(videoId);
+      if (!file) return;
+      const path = await uploadSourceFile(videoId, file).catch(() => null);
+      if (path) patchDoc({ media: { ...doc.media, storagePath: path } }, "mídia na nuvem");
+    })();
+  }, [doc, patchDoc, videoId]);
 
   /** Pré-edição (corte, enquadramento, cor, layout) — mesma estrutura do estúdio. */
   const patchPre = useCallback(
@@ -732,13 +756,13 @@ function EditorPage() {
             {rendering ? `Renderizando ${Math.round(renderPct * 100)}%` : "Renderizar"}
           </button>
           {rendered && (
-            <a
-              href={URL.createObjectURL(rendered)}
-              download={rendered.name}
+            <button
+              type="button"
+              onClick={() => void saveRenderedVideo(rendered)}
               className="rounded-lg border border-border/60 px-3 py-1.5 text-sm"
             >
               Baixar MP4
-            </a>
+            </button>
           )}
           <button
             type="button"
@@ -1063,6 +1087,14 @@ function EditorPage() {
               <AudioPanel
                 audio={doc.audio ?? defaultEditorAudio()}
                 onChange={(next, label) => patchDoc({ audio: next }, label ?? "audio")}
+                scriptText={scriptText}
+                currentTime={currentTime}
+              />
+            )}
+            {tool === "voz" && (
+              <VoicePanel
+                audio={doc.audio ?? defaultEditorAudio()}
+                onChange={(next, label) => patchDoc({ audio: next }, label ?? "voz")}
                 scriptText={scriptText}
                 currentTime={currentTime}
               />

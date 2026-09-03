@@ -37,15 +37,29 @@ export function getSourceFile(sourceId: string): File | null {
 }
 
 /**
- * Recupera o arquivo de origem: memória primeiro, depois o IndexedDB — é o que
- * permite reabrir o projeto depois de recarregar a página.
+ * Recupera o arquivo de origem: memória, depois o armazenamento do navegador e,
+ * por fim, a cópia salva na conta — é o que permite reabrir o projeto em outro
+ * aparelho ou depois de limpar o navegador.
  */
-export async function loadSourceFile(sourceId: string): Promise<File | null> {
+export async function loadSourceFile(
+  sourceId: string,
+  storagePath?: string | null,
+): Promise<File | null> {
   const cached = files.get(sourceId);
   if (cached) return cached;
   const stored = await readSourceFile(sourceId);
-  if (stored) files.set(sourceId, stored);
-  return stored;
+  if (stored) {
+    files.set(sourceId, stored);
+    return stored;
+  }
+  if (!storagePath) return null;
+  const { downloadSourceFile } = await import("@/lib/editor/media-cloud");
+  const remote = await downloadSourceFile(storagePath).catch(() => null);
+  if (remote) {
+    files.set(sourceId, remote);
+    void persistSourceFile(sourceId, remote).catch(() => undefined);
+  }
+  return remote;
 }
 
 

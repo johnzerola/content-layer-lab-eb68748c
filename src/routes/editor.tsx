@@ -7,6 +7,7 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { RouteShell } from "@/components/RouteShell";
 import { SavedProjects } from "@/components/editor/SavedProjects";
 import { registerSourceFile } from "@/lib/editor/cuts";
+import { uploadSourceFile } from "@/lib/editor/media-cloud";
 import { createEditorProject } from "@/lib/editor/project";
 import { createEditorProjectRecord } from "@/lib/editor/project.service";
 import { createAudioClip, defaultEditorAudio, type AudioClip } from "@/lib/editor/audio";
@@ -146,9 +147,12 @@ function EditorLauncher() {
         info = meta && withFile === file ? meta : await probe(withFile);
         registerSourceFile(videoId, withFile);
       }
+      // cópia na conta: o projeto reabre em qualquer aparelho, sem depender
+      // do navegador onde foi criado
+      const storagePath = withFile ? await uploadSourceFile(videoId, withFile).catch(() => null) : null;
       const doc = createEditorProject(videoId, {
         title: withFile ? withFile.name.replace(/\.[^.]+$/, "") : "Novo corte",
-        media: { duration: info.duration, width: info.width, height: info.height },
+        media: { duration: info.duration, width: info.width, height: info.height, storagePath },
       });
       if (clips.length) doc.audio = { ...defaultEditorAudio(), tracks: clips };
       const record = await createEditorProjectRecord(doc);
