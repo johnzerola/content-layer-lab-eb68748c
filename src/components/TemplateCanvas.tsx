@@ -152,6 +152,7 @@ export function TemplateCanvas({
   debugSafeArea = true,
   debugBoxes = true,
   uiOverlay = null,
+  frameClassName,
 }: {
   template: Template;
   selected?: SelId | null;
@@ -180,6 +181,8 @@ export function TemplateCanvas({
   debugBoxes?: boolean;
   /** simula a interface do app (TikTok/IG/Shorts) por cima da prévia — nunca entra na exportação */
   uiOverlay?: PlatformUI | null;
+  /** permite o palco controlar o tamanho do quadro (padrão: 320px de largura) */
+  frameClassName?: string;
 }) {
 
 
@@ -414,12 +417,36 @@ export function TemplateCanvas({
   };
 
 
+  // Canva-like: setas movem a camada selecionada (Shift = 10px)
+  useEffect(() => {
+    if (!interactive || !onChange || !selected) return;
+    const onKey = (ev: KeyboardEvent) => {
+      const tag = (ev.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      const step = ev.shiftKey ? 10 : 1;
+      const d: Record<string, [number, number]> = {
+        ArrowLeft: [-step, 0],
+        ArrowRight: [step, 0],
+        ArrowUp: [0, -step],
+        ArrowDown: [0, step],
+      };
+      const mv = d[ev.key];
+      if (!mv) return;
+      const r = rectOf(template, selected);
+      if (!r) return;
+      ev.preventDefault();
+      onChange(applyRect(template, selected, { x: Math.round(r.x + mv[0]), y: Math.round(r.y + mv[1]) }));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [interactive, onChange, selected, template]);
+
   const ids = selectableIds(template);
 
   return (
     <div
       ref={wrapRef}
-      className="relative mx-auto w-full max-w-[320px] overflow-hidden rounded-2xl border border-border bg-black"
+      className={`relative mx-auto overflow-hidden rounded-2xl border border-border bg-black ${frameClassName ?? "w-full max-w-[320px]"}`}
       style={{ aspectRatio: `${W}/${H}` }}
     >
       <canvas ref={canvasRef} width={W} height={H} className="block h-full w-full" />

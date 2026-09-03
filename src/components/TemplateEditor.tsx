@@ -457,8 +457,9 @@ export function TemplateEditor({
                 {(t.canvasW ?? 1080)}×{(t.canvasH ?? 1920)}
               </span>
             </div>
-            <div className="rounded-2xl border border-border bg-surface-2/50 p-3">
+            <div className="grid place-items-center rounded-2xl border border-border bg-[repeating-conic-gradient(var(--color-surface-2)_0%_25%,transparent_0%_50%)] bg-[length:22px_22px] p-4">
               <TemplateCanvas
+                frameClassName="h-[min(62vh,660px)] w-auto max-w-full shadow-[0_24px_60px_-24px_rgba(0,0,0,0.8)]"
                 template={t}
                 selected={selected}
                 onSelect={setSelected}
@@ -485,7 +486,7 @@ export function TemplateEditor({
               setBoxes={setDebugBoxes}
             /> : (
               <p className="text-center text-xs text-muted-foreground">
-                Arraste elementos direto no preview · guias grudam nas bordas e no centro (Alt ignora)
+                Arraste para mover · alças nos 8 pontos para redimensionar · Shift mantém proporção · Alt redimensiona pelo centro · setas movem 1px (Shift 10px)
               </p>
             )}
           </div>
