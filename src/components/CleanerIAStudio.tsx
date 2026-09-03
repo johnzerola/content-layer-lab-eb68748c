@@ -602,7 +602,11 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         >
           <video
             ref={videoRef}
-            src={job?.status === "completed" && job.result_url ? job.result_url : src}
+            src={
+              job?.status === "completed" && (job.result_url || job.preview_url)
+                ? (job.result_url ?? job.preview_url)
+                : src
+            }
             controls={job?.status === "completed"}
             playsInline
             className="absolute inset-0 size-full object-contain z-0"
@@ -993,7 +997,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             >
               <Upload className="mr-2 size-4" /> {job ? "Reenviar vídeo" : "Enviar para IA"}
             </Button>
-          ) : job.status === "completed" ? (
+          ) : job.status === "completed" && !previewDone ? (
             <a
               href={job.result_url ?? "#"}
               download
@@ -1009,21 +1013,90 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             </a>
           ) : (
             <div className="space-y-2">
+              {previewDone && (
+                <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-3">
+                  <p className="flex items-center gap-1.5 text-[11px] font-medium text-primary">
+                    <Eye className="size-3.5" /> Prévia de 5s pronta — confira no player acima.
+                  </p>
+                  <div className="flex gap-2">
+                    <a
+                      href={job?.preview_url ?? "#"}
+                      download
+                      className="interactive flex-1 rounded-lg border border-border/70 py-1.5 text-center text-xs font-medium"
+                    >
+                      Baixar prévia
+                    </a>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-xs"
+                      onClick={() => void handleProcess(true)}
+                      disabled={polling}
+                    >
+                      Refazer
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-1 rounded-xl border border-border/70 bg-background/40 p-1 text-xs font-medium">
+                <button
+                  onClick={() => setWorkMode("auto")}
+                  className={`flex items-center justify-center gap-1 rounded-lg py-1.5 transition-colors ${
+                    workMode === "auto" ? "bg-primary/15 text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  <Wand2 className="size-3.5" /> Automático
+                </button>
+                <button
+                  onClick={() => setWorkMode("manual")}
+                  className={`flex items-center justify-center gap-1 rounded-lg py-1.5 transition-colors ${
+                    workMode === "manual" ? "bg-primary/15 text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  <PenTool className="size-3.5" /> Manual
+                </button>
+              </div>
+              {workMode === "auto" ? (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleDetect}
+                  disabled={polling || !inputReady}
+                >
+                  <Target className="mr-2 size-4" /> Detectar automaticamente
+                </Button>
+              ) : (
+                <p className="rounded-lg border border-border/50 bg-background/30 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+                  Use as ferramentas à esquerda para desenhar sobre o que remover, depois gere a
+                  prévia ou processe.
+                </p>
+              )}
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={handleDetect}
+                onClick={() => void handleProcess(true)}
                 disabled={polling || !inputReady}
               >
-                <Target className="mr-2 size-4" /> Detectar
+                <Eye className="mr-2 size-4" /> Prévia (5s, grátis)
               </Button>
               <Button
                 className="w-full shadow-glow"
-                onClick={handleProcess}
-                disabled={polling || !inputReady}
+                onClick={() => void handleProcess(false)}
+                disabled={polling || !inputReady || !creditsAvailable}
               >
-                <Sparkles className="mr-2 size-4" /> Remover
+                <Sparkles className="mr-2 size-4" /> Processar completo
+                {!isAdmin && !planUnlimited && (
+                  <span className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-primary-foreground/15 px-1.5 py-0.5 text-[10px]">
+                    <Coins className="size-3" /> {creditsNeeded}
+                  </span>
+                )}
               </Button>
+              {!creditsAvailable && (
+                <p className="flex items-center gap-1.5 text-[11px] text-destructive">
+                  <AlertCircle className="size-3.5" />
+                  Créditos insuficientes ({access?.sub?.credits ?? 0} disponíveis).
+                </p>
+              )}
             </div>
           )}
         </section>
