@@ -233,7 +233,8 @@ const DIAGNOSIS_ACTION: Record<HealthDiagnosis, string> = {
   edge_blocked:
     "A borda (Cloudflare) recusou o acesso — use um domínio HTTPS válido, nunca um IP direto.",
   unauthorized: "Credenciais do worker inválidas — revise CLEANER_WORKER_SECRET.",
-  unreachable: "O worker não respondeu a tempo — verifique se a instância GPU está ligada.",
+  unreachable:
+    "O worker não respondeu a tempo — verifique se a instância está ligada. O modo local (TBE) continua disponível.",
   bad_response: "O endereço respondeu algo que não é a API do worker — confira a URL.",
 };
 
@@ -270,7 +271,7 @@ export async function workerHealth() {
     return offline("edge_blocked", "endereço do worker aponta para um IP direto");
   }
   try {
-    const response = await fetch(`${base}/v1/health`, { signal: AbortSignal.timeout(12_000) });
+    const response = await fetch(`${base}/v1/health`, { signal: AbortSignal.timeout(25_000) });
 
     const responseBody = await response.text();
     if (!response.ok) {

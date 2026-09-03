@@ -1029,7 +1029,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 : health.online && health.ai_ready
                   ? "IA pronta"
                   : health.online && health.cuda === false
-                    ? "modo CPU"
+                    ? "modo CPU · TBE"
                   : health.online
                     ? "modo básico"
                     : "offline"}
