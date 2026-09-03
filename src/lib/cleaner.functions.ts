@@ -256,6 +256,7 @@ export const processCleanerJob = createServerFn({ method: "POST" })
         progress: 0.02,
         error: null,
         result_url: null,
+        preview_url: null,
       })
       .eq("id", data.id)
       .eq("user_id", context.userId)
