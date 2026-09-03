@@ -61,7 +61,9 @@ import {
   type ExportQuality,
 } from "@/lib/editor/export-quality";
 import { toast } from "sonner";
-import { loadSourceFile } from "@/lib/editor/cuts";
+import { loadSourceFile, registerSourceFile } from "@/lib/editor/cuts";
+import { CutGallery } from "@/components/editor/CutGallery";
+import type { LibraryCut } from "@/lib/editor/cuts.service";
 import { uploadSourceFile } from "@/lib/editor/media-cloud";
 import { saveRenderedVideo } from "@/lib/editor/download";
 
