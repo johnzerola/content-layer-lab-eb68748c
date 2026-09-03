@@ -186,6 +186,28 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime }: Pr
       </section>
 
       <section className="rounded-xl border border-border/60 p-2.5">
+        <p className="mb-1 font-mono text-[11px] uppercase text-muted-foreground">Separar voz e música</p>
+        <p className="mb-2 text-[11px] text-muted-foreground">
+          Divide o áudio do vídeo em duas trilhas independentes (voz e música/ambiente) para você controlar volume,
+          fade e mudo de cada uma. O processamento acontece no seu navegador.
+        </p>
+        <button
+          type="button"
+          disabled={!getSourceFile || splitting}
+          onClick={splitStems}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs disabled:opacity-50"
+        >
+          <AudioWaveform className="h-3.5 w-3.5" />
+          {splitting ? `Separando… ${Math.round(progress * 100)}%` : "Separar trilhas"}
+        </button>
+        {splitting && (
+          <div className="mt-2 h-1 overflow-hidden rounded bg-muted">
+            <div className="h-full bg-primary transition-all" style={{ width: `${progress * 100}%` }} />
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-border/60 p-2.5">
         <p className="mb-2 font-mono text-[11px] uppercase text-muted-foreground">Música, efeitos e voz</p>
         <div className="flex flex-wrap gap-1.5">
           <button
