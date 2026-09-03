@@ -367,9 +367,9 @@ export function drawTemplateFrame(
           layer.fit === "contain" ? Math.min(w / crop.sw, h / crop.sh) : Math.max(w / crop.sw, h / crop.sh);
         const dw = layer.fit === "fill" ? w : crop.sw * scale;
         const dh = layer.fit === "fill" ? h : crop.sh * scale;
-        ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+        ctx.drawImage(src.el, crop.sx, crop.sy, crop.sw, crop.sh, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
       } else {
-        drawFit(ctx, video, video.videoWidth, video.videoHeight, x, y, w, h, layer.fit);
+        drawFit(ctx, src.el, src.width, src.height, x, y, w, h, layer.fit);
       }
       ctx.restore();
     } else if (layer.type === "image" && layer.src) {
