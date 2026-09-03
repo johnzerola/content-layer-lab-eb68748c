@@ -186,8 +186,10 @@ def _boxes_morph(frame: np.ndarray) -> List[Box]:
 
 
 def detect_text_boxes(frame: np.ndarray) -> List[Box]:
-    boxes = _boxes_paddle(frame)
+    _get_detector()
+    boxes = _boxes_rapidocr(frame) if _detector_kind == "rapidocr-onnx" else _boxes_paddle(frame)
     return boxes if boxes else _boxes_morph(frame)
+
 
 
 def text_pixel_mask(frame: np.ndarray, box: Box, dilate_ratio: float = 0.18) -> np.ndarray:

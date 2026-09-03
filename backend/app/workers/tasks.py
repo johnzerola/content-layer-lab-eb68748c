@@ -516,9 +516,18 @@ def _run_classic_pipeline(
     verify_on: bool,
     emit,
 ) -> tuple[List[Dict], dict, int, str]:
-    engine = TemporalFillEngine(14)
-    core = 20
-    overlap = 5
+    cpu_engine = os.getenv("CLEANER_CPU_ENGINE", "tbe").lower()
+    if cpu_engine == "flow":
+        engine: object = TemporalFillEngine(14)
+        core = 20
+        overlap = 5
+    else:
+        # TBE harvests the background from a wide window with global-motion
+        # alignment — much cheaper than dense flow, so the window can be larger.
+        engine = TemporalBackgroundExposureEngine()
+        core = 48
+        overlap = 12
+
     total = max(1, info.frames)
     writer = RawWriter(tmp_path, info.width, info.height, info.fps)
     segments: List[Dict] = []

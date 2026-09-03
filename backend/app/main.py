@@ -216,7 +216,9 @@ async def health():
             "propainter": {"ready": propainter.ready, "missing": list(propainter.missing)},
             "diffueraser": {"ready": diffueraser.ready, "missing": list(diffueraser.missing)},
             "temporal_fill": {"ready": True, "quality": "fallback"},
+            "tbe": tbe_status(),
         },
+
         "detectors": {"text": detector_status()},
         "features": {"batch_render": True},
         "limits": {
