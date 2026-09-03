@@ -13,7 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { ActivityDock } from "../components/ActivityDock";
 import { Toaster } from "../components/ui/sonner";
-import { TooltipProvider } from "../components/ui/tooltip";
+import { TooltipProvider } from "../components/ui/base";
 import { BatchProgressDock } from "../components/BatchProgressDock";
 import { CommandPalette } from "../components/CommandPalette";
 import { installSessionScope } from "../lib/session-scope";

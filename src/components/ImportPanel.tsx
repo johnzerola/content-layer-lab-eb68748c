@@ -1,6 +1,13 @@
 import { useRef, useState } from "react";
 import { FolderOpen, Link as LinkIcon, Upload, CheckCircle2, Info } from "lucide-react";
-import { Button, Input, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/base";
+import {
+  Button,
+  Input,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/base";
 import { VIDEO_ACCEPT } from "@/lib/media";
 import { FLOWS, type Mode } from "@/lib/flows";
 
@@ -92,28 +99,30 @@ export function ImportPanel({
           </p>
         )}
 
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button onClick={() => inputRef.current?.click()}>
-                <Upload className="size-4" />
-                {flow.filesLabel}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Ou arraste e solte os arquivos aqui</TooltipContent>
-          </Tooltip>
-          {flow.folder && (
+        <TooltipProvider delayDuration={200}>
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" onClick={() => folderRef.current?.click()}>
-                  <FolderOpen className="size-4" />
-                  Selecionar pasta
+                <Button onClick={() => inputRef.current?.click()}>
+                  <Upload className="size-4" />
+                  {flow.filesLabel}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Importa todos os vídeos da pasta de uma vez</TooltipContent>
+              <TooltipContent>Ou arraste e solte os arquivos aqui</TooltipContent>
             </Tooltip>
-          )}
-        </div>
+            {flow.folder && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" onClick={() => folderRef.current?.click()}>
+                    <FolderOpen className="size-4" />
+                    Selecionar pasta
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Importa todos os vídeos da pasta de uma vez</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        </TooltipProvider>
       </div>
 
       <input
