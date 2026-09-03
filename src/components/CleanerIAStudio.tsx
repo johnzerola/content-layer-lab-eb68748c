@@ -85,6 +85,14 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [brushSize, setBrushSize] = useState(0.015);
+  const [workMode, setWorkMode] = useState<"auto" | "manual">("auto");
+
+  const access = useAccess();
+  const isAdmin = access?.isAdmin ?? false;
+  const creditsNeeded = Math.max(1, Math.ceil((duration || 60) / 60));
+  const planUnlimited = planFromId(access?.sub?.plan ?? null).credits === null;
+  const creditsAvailable = isAdmin || planUnlimited || (access?.sub?.credits ?? 0) >= creditsNeeded;
+  const previewDone = !!job?.preview_url && !job?.result_url && job?.status === "completed";
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
