@@ -15,6 +15,7 @@ import { READY_TEMPLATES } from "@/lib/editor/template-presets";
 import { DEFAULT_ANIM_IDENTITY, loadAnimIdentity, saveAnimIdentity, type AnimIdentity } from "@/lib/editor/animation-library";
 import { DEFAULT_BRAND_KIT, loadBrandKit, type BrandKit } from "@/lib/brand-kit";
 import { TransitionPicker } from "@/components/editor/TransitionPicker";
+import { CaptionTemplateStudio } from "@/components/editor/CaptionTemplateStudio";
 import { listMyTemplates, listPublicTemplates } from "@/lib/video-template/service";
 import type { VideoTemplateRecord } from "@/lib/video-template/types";
 import type { Transition } from "@/lib/preedit";
