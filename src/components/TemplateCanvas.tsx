@@ -93,6 +93,21 @@ export function selectableIds(t: Template): SelId[] {
 
 type Guide = { axis: "x" | "y"; pos: number };
 const SNAP = 14;
+const MIN_W = 24;
+const MIN_H = 20;
+
+type DragMode = "move" | "n" | "s" | "e" | "w" | "nw" | "ne" | "sw" | "se";
+
+const HANDLES: { mode: DragMode; style: React.CSSProperties; cursor: string }[] = [
+  { mode: "nw", style: { left: 0, top: 0 }, cursor: "nwse-resize" },
+  { mode: "n", style: { left: "50%", top: 0 }, cursor: "ns-resize" },
+  { mode: "ne", style: { left: "100%", top: 0 }, cursor: "nesw-resize" },
+  { mode: "e", style: { left: "100%", top: "50%" }, cursor: "ew-resize" },
+  { mode: "se", style: { left: "100%", top: "100%" }, cursor: "nwse-resize" },
+  { mode: "s", style: { left: "50%", top: "100%" }, cursor: "ns-resize" },
+  { mode: "sw", style: { left: 0, top: "100%" }, cursor: "nesw-resize" },
+  { mode: "w", style: { left: 0, top: "50%" }, cursor: "ew-resize" },
+];
 
 function snapValue(
   value: number,
@@ -490,10 +505,21 @@ export function TemplateCanvas({
               }}
             >
               {sel && (
-                <span
-                  onPointerDown={drag(id, "resize")}
-                  className="absolute -right-1.5 -bottom-1.5 size-3 cursor-se-resize rounded-[2px] bg-primary"
-                />
+                <>
+                  {HANDLES.map((hd) => (
+                    <span
+                      key={hd.mode}
+                      onPointerDown={drag(id, hd.mode)}
+                      style={{ ...hd.style, cursor: hd.cursor }}
+                      className="absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary bg-background shadow-sm transition-transform hover:scale-125"
+                    />
+                  ))}
+                  {live && live.id === id && (
+                    <span className="pointer-events-none absolute left-1/2 -bottom-6 -translate-x-1/2 whitespace-nowrap rounded bg-foreground/90 px-1.5 py-0.5 font-mono text-[9px] text-background">
+                      {Math.round(live.r.w)} × {Math.round(live.r.h)}
+                    </span>
+                  )}
+                </>
               )}
             </div>
           );
