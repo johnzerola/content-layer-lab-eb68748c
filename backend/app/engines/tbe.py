@@ -164,8 +164,15 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
                         + local_plate.astype(np.float32) * alpha
                     ).astype(np.uint8)
                     remaining = cv2.bitwise_and(remaining, cv2.bitwise_not(fillable))
-            if remaining.max() > 0:
-                current = patch_fill(current, remaining)
+            leftover = int(np.count_nonzero(remaining))
+            if leftover > 0:
+                original = max(1, int(np.count_nonzero(hole)))
+                if leftover / original < 0.2:
+                    # thin residual border: Telea is instant and visually identical
+                    patched = cv2.inpaint(current, remaining, 3, cv2.INPAINT_TELEA)
+                    current[remaining > 0] = patched[remaining > 0]
+                else:
+                    current = patch_fill(current, remaining)
             output.append(current)
         return np.asarray(output)
 
@@ -173,21 +180,27 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
     def _median_plate(
         stack: List[np.ndarray], valid_stack: List[np.ndarray]
     ) -> Tuple[np.ndarray, np.ndarray]:
+        """Per-pixel temporal median over the frames where the pixel is exposed."""
         if not stack:
             empty = np.zeros((1, 1, 3), np.uint8)
             return empty, np.zeros((1, 1), np.uint8)
         height, width = stack[0].shape[:2]
         samples = np.asarray(stack, dtype=np.float32)
-        weights = np.asarray([(v > 0).astype(np.float32) for v in valid_stack])
-        counts = weights.sum(axis=0)
-        plate = np.zeros((height, width, 3), np.float32)
-        masked = np.where(weights[..., None] > 0, samples, np.nan)
-        with np.errstate(all="ignore"):
-            median = np.nanmedian(masked, axis=0)
-        finite = np.isfinite(median)
-        plate[finite] = median[finite]
-        plate_valid = ((counts > 0) & finite.all(axis=2)).astype(np.uint8) * 255
+        valid = np.asarray([(v > 0) for v in valid_stack])
+        counts = valid.sum(axis=0)
+        # Push invisible samples to +inf, sort once, then read the middle of the
+        # visible run per pixel. Much cheaper than nanmedian and NaN-free.
+        big = np.float32(1e9)
+        filled = np.where(valid[..., None], samples, big)
+        filled.sort(axis=0)
+        idx = np.clip((counts - 1) // 2, 0, len(stack) - 1)
+        plate = np.take_along_axis(
+            filled, idx[None, ..., None].repeat(3, axis=3).astype(np.intp), axis=0
+        )[0]
+        plate_valid = (counts > 0).astype(np.uint8) * 255
+        plate[plate >= big] = 0
         return plate.astype(np.uint8), plate_valid
+
 
 
 def tbe_status() -> dict:
