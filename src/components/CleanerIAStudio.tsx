@@ -1372,15 +1372,25 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         )}
 
 
-        {health?.online && health.cuda === false && (
+        {health?.online && (health.cuda === false || health.ai_ready === false) && (
           <div className="flex items-start gap-2 rounded-xl bg-amber-500/10 p-4 text-amber-600">
             <AlertCircle className="mt-0.5 size-4 shrink-0" />
             <div className="text-[11px] leading-relaxed">
-              <p className="font-bold uppercase">Processamento em CPU</p>
-              <p className="opacity-80">O motor está disponível, mas vídeos podem demorar mais.</p>
+              <p className="font-bold uppercase">
+                {health.cuda === false ? "Processamento em CPU" : "Motor sem pesos completos"}
+              </p>
+              <p className="opacity-80">
+                {health.cuda === false
+                  ? `Motor disponível${health.gpu ? ` (${health.gpu})` : ""}, mas sem GPU CUDA: mais lento e com qualidade abaixo do preset máximo.`
+                  : "O worker respondeu, porém os modelos de reconstrução ainda não estão prontos."}
+                {health.engines?.["propainter"]?.missing?.length
+                  ? ` Faltando: ${health.engines["propainter"].missing.join(", ")}.`
+                  : ""}
+              </p>
             </div>
           </div>
         )}
+
       </div>
     </div>
   );
