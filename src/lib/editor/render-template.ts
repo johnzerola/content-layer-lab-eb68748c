@@ -45,6 +45,8 @@ export interface TemplateRenderOptions {
   fps?: number;
   /** escala do canvas de saída: 1 = 1080x1920, 2 = 4K */
   scale?: number;
+  /** avisa quando o aparelho não aguentou a resolução pedida e caiu um degrau */
+  onQualityDrop?: (height: number) => void;
   onProgress?: (p: number) => void;
   signal?: AbortSignal | undefined;
 }
