@@ -640,6 +640,7 @@ export function TemplateEditor({
                           <Slider label="Tamanho" value={caps.size} min={28} max={140} onChange={(v) => patch(id, { size: v })} />
                           <Slider label="Contorno" value={caps.stroke} min={0} max={24} onChange={(v) => patch(id, { stroke: v })} />
                           <Slider label="Palavras por bloco" value={caps.maxWords} min={1} max={8} onChange={(v) => patch(id, { maxWords: v })} />
+                          <Slider label="Sincronia (s)" value={caps.offset ?? 0} min={-1} max={1} step={0.05} onChange={(v) => patch(id, { offset: v })} />
                           <Slider label="X" value={caps.x} min={0} max={1080} onChange={(v) => patch(id, { x: v })} />
                           <Slider label="Y" value={caps.y} min={0} max={1920} onChange={(v) => patch(id, { y: v })} />
                           <Slider label="Largura" value={caps.w} min={200} max={1080} onChange={(v) => patch(id, { w: v })} />
