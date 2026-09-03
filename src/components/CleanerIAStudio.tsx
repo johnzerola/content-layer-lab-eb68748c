@@ -44,7 +44,14 @@ import {
   type CleanerRegion,
 } from "@/lib/cleaner";
 import { cloudAuthHeaders } from "@/lib/cloud";
-import { localCleanSupported, runLocalClean } from "@/lib/cleaner-local";
+import {
+  DEFAULT_LOCAL_ADVANCED,
+  LOCAL_ADVANCED_LIMITS,
+  localCleanSupported,
+  runLocalClean,
+  type LocalCleanAdvanced,
+} from "@/lib/cleaner-local";
+
 import { consumeCredits, useAccess } from "@/lib/subscription";
 import { planFromId } from "@/lib/plan";
 
