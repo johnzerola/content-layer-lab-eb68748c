@@ -148,6 +148,8 @@ function EstilosPage() {
             >
               {t === "meus"
                 ? `Meus estilos (${mine.length})`
+                : t === "legenda"
+                ? "Template de legenda"
                 : t === "templates"
                   ? `Templates de vídeo (${videoTemplates.length})`
                   : t === "transicoes"
