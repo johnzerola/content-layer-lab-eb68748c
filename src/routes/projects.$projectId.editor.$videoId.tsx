@@ -53,7 +53,7 @@ import {
   type ExportQuality,
 } from "@/lib/editor/export-quality";
 import { toast } from "sonner";
-import { loadSourceFile, registerSourceFile } from "@/lib/editor/cuts";
+import { loadSourceFile } from "@/lib/editor/cuts";
 import { uploadSourceFile } from "@/lib/editor/media-cloud";
 import { saveRenderedVideo } from "@/lib/editor/download";
 
