@@ -658,7 +658,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         >
           <video
             ref={videoRef}
-            src={job?.status === "completed" ? (job.result_url ?? job.preview_url ?? src) : src}
+            src={
+              localUrl ?? (job?.status === "completed" ? (job.result_url ?? job.preview_url ?? src) : src)
+            }
+
             controls={job?.status === "completed"}
             playsInline
             muted
