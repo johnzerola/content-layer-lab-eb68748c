@@ -47,6 +47,7 @@ from ..security import callback_signature, validate_callback_url
 from ..storage import job_dir as safe_job_dir, read_state, write_state
 from ..utils.video import (
     RawWriter,
+    composite_masked,
     ffmpeg_filter,
     masks_to_video,
     mux_audio,
@@ -54,6 +55,7 @@ from ..utils.video import (
     probe,
     read_chunk,
     read_frames,
+    trim_video,
 )
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -111,6 +113,24 @@ def _apply_postprocess(input_path: str, output_path: str, info, opts: Dict, emit
     ffmpeg_filter(source, final_path, ",".join(filters), crf=int(opts.get("crf", 14)))
     os.replace(final_path, output_path)
     return output_path
+
+
+def _composite_step(
+    input_path: str,
+    inpainted_path: str,
+    mask_dir: str,
+    fps: float,
+    job_dir: str,
+    emit,
+) -> str:
+    """Composite seletivo: fora da máscara o pixel original é preservado."""
+    composited = os.path.join(job_dir, "composited.mp4")
+    emit(90, "preservando pixels originais fora da mascara", "refining")
+    try:
+        return composite_masked(input_path, inpainted_path, mask_dir, fps, composited)
+    except Exception as exc:
+        print(f"[composite] fallback para saida integral do modelo: {exc}")
+        return inpainted_path
 
 
 def sign_payload(payload: dict, secret: str) -> str:
@@ -370,6 +390,7 @@ def _run_official_pipeline(
     verify_on: bool,
     emit,
     cancel_file: Optional[str] = None,
+    composite_on: bool = True,
 ) -> tuple[List[Dict], dict, int]:
     mask_dir = os.path.join(job_dir, "masks")
     run_dir = os.path.join(job_dir, "propainter-run")
