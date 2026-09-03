@@ -44,8 +44,10 @@ import {
   type CleanerRegion,
 } from "@/lib/cleaner";
 import { cloudAuthHeaders } from "@/lib/cloud";
+import { localCleanSupported, runLocalClean } from "@/lib/cleaner-local";
 import { consumeCredits, useAccess } from "@/lib/subscription";
 import { planFromId } from "@/lib/plan";
+
 
 type Props = {
   item: { id: string; file: File; poster: string | null; w: number; h: number };
@@ -86,6 +88,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [duration, setDuration] = useState(0);
   const [brushSize, setBrushSize] = useState(0.015);
   const [workMode, setWorkMode] = useState<"auto" | "manual">("auto");
+  const [localBusy, setLocalBusy] = useState(false);
+  const [localProgress, setLocalProgress] = useState(0);
+  const [localPhase, setLocalPhase] = useState("");
+  const [localUrl, setLocalUrl] = useState<string | null>(null);
+  const localCancel = useRef(false);
+
 
   const access = useAccess();
   const isAdmin = access?.isAdmin ?? false;
@@ -349,7 +357,52 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     setDraft(null);
   };
 
+  /** Fallback sem GPU: reconstrói o fundo no navegador (mais lento, sem blur). */
+  const runLocal = async (previewOnly: boolean) => {
+    if (!localCleanSupported()) {
+      toast.error("Este navegador não suporta o modo local (requer WebCodecs).");
+      return;
+    }
+    const usable = masks.filter((m) => m.role === "remove" && m.enabled !== false);
+    if (!usable.length) {
+      toast.error("Marque ao menos uma área para remover antes de processar localmente.");
+      return;
+    }
+    localCancel.current = false;
+    setLocalBusy(true);
+    setLocalProgress(0);
+    setLocalPhase("iniciando");
+    try {
+      const blob = await runLocalClean({
+        file: item.file,
+        masks: usable,
+        seconds: previewOnly ? 5 : undefined,
+        onProgress: (p) => setLocalProgress(Math.round(p * 100)),
+        onPhase: setLocalPhase,
+        isCancelled: () => localCancel.current,
+      });
+      const url = URL.createObjectURL(blob);
+      setLocalUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return url;
+      });
+      if (!previewOnly) onComplete(url);
+      toast.success(
+        previewOnly
+          ? "Prévia local de 5s pronta."
+          : "Vídeo limpo localmente — confira o resultado no player.",
+      );
+    } catch (e) {
+      if ((e as DOMException)?.name === "AbortError") toast.info("Processamento local cancelado.");
+      else toast.error(e instanceof Error ? e.message : "Falha no processamento local");
+    } finally {
+      setLocalBusy(false);
+      setLocalPhase("");
+    }
+  };
+
   const startUpload = async () => {
+
     if (!health?.online) {
       toast.error("Motor de IA offline — configure o processamento local.");
       return;
@@ -605,8 +658,11 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         >
           <video
             ref={videoRef}
-            src={job?.status === "completed" ? (job.result_url ?? job.preview_url ?? src) : src}
-            controls={job?.status === "completed"}
+            src={
+              localUrl ?? (job?.status === "completed" ? (job.result_url ?? job.preview_url ?? src) : src)
+            }
+
+            controls={!!localUrl || job?.status === "completed"}
             playsInline
             muted
             preload="auto"
@@ -1229,14 +1285,63 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         )}
 
         {health && !health.online && (
-          <div className="flex items-start gap-2 rounded-xl bg-destructive/10 p-4 text-destructive">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <div className="text-[11px] leading-relaxed">
-              <p className="font-bold uppercase tracking-tight">Backend offline</p>
-              <p className="opacity-80">{health.reason || "processamento local não configurado"}</p>
+          <div className="space-y-3 rounded-xl bg-destructive/10 p-4 text-destructive">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <div className="text-[11px] leading-relaxed">
+                <p className="font-bold uppercase tracking-tight">Motor GPU offline</p>
+                <p className="opacity-80">
+                  {health.reason || "endpoint do worker não configurado"} — use o modo local abaixo
+                  para não travar seu fluxo.
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2 rounded-lg bg-background/40 p-3 text-foreground">
+              <p className="text-[11px] font-semibold">Modo local (sem GPU)</p>
+              <p className="text-[10px] text-muted-foreground">
+                Reconstrói o fundo por mediana temporal no seu navegador. Mais lento e ideal para
+                legendas/marcas paradas com câmera estável — sem blur, sem mosaico.
+              </p>
+              {localBusy ? (
+                <div className="space-y-2">
+                  <Progress value={localProgress} />
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span>
+                      {localPhase} · {localProgress}%
+                    </span>
+                    <button
+                      className="font-bold text-destructive"
+                      onClick={() => {
+                        localCancel.current = true;
+                      }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => runLocal(true)}>
+                    <Eye className="mr-1 size-3.5" /> Prévia local 5s
+                  </Button>
+                  <Button size="sm" onClick={() => runLocal(false)}>
+                    <Wand2 className="mr-1 size-3.5" /> Processar local
+                  </Button>
+                  {localUrl && (
+                    <a
+                      href={localUrl}
+                      download={`limpo-${item.file.name.replace(/\.[^.]+$/, "")}.mp4`}
+                      className="inline-flex items-center rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground"
+                    >
+                      Baixar resultado
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
+
 
         {health?.online && health.cuda === false && (
           <div className="flex items-start gap-2 rounded-xl bg-amber-500/10 p-4 text-amber-600">
