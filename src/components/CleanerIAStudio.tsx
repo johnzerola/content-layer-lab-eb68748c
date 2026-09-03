@@ -104,6 +104,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [localPhase, setLocalPhase] = useState("");
   const [localUrl, setLocalUrl] = useState<string | null>(null);
   const localCancel = useRef(false);
+  const [advanced, setAdvanced] = useState<LocalCleanAdvanced>(DEFAULT_LOCAL_ADVANCED);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
 
 
   const access = useAccess();
