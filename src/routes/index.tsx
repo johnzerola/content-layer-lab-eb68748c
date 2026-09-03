@@ -124,7 +124,7 @@ import { CaptionTimeline } from "@/components/CaptionTimeline";
 import { canBrowserDecode, guessMime, isVideoFile, VIDEO_ACCEPT, VIDEO_EXT_RE } from "@/lib/media";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
-import { ImportPanel } from "@/components/ImportPanel";
+import { ImportPanelSafe } from "@/components/ImportPanelSafe";
 import { FLOWS, outputName, zipName, type Mode } from "@/lib/flows";
 import { dedupeNames, expandPattern, sanitizeName, stripExt } from "@/lib/naming";
 import { bankPick, headlineTweak, parseBank } from "@/lib/headlines";
@@ -2287,7 +2287,7 @@ function Home() {
           </section>
         )}
 
-        <ImportPanel
+        <ImportPanelSafe
           mode={mode}
           count={items.length}
           onFiles={(f) => void addFiles(f)}
