@@ -1199,19 +1199,21 @@ function EditorPage() {
             {tool === "templates" && (
               <div className="space-y-3">
                 <div className="flex rounded-lg border border-border/60 p-0.5 text-xs">
-                  {(["prontos", "meus"] as const).map((t) => (
+                  {(["prontos", "meus", "cortes"] as const).map((t) => (
                     <button
                       key={t}
                       type="button"
                       onClick={() => setTemplateTab(t)}
                       className={`flex-1 rounded-md px-2 py-1 ${templateTab === t ? "bg-primary/20" : "text-muted-foreground"}`}
                     >
-                      {t === "prontos" ? "Prontos" : "Meus templates"}
+                      {t === "prontos" ? "Prontos" : t === "meus" ? "Meus" : "Cortes"}
                     </button>
                   ))}
                 </div>
 
-                {templateTab === "prontos" ? (
+                {templateTab === "cortes" ? (
+                  <CutGallery onApply={applyCut} />
+                ) : templateTab === "prontos" ? (
                   <div className="grid grid-cols-2 gap-2">
                     {READY_TEMPLATES.map((t) => (
                       <button
