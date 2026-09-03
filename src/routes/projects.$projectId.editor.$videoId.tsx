@@ -45,7 +45,7 @@ import { listAccounts, type SocialAccount } from "@/lib/social";
 import { renderTemplateProject, templateRenderSupported } from "@/lib/editor/render-template";
 import { exportScale, loadExportQuality } from "@/lib/editor/export-quality";
 import { toast } from "sonner";
-import { getSourceFile, loadSourceFile } from "@/lib/editor/cuts";
+import { loadSourceFile } from "@/lib/editor/cuts";
 
 import { CutPanel, FramePanel, GradePanel, LayoutPanel, TitlesPanel } from "@/components/editor/ToolPanels";
 import { EditorCanvas } from "@/components/vtemplate/EditorCanvas";
