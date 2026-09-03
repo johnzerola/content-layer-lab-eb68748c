@@ -565,7 +565,7 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
         ctx.translate(-W / 2, -H / 2);
       }
       const grade = pre ? preEditFilter(pre) : "none";
-      drawTemplateFrame(ctx, doc, tOut, video, images, cues, crop, grade, { width: W, height: H });
+      drawTemplateFrame(ctx, doc, tOut, source, images, cues, crop, grade, { width: W, height: H });
       ctx.restore();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
 
@@ -574,7 +574,49 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
       frame.close();
       while (encoder.encodeQueueSize > 6) await bgSleep(2);
       if (i % 3 === 0) opts.onProgress?.(Math.min(0.96, i / totalFrames));
+    };
+
+    let done = 0;
+
+    // Caminho turbo: decodifica o arquivo direto (WebCodecs), sem 1 seek por
+    // quadro — tipicamente 5–10x mais rápido que a busca precisa.
+    const reader = await FrameReader.open(file).catch(() => null);
+    if (reader) {
+      let cur: DecodedFrame | null = null;
+      try {
+        await reader.seek(Math.max(0, srcAt(0) - 0.05));
+        for (let i = 0; i < totalFrames; i++) {
+          const tSrc = srcAt(i);
+          // avança a decodificação até o quadro que cobre este instante
+          while (!cur || cur.time + cur.duration <= tSrc) {
+            const nxt = await reader.read();
+            if (!nxt) break;
+            cur?.frame.close();
+            cur = nxt;
+          }
+          if (!cur) break;
+          // salto para trás (emendas fora de ordem): volta ao caminho preciso
+          if (cur.time > tSrc + 0.5) break;
+          await emit(i, tSrc, { el: cur.frame, width: cur.frame.displayWidth, height: cur.frame.displayHeight });
+          done = i + 1;
+        }
+      } catch (err) {
+        if ((err as Error)?.name === "AbortError") throw err;
+        // qualquer falha na decodificação direta: segue pela busca precisa
+      } finally {
+        cur?.frame.close();
+        reader.close();
+      }
     }
+
+    // Busca precisa: fallback determinístico (formatos não suportados, emendas
+    // fora de ordem ou falha do decodificador).
+    for (let i = done; i < totalFrames; i++) {
+      const tSrc = srcAt(i);
+      await seekTo(tSrc);
+      await emit(i, tSrc, { el: video, width: video.videoWidth, height: video.videoHeight });
+    }
+
 
     await encoder.flush();
     encoder.close();
