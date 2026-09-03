@@ -97,7 +97,7 @@ class ImportPanelBoundary extends React.Component<
 > {
   override state = { failed: false };
 
-  static override getDerivedStateFromError() {
+  static getDerivedStateFromError() {
     return { failed: true };
   }
 
