@@ -61,17 +61,25 @@ function rectOf(t: Template, id: SelId): Rect | null {
 }
 
 function applyRect(t: Template, id: SelId, r: Partial<Rect>): Template {
+  // camadas de texto não têm altura própria: a altura vem de `size`
+  const cur = layerOf(t, id) as (Rect & { size?: number; h?: number }) | null;
+  const patch: Record<string, number> = { ...r };
+  if (cur && cur.h == null && typeof cur.size === "number" && r.h != null) {
+    patch.size = Math.max(8, Math.round(r.h / 1.2));
+    delete patch.h;
+  }
   if (isExtra(id)) {
     return {
       ...t,
-      extras: (t.extras ?? []).map((e) => (`extra:${e.id}` === id ? { ...e, ...r } : e)),
+      extras: (t.extras ?? []).map((e) => (`extra:${e.id}` === id ? { ...e, ...patch } : e)),
     };
   }
   const key = FIXED_KEY[id as LayerId];
-  const cur = t[key] as unknown as Rect;
-  if (!cur) return t;
-  return { ...t, [key]: { ...cur, ...r } } as Template;
+  const base = t[key] as unknown as Rect;
+  if (!base) return t;
+  return { ...t, [key]: { ...base, ...patch } } as Template;
 }
+
 
 function labelOf(t: Template, id: SelId) {
   if (isExtra(id)) return (t.extras ?? []).find((e) => `extra:${e.id}` === id)?.label ?? "Camada";
