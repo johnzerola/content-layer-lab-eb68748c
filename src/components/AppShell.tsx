@@ -356,7 +356,9 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             }
           />
         ))}
+        {routeLink("/remover", "Remover legenda/marca", Eraser, expanded, close)}
         {routeLink("/cortes", "Corte IA & Cortes", Scissors, expanded, close)}
+
         {routeLink("/estudio", "Estúdio de gravação", Radio, expanded, close)}
         {routeLink("/fotos", "FotoViral", Images, expanded, close)}
       </nav>
