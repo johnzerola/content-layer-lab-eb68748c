@@ -38,13 +38,14 @@ function compactWorkerError(body: string, status?: number): string {
 export function workerBase(): string | null {
   const url = process.env["CLEANER_WORKER_URL"];
   const publicUrl = process.env["CLEANER_WORKER_PUBLIC_URL"];
-  // O runtime serverless bloqueia subrequisições em http://; quando existe uma
-  // URL pública https, ela é sempre preferida para as chamadas de controle.
-  if (url && /^http:\/\//i.test(url) && publicUrl && /^https:\/\//i.test(publicUrl)) {
-    return normalizeBase(publicUrl);
-  }
+  // O runtime serverless bloqueia subrequisições em http:// e acesso direto a IP.
+  // Sempre que existir um domínio HTTPS público, ele é a base de controle.
+  const isSafe = (value?: string | null) =>
+    !!value && /^https:\/\//i.test(value) && !/^https:\/\/(\d{1,3}\.){3}\d{1,3}(:|\/|$)/i.test(value);
+  if (isSafe(publicUrl)) return normalizeBase(publicUrl!);
   return url ? normalizeBase(url) : publicUrl ? normalizeBase(publicUrl) : null;
 }
+
 
 export function workerPublicBase(): string | null {
   const url = process.env["CLEANER_WORKER_PUBLIC_URL"];
