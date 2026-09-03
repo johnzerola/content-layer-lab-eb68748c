@@ -80,7 +80,9 @@ function fromTemplate(id: string): Omit<SavedStylePreset, "id" | "createdAt"> | 
 
 function EstilosPage() {
   const [mine, setMine] = useState<SavedStylePreset[]>([]);
-  const [tab, setTab] = useState<"layouts" | "templates" | "transicoes" | "prontos" | "meus" | "paletas" | "tipografia">("layouts");
+  const [tab, setTab] = useState<
+    "layouts" | "legenda" | "templates" | "transicoes" | "prontos" | "meus" | "paletas" | "tipografia"
+  >("layouts");
   const [videoTemplates, setVideoTemplates] = useState<VideoTemplateRecord[]>([]);
   const [trans, setTrans] = useState<Transition>({ kind: "fade", dur: 0.4 });
   const [identity, setIdentity] = useState<AnimIdentity>(DEFAULT_ANIM_IDENTITY);
