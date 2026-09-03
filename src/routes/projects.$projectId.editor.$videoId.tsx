@@ -657,6 +657,15 @@ function EditorPage() {
     if (videoRef.current) videoRef.current.currentTime = time;
   }, []);
 
+  /** Posiciona o playhead e reproduz — usado nas prévias de transição. */
+  const previewFrom = useCallback(
+    (time: number) => {
+      seek(Math.max(0, time));
+      setPlaying(true);
+    },
+    [seek],
+  );
+
   // Atalhos de teclado
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1019,7 +1028,7 @@ function EditorPage() {
                         patchPre({ transitions: list }, "transicao-emenda");
                       }}
                       label={`Emenda ${joinIndex + 1}`}
-                      onPreview={() => seek(pre.segments[joinIndex]?.end ?? 0)}
+                      onPreview={() => previewFrom((pre.segments[joinIndex]?.end ?? 0) - 0.15)}
                     />
                   </div>
                 )}
@@ -1027,13 +1036,13 @@ function EditorPage() {
                   value={pre.transIn}
                   onChange={(t) => patchPre({ transIn: t }, "transicao-entrada")}
                   label="Entrada"
-                  onPreview={() => seek(Math.max(0, (pre.segments[0]?.start ?? 0)))}
+                  onPreview={() => previewFrom(pre.segments[0]?.start ?? 0)}
                 />
                 <TransitionPicker
                   value={pre.transOut}
                   onChange={(t) => patchPre({ transOut: t }, "transicao-saida")}
                   label="Saída"
-                  onPreview={() => seek(Math.max(0, duration - (pre.transOut.dur || 0.5)))}
+                  onPreview={() => previewFrom(duration - (pre.transOut.dur || 0.5) - 0.1)}
                 />
               </div>
             )}
