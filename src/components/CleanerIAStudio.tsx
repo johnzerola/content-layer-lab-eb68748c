@@ -593,18 +593,30 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     }
     try {
       const headers = await cloudAuthHeaders();
+      // Só as áreas realmente ativas vão para o motor; áreas desligadas ou de proteção
+      // que cobrem uma área de remoção anulariam o inpainting.
+      const removeMasks = masks.filter((m) => m.role === "remove" && m.enabled !== false);
+      const bbox = maskBounds(removeMasks);
+      const keepProtect = protectSubject && !bbox;
+      const sendMasks = masks
+        .filter((m) => m.enabled !== false)
+        .filter((m) => m.role !== "protect" || !overlapsAny(m, removeMasks));
+      // Com áreas marcadas o recorte é ignorado: reenquadrar não apaga legenda que
+      // fica dentro do quadro — nesse caso o certo é reconstruir o fundo.
+      const useCrop = cropClean && removeMasks.length === 0;
       await processJob({
         data: {
           id: job.id,
           mode,
           preset: preview ? "fast" : preset,
-          masks,
+          masks: sendMasks,
           options: {
             dynamic: dynamicMask,
-            protect_subject: protectSubject,
+            protect_subject: keepProtect,
             verify: verifyPass,
-            strategy: cropClean ? "crop-clean" : "inpaint",
-            crop_clean: { y: 0.26, h: 0.435 },
+            strategy: useCrop ? "crop-clean" : "inpaint",
+            ...(useCrop ? { crop_clean: { y: 0.26, h: 0.435 } } : {}),
+            ...(bbox ? { mask_bbox: bbox } : {}),
             enhance: enhanceOutput ? { mode: "hq", scale: 1 } : { mode: "off" },
             crf: enhanceOutput ? 14 : 16,
             key_step: dynamicMask ? 3 : 8,
@@ -613,6 +625,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         },
         headers,
       });
+      if (protectSubject && !keepProtect) {
+        toast.info("Proteção de pessoa desativada nesta passada para apagar as áreas marcadas.");
+      }
+
       if (!preview && !isAdmin && !planUnlimited) {
         void consumeCredits(creditsNeeded);
       }
