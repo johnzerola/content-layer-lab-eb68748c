@@ -44,7 +44,14 @@ import {
   type CleanerRegion,
 } from "@/lib/cleaner";
 import { cloudAuthHeaders } from "@/lib/cloud";
-import { localCleanSupported, runLocalClean } from "@/lib/cleaner-local";
+import {
+  DEFAULT_LOCAL_ADVANCED,
+  LOCAL_ADVANCED_LIMITS,
+  localCleanSupported,
+  runLocalClean,
+  type LocalCleanAdvanced,
+} from "@/lib/cleaner-local";
+
 import { consumeCredits, useAccess } from "@/lib/subscription";
 import { planFromId } from "@/lib/plan";
 
@@ -97,6 +104,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [localPhase, setLocalPhase] = useState("");
   const [localUrl, setLocalUrl] = useState<string | null>(null);
   const localCancel = useRef(false);
+  const [advanced, setAdvanced] = useState<LocalCleanAdvanced>(DEFAULT_LOCAL_ADVANCED);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
 
 
   const access = useAccess();
@@ -381,10 +391,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         file: item.file,
         masks: usable,
         seconds: previewOnly ? 5 : undefined,
+        advanced,
         onProgress: (p) => setLocalProgress(Math.round(p * 100)),
         onPhase: setLocalPhase,
         isCancelled: () => localCancel.current,
       });
+
       const url = URL.createObjectURL(blob);
       setLocalUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
@@ -1328,9 +1340,60 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             <div className="space-y-2 rounded-lg bg-background/40 p-3 text-foreground">
               <p className="text-[11px] font-semibold">Modo local (sem GPU)</p>
               <p className="text-[10px] text-muted-foreground">
-                Reconstrói o fundo por mediana temporal no seu navegador. Mais lento e ideal para
-                legendas/marcas paradas com câmera estável — sem blur, sem mosaico.
+                Modelo próprio de fundo: reestima o fundo em blocos, usando uma janela de quadros
+                vizinhos e analisando só o recorte das máscaras — por isso aguenta vídeos longos.
+                Sem blur, sem mosaico.
               </p>
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((v) => !v)}
+                className="text-[10px] font-bold uppercase tracking-tight text-primary"
+              >
+                {showAdvanced ? "Ocultar ajustes avançados" : "Ajustes avançados do inpainting"}
+              </button>
+              {showAdvanced && (
+                <div className="space-y-3 rounded-lg border border-border/60 bg-background/50 p-3">
+                  {(Object.keys(LOCAL_ADVANCED_LIMITS) as (keyof LocalCleanAdvanced)[]).map((k) => {
+                    const l = LOCAL_ADVANCED_LIMITS[k];
+                    return (
+                      <label key={k} className="block space-y-1">
+                        <span className="flex items-center justify-between text-[10px] font-semibold">
+                          {l.label}
+                          <span className="font-mono text-muted-foreground">
+                            {k === "cropPadding"
+                              ? `${Math.round(advanced[k] * 100)}%`
+                              : advanced[k]}
+                          </span>
+                        </span>
+                        <input
+                          type="range"
+                          min={l.min}
+                          max={l.max}
+                          step={l.step}
+                          value={advanced[k]}
+                          disabled={localBusy}
+                          onChange={(e) =>
+                            setAdvanced((prev) => ({ ...prev, [k]: Number(e.target.value) }))
+                          }
+                          className="w-full accent-[var(--primary)]"
+                        />
+                        <span className="block text-[10px] leading-snug text-muted-foreground">
+                          {l.hint}
+                        </span>
+                      </label>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setAdvanced(DEFAULT_LOCAL_ADVANCED)}
+                    disabled={localBusy}
+                    className="text-[10px] font-bold uppercase text-muted-foreground"
+                  >
+                    Restaurar padrão
+                  </button>
+                </div>
+              )}
+
               {localBusy ? (
                 <div className="space-y-2">
                   <Progress value={localProgress} />
