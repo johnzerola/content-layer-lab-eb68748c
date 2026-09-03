@@ -88,6 +88,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [duration, setDuration] = useState(0);
   const [brushSize, setBrushSize] = useState(0.015);
   const [workMode, setWorkMode] = useState<"auto" | "manual">("auto");
+  const [localBusy, setLocalBusy] = useState(false);
+  const [localProgress, setLocalProgress] = useState(0);
+  const [localPhase, setLocalPhase] = useState("");
+  const [localUrl, setLocalUrl] = useState<string | null>(null);
+  const localCancel = useRef(false);
+
 
   const access = useAccess();
   const isAdmin = access?.isAdmin ?? false;
