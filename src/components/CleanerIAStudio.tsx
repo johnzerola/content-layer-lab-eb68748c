@@ -1282,14 +1282,63 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         )}
 
         {health && !health.online && (
-          <div className="flex items-start gap-2 rounded-xl bg-destructive/10 p-4 text-destructive">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <div className="text-[11px] leading-relaxed">
-              <p className="font-bold uppercase tracking-tight">Backend offline</p>
-              <p className="opacity-80">{health.reason || "processamento local não configurado"}</p>
+          <div className="space-y-3 rounded-xl bg-destructive/10 p-4 text-destructive">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <div className="text-[11px] leading-relaxed">
+                <p className="font-bold uppercase tracking-tight">Motor GPU offline</p>
+                <p className="opacity-80">
+                  {health.reason || "endpoint do worker não configurado"} — use o modo local abaixo
+                  para não travar seu fluxo.
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2 rounded-lg bg-background/40 p-3 text-foreground">
+              <p className="text-[11px] font-semibold">Modo local (sem GPU)</p>
+              <p className="text-[10px] text-muted-foreground">
+                Reconstrói o fundo por mediana temporal no seu navegador. Mais lento e ideal para
+                legendas/marcas paradas com câmera estável — sem blur, sem mosaico.
+              </p>
+              {localBusy ? (
+                <div className="space-y-2">
+                  <Progress value={localProgress} />
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span>
+                      {localPhase} · {localProgress}%
+                    </span>
+                    <button
+                      className="font-bold text-destructive"
+                      onClick={() => {
+                        localCancel.current = true;
+                      }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => runLocal(true)}>
+                    <Eye className="mr-1 size-3.5" /> Prévia local 5s
+                  </Button>
+                  <Button size="sm" onClick={() => runLocal(false)}>
+                    <Wand2 className="mr-1 size-3.5" /> Processar local
+                  </Button>
+                  {localUrl && (
+                    <a
+                      href={localUrl}
+                      download={`limpo-${item.file.name.replace(/\.[^.]+$/, "")}.mp4`}
+                      className="inline-flex items-center rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground"
+                    >
+                      Baixar resultado
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
+
 
         {health?.online && health.cuda === false && (
           <div className="flex items-start gap-2 rounded-xl bg-amber-500/10 p-4 text-amber-600">
