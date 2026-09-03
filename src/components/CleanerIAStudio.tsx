@@ -1202,6 +1202,26 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               reconstruído com contexto temporal — nunca borrado.
             </p>
           ) : (
+            <>
+              <div className="flex flex-wrap gap-1.5">
+                {(
+                  [
+                    ["Só legendas", (m: CleanerRegion) => /texto|legenda|caption/i.test(m.label || m.role || "")],
+                    ["Só marca d'água", (m: CleanerRegion) => /marca|watermark|logo/i.test(m.label || m.role || "")],
+                    ["Só as minhas", (m: CleanerRegion) => /manual|polígono|pincel|protegida/i.test(m.label || "")],
+                  ] as [string, (m: CleanerRegion) => boolean][]
+                ).map(([label, keep]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setMasks((prev) => (prev.some(keep) ? prev.filter(keep) : prev))}
+                    className="rounded-full border border-border/60 px-2 py-1 text-[10px] font-semibold text-muted-foreground hover:border-primary hover:text-primary"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
             <div className="max-h-[220px] space-y-2 overflow-y-auto pr-1">
               {masks.map((m) => (
                 <div
@@ -1231,7 +1251,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 </div>
               ))}
             </div>
+            </>
           )}
+
           {masks.length > 0 && (
             <Button
               variant="ghost"
