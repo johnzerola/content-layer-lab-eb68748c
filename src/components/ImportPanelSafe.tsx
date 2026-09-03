@@ -2,6 +2,7 @@ import React from "react";
 import { FolderOpen, Link2, Loader2, Upload } from "lucide-react";
 import { Button, Input } from "@/components/ui/base";
 import { ImportPanel } from "@/components/ImportPanel";
+import { FLOWS } from "@/lib/flows";
 
 type ImportPanelProps = React.ComponentProps<typeof ImportPanel>;
 
@@ -18,24 +19,18 @@ function useHydrated(): boolean {
 function FallbackPanel({ props }: { props: ImportPanelProps }) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const folderRef = React.useRef<HTMLInputElement>(null);
-  const isLink = props.mode === "link";
+  const flow = FLOWS[props.mode].import;
 
   return (
     <section className="glass rounded-2xl border border-border p-6 text-center">
-      <h2 className="font-display text-lg font-semibold">
-        {isLink ? "Importar vídeo por link" : "Importar seus vídeos"}
-      </h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {isLink
-          ? "Cole a URL pública do vídeo para importar."
-          : "Selecione os arquivos de vídeo do seu computador."}
-      </p>
+      <h2 className="font-display text-lg font-semibold">{flow.title}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">{flow.hint}</p>
 
       <input
         ref={inputRef}
         type="file"
         accept="video/*"
-        multiple
+        multiple={flow.multiple}
         className="hidden"
         onChange={(e) => {
           props.onFiles(e.target.files);
@@ -55,28 +50,38 @@ function FallbackPanel({ props }: { props: ImportPanelProps }) {
         }}
       />
 
-      {isLink ? (
-        <div className="mx-auto mt-5 flex max-w-lg gap-2">
-          <Input
-            value={props.linkUrl}
-            onChange={(e) => props.onLinkUrl(e.target.value)}
-            placeholder="https://..."
-            className="flex-1"
-          />
-          <Button onClick={props.onImportLink} disabled={props.linkBusy || !props.linkUrl.trim()}>
-            {props.linkBusy ? <Loader2 className="size-4 animate-spin" /> : <Link2 className="size-4" />}
-            Importar
-          </Button>
-        </div>
-      ) : (
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <Button onClick={() => inputRef.current?.click()}>
-            <Upload className="size-4" />
-            Selecionar vídeos
-          </Button>
+      <div className="mt-6 flex flex-wrap justify-center gap-2">
+        <Button onClick={() => inputRef.current?.click()}>
+          <Upload className="size-4" />
+          {flow.filesLabel}
+        </Button>
+        {flow.folder && (
           <Button variant="outline" onClick={() => folderRef.current?.click()}>
             <FolderOpen className="size-4" />
             Selecionar pasta
+          </Button>
+        )}
+      </div>
+
+      {flow.link && (
+        <div className="mx-auto mt-4 flex max-w-lg gap-2">
+          <Input
+            value={props.linkUrl}
+            onChange={(e) => props.onLinkUrl(e.target.value)}
+            placeholder={flow.linkPlaceholder}
+            className="flex-1"
+            disabled={props.linkBlocked}
+          />
+          <Button
+            onClick={props.onImportLink}
+            disabled={props.linkBusy || props.linkBlocked || !props.linkUrl.trim()}
+          >
+            {props.linkBusy ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Link2 className="size-4" />
+            )}
+            Importar
           </Button>
         </div>
       )}
@@ -90,24 +95,24 @@ class ImportPanelBoundary extends React.Component<
   { panelProps: ImportPanelProps },
   { failed: boolean }
 > {
-  state = { failed: false };
+  override state = { failed: false };
 
-  static getDerivedStateFromError() {
+  static override getDerivedStateFromError() {
     return { failed: true };
   }
 
-  componentDidCatch(error: unknown) {
+  override componentDidCatch(error: unknown) {
     console.error("ImportPanel falhou, usando fallback:", error);
   }
 
-  componentDidUpdate(prev: { panelProps: ImportPanelProps }) {
+  override componentDidUpdate(prev: { panelProps: ImportPanelProps }) {
     // Se o modo mudou, tenta renderizar o painel completo novamente.
     if (this.state.failed && prev.panelProps.mode !== this.props.panelProps.mode) {
       this.setState({ failed: false });
     }
   }
 
-  render() {
+  override render() {
     if (this.state.failed) return <FallbackPanel props={this.props.panelProps} />;
     return <ImportPanel {...this.props.panelProps} />;
   }
