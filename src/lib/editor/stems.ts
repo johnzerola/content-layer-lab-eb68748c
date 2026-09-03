@@ -58,7 +58,7 @@ function midChannel(buffer: AudioBuffer, focus: number): Float32Array {
 
 function bufferFrom(ctx: BaseAudioContext, data: Float32Array, rate: number): AudioBuffer {
   const buf = ctx.createBuffer(1, data.length, rate);
-  buf.copyToChannel(data, 0);
+  buf.getChannelData(0).set(data);
   return buf;
 }
 

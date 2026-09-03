@@ -74,7 +74,7 @@ export function StickerPanel({
 
   const platformDef = CTA_PLATFORMS.find((p) => p.id === platform)!;
   const smart = useMemo(
-    () => buildSmartCta(platform, goal, handle, { color: brandColor, accent: brandAccent, useBrand }),
+    () => buildSmartCta(platform, goal, handle, { ...(brandColor ? { color: brandColor } : {}), ...(brandAccent ? { accent: brandAccent } : {}), useBrand }),
     [platform, goal, handle, brandColor, brandAccent, useBrand],
   );
   const smartDef = useMemo(() => STICKERS.find((s) => s.id === smart.stickerId)!, [smart.stickerId]);
