@@ -1174,6 +1174,7 @@ function EditorPage() {
             )}
             {tool === "audio" && (
               <AudioPanel
+                getSourceFile={() => loadSourceFile(videoId, doc.media.storagePath ?? null)}
                 audio={doc.audio ?? defaultEditorAudio()}
                 onChange={(next, label) => patchDoc({ audio: next }, label ?? "audio")}
                 scriptText={scriptText}
