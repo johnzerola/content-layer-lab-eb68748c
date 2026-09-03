@@ -644,7 +644,8 @@ function EditorPage() {
             : d,
         "aplicar-corte",
       );
-      seekRef.current?.(cut.start);
+      setCurrentTime(cut.start);
+      if (videoRef.current) videoRef.current.currentTime = cut.start;
       toast.success(`Corte “${cut.title}” aplicado ao projeto.`);
     },
     [doc, history, videoId],
