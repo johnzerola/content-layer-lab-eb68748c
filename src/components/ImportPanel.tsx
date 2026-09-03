@@ -1,6 +1,13 @@
 import { useRef, useState } from "react";
 import { FolderOpen, Link as LinkIcon, Upload, CheckCircle2, Info } from "lucide-react";
-import { Button, Input, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/base";
+import {
+  Button,
+  Input,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/base";
 import { VIDEO_ACCEPT } from "@/lib/media";
 import { FLOWS, type Mode } from "@/lib/flows";
 
