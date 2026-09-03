@@ -592,7 +592,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           onPointerMove={onMove}
           onPointerUp={onUp}
           onDoubleClick={() => tool === "poly" && finishPolygon()}
-          className={`panel relative aspect-video overflow-hidden rounded-2xl border border-border/60 bg-black touch-none z-0 ${
+          style={{ aspectRatio: `${item.w || 16} / ${item.h || 9}` }}
+          className={`panel relative mx-auto max-h-[70vh] w-full overflow-hidden rounded-2xl border border-border/60 bg-black touch-none z-0 ${
+            item.h > item.w ? "max-w-[min(100%,42vh)]" : ""
+          } ${
             tool === "select"
               ? "cursor-default"
               : tool === "erase"
@@ -605,10 +608,17 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             src={job?.status === "completed" ? (job.result_url ?? job.preview_url ?? src) : src}
             controls={job?.status === "completed"}
             playsInline
+            muted
+            preload="auto"
+            poster={item.poster ?? undefined}
             className="absolute inset-0 size-full object-contain z-0"
-            onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+            onLoadedMetadata={(e) => {
+              setDuration(e.currentTarget.duration || 0);
+              if (e.currentTarget.currentTime === 0) e.currentTarget.currentTime = 0.05;
+            }}
             onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
           />
+
 
           {job?.status !== "completed" &&
             [...visible, ...(draft ? [draft] : [])].map((m) => {
