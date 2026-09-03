@@ -26,6 +26,8 @@ from ..engines.inpainting import (
     empty_cache,
     process_windowed,
 )
+from ..engines.tbe import TemporalBackgroundExposureEngine
+
 from ..engines.diffueraser_official import (
     DiffuEraserUnavailable,
     diffueraser_status,
