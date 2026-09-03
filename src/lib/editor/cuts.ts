@@ -24,14 +24,28 @@ export function cutDuration(cut: CutRecord): number {
   return Math.max(0, cut.end - cut.start);
 }
 
-/** Guarda o arquivo original em memória para render/prévia nesta sessão. */
+/** Guarda o arquivo original em memória (e no IndexedDB) para render/prévia. */
 export function registerSourceFile(sourceId: string, file: File) {
   files.set(sourceId, file);
+  void persistSourceFile(sourceId, file).catch(() => undefined);
 }
 
 export function getSourceFile(sourceId: string): File | null {
   return files.get(sourceId) ?? null;
 }
+
+/**
+ * Recupera o arquivo de origem: memória primeiro, depois o IndexedDB — é o que
+ * permite reabrir o projeto depois de recarregar a página.
+ */
+export async function loadSourceFile(sourceId: string): Promise<File | null> {
+  const cached = files.get(sourceId);
+  if (cached) return cached;
+  const stored = await readSourceFile(sourceId);
+  if (stored) files.set(sourceId, stored);
+  return stored;
+}
+
 
 export function sourceIdFor(file: File): string {
   return `src-${file.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${file.size}`;
