@@ -22,6 +22,7 @@ from .config import get_settings
 from .engines.diffueraser_official import diffueraser_status
 from .engines.inpainting import cuda_available, device_name
 from .engines.propainter_official import propainter_status
+from .engines.tbe import tbe_status
 from .security import TokenError, validate_callback_url, validate_job_token, validate_service_token
 from .services.media_resolver import MediaResolveError, resolve_public_media
 from .services.text_detect import detector_status
