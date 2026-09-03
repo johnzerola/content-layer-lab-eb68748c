@@ -655,7 +655,7 @@ def run_pipeline(
                 "status": "completed",
                 "progress": 100,
                 "stage": "concluÃ­do",
-                "result_url": f"/v1/jobs/{job_id}/result",
+                result_key: result_path,
                 "detections": [],
                 "segments": [],
                 "metrics": {
@@ -670,6 +670,7 @@ def run_pipeline(
                     "enhance": opts.get("enhance", {"mode": "hq"}),
                     "dynamic_masks": False,
                     "subject_protection": False,
+                    "preview": is_preview,
                 },
                 "probe": {
                     "width": info.width, "height": info.height,
@@ -709,6 +710,7 @@ def run_pipeline(
                 verify_on,
                 emit,
                 str(cancel_path),
+                composite_on,
             )
             engine_name = "diffueraser-official"
             pass_count = 2
