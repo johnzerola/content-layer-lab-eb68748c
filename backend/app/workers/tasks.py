@@ -633,6 +633,13 @@ def run_pipeline(
 
         emit(3, "analisando vídeo", "analyzing")
         info = probe(input_path)
+        if is_preview and info.duration > preview_seconds + 1:
+            emit(5, f"recortando prévia de {int(preview_seconds)}s", "analyzing")
+            trimmed = str(job_path / "input.preview.mp4")
+            trim_video(input_path, trimmed, preview_seconds)
+            input_path = trimmed
+            tmp_path = str(job_path / "video_only.preview.mp4")
+            info = probe(input_path)
         if str(opts.get("strategy", "inpaint")) == "crop-clean":
             emit(20, "reenquadrando sem legenda", "encoding")
             ffmpeg_filter(
