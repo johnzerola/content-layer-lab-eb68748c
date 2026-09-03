@@ -64,21 +64,27 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime }: Pr
       const rec = new MediaRecorder(stream);
       const chunks: BlobPart[] = [];
       rec.ondataavailable = (e) => chunks.push(e.data);
-      rec.onstop = () => {
+      rec.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
-        addClip(
-          createAudioClip({
-            kind: "voice",
-            name: "Narração gravada",
-            url: URL.createObjectURL(blob),
-            startTime: currentTime,
-            volume: 1,
-            fadeIn: 0,
-            fadeOut: 0.2,
-          }),
-        );
         setRecording(false);
+        try {
+          // data URL: sobrevive ao salvar/reabrir o projeto (blob: morre na sessão)
+          const url = await toPersistentUrl(blob);
+          addClip(
+            createAudioClip({
+              kind: "voice",
+              name: "Narração gravada",
+              url,
+              startTime: currentTime,
+              volume: 1,
+              fadeIn: 0,
+              fadeOut: 0.2,
+            }),
+          );
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Falha ao salvar a gravação.");
+        }
       };
       recorderRef.current = rec;
       rec.start();
