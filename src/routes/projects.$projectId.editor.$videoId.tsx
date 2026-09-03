@@ -45,7 +45,7 @@ import { listAccounts, type SocialAccount } from "@/lib/social";
 import { renderTemplateProject, templateRenderSupported } from "@/lib/editor/render-template";
 import { exportScale, loadExportQuality } from "@/lib/editor/export-quality";
 import { toast } from "sonner";
-import { getSourceFile } from "@/lib/editor/cuts";
+import { getSourceFile, loadSourceFile } from "@/lib/editor/cuts";
 
 import { CutPanel, FramePanel, GradePanel, LayoutPanel, TitlesPanel } from "@/components/editor/ToolPanels";
 import { EditorCanvas } from "@/components/vtemplate/EditorCanvas";
@@ -231,13 +231,23 @@ function EditorPage() {
     return () => clearTimeout(t);
   }, [transcript, recordId]);
 
-  /** Reaproveita o arquivo local registrado por outra tela (ViralBatch, cortes). */
+  /**
+   * Reaproveita o arquivo local registrado por outra tela (ViralBatch, cortes)
+   * e, se a página foi recarregada, recupera o vídeo guardado no navegador.
+   */
   useEffect(() => {
-    const file = getSourceFile(videoId);
-    if (!file) return;
-    const objectUrl = URL.createObjectURL(file);
-    setLocalSrc(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
+    let objectUrl: string | null = null;
+    let alive = true;
+    void (async () => {
+      const file = await loadSourceFile(videoId);
+      if (!file || !alive) return;
+      objectUrl = URL.createObjectURL(file);
+      setLocalSrc(objectUrl);
+    })();
+    return () => {
+      alive = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [videoId]);
 
   useEffect(() => {
@@ -257,7 +267,7 @@ function EditorPage() {
         toast.error("Este navegador não suporta a renderização (WebCodecs).");
         return;
       }
-      const file = getSourceFile(videoId);
+      const file = await loadSourceFile(videoId);
       if (!file) {
         toast.error("Carregue o vídeo de origem na barra de mídia para renderizar.");
         return;
@@ -491,7 +501,7 @@ function EditorPage() {
   );
 
   const generateTranscript = useCallback(async () => {
-    const file = getSourceFile(videoId);
+    const file = await loadSourceFile(videoId);
     if (!file) {
       toast.error("Carregue o vídeo para gerar a transcrição.");
       return;
