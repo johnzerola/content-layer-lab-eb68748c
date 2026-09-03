@@ -137,7 +137,7 @@ function EstilosPage() {
         </header>
 
         <div className="flex flex-wrap items-center gap-2">
-          {(["layouts", "templates", "transicoes", "prontos", "meus", "paletas", "tipografia"] as const).map((t) => (
+          {(["layouts", "legenda", "templates", "transicoes", "prontos", "meus", "paletas", "tipografia"] as const).map((t) => (
             <button
               key={t}
               type="button"
