@@ -617,6 +617,39 @@ function EditorPage() {
     [doc, patchDoc],
   );
 
+  /** Aplica um corte real da biblioteca ao projeto aberto (janela, textos e mídia). */
+  const applyCut = useCallback(
+    async (cut: LibraryCut) => {
+      if (!doc) return;
+      const file = await loadSourceFile(cut.sourceId).catch(() => null);
+      if (file) {
+        registerSourceFile(videoId, file);
+        const url = URL.createObjectURL(file);
+        setLocalSrc(url);
+      }
+      history.set(
+        (d) =>
+          d
+            ? {
+                ...d,
+                cutId: cut.id,
+                title: cut.title || d.title,
+                hook: cut.caption ?? d.hook,
+                media: { ...d.media, posterUrl: cut.thumbnail ?? d.media.posterUrl },
+                preedit: {
+                  ...(d.preedit ?? defaultPreEdit()),
+                  segments: [{ start: cut.start, end: cut.end }],
+                },
+              }
+            : d,
+        "aplicar-corte",
+      );
+      seekRef.current?.(cut.start);
+      toast.success(`Corte “${cut.title}” aplicado ao projeto.`);
+    },
+    [doc, history, videoId],
+  );
+
   const seek = useCallback((time: number) => {
     setCurrentTime(time);
     if (videoRef.current) videoRef.current.currentTime = time;
