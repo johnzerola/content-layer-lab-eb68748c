@@ -44,8 +44,10 @@ import {
   type CleanerRegion,
 } from "@/lib/cleaner";
 import { cloudAuthHeaders } from "@/lib/cloud";
+import { localCleanSupported, runLocalClean } from "@/lib/cleaner-local";
 import { consumeCredits, useAccess } from "@/lib/subscription";
 import { planFromId } from "@/lib/plan";
+
 
 type Props = {
   item: { id: string; file: File; poster: string | null; w: number; h: number };
