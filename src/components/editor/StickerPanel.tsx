@@ -9,6 +9,13 @@ import { Button, Input } from "@/components/ui/base";
 import { Label } from "@/components/ui/label";
 import { STICKERS, drawSticker, type StickerDef, type StickerId } from "@/lib/editor/stickers";
 import { createStickerLayer } from "@/lib/video-template/factory";
+import {
+  CTA_GOAL_LABELS,
+  CTA_PLATFORMS,
+  buildSmartCta,
+  type CtaGoal,
+  type CtaPlatform,
+} from "@/lib/editor/cta-smart";
 import type { StickerLayer, TemplateLayer } from "@/lib/video-template/types";
 
 function StickerThumb({ def, color, accent, text }: { def: StickerDef; color: string; accent: string; text: string }) {
@@ -60,6 +67,35 @@ export function StickerPanel({
   const [accent, setAccent] = useState(brandAccent || "#ffffff");
   const [text, setText] = useState("");
   const [group, setGroup] = useState<string>("Todos");
+  const [platform, setPlatform] = useState<CtaPlatform>("instagram");
+  const [goal, setGoal] = useState<CtaGoal>("seguir");
+  const [handle, setHandle] = useState("");
+  const [useBrand, setUseBrand] = useState(false);
+
+  const platformDef = CTA_PLATFORMS.find((p) => p.id === platform)!;
+  const smart = useMemo(
+    () => buildSmartCta(platform, goal, handle, { ...(brandColor ? { color: brandColor } : {}), ...(brandAccent ? { accent: brandAccent } : {}), useBrand }),
+    [platform, goal, handle, brandColor, brandAccent, useBrand],
+  );
+  const smartDef = useMemo(() => STICKERS.find((s) => s.id === smart.stickerId)!, [smart.stickerId]);
+
+  /** Adiciona o CTA já ajustado ao formato e à UI nativa da plataforma. */
+  const addSmart = () => {
+    onAdd(
+      createStickerLayer(layers, smart.stickerId, {
+        name: `CTA ${platformDef.label}`,
+        text: smart.text,
+        color: smart.color,
+        accent: smart.accent,
+        speed: smart.speed,
+        x: smart.x,
+        y: smart.y,
+        width: smart.width,
+        height: smart.height,
+        endTime: smart.duration,
+      }),
+    );
+  };
 
   const groups = useMemo(() => ["Todos", ...Array.from(new Set(STICKERS.map((s) => s.group)))], []);
   const list = useMemo(() => (group === "Todos" ? STICKERS : STICKERS.filter((s) => s.group === group)), [group]);
@@ -88,6 +124,57 @@ export function StickerPanel({
           Clique para adicionar no vídeo. Depois ajuste posição e duração na timeline.
         </p>
       </div>
+
+      <section className="space-y-2 rounded-xl border border-primary/40 bg-primary/5 p-3">
+        <Label className="text-xs">CTA inteligente por plataforma</Label>
+        <div className="flex gap-1">
+          {CTA_PLATFORMS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => {
+                setPlatform(p.id);
+                if (!p.goals.includes(goal)) setGoal(p.goals[0]!);
+              }}
+              className={`flex-1 rounded-lg px-2 py-1 text-[11px] transition ${
+                platform === p.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {platformDef.goals.map((g) => (
+            <button
+              key={g}
+              type="button"
+              onClick={() => setGoal(g)}
+              className={`rounded-full px-2.5 py-1 text-[11px] transition ${
+                goal === g ? "bg-foreground text-background" : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {CTA_GOAL_LABELS[g]}
+            </button>
+          ))}
+        </div>
+        <Input
+          value={handle}
+          onChange={(e) => setHandle(e.target.value)}
+          placeholder="@seucanal ou link do perfil"
+        />
+        <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          <input type="checkbox" checked={useBrand} onChange={(e) => setUseBrand(e.target.checked)} />
+          Usar as cores da minha marca
+        </label>
+        <div className="rounded-lg bg-background/60 p-2">
+          <StickerThumb def={smartDef} color={smart.color} accent={smart.accent} text={smart.text} />
+          <p className="mt-1 text-[10px] text-muted-foreground">{smart.hint}</p>
+        </div>
+        <Button size="sm" className="w-full" onClick={addSmart}>
+          Adicionar CTA de {platformDef.label}
+        </Button>
+      </section>
 
       <div className="grid grid-cols-2 gap-2">
         <div>

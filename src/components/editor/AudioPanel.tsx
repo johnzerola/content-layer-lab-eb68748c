@@ -1,6 +1,6 @@
 /** Mixagem: música de fundo, áudio original, gravação e narração por IA. */
 import { useRef, useState } from "react";
-import { Mic, Sparkles, Square, Trash2, Upload } from "lucide-react";
+import { AudioWaveform, Mic, Sparkles, Square, Trash2, Upload } from "lucide-react";
 import {
   createAudioClip,
   defaultEditorAudio,
@@ -10,6 +10,7 @@ import {
 
 import { NARRATION_VOICES, generateNarration } from "@/lib/tts.functions";
 import { SoundLibrary } from "@/components/editor/SoundLibrary";
+import { separateStems } from "@/lib/editor/stems";
 
 const NARRATION_TONES: { id: string; label: string; prompt: string }[] = [
   { id: "viral", label: "Viral / energia alta", prompt: "Narre em português do Brasil com energia alta de vídeo curto, ritmo acelerado e ênfase nas primeiras palavras." },
@@ -25,6 +26,8 @@ interface Props {
   /** texto sugerido para narração (roteiro/transcrição) */
   scriptText?: string;
   currentTime: number;
+  /** arquivo de origem do vídeo — usado para separar voz e música */
+  getSourceFile?: () => Promise<File | null>;
 }
 
 /** Limite de segurança para embutir o áudio no documento do projeto (~20 MB). */
@@ -54,7 +57,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-export function AudioPanel({ audio, onChange, scriptText = "", currentTime }: Props) {
+export function AudioPanel({ audio, onChange, scriptText = "", currentTime, getSourceFile }: Props) {
   const state = audio ?? defaultEditorAudio();
   const fileRef = useRef<HTMLInputElement>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -65,12 +68,69 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime }: Pr
   const [speed, setSpeed] = useState(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [splitting, setSplitting] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const patch = (p: Partial<EditorAudio>, label = "audio") => onChange({ ...state, ...p }, label);
   const addClip = (clip: AudioClip) => patch({ tracks: [...state.tracks, clip] }, "add-audio");
   const updateClip = (id: string, p: Partial<AudioClip>) =>
     patch({ tracks: state.tracks.map((c) => (c.id === id ? { ...c, ...p } : c)) }, "audio-clip");
   const removeClip = (id: string) => patch({ tracks: state.tracks.filter((c) => c.id !== id) }, "remover-audio");
+
+  /** Separa o áudio do vídeo em trilha de voz e trilha de música. */
+  async function splitStems() {
+    if (!getSourceFile || splitting) return;
+    setSplitting(true);
+    setProgress(0);
+    setError(null);
+    try {
+      const file = await getSourceFile();
+      if (!file) throw new Error("Não encontrei o vídeo de origem para separar o áudio.");
+      const stems = await separateStems(file, {}, setProgress);
+      const urlFor = async (blob: Blob) => {
+        try {
+          return await toPersistentUrl(blob);
+        } catch {
+          // grande demais para salvar no projeto: continua utilizável nesta sessão
+          return URL.createObjectURL(blob);
+        }
+      };
+      const [voiceUrl, musicUrl] = await Promise.all([urlFor(stems.voice), urlFor(stems.music)]);
+      patch(
+        {
+          originalMuted: true,
+          tracks: [
+            ...state.tracks,
+            createAudioClip({
+              kind: "voice",
+              name: "Trilha de voz",
+              url: voiceUrl,
+              startTime: 0,
+              duration: stems.duration,
+              volume: 1,
+              fadeIn: 0,
+              fadeOut: 0,
+            }),
+            createAudioClip({
+              kind: "music",
+              name: "Trilha de música/ambiente",
+              url: musicUrl,
+              startTime: 0,
+              duration: stems.duration,
+              volume: 0.8,
+              fadeIn: 0,
+              fadeOut: 0,
+            }),
+          ],
+        },
+        "separar-trilhas",
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não consegui separar o áudio deste vídeo.");
+    } finally {
+      setSplitting(false);
+    }
+  }
 
   async function record() {
     if (recording) {
@@ -182,6 +242,28 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime }: Pr
               className="min-w-0 flex-1"
             />
           </Row>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-border/60 p-2.5">
+        <p className="mb-1 font-mono text-[11px] uppercase text-muted-foreground">Separar voz e música</p>
+        <p className="mb-2 text-[11px] text-muted-foreground">
+          Divide o áudio do vídeo em duas trilhas independentes (voz e música/ambiente) para você controlar volume,
+          fade e mudo de cada uma. O processamento acontece no seu navegador.
+        </p>
+        <button
+          type="button"
+          disabled={!getSourceFile || splitting}
+          onClick={splitStems}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs disabled:opacity-50"
+        >
+          <AudioWaveform className="h-3.5 w-3.5" />
+          {splitting ? `Separando… ${Math.round(progress * 100)}%` : "Separar trilhas"}
+        </button>
+        {splitting && (
+          <div className="mt-2 h-1 overflow-hidden rounded bg-muted">
+            <div className="h-full bg-primary transition-all" style={{ width: `${progress * 100}%` }} />
+          </div>
         )}
       </section>
 
