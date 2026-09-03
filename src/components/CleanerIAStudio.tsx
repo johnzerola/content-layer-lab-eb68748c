@@ -79,7 +79,11 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     cuda?: boolean;
     gpu?: string;
     reason?: string;
+    action?: string;
+    diagnosis?: string;
+    engines?: Record<string, { ready?: boolean; missing?: string[] }>;
   } | null>(null);
+
   const [polling, setPolling] = useState(false);
   const [tool, setTool] = useState<Tool>("rect");
   const [selected, setSelected] = useState<string | null>(null);
