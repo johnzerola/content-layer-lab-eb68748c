@@ -1306,13 +1306,25 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             <div className="flex items-start gap-2">
               <AlertCircle className="mt-0.5 size-4 shrink-0" />
               <div className="text-[11px] leading-relaxed">
-                <p className="font-bold uppercase tracking-tight">Motor GPU offline</p>
-                <p className="opacity-80">
-                  {health.reason || "endpoint do worker não configurado"} — use o modo local abaixo
-                  para não travar seu fluxo.
+                <p className="font-bold uppercase tracking-tight">
+                  {health.diagnosis === "not_configured"
+                    ? "Motor GPU não configurado"
+                    : health.diagnosis === "edge_blocked"
+                      ? "Acesso ao motor bloqueado pela borda"
+                      : health.diagnosis === "unauthorized"
+                        ? "Credencial do motor inválida"
+                        : health.diagnosis === "unreachable"
+                          ? "Motor GPU sem resposta"
+                          : "Motor GPU offline"}
                 </p>
+                <p className="opacity-80">
+                  {health.reason || "endpoint do worker não configurado"}
+                </p>
+                {health.action && <p className="mt-1 font-semibold">{health.action}</p>}
+                <p className="opacity-80">Use o modo local abaixo para não travar seu fluxo.</p>
               </div>
             </div>
+
             <div className="space-y-2 rounded-lg bg-background/40 p-3 text-foreground">
               <p className="text-[11px] font-semibold">Modo local (sem GPU)</p>
               <p className="text-[10px] text-muted-foreground">
