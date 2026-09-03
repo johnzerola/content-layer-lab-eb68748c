@@ -133,6 +133,24 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
         plate, plate_valid = self._median_plate(stack, valid_stack)
         del stack, valid_stack
 
+        # Pixels the timeline never exposed (a truly static overlay on a static
+        # shot) are reconstructed ONCE in reference space with the exemplar
+        # filler: cheap on CPU and temporally coherent, since every frame then
+        # reuses the same plate instead of hallucinating its own patch.
+        if plate_valid.max() > 0:
+            unseen = cv2.bitwise_not(plate_valid)
+            interest = np.zeros_like(plate_valid)
+            for index in range(0, count, max(1, count // 8)):
+                interest = np.maximum(interest, masks[index])
+            interest = cv2.dilate(
+                interest, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (61, 61))
+            )
+            unseen = cv2.bitwise_and(unseen, interest)
+            if unseen.max() > 0:
+                plate = patch_fill(plate, unseen)
+                plate_valid = cv2.bitwise_or(plate_valid, unseen)
+
+
         output: List[np.ndarray] = []
         for index in range(count):
             hole = masks[index]
