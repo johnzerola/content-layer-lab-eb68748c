@@ -3145,7 +3145,7 @@ function Home() {
                     <Sparkles className="size-3" /> enquadramento inteligente
                   </label>
                   <span>{webCodecsSupported() ? "MP4 H.264 · WebCodecs" : "WebM (fallback)"}</span>
-                  {eta && <span className="text-primary">â— restam ~{eta}</span>}
+                  {eta && <span className="text-primary">● restam ~{eta}</span>}
                 </div>
 
                 {selected && mode !== "limpar" && (
@@ -3200,7 +3200,7 @@ function Home() {
                     {!!selected.captions?.length && (
                       <div className="mt-2 flex items-center gap-2">
                         <span className="text-[12px] text-primary">
-                          â— {selected.captions.length} blocos prontos
+                          ● {selected.captions.length} blocos prontos
                         </span>
                         <button
                           className="text-[12px] text-muted-foreground underline"
@@ -3744,7 +3744,7 @@ function Home() {
                                 : "text-muted-foreground"
                         }`}
                       >
-                        â— {it.status}
+                        ● {it.status}
                         {it.status === "processando" ? ` ${Math.round(it.progress * 100)}%` : ""}
                         {it.stage && it.status !== "pendente" ? ` · ${it.stage}` : ""}
                       </p>

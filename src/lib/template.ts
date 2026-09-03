@@ -220,6 +220,8 @@ export const CAPTION_PRESETS: { id: string; label: string; style: Partial<Captio
 export interface CustomFont {
   name: string;
   dataUrl: string;
+  /** peso do arquivo (400, 700, 800...). Sem valor, vale para toda a faixa. */
+  weight?: string;
 }
 
 /** Máscara para remover legenda queimada, marca d'água ou texto do vídeo original.
