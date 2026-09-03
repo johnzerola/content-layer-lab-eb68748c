@@ -377,12 +377,6 @@ function AgendaPage() {
       setSending(false);
     }
   }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao agendar.");
-    } finally {
-      setSending(false);
-    }
-  }
 
   return (
     <AppShell
