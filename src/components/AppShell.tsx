@@ -252,7 +252,11 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
   const { signedIn, sub, isAdmin } = useAccess();
   const plan = planFromId(sub?.plan);
   const pathname = useRouterState({ select: (r) => r.location.pathname });
-  const navigating = useRouterState({ select: (r) => r.status === "pending" });
+  const navigatingPending = useRouterState({ select: (r) => r.status === "pending" });
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  // Barra de progresso só após a hidratação, para não divergir do HTML do SSR.
+  const navigating = mounted && navigatingPending;
   const navigate = useNavigate();
   const onFixedRoute = ROUTE_PATHS.some((p) => pathname.startsWith(p));
 
