@@ -333,24 +333,23 @@ function AgendaPage() {
     try {
       const up = await uploadPostVideo(file, file.name);
       const isYoutube = selectedAccount?.platform === "youtube";
+      const ytMeta: NonNullable<PublishMeta["youtube"]> = {};
+      if (ytTitle.trim()) ytMeta.title = ytTitle.trim();
+      if (ytDescription.trim()) ytMeta.description = ytDescription.trim();
+      const tags = ytTags
+        .split(/[,\n]/)
+        .map((t) => t.trim().replace(/^#/, ""))
+        .filter(Boolean);
+      if (tags.length) ytMeta.tags = tags;
+      const publishMeta: PublishMeta | undefined =
+        isYoutube && Object.keys(ytMeta).length ? { youtube: ytMeta } : undefined;
       await schedulePost({
         accountId: accountId || null,
         kind,
         caption,
         scheduledAt: at,
         timezone,
-        publishMeta: isYoutube
-          ? {
-              youtube: {
-                title: ytTitle.trim() || undefined,
-                description: ytDescription.trim() || undefined,
-                tags: ytTags
-                  .split(/[,\n]/)
-                  .map((t) => t.trim().replace(/^#/, ""))
-                  .filter(Boolean),
-              },
-            }
-          : undefined,
+        ...(publishMeta ? { publishMeta } : {}),
         videoPath: up.path,
         videoUrl: up.url,
         fileName: file.name,
