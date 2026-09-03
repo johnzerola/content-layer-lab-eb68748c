@@ -8,6 +8,7 @@
  * uma vez por vídeo e reaproveitadas entre as variações.
  */
 import type { Template } from "./template";
+import { templateFontPayload } from "@/lib/font-embed";
 import type { RenderOptions } from "./render";
 import type { WorkerResponse, RenderRequest } from "@/workers/render.worker";
 import { analysisCache, fileKey } from "./analysis-cache";
@@ -310,7 +311,7 @@ export async function renderInPool(
     audio,
     envelope,
     images,
-    fonts: template.fonts ?? [],
+    fonts: await templateFontPayload(template),
   };
 
   const transfer: Transferable[] = [
