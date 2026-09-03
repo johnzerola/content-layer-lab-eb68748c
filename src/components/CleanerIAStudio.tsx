@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
+  Coins,
   Eraser,
+  Eye,
   MousePointer2,
   PenTool,
   Pentagon,
@@ -12,6 +14,7 @@ import {
   Target,
   Trash2,
   Upload,
+  Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -41,6 +44,8 @@ import {
   type CleanerRegion,
 } from "@/lib/cleaner";
 import { cloudAuthHeaders } from "@/lib/cloud";
+import { consumeCredits, useAccess } from "@/lib/subscription";
+import { planFromId } from "@/lib/plan";
 
 type Props = {
   item: { id: string; file: File; poster: string | null; w: number; h: number };
