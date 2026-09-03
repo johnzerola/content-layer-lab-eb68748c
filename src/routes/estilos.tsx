@@ -360,9 +360,10 @@ function EstilosPage() {
             {ready.map((t) => (
               <article key={t.id} className="glass overflow-hidden rounded-2xl border border-border/60">
                 <div
-                  className={`flex h-24 items-center justify-center bg-gradient-to-br ${t.gradient}`}
-                  style={{ color: t.colors[0] }}
+                  className="flex h-24 items-center justify-center"
+                  style={{ color: t.colors[0], backgroundImage: t.gradient }}
                 >
+
                   <span
                     style={{
                       fontFamily: t.fontFamily,
