@@ -7,8 +7,8 @@ export interface PipelineStep {
   title: string;
   hint: string;
   state: PipelineStepState;
-  detail?: string;
-  progress?: number;
+  detail?: string | undefined;
+  progress?: number | undefined;
 }
 
 /**
