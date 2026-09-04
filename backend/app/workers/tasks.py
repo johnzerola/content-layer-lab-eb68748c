@@ -176,13 +176,13 @@ def auto_detect(job_id: str, mode: str, samples: int = 12) -> List[Dict]:
     if mode in ("watermark", "logo"):
         return detect_watermarks(frames)
 
-    if mode in ("subtitle", "text", "smart"):
+    if mode in ("subtitle", "text", "smart", "karaoke"):
         heat = np.zeros((h, w), np.float32)
         for frame in frames:
             layer = np.zeros((h, w), np.uint8)
             for box in detect_text_boxes(frame):
                 x, y, bw, bh = box
-                if mode == "subtitle" and (y + bh / 2) < h * 0.45:
+                if mode in ("subtitle", "karaoke") and (y + bh / 2) < h * 0.45:
                     continue  # legenda vive no terço inferior
                 cv2.rectangle(layer, (x, y), (x + bw, y + bh), 255, -1)
             heat += layer.astype(np.float32) / 255.0
@@ -201,7 +201,7 @@ def auto_detect(job_id: str, mode: str, samples: int = 12) -> List[Dict]:
                 "role": "remove",
                 "x": x / w, "y": y / h, "w": bw / w, "h": bh / h,
                 "grow": 0.008,
-                "label": "Legenda" if mode == "subtitle" else "Texto",
+                "label": "Legenda" if mode in ("subtitle", "karaoke") else "Texto",
             })
         if mode == "smart":
             regions += detect_watermarks(frames)
