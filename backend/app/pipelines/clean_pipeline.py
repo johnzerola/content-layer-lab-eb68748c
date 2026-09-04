@@ -497,6 +497,7 @@ def clean_video(
                 {
                     "start_frame": position,
                     "frames": body,
+                    "mask_ratio": round(mask_ratio, 4),
                     "engine": engine_used,
                     "quality_score": round(report.score, 1),
                     **report.metrics,
