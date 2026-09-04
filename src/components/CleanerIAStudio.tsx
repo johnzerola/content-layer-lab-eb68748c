@@ -125,6 +125,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [inputReady, setInputReady] = useState(false);
+  const [pipelineBusy, setPipelineBusy] = useState(false);
+  const [pipelineStep, setPipelineStep] = useState<string | null>(null);
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [mode, setMode] = useState<CleanerMode>("smart");
   const [preset, setPreset] = useState<CleanerPreset>("quality");
   const [dynamicMask, setDynamicMask] = useState(true);
