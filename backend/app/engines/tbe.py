@@ -148,14 +148,19 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
         exemplar_hole = np.zeros_like(hole)
         for label in range(1, count):
             part = (labels == label).astype(np.uint8) * 255
+            ys, xs = np.where(part > 0)
+            thin = int(ys.max() - ys.min()) <= 44 if ys.size else False
             ring = cv2.subtract(cv2.dilate(part, kernel), part)
             samples = crop[ring > 0].astype(np.float32).reshape(-1, 3)
-            if samples.size and float(samples.std(axis=0).max()) < 12.0:
-                # flat / softly graded plate: Telea rebuilds it exactly, no smear
-                patched = cv2.inpaint(out, part, 5, cv2.INPAINT_TELEA)
+            flat = bool(samples.size) and float(samples.std(axis=0).max()) < 12.0
+            if flat or thin:
+                # flat plate or a thin glyph stroke: edge propagation rebuilds it
+                # cleanly, while exemplar blocks would leave visible patches.
+                patched = cv2.inpaint(out, part, 6, cv2.INPAINT_TELEA)
                 out[part > 0] = patched[part > 0]
             else:
                 exemplar_hole = cv2.bitwise_or(exemplar_hole, part)
+
         if exemplar_hole.max() > 0:
             out = patch_fill(out, exemplar_hole, patch=21, search=72)
         return out
