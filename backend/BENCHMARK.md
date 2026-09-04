@@ -42,3 +42,48 @@ CLEANER_LAMA_ONNX=/caminho/lama_fp32.onnx \
 python benchmark.py video.mp4 --mode caption --pipelines fast,high --preview 30 \
   --outdir bench --report bench/report.json
 ```
+
+## Rodada — qualidade do preenchimento (clipes sintéticos, CPU)
+
+Medido contra o ground truth (`*_truth.mp4`), erro médio absoluto só dentro da
+área que teve texto:
+
+| Cenário | MAE |
+|---|---|
+| caption, só TBE | 19,56 |
+| caption, TBE + LaMa (tile antigo) | 14,99 |
+| caption, TBE + LaMa (tile com contexto + teto 640) | **13,28** |
+
+Teto do tile (o tile é reamostrado para 512 antes da inferência):
+
+| lado do tile | MAE | tempo |
+|---|---|---|
+| 512 | 14,40 | 19,1 s/frame |
+| **640** | **13,78** | 13,4 s/frame |
+| 768 | 14,70 | 11,3 s/frame |
+| 1024 | 15,48 | 15,6 s/frame |
+
+Janela temporal e fluxo óptico (hipótese testada e **descartada como prioridade**):
+
+| config | MAE caption | MAE motion |
+|---|---|---|
+| 16 amostras, sem fluxo | 19,56 | 3,66 |
+| 48 amostras, sem fluxo | 19,56 | 3,62 |
+| 48 amostras, com fluxo | 19,56 | 3,65 |
+
+Leitura: em cena com movimento o TBE já está quase perfeito (MAE 3,6 / PSNR
+~37 dB) e alongar a janela ou corrigir por fluxo muda quase nada. Em legenda
+estática sobre cena estática o fundo **nunca** é exposto, então nenhuma janela
+resolve — 100% do erro vem do preenchimento sintético. Por isso o fluxo virou
+opt-in (`--flow`) e o esforço foi para o tile do LaMa.
+
+Pipeline completo, `caption --quality high`, clipe sintético 2s:
+
+| | antes | depois |
+|---|---|---|
+| engine | tbe+retry (LaMa nunca acionava) | tbe+lama |
+| texture_gap | 0,040 | **0,011** |
+| sharpness_ratio | 0,034 | **0,107** |
+| score | 79,2 | 79,8 |
+| lama_rejected | 7 de 8 chunks | 0 |
+| tempo | 80,6 s | 169,8 s |
