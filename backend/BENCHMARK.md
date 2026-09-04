@@ -87,3 +87,24 @@ Pipeline completo, `caption --quality high`, clipe sintético 2s:
 | score | 79,2 | 79,8 |
 | lama_rejected | 7 de 8 chunks | 0 |
 | tempo | 80,6 s | 169,8 s |
+
+## Grade janela temporal 24–48 × fluxo óptico (64 frames, CPU, MAE na área da legenda)
+
+| clipe | 24 off | 24 on | 32 off | 32 on | 48 off | 48 on |
+|---|---|---|---|---|---|---|
+| caption | **12,22** | 12,22 | 12,22 | 12,22 | 12,24 | 12,24 |
+| karaoke | **10,18** | 10,18 | 10,18 | 10,18 | 10,18 | 10,18 |
+| motion | 3,95 | 3,98 | 3,95 | 3,98 | **3,82** | 3,85 |
+
+Tempo (caption): 24 off 15,5s → 48 on 33,0s, ou seja +113% de custo.
+
+Conclusão: a janela satura em 24 amostras. Em cena estática o MAE é idêntico
+até a 3ª casa porque o fundo atrás da legenda nunca é exposto — não existe
+frame limpo para colher, então o erro é 100% do preenchimento sintético. Só o
+clipe `motion` ganha algo com 48 (−3,3%), e mesmo ali o fluxo **piora**
+(3,82 → 3,85) enquanto cobra +63% de tempo: o campo Farneback de baixa
+resolução introduz mais ruído de reamostragem do que corrige de desalinhamento
+residual, já que o affine global sozinho basta neste tipo de movimento.
+
+Presets mantidos: fast 24 / high 32 / max 48, `flow` desligado por padrão e
+disponível via `--flow` para material com parallax forte.
