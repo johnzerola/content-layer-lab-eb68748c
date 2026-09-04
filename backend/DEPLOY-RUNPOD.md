@@ -26,22 +26,45 @@ A imagem atual funciona **sem alteração de código** num GPU Pod persistente:
 
 Custo típico: ~US$ 300–500/mês por GPU dedicada 24/7, sem limite de fila.
 
-## Opção 2 — RunPod Serverless (ainda não implementada)
+## Opção 2 — RunPod Serverless (implementada)
 
-O modelo serverless da RunPod não é drop-in para este worker:
+O handler serverless já existe: `backend/runpod_handler.py` processa **um chunk
+por invocação**, usando a mesma pipeline do worker (`run_pipeline`). A imagem
+é o `backend/Dockerfile.runpod` e o app já possui a orquestração de chunks com
+overlap + concat final (CleanerIA v3).
 
-- O handler serverless é **request/response** com limite de execução por
-  requisição; nosso pipeline é um job longo com callbacks de progresso —
-  exigiria um handler `runpod.serverless.start()` que delegue ao Celery ou
-  processe síncrono com `job_scale`/`executionTimeout` altos.
-- Storage é **efêmero por worker**; seria preciso mover `input.mp4`,
-  `output.mp4` e máscaras para um volume de rede ou storage de objetos (S3),
-  mudando `storage_dir` e os endpoints `/result` e `/preview`.
-- Modelos (ProPainter/DiffuEraser) precisam vir embutidos na imagem ou em
-  network volume para não pagar download a cada cold start.
+### Build e push da imagem (na VPS da Hostear)
+
+```bash
+cd backend
+REGISTRY_USER=seu_usuario_dockerhub ./scripts/build-push-runpod.sh
+```
+
+O script instala o Docker se necessário, faz login, builda
+`Dockerfile.runpod` e envia para o registry (Docker Hub por padrão; use
+`REGISTRY=ghcr.io` para GHCR).
+
+### Criar o endpoint na RunPod
+
+1. **Serverless → New Endpoint → Deploy from a Docker image**
+2. Container image: `<usuario>/cleaneria-runpod:latest`
+3. GPU: RTX 4090 (24 GB); min workers `0`, max workers `3` (escala de zero)
+4. Anexe um **Network Volume** montado em `/runpod-volume` com os pesos:
+   - ProPainter → `/runpod-volume/models`
+   - DiffuEraser → `/runpod-volume/max-models`
+5. Env var do endpoint: `CLEANER_WORKER_SECRET=<mesmo segredo do app>`
+6. Copie o **Endpoint ID** e configure os secrets no app:
+   `RUNPOD_API_KEY` e `RUNPOD_ENDPOINT_ID`
+
+### Fluxo de dados
+
+O handler baixa o chunk pela `source_url` (URL assinada do storage do app),
+processa e devolve via `upload_url` (PUT assinado) — portanto o storage
+efêmero do worker não é problema. A VPS da Hostear continua como worker CPU
+(prévia rápida + fallback) e como máquina de build da imagem.
 
 Custo estimado serverless: ~US$ 0,10–0,40 por minuto de vídeo, conforme GPU
-(4090 ~US$ 0,00034/s; A100 ~US$ 0,0011/s).
+(4090 ~US$ 0,00034/s; A100 ~US$ 0,0011/s). Sem jobs, custo zero (min workers 0).
 
 **Recomendação:** comece com o GPU Pod persistente. Quando o volume de jobs
 justificar pagamento por uso, migre para serverless com storage S3.
