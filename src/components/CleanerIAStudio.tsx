@@ -629,41 +629,48 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     }
   };
 
-  const handleDetect = async () => {
-    if (!inputReady) {
+  const handleDetect = async (jobArg?: CleanerJob | null): Promise<CleanerRegion[] | null> => {
+    const target = jobArg ?? job;
+    if (!target?.id || (!inputReady && !jobArg)) {
       toast.error("O vídeo ainda não foi confirmado no motor. Reenvie o arquivo.");
-      return;
+      return null;
     }
     // Primeiro salva as máscaras atuais para garantir persistência antes da detecção
-    if (masks.length > 0 && job?.id) {
+    if (masks.length > 0) {
       const headers = await cloudAuthHeaders();
-      await saveMasks({ data: { id: job.id, masks }, headers }).catch(() => null);
+      await saveMasks({ data: { id: target.id, masks }, headers }).catch(() => null);
     }
 
-    if (!job?.id) return;
     try {
       setJob((prev) => (prev ? { ...prev, status: "detecting", stage: "detectando áreas" } : prev));
       const headers = await cloudAuthHeaders();
-      const res = (await detectJob({ data: { id: job.id, mode }, headers })) as CleanerJob;
+      const res = (await detectJob({ data: { id: target.id, mode }, headers })) as CleanerJob;
       const found = (res.detections || []) as CleanerRegion[];
       setMasks((prev) => [...prev, ...found]);
       setJob({ ...res, status: "queued" });
       toast[found.length ? "success" : "warning"](
         found.length ? `${found.length} área(s) encontrada(s).` : "Nada detectado — marque à mão.",
       );
+      return found;
     } catch (e) {
       setJob((prev) => (prev ? { ...prev, status: "queued" } : prev));
       toast.error(`Erro na detecção: ${e instanceof Error ? e.message : "desconhecido"}`);
+      return null;
     }
   };
 
-  const handleProcess = async (preview = false) => {
-    if (!job?.id) return;
-    if (!inputReady) {
+  const handleProcess = async (
+    preview = false,
+    override?: { job?: CleanerJob | null; masks?: CleanerRegion[] },
+  ) => {
+    const target = override?.job ?? job;
+    const activeMasks = override?.masks ?? masks;
+    if (!target?.id) return;
+    if (!inputReady && !override?.job) {
       toast.error("O vídeo ainda não foi confirmado no motor. Reenvie o arquivo.");
       return;
     }
-    if (!masks.length && !cropClean) {
+    if (!activeMasks.length && !cropClean) {
       toast.error("Marque ao menos uma área ou use Detectar.");
       return;
     }
@@ -673,6 +680,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       );
       return;
     }
+
     try {
       const headers = await cloudAuthHeaders();
       // Só as áreas realmente ativas vão para o motor; áreas desligadas ou de proteção
