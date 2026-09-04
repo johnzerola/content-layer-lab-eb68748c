@@ -17,3 +17,12 @@ padrão e exigem `CLEANER_ALLOW_NONCOMMERCIAL=1`.
 1. Nenhum provider não comercial pode ser ativado em produção paga.
 2. Ao adicionar um provider novo, registre-o nesta tabela **antes** de habilitá-lo.
 3. A ferramenta é destinada a vídeos próprios ou conteúdo autorizado.
+
+## SAM2 (Segment Anything Model 2) — ONNX
+
+- Origem: Meta AI, `facebook/sam2`.
+- Licença: **Apache 2.0** (checkpoints Hiera; conferir a variante exportada).
+- Uso no projeto: segmentação promptável do modo `object` (clique/caixa do usuário).
+- Status: **liberado para uso comercial**, carregado por `CLEANER_SAM2_ENCODER` /
+  `CLEANER_SAM2_DECODER`. Sem pesos, o motor usa o fallback GrabCut (OpenCV,
+  BSD-3) — sempre disponível e também comercialmente livre.

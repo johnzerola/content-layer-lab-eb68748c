@@ -43,6 +43,21 @@ def run_static_logo(source: str, output: str, options: CleanOptions, on_progress
     return clean_video(source, output, replace(options, mode="logo"), on_progress)
 
 
+def run_object(source: str, output: str, options: CleanOptions, on_progress=None) -> CleanResult:
+    """Remoção de objeto apontado pelo usuário (SAM2 + Protect Area).
+
+    Exige `options.selection`. Objeto costuma ter borda mais complexa que
+    glifo de legenda, então a máscara nasce um pouco mais larga.
+    """
+    tuned = replace(
+        options,
+        mode="object",
+        mask_expand_px=max(options.mask_expand_px, 6),
+        mask_feather_px=max(options.mask_feather_px, 4),
+    )
+    return clean_video(source, output, tuned, on_progress)
+
+
 def analyse(source: str, workdir: Optional[str] = None) -> dict:
     """Amostra o vídeo e sugere modo/qualidade — base do modo automático."""
     info = probe(source)
@@ -135,5 +150,6 @@ RUNNERS_BY_MODE = {
     "karaoke": run_karaoke,
     "text": run_static_text,
     "logo": run_static_logo,
+    "object": run_object,
     "auto": run_auto,
 }

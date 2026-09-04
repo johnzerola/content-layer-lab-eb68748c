@@ -31,6 +31,9 @@ import cv2
 import numpy as np
 
 from ..providers.lama_provider import LaMaProvider
+from ..providers.sam2_provider import Sam2Provider
+from ..video.protect import ProtectMap
+from .object_pipeline import ObjectMaskStats, Selection, build_object_masks, stats_to_metrics
 from .plate import reconstruct_with_plates
 from ..providers.rapidocr_provider import GlyphMaskGenerator, RapidOcrTextDetector
 from ..providers.temporal_provider import TemporalProvider
@@ -54,7 +57,7 @@ QUALITY_PRESETS: Dict[str, dict] = {
     "max": {"samples": 48, "key_step": 2, "retries": 2, "lama": True, "chunk": 6.0, "lama_keys": 4},
 }
 
-MODES = ("caption", "karaoke", "text", "logo", "auto")
+MODES = ("caption", "karaoke", "text", "logo", "object", "auto")
 
 
 @dataclass
@@ -77,6 +80,14 @@ class CleanOptions:
     auto_lama: bool = True
     auto_lama_max_mask: float = 0.18  # fração máxima da ROI coberta pela máscara
     auto_lama_min_mask: float = 0.0008
+    # Modo objeto: o que o usuário apontou (percentual do frame).
+    #   {"boxes": [[x, y, w, h]], "points": [[x, y, 1]]}
+    selection: Optional[dict] = None
+    object_key_step: int = 8
+    # Protect Area: o que o motor não pode tocar.
+    protect_regions: List[dict] = field(default_factory=list)
+    protect_person: bool = False
+    protect_feather_px: int = 9
 
 
 @dataclass
@@ -178,10 +189,28 @@ def _chunk_masks(
     mode: str,
     key_step: int,
     timer: _Timer,
+    segmenter=None,
+    object_hint: Optional[dict] = None,
+    object_stats: Optional[ObjectMaskStats] = None,
+    expand_px: int = 6,
 ) -> np.ndarray:
     """Máscara por frame do chunk, detectando só em keyframes."""
     count = len(crops)
     height, width = crops[0].shape[:2]
+
+    if mode == "object":
+        # Objeto não passa por OCR: a máscara vem da seleção promptável e é
+        # propagada no tempo (SAM2 quando há pesos, GrabCut quando não há).
+        started = time.perf_counter()
+        if segmenter is None or not object_hint:
+            return np.zeros((count, height, width), np.uint8)
+        masks = build_object_masks(
+            crops, segmenter, object_hint,
+            key_step=max(2, key_step), expand_px=expand_px, stats=object_stats,
+        )
+        timer.add("segment_ms", started)
+        return masks
+
     keys = list(range(0, count, max(1, key_step)))
     if keys[-1] != count - 1:
         keys.append(count - 1)
@@ -275,32 +304,43 @@ def clean_video(
 
     detector = RapidOcrTextDetector()
     generator = GlyphMaskGenerator(opts.mask_expand_px, opts.mask_feather_px)
+    selection = Selection.from_dict(opts.selection)
+    segmenter = Sam2Provider() if opts.mode == "object" else None
+    object_stats = ObjectMaskStats() if opts.mode == "object" else None
+    protect = ProtectMap.build(opts.protect_regions, opts.protect_person, opts.protect_feather_px)
+    protect_timed = any(r.start > 0 or r.end != float("inf") for r in protect.regions)
 
-    emit(8, "Detectando texto")
-    started = time.perf_counter()
-    zone_cache = os.path.join(workdir, f"zone_{opts.mode}.json")
-    cached = _cached_json(zone_cache)
-    if cached and cached.get("zone"):
-        zone_master = Roi.from_percent(
-            cached["zone"]["x"], cached["zone"]["y"], cached["zone"]["w"], cached["zone"]["h"],
-            info.width, info.height,
-        )
-        zone_payload = cached
+    zone_payload: dict = {}
+    zone_master = None
+    if opts.mode == "object":
+        if selection.empty:
+            raise ValueError("modo object exige seleção: --box ou --point")
     else:
-        scan = zone_svc.scan_zone(
-            proxy.path,
-            detector,
-            step=max(5, int(round(info.fps / 2))),
-            subtitle_only=opts.mode in ("caption", "karaoke"),
-        )
-        zone_payload = scan.as_dict(proxy.width, proxy.height)
-        _store_json(zone_cache, zone_payload)
-        zone_master = (
-            scan.zone.scaled(1.0 / max(proxy.scale, 1e-6), info.width, info.height)
-            if scan.zone
-            else None
-        )
-    timer.add("zone_ms", started)
+        emit(8, "Detectando texto")
+        started = time.perf_counter()
+        zone_cache = os.path.join(workdir, f"zone_{opts.mode}.json")
+        cached = _cached_json(zone_cache)
+        if cached and cached.get("zone"):
+            zone_master = Roi.from_percent(
+                cached["zone"]["x"], cached["zone"]["y"], cached["zone"]["w"], cached["zone"]["h"],
+                info.width, info.height,
+            )
+            zone_payload = cached
+        else:
+            scan = zone_svc.scan_zone(
+                proxy.path,
+                detector,
+                step=max(5, int(round(info.fps / 2))),
+                subtitle_only=opts.mode in ("caption", "karaoke"),
+            )
+            zone_payload = scan.as_dict(proxy.width, proxy.height)
+            _store_json(zone_cache, zone_payload)
+            zone_master = (
+                scan.zone.scaled(1.0 / max(proxy.scale, 1e-6), info.width, info.height)
+                if scan.zone
+                else None
+            )
+        timer.add("zone_ms", started)
 
     if opts.roi_percent:
         roi = Roi.from_percent(
@@ -310,11 +350,23 @@ def clean_video(
             float(opts.roi_percent.get("h", 1)),
             info.width, info.height,
         )
+    elif opts.mode == "object":
+        # ROI = envelope da seleção. Objeto pequeno num vídeo 4K não deve
+        # custar processamento do frame inteiro.
+        emit(8, "Preparando seleção")
+        bbox = selection.bbox_percent(margin=0.08) or (0.0, 0.0, 1.0, 1.0)
+        roi = Roi.from_percent(bbox[0], bbox[1], bbox[2], bbox[3], info.width, info.height)
     elif zone_master is not None:
         roi = zone_master.expand(int(round(max(info.width, info.height) * 0.035)), info.width, info.height)
     else:
         roi = Roi.full(info.width, info.height)
     roi = roi.even(info.width, info.height)
+
+    object_hint = (
+        selection.to_pixels(info.width, info.height, roi.x, roi.y)
+        if opts.mode == "object"
+        else None
+    )
 
     started = time.perf_counter()
     scenes_cache = os.path.join(workdir, "scenes.json")
@@ -388,7 +440,32 @@ def clean_video(
                 break
 
             crops = [roi.crop(f) for f in frames]
-            masks = _chunk_masks(crops, detector, generator, opts.mode, int(preset["key_step"]), timer)
+            masks = _chunk_masks(
+                crops, detector, generator, opts.mode, int(preset["key_step"]), timer,
+                segmenter=segmenter, object_hint=object_hint, object_stats=object_stats,
+                expand_px=opts.mask_expand_px,
+            )
+
+            # Protect Area: subtrai da máscara tudo que é intocável, antes de
+            # qualquer reconstrução. Assim nenhum motor escreve sobre o rosto.
+            if protect.active:
+                started = time.perf_counter()
+                person = protect.person_mask(crops)
+                static_manual = (
+                    roi.crop(protect.frame_mask(info.width, info.height, 0.0))
+                    if protect.regions and not protect_timed
+                    else None
+                )
+                for i in range(len(masks)):
+                    guard = static_manual
+                    if protect_timed:
+                        seconds = (read_start + i) / max(1.0, info.fps)
+                        guard = roi.crop(protect.frame_mask(info.width, info.height, seconds))
+                    if person is not None:
+                        guard = person if guard is None else np.maximum(guard, person)
+                    if guard is not None and guard.max() > 0:
+                        masks[i] = protect.subtract(masks[i], guard)
+                timer.add("protect_ms", started)
 
             emit(
                 10 + 80 * (position / float(total_frames)),
@@ -527,6 +604,11 @@ def clean_video(
     metrics["worst_chunk_score"] = round(worst, 1)
     for key, value in plate_totals.items():
         metrics[key] = float(value)
+    if object_stats is not None:
+        metrics.update(stats_to_metrics(object_stats))
+    if protect.active:
+        metrics["protect_regions"] = float(len(protect.regions))
+        metrics["protect_person"] = 1.0 if protect.protect_person else 0.0
 
 
     timer.totals["total_ms"] = (time.perf_counter() - started_all) * 1000.0
