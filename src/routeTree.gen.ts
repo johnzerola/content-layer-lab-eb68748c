@@ -49,6 +49,7 @@ import { Route as ApiPublicHlsProxyRouteImport } from './routes/api/public/hls-p
 import { Route as ApiPublicMediaProxyRouteImport } from './routes/api/public/media-proxy'
 import { Route as ApiPublicRenderHookRouteImport } from './routes/api/public/render-hook'
 import { Route as ApiPublicRenderUploadRouteImport } from './routes/api/public/render-upload'
+import { Route as ApiPublicTestRunpodRouteImport } from './routes/api/public/test-runpod'
 import { Route as IntegracoesFacebookCallbackRouteImport } from './routes/integracoes_.facebook.callback'
 import { Route as IntegracoesInstagramCallbackRouteImport } from './routes/integracoes_.instagram.callback'
 import { Route as IntegracoesTiktokCallbackRouteImport } from './routes/integracoes_.tiktok.callback'
@@ -266,6 +267,11 @@ const ApiPublicRenderUploadRoute = ApiPublicRenderUploadRouteImport.update({
   path: '/api/public/render-upload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicTestRunpodRoute = ApiPublicTestRunpodRouteImport.update({
+  id: '/api/public/test-runpod',
+  path: '/api/public/test-runpod',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IntegracoesFacebookCallbackRoute =
   IntegracoesFacebookCallbackRouteImport.update({
     id: '/integracoes_/facebook/callback',
@@ -373,6 +379,7 @@ export interface FileRoutesByFullPath {
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
   '/api/public/render-hook': typeof ApiPublicRenderHookRoute
   '/api/public/render-upload': typeof ApiPublicRenderUploadRoute
+  '/api/public/test-runpod': typeof ApiPublicTestRunpodRoute
   '/integracoes/facebook/callback': typeof IntegracoesFacebookCallbackRoute
   '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
@@ -426,6 +433,7 @@ export interface FileRoutesByTo {
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
   '/api/public/render-hook': typeof ApiPublicRenderHookRoute
   '/api/public/render-upload': typeof ApiPublicRenderUploadRoute
+  '/api/public/test-runpod': typeof ApiPublicTestRunpodRoute
   '/integracoes/facebook/callback': typeof IntegracoesFacebookCallbackRoute
   '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
@@ -480,6 +488,7 @@ export interface FileRoutesById {
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
   '/api/public/render-hook': typeof ApiPublicRenderHookRoute
   '/api/public/render-upload': typeof ApiPublicRenderUploadRoute
+  '/api/public/test-runpod': typeof ApiPublicTestRunpodRoute
   '/integracoes_/facebook/callback': typeof IntegracoesFacebookCallbackRoute
   '/integracoes_/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/integracoes_/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
@@ -535,6 +544,7 @@ export interface FileRouteTypes {
     | '/api/public/media-proxy'
     | '/api/public/render-hook'
     | '/api/public/render-upload'
+    | '/api/public/test-runpod'
     | '/integracoes/facebook/callback'
     | '/integracoes/instagram/callback'
     | '/integracoes/tiktok/callback'
@@ -588,6 +598,7 @@ export interface FileRouteTypes {
     | '/api/public/media-proxy'
     | '/api/public/render-hook'
     | '/api/public/render-upload'
+    | '/api/public/test-runpod'
     | '/integracoes/facebook/callback'
     | '/integracoes/instagram/callback'
     | '/integracoes/tiktok/callback'
@@ -641,6 +652,7 @@ export interface FileRouteTypes {
     | '/api/public/media-proxy'
     | '/api/public/render-hook'
     | '/api/public/render-upload'
+    | '/api/public/test-runpod'
     | '/integracoes_/facebook/callback'
     | '/integracoes_/instagram/callback'
     | '/integracoes_/tiktok/callback'
@@ -695,6 +707,7 @@ export interface RootRouteChildren {
   ApiPublicMediaProxyRoute: typeof ApiPublicMediaProxyRoute
   ApiPublicRenderHookRoute: typeof ApiPublicRenderHookRoute
   ApiPublicRenderUploadRoute: typeof ApiPublicRenderUploadRoute
+  ApiPublicTestRunpodRoute: typeof ApiPublicTestRunpodRoute
   IntegracoesFacebookCallbackRoute: typeof IntegracoesFacebookCallbackRoute
   IntegracoesInstagramCallbackRoute: typeof IntegracoesInstagramCallbackRoute
   IntegracoesTiktokCallbackRoute: typeof IntegracoesTiktokCallbackRoute
@@ -990,6 +1003,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicRenderUploadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/test-runpod': {
+      id: '/api/public/test-runpod'
+      path: '/api/public/test-runpod'
+      fullPath: '/api/public/test-runpod'
+      preLoaderRoute: typeof ApiPublicTestRunpodRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/integracoes_/facebook/callback': {
       id: '/integracoes_/facebook/callback'
       path: '/integracoes/facebook/callback'
@@ -1112,6 +1132,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicMediaProxyRoute: ApiPublicMediaProxyRoute,
   ApiPublicRenderHookRoute: ApiPublicRenderHookRoute,
   ApiPublicRenderUploadRoute: ApiPublicRenderUploadRoute,
+  ApiPublicTestRunpodRoute: ApiPublicTestRunpodRoute,
   IntegracoesFacebookCallbackRoute: IntegracoesFacebookCallbackRoute,
   IntegracoesInstagramCallbackRoute: IntegracoesInstagramCallbackRoute,
   IntegracoesTiktokCallbackRoute: IntegracoesTiktokCallbackRoute,
