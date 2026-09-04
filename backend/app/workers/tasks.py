@@ -270,7 +270,7 @@ def _window_masks(
                     detected = base.copy()
             else:
                 detected = frame_text_mask(
-                    frames[key], roi=base, subtitle_only=(mode == "subtitle")
+                    frames[key], roi=base, subtitle_only=(mode in ("subtitle", "karaoke"))
                 )
                 if mode == "smart":
                     detected = np.maximum(
@@ -281,6 +281,12 @@ def _window_masks(
             key_masks.append(detected)
 
         masks = tracking.interpolate_keyframes(frames, keys, key_masks)
+        if mode == "karaoke":
+            # Legenda karaokê muda de cor/largura por palavra: a união temporal
+            # cobre toda a extensão ocupada no trecho e elimina o flicker.
+            masks = mask_modes.karaoke_union(masks)
+        elif mode in ("watermark", "logo"):
+            masks = mask_modes.apply_locked(masks, mask_modes.vote_locked_mask(masks))
     else:
         masks = [base.copy() for base in base_masks]
 
