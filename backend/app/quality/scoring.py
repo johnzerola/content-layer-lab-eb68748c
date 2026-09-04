@@ -94,13 +94,15 @@ def quality_score(
     frames: Sequence[np.ndarray],
     masks: np.ndarray,
     step: int = 4,
+    max_samples: int = 8,
 ) -> QualityReport:
     """Amostra a janela processada e devolve um score de 0 a 100."""
     texts: List[float] = []
     ghosts: List[float] = []
     blurs: List[float] = []
     textures: List[float] = []
-    for i in range(0, len(frames), max(1, step)):
+    stride = max(int(step), int(np.ceil(len(frames) / max(1, max_samples))))
+    for i in range(0, len(frames), stride):
         if i >= len(masks) or masks[i].max() == 0:
             continue
         texts.append(residual_text(frames[i], masks[i]))
