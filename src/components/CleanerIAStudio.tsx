@@ -27,8 +27,11 @@ import {
   createCleanerJob,
   detectCleanerJob,
   prepareCleanerUpload,
+  listCleanerChunks,
   processCleanerJob,
+  pumpCleanerGpuJob,
   refreshCleanerJob,
+  startCleanerGpuJob,
   saveCleanerMasks,
 } from "@/lib/cleaner.functions";
 import {
@@ -116,6 +119,11 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [verifyPass, setVerifyPass] = useState(true);
   const [cropClean, setCropClean] = useState(true);
   const [enhanceOutput, setEnhanceOutput] = useState(true);
+  // Turbo GPU: o vídeo é dividido em partes que rodam em paralelo na nuvem.
+  const [turboGpu, setTurboGpu] = useState(false);
+  const [chunks, setChunks] = useState<
+    { idx: number; status: string; residual_text: number | null; attempts: number }[]
+  >([]);
   const [masks, setMasks] = useState<CleanerRegion[]>([]);
   const [health, setHealth] = useState<{
     online: boolean;
@@ -167,6 +175,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const processJob = useServerFn(processCleanerJob);
   const refreshJob = useServerFn(refreshCleanerJob);
   const saveMasks = useServerFn(saveCleanerMasks);
+  const startGpu = useServerFn(startCleanerGpuJob);
+  const pumpGpu = useServerFn(pumpCleanerGpuJob);
+  const getChunks = useServerFn(listCleanerChunks);
   const cleanupRemoteJob = useServerFn(cleanupCleanerRemoteJob);
 
   const src = useMemo(() => URL.createObjectURL(item.file), [item.file]);
@@ -202,6 +213,27 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       window.clearInterval(timer);
     };
   }, [getHealth]);
+
+  // Progresso por partes: a fila roda no servidor, então basta acompanhar.
+  useEffect(() => {
+    if (!turboGpu || !job?.id || !polling) return;
+    let alive = true;
+    const tick = async () => {
+      try {
+        const rows = (await getChunks({ data: { id: job.id } })) as typeof chunks;
+        if (alive) setChunks(rows ?? []);
+        await pumpGpu({ data: { id: job.id } });
+      } catch {
+        // a batida do servidor (cron) continua avançando o job
+      }
+    };
+    void tick();
+    const timer = window.setInterval(tick, 8000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [turboGpu, job?.id, polling, getChunks, pumpGpu]);
 
   useEffect(() => {
     if (job || !health?.online) return;
@@ -642,7 +674,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       // Com áreas marcadas o recorte é ignorado: reenquadrar não apaga legenda que
       // fica dentro do quadro — nesse caso o certo é reconstruir o fundo.
       const useCrop = cropClean && removeMasks.length === 0;
-      await processJob({
+      const gpuRun = turboGpu && !preview;
+      const submit = gpuRun ? startGpu : processJob;
+      await submit({
         data: {
           id: job.id,
           mode,
@@ -673,7 +707,11 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       setPolling(true);
       setJob((prev) => (prev ? { ...prev, status: "inpainting", progress: 1 } : prev));
       toast.success(
-        preview ? "Gerando prévia de 5 segundos…" : "Reconstrução iniciada no motor de IA.",
+        preview
+          ? "Gerando prévia de 5 segundos…"
+          : gpuRun
+            ? "Vídeo dividido em partes e enviado para as GPUs."
+            : "Reconstrução iniciada no motor de IA.",
       );
     } catch (e) {
       toast.error(`Erro ao iniciar: ${e instanceof Error ? e.message : "desconhecido"}`);
@@ -1065,6 +1103,48 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               </button>
             ))}
           </div>
+
+          <button
+            type="button"
+            onClick={() => !job && setTurboGpu((v) => !v)}
+            disabled={!!job}
+            className={`w-full rounded-lg border p-2.5 text-left text-xs transition ${
+              turboGpu ? "border-primary bg-primary/10" : "border-border/60 bg-background/40"
+            } disabled:opacity-60`}
+          >
+            <span className="block font-semibold">Turbo GPU {turboGpu ? "· ligado" : "· desligado"}</span>
+            <span className="block text-[10px] text-muted-foreground">
+              Divide o vídeo em partes e processa em paralelo na nuvem — muito mais rápido em
+              vídeos longos. Continua mesmo se você fechar a página.
+            </span>
+          </button>
+
+          {turboGpu && chunks.length > 0 && (
+            <div className="space-y-2 rounded-lg border border-border/60 bg-background/40 p-3">
+              <span className="mono-label">
+                Partes {chunks.filter((c) => c.status === "done").length}/{chunks.length}
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {chunks.map((c) => (
+                  <span
+                    key={c.idx}
+                    title={`Parte ${c.idx + 1} · ${c.status}${
+                      c.residual_text != null ? ` · resíduo ${c.residual_text.toFixed(3)}` : ""
+                    }`}
+                    className={`h-2 w-4 rounded-sm ${
+                      c.status === "done"
+                        ? "bg-primary"
+                        : c.status === "running"
+                          ? "bg-primary/50 animate-pulse"
+                          : c.status === "failed"
+                            ? "bg-destructive"
+                            : "bg-border"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2 rounded-lg border border-border/60 bg-background/40 p-3">
             <span className="mono-label">Precisão</span>

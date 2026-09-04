@@ -42,6 +42,7 @@ import { Route as TemplatesNewRouteImport } from './routes/templates.new'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as ApiPublicCleanerCallbackRouteImport } from './routes/api/public/cleaner-callback'
+import { Route as ApiPublicCleanerChunkTickRouteImport } from './routes/api/public/cleaner-chunk-tick'
 import { Route as ApiPublicCleanerHealthRouteImport } from './routes/api/public/cleaner-health'
 import { Route as ApiPublicCleanerUploadRouteImport } from './routes/api/public/cleaner-upload'
 import { Route as ApiPublicHlsProxyRouteImport } from './routes/api/public/hls-proxy'
@@ -229,6 +230,12 @@ const ApiPublicCleanerCallbackRoute =
     path: '/api/public/cleaner-callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCleanerChunkTickRoute =
+  ApiPublicCleanerChunkTickRouteImport.update({
+    id: '/api/public/cleaner-chunk-tick',
+    path: '/api/public/cleaner-chunk-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicCleanerHealthRoute = ApiPublicCleanerHealthRouteImport.update({
   id: '/api/public/cleaner-health',
   path: '/api/public/cleaner-health',
@@ -359,6 +366,7 @@ export interface FileRoutesByFullPath {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
+  '/api/public/cleaner-chunk-tick': typeof ApiPublicCleanerChunkTickRoute
   '/api/public/cleaner-health': typeof ApiPublicCleanerHealthRoute
   '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
@@ -411,6 +419,7 @@ export interface FileRoutesByTo {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
+  '/api/public/cleaner-chunk-tick': typeof ApiPublicCleanerChunkTickRoute
   '/api/public/cleaner-health': typeof ApiPublicCleanerHealthRoute
   '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
@@ -464,6 +473,7 @@ export interface FileRoutesById {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
+  '/api/public/cleaner-chunk-tick': typeof ApiPublicCleanerChunkTickRoute
   '/api/public/cleaner-health': typeof ApiPublicCleanerHealthRoute
   '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
@@ -518,6 +528,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/cleaner-callback'
+    | '/api/public/cleaner-chunk-tick'
     | '/api/public/cleaner-health'
     | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
@@ -570,6 +581,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/cleaner-callback'
+    | '/api/public/cleaner-chunk-tick'
     | '/api/public/cleaner-health'
     | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
@@ -622,6 +634,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/cleaner-callback'
+    | '/api/public/cleaner-chunk-tick'
     | '/api/public/cleaner-health'
     | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
@@ -675,6 +688,7 @@ export interface RootRouteChildren {
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicCleanerCallbackRoute: typeof ApiPublicCleanerCallbackRoute
+  ApiPublicCleanerChunkTickRoute: typeof ApiPublicCleanerChunkTickRoute
   ApiPublicCleanerHealthRoute: typeof ApiPublicCleanerHealthRoute
   ApiPublicCleanerUploadRoute: typeof ApiPublicCleanerUploadRoute
   ApiPublicHlsProxyRoute: typeof ApiPublicHlsProxyRoute
@@ -927,6 +941,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCleanerCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cleaner-chunk-tick': {
+      id: '/api/public/cleaner-chunk-tick'
+      path: '/api/public/cleaner-chunk-tick'
+      fullPath: '/api/public/cleaner-chunk-tick'
+      preLoaderRoute: typeof ApiPublicCleanerChunkTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cleaner-health': {
       id: '/api/public/cleaner-health'
       path: '/api/public/cleaner-health'
@@ -1084,6 +1105,7 @@ const rootRouteChildren: RootRouteChildren = {
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicCleanerCallbackRoute: ApiPublicCleanerCallbackRoute,
+  ApiPublicCleanerChunkTickRoute: ApiPublicCleanerChunkTickRoute,
   ApiPublicCleanerHealthRoute: ApiPublicCleanerHealthRoute,
   ApiPublicCleanerUploadRoute: ApiPublicCleanerUploadRoute,
   ApiPublicHlsProxyRoute: ApiPublicHlsProxyRoute,

@@ -203,17 +203,90 @@ export type Database = {
         }
         Relationships: []
       }
+      cleaner_chunks: {
+        Row: {
+          attempts: number
+          cost_seconds: number | null
+          created_at: string
+          end_seconds: number
+          error: string | null
+          id: string
+          idx: number
+          job_id: string
+          lease_until: string | null
+          output_url: string | null
+          overlap_seconds: number
+          provider_job_id: string | null
+          residual_text: number | null
+          start_seconds: number
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          cost_seconds?: number | null
+          created_at?: string
+          end_seconds: number
+          error?: string | null
+          id?: string
+          idx: number
+          job_id: string
+          lease_until?: string | null
+          output_url?: string | null
+          overlap_seconds?: number
+          provider_job_id?: string | null
+          residual_text?: number | null
+          start_seconds: number
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          cost_seconds?: number | null
+          created_at?: string
+          end_seconds?: number
+          error?: string | null
+          id?: string
+          idx?: number
+          job_id?: string
+          lease_until?: string | null
+          output_url?: string | null
+          overlap_seconds?: number
+          provider_job_id?: string | null
+          residual_text?: number | null
+          start_seconds?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cleaner_chunks_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cleaner_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cleaner_jobs: {
         Row: {
+          chunks_done: number
+          chunks_total: number
           created_at: string
           detections: Json
+          engine: string
           error: string | null
           filename: string
           id: string
+          lease_until: string | null
           masks: Json
           metrics: Json | null
           mode: string
           options: Json
+          paused_reason: string | null
           preset: string
           preview_url: string | null
           probe: Json | null
@@ -226,15 +299,20 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          chunks_done?: number
+          chunks_total?: number
           created_at?: string
           detections?: Json
+          engine?: string
           error?: string | null
           filename: string
           id?: string
+          lease_until?: string | null
           masks?: Json
           metrics?: Json | null
           mode?: string
           options?: Json
+          paused_reason?: string | null
           preset?: string
           preview_url?: string | null
           probe?: Json | null
@@ -247,15 +325,20 @@ export type Database = {
           user_id: string
         }
         Update: {
+          chunks_done?: number
+          chunks_total?: number
           created_at?: string
           detections?: Json
+          engine?: string
           error?: string | null
           filename?: string
           id?: string
+          lease_until?: string | null
           masks?: Json
           metrics?: Json | null
           mode?: string
           options?: Json
+          paused_reason?: string | null
           preset?: string
           preview_url?: string | null
           probe?: Json | null

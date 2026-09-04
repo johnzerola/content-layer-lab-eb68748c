@@ -39,6 +39,7 @@ from ..engines.propainter_official import (
     run_propainter,
 )
 from ..services import mask as mask_svc
+from ..services import mask_modes
 from ..services import protect as protect_svc
 from ..services import tracking
 from ..services import verify
@@ -175,13 +176,13 @@ def auto_detect(job_id: str, mode: str, samples: int = 12) -> List[Dict]:
     if mode in ("watermark", "logo"):
         return detect_watermarks(frames)
 
-    if mode in ("subtitle", "text", "smart"):
+    if mode in ("subtitle", "text", "smart", "karaoke"):
         heat = np.zeros((h, w), np.float32)
         for frame in frames:
             layer = np.zeros((h, w), np.uint8)
             for box in detect_text_boxes(frame):
                 x, y, bw, bh = box
-                if mode == "subtitle" and (y + bh / 2) < h * 0.45:
+                if mode in ("subtitle", "karaoke") and (y + bh / 2) < h * 0.45:
                     continue  # legenda vive no terço inferior
                 cv2.rectangle(layer, (x, y), (x + bw, y + bh), 255, -1)
             heat += layer.astype(np.float32) / 255.0
@@ -200,7 +201,7 @@ def auto_detect(job_id: str, mode: str, samples: int = 12) -> List[Dict]:
                 "role": "remove",
                 "x": x / w, "y": y / h, "w": bw / w, "h": bh / h,
                 "grow": 0.008,
-                "label": "Legenda" if mode == "subtitle" else "Texto",
+                "label": "Legenda" if mode in ("subtitle", "karaoke") else "Texto",
             })
         if mode == "smart":
             regions += detect_watermarks(frames)
@@ -243,7 +244,7 @@ def _window_masks(
                 fixed_regions, w, h, frame_offset, n, info.fps
             )
 
-    if mode in ("subtitle", "text", "smart", "watermark", "logo") and dynamic:
+    if mode in ("subtitle", "text", "smart", "karaoke", "watermark", "logo") and dynamic:
         keys = list(range(0, n, max(1, key_step)))
         if keys[-1] != n - 1:
             keys.append(n - 1)
@@ -270,7 +271,7 @@ def _window_masks(
                     detected = base.copy()
             else:
                 detected = frame_text_mask(
-                    frames[key], roi=base, subtitle_only=(mode == "subtitle")
+                    frames[key], roi=base, subtitle_only=(mode in ("subtitle", "karaoke"))
                 )
                 if mode == "smart":
                     detected = np.maximum(
@@ -281,6 +282,12 @@ def _window_masks(
             key_masks.append(detected)
 
         masks = tracking.interpolate_keyframes(frames, keys, key_masks)
+        if mode == "karaoke":
+            # Legenda karaokê muda de cor/largura por palavra: a união temporal
+            # cobre toda a extensão ocupada no trecho e elimina o flicker.
+            masks = mask_modes.karaoke_union(masks)
+        elif mode in ("watermark", "logo"):
+            masks = mask_modes.apply_locked(masks, mask_modes.vote_locked_mask(masks))
     else:
         masks = [base.copy() for base in base_masks]
 

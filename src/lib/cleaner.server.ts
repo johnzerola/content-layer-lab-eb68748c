@@ -384,3 +384,35 @@ export async function workerDelete(jobId: string) {
 export async function workerUploadToken(jobId: string) {
   return (await usesLegacyWorkerToken()) ? legacyJobToken(jobId) : jobToken(jobId, "upload");
 }
+
+/** Planeja as janelas (com sobreposição) que serão processadas em paralelo. */
+export async function workerPlanChunks(
+  jobId: string,
+  input: { targetSeconds: number; overlap: number; useScenes?: boolean },
+) {
+  return call<{
+    duration: number;
+    fps: number;
+    chunks: { index: number; start: number; end: number; overlap: number }[];
+  }>(`/v1/jobs/${jobId}/plan`, {
+    method: "POST",
+    jobId,
+    body: JSON.stringify({
+      target_seconds: input.targetSeconds,
+      overlap: input.overlap,
+      use_scenes: input.useScenes ?? true,
+    }),
+  });
+}
+
+/** Baixa os chunks prontos, concatena na ordem e remonta o áudio original. */
+export async function workerAssemble(
+  jobId: string,
+  parts: { index: number; url: string }[],
+  metrics: Record<string, unknown> = {},
+) {
+  return call<{ ok: boolean; result_url?: string; metrics?: Record<string, unknown> }>(
+    `/v1/jobs/${jobId}/assemble`,
+    { method: "POST", jobId, body: JSON.stringify({ parts, metrics }) },
+  );
+}
