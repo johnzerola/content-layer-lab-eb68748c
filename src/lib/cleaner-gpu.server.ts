@@ -146,7 +146,7 @@ export async function chunkStatus(providerJobId: string): Promise<ChunkStatus> {
       state: "completed",
       residualText: Number(output["residual_text"] ?? 0) || 0,
       outputUrl: (output["output_url"] as string | undefined) ?? null,
-      seconds: Number(output["seconds"] ?? (result.executionTime ?? 0) / 1000) || 0,
+      seconds: (Number(output["seconds"] ?? (result.executionTime ?? 0) / 1000)  || 0),
     };
   }
   return {
