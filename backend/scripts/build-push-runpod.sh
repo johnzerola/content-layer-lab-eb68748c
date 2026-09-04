@@ -21,11 +21,16 @@
 # =============================================================================
 set -euo pipefail
 
+# Permite executar tanto da raiz do projeto quanto de dentro de backend/.
+BACKEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "${BACKEND_DIR}"
+
 IMAGE_NAME="${IMAGE_NAME:-cleaneria-runpod}"
 REGISTRY="${REGISTRY:-docker.io}"
 REGISTRY_USER="${REGISTRY_USER:-}"
 TAG="${TAG:-latest}"
 DOCKERFILE="${DOCKERFILE:-Dockerfile.runpod}"
+REGISTRY_TOKEN="${REGISTRY_TOKEN:-${DOCKERHUB_TOKEN:-}}"
 
 if [[ -z "${REGISTRY_USER}" ]]; then
   echo "ERRO: defina REGISTRY_USER (usuário do Docker Hub ou GitHub)."
@@ -59,7 +64,13 @@ fi
 # --- 2) Login no registry ---------------------------------------------------
 echo ""
 echo "[2/4] Login no registry ${REGISTRY} (vai pedir senha/token)..."
-if [[ "${REGISTRY}" == "docker.io" ]]; then
+if [[ -n "${REGISTRY_TOKEN}" ]]; then
+  if [[ "${REGISTRY}" == "docker.io" ]]; then
+    printf '%s' "${REGISTRY_TOKEN}" | docker login -u "${REGISTRY_USER}" --password-stdin
+  else
+    printf '%s' "${REGISTRY_TOKEN}" | docker login "${REGISTRY}" -u "${REGISTRY_USER}" --password-stdin
+  fi
+elif [[ "${REGISTRY}" == "docker.io" ]]; then
   docker login -u "${REGISTRY_USER}"
 else
   docker login "${REGISTRY}" -u "${REGISTRY_USER}"
