@@ -22,7 +22,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.pipelines.caption_pipeline import (  # noqa: E402
-    analyse, run_auto, run_caption, run_karaoke, run_static_logo, run_static_text,
+    analyse, run_auto, run_caption, run_karaoke, run_object, run_static_logo, run_static_text,
 )
 from app.pipelines.clean_pipeline import CleanOptions  # noqa: E402
 
@@ -31,6 +31,7 @@ RUNNERS = {
     "karaoke": run_karaoke,
     "text": run_static_text,
     "logo": run_static_logo,
+    "object": run_object,
     "auto": run_auto,
 }
 
@@ -117,6 +118,16 @@ def main() -> int:
     parser.add_argument("--expand", type=int, default=4, help="mask_expand_px")
     parser.add_argument("--feather", type=int, default=3, help="mask_feather_px")
     parser.add_argument("--roi", help="ROI manual em percentual: x,y,w,h (ex.: 0.08,0.68,0.84,0.18)")
+    parser.add_argument("--box", action="append", default=[],
+                        help="modo object: caixa do objeto em percentual x,y,w,h (repetível)")
+    parser.add_argument("--point", action="append", default=[],
+                        help="modo object: ponto x,y[,1|0] em percentual (1 = objeto, 0 = fundo)")
+    parser.add_argument("--selection", help="modo object: JSON com {\"boxes\":[],\"points\":[]}")
+    parser.add_argument("--protect", action="append", default=[],
+                        help="área intocável: [rect|ellipse,]x,y,w,h[,inicio_s,fim_s] (repetível)")
+    parser.add_argument("--protect-person", action="store_true",
+                        help="protege automaticamente rosto/pessoa detectados")
+    parser.add_argument("--protect-feather", type=int, default=9, help="suavidade da borda protegida")
     parser.add_argument("--workdir", help="pasta de cache (proxy, OCR, cenas)")
     parser.add_argument("--json", action="store_true", help="imprimir relatório em JSON")
     parser.add_argument("--check", action="store_true", help="apenas checar o ambiente")
@@ -148,6 +159,29 @@ def main() -> int:
             parser.error("--roi precisa de 4 valores: x,y,w,h")
         roi_percent = {"x": parts[0], "y": parts[1], "w": parts[2], "h": parts[3]}
 
+    selection = None
+    if args.selection:
+        selection = json.loads(args.selection) if args.selection.strip().startswith("{") else json.load(
+            open(args.selection, "r", encoding="utf-8")
+        )
+    if args.box or args.point:
+        selection = selection or {"boxes": [], "points": []}
+        selection.setdefault("boxes", [])
+        selection.setdefault("points", [])
+        for raw in args.box:
+            values = [float(p) for p in raw.split(",")]
+            if len(values) != 4:
+                parser.error("--box precisa de 4 valores: x,y,w,h")
+            selection["boxes"].append(values)
+        for raw in args.point:
+            values = [float(p) for p in raw.split(",")]
+            if len(values) < 2:
+                parser.error("--point precisa de x,y[,label]")
+            selection["points"].append([values[0], values[1], int(values[2]) if len(values) > 2 else 1])
+
+    if args.mode == "object" and not selection:
+        parser.error("modo object exige --box, --point ou --selection")
+
     options = CleanOptions(
         mode=args.mode,
         quality=args.quality,
@@ -157,6 +191,10 @@ def main() -> int:
         mask_expand_px=args.expand,
         mask_feather_px=args.feather,
         roi_percent=roi_percent,
+        selection=selection,
+        protect_regions=list(args.protect),
+        protect_person=bool(args.protect_person),
+        protect_feather_px=args.protect_feather,
         workdir=args.workdir,
         keep_workdir=True,
     )
