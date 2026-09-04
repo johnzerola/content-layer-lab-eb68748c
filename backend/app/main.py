@@ -171,13 +171,13 @@ def _validate_video(path: Path) -> dict:
 
 
 class DetectRequest(BaseModel):
-    mode: Literal["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"] = "subtitle"
+    mode: Literal["smart", "subtitle", "text", "karaoke", "watermark", "logo", "object", "passerby"] = "subtitle"
     roi: Optional[dict] = None
 
 
 class ProcessRequest(BaseModel):
     jobId: Optional[str] = None
-    mode: Literal["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"] = "subtitle"
+    mode: Literal["smart", "subtitle", "text", "karaoke", "watermark", "logo", "object", "passerby"] = "subtitle"
     preset: Literal["fast", "quality", "max"] = "quality"
     masks: List[dict] = Field(default_factory=list, max_length=500)
     options: dict = Field(default_factory=dict)
