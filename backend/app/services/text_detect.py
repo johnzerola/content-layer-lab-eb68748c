@@ -192,7 +192,7 @@ def detect_text_boxes(frame: np.ndarray) -> List[Box]:
 
 
 
-def text_pixel_mask(frame: np.ndarray, box: Box, dilate_ratio: float = 0.18) -> np.ndarray:
+def text_pixel_mask(frame: np.ndarray, box: Box, dilate_ratio: float = 0.32) -> np.ndarray:
     """Mask glyphs, outline, shadow and glow inside a detected text box."""
     h_img, w_img = frame.shape[:2]
     x, y, w, h = box
