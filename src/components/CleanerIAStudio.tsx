@@ -616,10 +616,14 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         confirmed ??= await verifyUpload();
         setJob(confirmed);
         setInputReady(true);
+        toast.success("Vídeo enviado. Detecte as áreas ou marque à mão.");
+        return confirmed;
       }
       toast.success("Vídeo enviado. Detecte as áreas ou marque à mão.");
+      return newJob;
     } catch (e) {
       toast.error(`Erro no upload: ${e instanceof Error ? e.message : "desconhecido"}`);
+      return null;
     } finally {
       setUploading(false);
     }
