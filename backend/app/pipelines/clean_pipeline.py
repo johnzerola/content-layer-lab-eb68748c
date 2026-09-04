@@ -32,6 +32,7 @@ import numpy as np
 
 from ..providers.lama_provider import LaMaProvider
 from ..providers.sam2_provider import Sam2Provider
+from ..video.harmonize import harmonize_sequence
 from ..video.protect import ProtectMap
 from .object_pipeline import ObjectMaskStats, Selection, build_object_masks, stats_to_metrics
 from .plate import reconstruct_with_plates
@@ -88,6 +89,9 @@ class CleanOptions:
     # Correção residual por fluxo óptico no TBE (opt-in: só compensa quando o
     # fundo tem parallax forte; em cena plana só custa tempo).
     flow_refine: bool = False
+    # Pós-passe de harmonização (grão/nitidez/cor) da área reconstruída.
+    harmonize: bool = True
+    harmonize_grain: bool = True
 
     auto_lama_max_mask: float = 0.18  # fração máxima da ROI coberta pela máscara
     auto_lama_min_mask: float = 0.0008
@@ -579,7 +583,27 @@ def clean_video(
                 )
             cleaned = restored
 
-
+            # Pós-passe de harmonização: casa grão, cor e nitidez da área
+            # reconstruída com o fundo ao redor. Só entra se não piorar o score.
+            if opts.harmonize:
+                started = time.perf_counter()
+                harmonized, h_stats = harmonize_sequence(
+                    cleaned, masks, grain=opts.harmonize_grain
+                )
+                timer.add("harmonize_ms", started)
+                if h_stats.applied:
+                    started = time.perf_counter()
+                    h_report = quality_score(list(harmonized), masks)
+                    timer.add("quality_ms", started)
+                    if h_report.score >= report.score - 0.5:
+                        cleaned = harmonized
+                        report = h_report
+                        for key, value in h_stats.as_dict().items():
+                            plate_totals[key] = plate_totals.get(key, 0) + value
+                    else:
+                        plate_totals["harmonize_rejected"] = (
+                            plate_totals.get("harmonize_rejected", 0) + 1
+                        )
 
             started = time.perf_counter()
             for i in range(lead, lead + body):
