@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { CopyCheck, Eraser, Plus, ScanSearch, Trash2 } from "lucide-react";
 import { CLEANUP_PRESETS, makeCleanupRegion, type CleanupRegion } from "@/lib/template";
 
