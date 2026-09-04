@@ -243,7 +243,7 @@ def _window_masks(
                 fixed_regions, w, h, frame_offset, n, info.fps
             )
 
-    if mode in ("subtitle", "text", "smart", "watermark", "logo") and dynamic:
+    if mode in ("subtitle", "text", "smart", "karaoke", "watermark", "logo") and dynamic:
         keys = list(range(0, n, max(1, key_step)))
         if keys[-1] != n - 1:
             keys.append(n - 1)
