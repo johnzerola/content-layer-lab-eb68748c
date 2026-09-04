@@ -24,6 +24,7 @@ import {
   cleanerHealth,
   cleanupCleanerRemoteJob,
   confirmCleanerUpload,
+  cancelCleanerJob,
   createCleanerJob,
   detectCleanerJob,
   prepareCleanerUpload,
@@ -197,6 +198,24 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const pumpGpu = useServerFn(pumpCleanerGpuJob);
   const getChunks = useServerFn(listCleanerChunks);
   const cleanupRemoteJob = useServerFn(cleanupCleanerRemoteJob);
+  const cancelJobFn = useServerFn(cancelCleanerJob);
+  const [cancelling, setCancelling] = useState(false);
+
+  const cancelRemoteJob = async () => {
+    if (!job?.id) return;
+    setCancelling(true);
+    try {
+      const headers = await cloudAuthHeaders();
+      const row = (await cancelJobFn({ data: { id: job.id }, headers })) as CleanerJob;
+      setPolling(false);
+      setJob((prev) => ({ ...(prev as CleanerJob), ...row }));
+      toast.info("Processamento cancelado e arquivos temporários removidos.");
+    } catch (e) {
+      toast.error((e as Error)?.message || "Não foi possível cancelar agora.");
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   const src = useMemo(() => URL.createObjectURL(item.file), [item.file]);
   useEffect(() => () => URL.revokeObjectURL(src), [src]);
@@ -1012,6 +1031,15 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               <p className="mt-1 text-xs text-muted-foreground">{job!.stage}</p>
               <Progress value={job!.progress} className="mt-4 h-1.5 w-56" />
               <p className="mt-1 font-mono text-[10px]">{Math.round(job!.progress)}%</p>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="mt-4"
+                disabled={cancelling}
+                onClick={cancelRemoteJob}
+              >
+                {cancelling ? "Cancelando…" : "Cancelar processamento"}
+              </Button>
             </div>
           )}
 
