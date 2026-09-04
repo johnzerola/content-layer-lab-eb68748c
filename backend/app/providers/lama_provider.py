@@ -26,7 +26,7 @@ _FILE = "lama_fp32.onnx"
 _DEFAULT_SIDE = 512
 _CONTEXT = 1.6  # quanto de fundo limpo entra junto na janela
 _MAX_WINDOWS = 4  # regiões distintas por frame
-_MAX_TILES = 8    # inferências por frame; acima disso o custo em CPU explode
+_MAX_TILES = 12    # inferências por frame; acima disso o custo em CPU explode
 
 
 def models_dir() -> str:
@@ -165,7 +165,11 @@ class LaMaProvider:
                     windows.append((wx0, wy0, min(width, wx0 + side), min(height, wy0 + side)))
         # Deduplica e limita o custo total por frame.
         unique = sorted(set(windows))
-        return unique[:_MAX_TILES]
+        if len(unique) <= _MAX_TILES:
+            return unique
+        # Amostra uniforme: truncar deixaria uma das pontas da faixa sem cobertura.
+        idx = np.linspace(0, len(unique) - 1, _MAX_TILES).round().astype(int)
+        return [unique[int(i)] for i in sorted(set(idx.tolist()))]
 
 
 
