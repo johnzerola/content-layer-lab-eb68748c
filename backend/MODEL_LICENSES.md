@@ -9,6 +9,7 @@ padrão e exigem `CLEANER_ALLOW_NONCOMMERCIAL=1`.
 | `temporal` (TBE) | algoritmo próprio (OpenCV) | Apache-2.0 (OpenCV) | Sim | Sem pesos externos. |
 | `ocr` | RapidOCR / PP-OCR (ONNX) | Apache-2.0 | Sim | Detecção de texto. |
 | `lama` | Carve/LaMa-ONNX (`lama_fp32.onnx`) | Apache-2.0 (export Carve) | Sim | Pesos originais LaMa: CC BY-NC-SA 4.0. O export Carve é publicado sob Apache-2.0; ainda assim, valide com seu jurídico antes de uso comercial. |
+| `sttn` | STTN (export ONNX `sttn.onnx`) | Apache-2.0 | Sim | Motor temporal rapido para faixas largas; sem pesos, o provider fica inativo. |
 | `propainter` | ProPainter | S-Lab License 1.0 | **Não** | Somente pesquisa/uso não comercial. Desativado por padrão. |
 | `diffueraser` | DiffuEraser | S-Lab / Stable Diffusion CreativeML | **Não** | Desativado por padrão. |
 

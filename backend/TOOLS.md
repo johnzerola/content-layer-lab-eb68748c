@@ -43,6 +43,7 @@ deixa degrau visível entre reconstruído e preservado.
 |---|---|---|
 | TBE (Temporal Background Exposure) | usa pixels reais de outros frames | própria/OpenCV |
 | LaMa ONNX | inpainting por modelo, só na ROI, em keyframes + propagação | Apache 2.0 |
+| STTN ONNX | inpainting temporal leve por chunk (faixa larga/karaoke), escolhido pelo roteador | Apache 2.0 |
 | ProPainter | flow-guided, alta qualidade, GPU | **não comercial — desligado** |
 | DiffuEraser | difusão, alvo da rota GPU comercial | Apache 2.0 |
 
