@@ -1339,6 +1339,17 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             ))}
           </div>
 
+          {/* Trilha do motor completo */}
+          <div className="rounded-xl border border-border/70 bg-background/40 p-3">
+            <p className="mono-label mb-2">Etapas do motor</p>
+            <CleanerPipelineSteps steps={pipelineSteps} />
+            {pipelineError && (
+              <p className="flex items-center gap-1.5 text-[11px] text-destructive">
+                <AlertCircle className="size-3.5" /> {pipelineError}
+              </p>
+            )}
+          </div>
+
           {!job || !inputReady ? (
             health && !health.online ? (
               <Button
@@ -1351,14 +1362,26 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 {localBusy ? "Processando local…" : "Processar no modo local"}
               </Button>
             ) : (
-              <Button
-                className="w-full shadow-glow"
-                onClick={startUpload}
-                disabled={!health?.online || uploading}
-              >
-                <Upload className="mr-2 size-4" /> {job ? "Reenviar vídeo" : "Enviar para IA"}
-              </Button>
+              <div className="space-y-2">
+                <Button
+                  className="w-full shadow-glow"
+                  onClick={() => void runFullPipeline(false)}
+                  disabled={!health?.online || uploading || pipelineBusy || !creditsAvailable}
+                >
+                  <Sparkles className="mr-2 size-4" />
+                  {pipelineBusy ? "Executando fluxo…" : "Limpar automático (fluxo completo)"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => void startUpload()}
+                  disabled={!health?.online || uploading || pipelineBusy}
+                >
+                  <Upload className="mr-2 size-4" /> {job ? "Reenviar vídeo" : "Só enviar para IA"}
+                </Button>
+              </div>
             )
+
           ) : job.status === "completed" && !previewDone ? (
 
             <a
