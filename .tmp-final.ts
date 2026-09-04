@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { workerStatus } from "@/lib/cleaner.server";
 const db = createClient(process.env["SUPABASE_URL"]!, process.env["SUPABASE_SERVICE_ROLE_KEY"]!, { auth: { persistSession: false } });
-const jobId = "4f1d8f38-a9f6-48d6-94a3-2575a807447c";
+const jobId = "fe692894-4bd8-4676-bc22-175ed5220b6a";
 const { data: j } = await db.from("cleaner_jobs").select("status,stage,progress,result_url,preview_url,metrics,chunks_done").eq("id", jobId).single();
 console.log("job:", JSON.stringify(j));
 const { data: c } = await db.from("cleaner_chunks").select("idx,status,output_url").eq("job_id", jobId);
