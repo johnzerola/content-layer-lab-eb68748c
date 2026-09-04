@@ -1443,14 +1443,25 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 </button>
               </div>
               {workMode === "auto" ? (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleDetect}
-                  disabled={polling || !inputReady}
-                >
-                  <Target className="mr-2 size-4" /> Detectar automaticamente
-                </Button>
+                <div className="space-y-2">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => void handleDetect()}
+                    disabled={polling || pipelineBusy || !inputReady}
+                  >
+                    <Target className="mr-2 size-4" /> Detectar automaticamente
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => void runFullPipeline(false)}
+                    disabled={polling || pipelineBusy || !inputReady || !creditsAvailable}
+                  >
+                    <Sparkles className="mr-2 size-4" />
+                    {pipelineBusy ? "Executando fluxo…" : "Detectar e limpar em sequência"}
+                  </Button>
+                </div>
               ) : (
                 <p className="rounded-lg border border-border/50 bg-background/30 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
                   Use as ferramentas à esquerda para desenhar sobre o que remover, depois gere a
