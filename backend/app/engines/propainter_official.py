@@ -97,9 +97,12 @@ def _propainter_cuda_available() -> bool:
         return cuda_available()
 
 
-def _processing_size(width: int, height: int, preset: str) -> Tuple[int, int]:
+def _processing_size(
+    width: int, height: int, preset: str, scale_factor: float = 1.0
+) -> Tuple[int, int]:
     default_side = 1280 if preset == "max" else 960
     max_side = max(320, int(os.getenv("PROPAINTER_MAX_SIDE", str(default_side))))
+    max_side = max(320, int(max_side * max(0.2, min(1.0, scale_factor))))
     scale = min(1.0, max_side / float(max(width, height)))
     out_w = max(8, int(width * scale) // 8 * 8)
     out_h = max(8, int(height * scale) // 8 * 8)
@@ -114,9 +117,11 @@ def build_propainter_command(
     height: int,
     fps: float,
     preset: str,
+    scale_factor: float = 1.0,
 ) -> List[str]:
     root = propainter_root()
-    proc_w, proc_h = _processing_size(width, height, preset)
+    proc_w, proc_h = _processing_size(width, height, preset, scale_factor)
+    tight = scale_factor < 1.0
     command = [
         os.getenv("PROPAINTER_PYTHON", sys.executable),
         str(root / "inference_propainter.py"),
@@ -126,14 +131,15 @@ def build_propainter_command(
         "--width", str(proc_w),
         "--height", str(proc_h),
         "--save_fps", str(max(1, round(fps))),
-        "--subvideo_length", "80" if preset == "max" else "64",
-        "--neighbor_length", "12" if preset == "max" else "10",
-        "--ref_stride", "5" if preset == "max" else "10",
+        "--subvideo_length", "40" if tight else ("80" if preset == "max" else "64"),
+        "--neighbor_length", "8" if tight else ("12" if preset == "max" else "10"),
+        "--ref_stride", "10" if tight else ("5" if preset == "max" else "10"),
         "--mask_dilation", "2" if preset == "max" else "1",
     ]
     if _propainter_cuda_available() and os.getenv("PROPAINTER_FP16", "1") == "1":
         command.append("--fp16")
     return command
+
 
 
 def run_propainter(
