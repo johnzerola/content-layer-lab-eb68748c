@@ -214,6 +214,27 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     };
   }, [getHealth]);
 
+  // Progresso por partes: a fila roda no servidor, então basta acompanhar.
+  useEffect(() => {
+    if (!turboGpu || !job?.id || !polling) return;
+    let alive = true;
+    const tick = async () => {
+      try {
+        const rows = (await getChunks({ data: { id: job.id } })) as typeof chunks;
+        if (alive) setChunks(rows ?? []);
+        await pumpGpu({ data: { id: job.id } });
+      } catch {
+        // a batida do servidor (cron) continua avançando o job
+      }
+    };
+    void tick();
+    const timer = window.setInterval(tick, 8000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [turboGpu, job?.id, polling, getChunks, pumpGpu]);
+
   useEffect(() => {
     if (job || !health?.online) return;
     if (health.ai_ready === false && preset !== "fast") setPreset("fast");
@@ -1082,6 +1103,48 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               </button>
             ))}
           </div>
+
+          <button
+            type="button"
+            onClick={() => !job && setTurboGpu((v) => !v)}
+            disabled={!!job}
+            className={`w-full rounded-lg border p-2.5 text-left text-xs transition ${
+              turboGpu ? "border-primary bg-primary/10" : "border-border/60 bg-background/40"
+            } disabled:opacity-60`}
+          >
+            <span className="block font-semibold">Turbo GPU {turboGpu ? "· ligado" : "· desligado"}</span>
+            <span className="block text-[10px] text-muted-foreground">
+              Divide o vídeo em partes e processa em paralelo na nuvem — muito mais rápido em
+              vídeos longos. Continua mesmo se você fechar a página.
+            </span>
+          </button>
+
+          {turboGpu && chunks.length > 0 && (
+            <div className="space-y-2 rounded-lg border border-border/60 bg-background/40 p-3">
+              <span className="mono-label">
+                Partes {chunks.filter((c) => c.status === "done").length}/{chunks.length}
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {chunks.map((c) => (
+                  <span
+                    key={c.idx}
+                    title={`Parte ${c.idx + 1} · ${c.status}${
+                      c.residual_text != null ? ` · resíduo ${c.residual_text.toFixed(3)}` : ""
+                    }`}
+                    className={`h-2 w-4 rounded-sm ${
+                      c.status === "done"
+                        ? "bg-primary"
+                        : c.status === "running"
+                          ? "bg-primary/50 animate-pulse"
+                          : c.status === "failed"
+                            ? "bg-destructive"
+                            : "bg-border"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2 rounded-lg border border-border/60 bg-background/40 p-3">
             <span className="mono-label">Precisão</span>
