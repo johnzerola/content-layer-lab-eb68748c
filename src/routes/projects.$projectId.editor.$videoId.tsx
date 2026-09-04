@@ -182,12 +182,16 @@ function EditorPage() {
   const [transcript, setTranscript] = useState<TranscriptDoc>(emptyTranscript(videoId));
   const [templates, setTemplates] = useState<VideoTemplateRecord[]>([]);
   const [leftTab, setLeftTab] = useState<"texto" | "estilos">("texto");
-  const [tool, setTool] = useState<ToolId>("corte");
+  // Templates are the fastest way to a finished result, so the editor opens
+  // with the visual library instead of an advanced adjustment panel.
+  const [tool, setTool] = useState<ToolId>("templates");
   const [joinIndex, setJoinIndex] = useState<number | null>(null);
   const [templateTab, setTemplateTab] = useState<"prontos" | "meus" | "cortes">("prontos");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [lookPreview, setLookPreview] = useState<Partial<PreEdit> | null>(null);
+  const [transitionPreview, setTransitionPreview] = useState<PreEdit | null>(null);
   const [cutOnRemove, setCutOnRemove] = useState(true);
   const [saveState, setSaveState] = useState<"idle" | "dirty" | "saving" | "saved">("idle");
   const [batchOpen, setBatchOpen] = useState(false);
@@ -682,6 +686,27 @@ function EditorPage() {
       } else if (meta && e.key.toLowerCase() === "s") {
         e.preventDefault();
         if (recordId && doc) void saveEditorProject(recordId, doc).then(() => setSaveState("saved"));
+      } else if (!meta && e.key.toLowerCase() === "s" && doc) {
+        e.preventDefault();
+        const total = doc.media.duration || transcript.duration;
+        const current = doc.preedit ?? defaultPreEdit();
+        const segs = current.segments?.length ? [...current.segments] : [{ start: 0, end: total }];
+        const index = segs.findIndex((segment) => currentTime > segment.start + 0.1 && currentTime < segment.end - 0.1);
+        if (index < 0) {
+          toast.info("Posicione a agulha dentro do vídeo para dividir.");
+          return;
+        }
+        const segment = segs[index]!;
+        segs.splice(index, 1, { start: segment.start, end: currentTime }, { start: currentTime, end: segment.end });
+        const transitions = [...(current.transitions ?? [])];
+        transitions.splice(index, 0, { kind: "fade", dur: 0.4 });
+        history.set(
+          (value) => value ? { ...value, preedit: { ...(value.preedit ?? defaultPreEdit()), segments: segs, transitions } } : value,
+          "cortar-video",
+        );
+        setJoinIndex(index);
+        setTool("transicoes");
+        toast.success("Vídeo dividido. Escolha a transição da emenda.");
       } else if (e.key === "Delete" && selectedId) {
         history.set(
           (d) =>
@@ -693,7 +718,7 @@ function EditorPage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [history, recordId, doc, selectedId]);
+  }, [history, recordId, doc, selectedId, transcript.duration, currentTime]);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -737,6 +762,12 @@ function EditorPage() {
   const duration = doc.media.duration || transcript.duration;
   const pre = doc.preedit ?? defaultPreEdit();
   const selectedLayer = doc.composition.layers.find((l) => l.id === selectedId) ?? null;
+  const selectLayer = (id: string | null) => {
+    setSelectedId(id);
+    // Clicking the composition should always reveal the controls for the
+    // selected object, matching the direct-manipulation model users expect.
+    if (id) setTool("camada");
+  };
   const scriptText = transcript.words
     .filter((w) => !w.removed)
     .map((w) => w.word)
@@ -745,9 +776,9 @@ function EditorPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground lg:h-dvh">
       {/* HEADER */}
-      <header className="flex flex-wrap items-center gap-2 border-b border-border/60 px-2 py-2 sm:px-3">
-        <Link to="/" className="font-semibold tracking-tight">
-          VaiViral
+      <header className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-[oklch(0.16_0.018_275)] px-2 py-2 text-white shadow-lg sm:px-3">
+        <Link to="/" className="rounded-lg px-2 py-1 font-semibold tracking-tight hover:bg-white/10">
+          VaiViral <span className="text-[10px] font-normal text-white/45">EDITOR</span>
         </Link>
         <button type="button" onClick={() => history.undo()} className="rounded-md border border-border/60 px-2 py-1 text-xs">
           Desfazer
@@ -759,9 +790,9 @@ function EditorPage() {
           value={doc.title}
           onChange={(e) => patchDoc({ title: e.target.value }, "titulo")}
           aria-label="Nome do projeto"
-          className="min-w-40 rounded-md border border-border/60 bg-card/60 px-2 py-1 text-sm"
+          className="min-w-40 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-sm text-white outline-none focus:border-primary/70"
         />
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-white/55">
           {saveState === "saving" ? "Salvando..." : saveState === "dirty" ? "Alterações pendentes" : "Salvo"}
         </span>
         <MediaSourceBar
@@ -828,9 +859,9 @@ function EditorPage() {
             type="button"
             onClick={() => void renderAndPublish(true)}
             disabled={rendering}
-            className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            className="rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 px-4 py-1.5 text-sm font-semibold text-white shadow-lg shadow-fuchsia-950/30 disabled:opacity-50"
           >
-            Renderizar e publicar
+            Exportar vídeo
           </button>
           <button
             type="button"
@@ -843,7 +874,7 @@ function EditorPage() {
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[76px_320px_1fr_330px]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[78px_330px_minmax(360px,1fr)_370px]">
         {/* BARRA DE FERRAMENTAS */}
         <nav aria-label="Ferramentas do editor" className="order-2 flex min-h-0 shrink-0 flex-row gap-3 overflow-x-auto border-b border-border/60 px-2 py-2 lg:order-none lg:flex-col lg:overflow-x-visible lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-0 lg:py-3">
           {TOOL_GROUPS.map((group) => (
@@ -942,7 +973,7 @@ function EditorPage() {
               videoRef={videoRef}
               src={src}
               composition={doc.composition}
-              preedit={pre}
+              preedit={transitionPreview ?? (lookPreview ? { ...pre, ...lookPreview } : pre)}
               effects={(doc.composition.effects ?? []) as ClipEffect[]}
               clip={duration > 0 ? { start: 0, end: duration } : null}
               onTimeUpdate={setCurrentTime}
@@ -961,7 +992,7 @@ function EditorPage() {
                   canvas: { ...doc.composition.canvas, background: { kind: "color", color: "transparent" } },
                 }}
                 selectedId={selectedId}
-                onSelect={setSelectedId}
+                onSelect={selectLayer}
                 onChange={updateLayer}
                 zoom={1}
                 showSafeArea
@@ -978,15 +1009,27 @@ function EditorPage() {
             >
               {playing ? "Pausar" : "Reproduzir"}
             </button>
-            <span className="text-xs text-muted-foreground">Espaço = play/pause · Delete = excluir camada</span>
+            <span className="text-xs text-muted-foreground">Espaço = reproduzir · S = dividir na agulha · Delete = excluir</span>
           </div>
         </main>
 
         {/* PAINEL CONTEXTUAL */}
         <aside className="order-4 flex max-h-[60vh] min-h-0 flex-col overflow-hidden border-t border-border/60 p-3 lg:order-none lg:max-h-none lg:border-l lg:border-t-0">
-          <p className="mb-2 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
-            {TOOL_GROUPS.flatMap((g) => g.tools).find((t) => t.id === tool)?.label}
-          </p>
+          <div className="mb-3 flex items-center justify-between border-b border-border/60 pb-2">
+            <div>
+              <p className="font-semibold">
+                {TOOL_GROUPS.flatMap((g) => g.tools).find((t) => t.id === tool)?.label}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {selectedLayer ? `Editando: ${selectedLayer.name}` : tool === "templates" ? "Aplique um visual completo" : "Escolha uma opção"}
+              </p>
+            </div>
+            {selectedLayer && (
+              <button type="button" onClick={() => selectLayer(null)} className="rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground">
+                Concluir
+              </button>
+            )}
+          </div>
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
             {tool === "corte" && (
               <CutPanel
@@ -1028,7 +1071,17 @@ function EditorPage() {
                         patchPre({ transitions: list }, "transicao-emenda");
                       }}
                       label={`Emenda ${joinIndex + 1}`}
-                      onPreview={() => previewFrom((pre.segments[joinIndex]?.end ?? 0) - 0.15)}
+                      onPreview={(candidate) => {
+                        if (!candidate) {
+                          setTransitionPreview(null);
+                          setPlaying(false);
+                          return;
+                        }
+                        const list = [...(pre.transitions ?? [])];
+                        list[joinIndex] = candidate;
+                        setTransitionPreview({ ...pre, transitions: list });
+                        previewFrom(Math.max(0, (pre.segments[joinIndex]?.end ?? 0) - candidate.dur));
+                      }}
                     />
                   </div>
                 )}
@@ -1036,13 +1089,29 @@ function EditorPage() {
                   value={pre.transIn}
                   onChange={(t) => patchPre({ transIn: t }, "transicao-entrada")}
                   label="Entrada"
-                  onPreview={() => previewFrom(pre.segments[0]?.start ?? 0)}
+                  onPreview={(candidate) => {
+                    if (!candidate) {
+                      setTransitionPreview(null);
+                      setPlaying(false);
+                      return;
+                    }
+                    setTransitionPreview({ ...pre, transIn: candidate });
+                    previewFrom(pre.segments[0]?.start ?? 0);
+                  }}
                 />
                 <TransitionPicker
                   value={pre.transOut}
                   onChange={(t) => patchPre({ transOut: t }, "transicao-saida")}
                   label="Saída"
-                  onPreview={() => previewFrom(duration - (pre.transOut.dur || 0.5) - 0.1)}
+                  onPreview={(candidate) => {
+                    if (!candidate) {
+                      setTransitionPreview(null);
+                      setPlaying(false);
+                      return;
+                    }
+                    setTransitionPreview({ ...pre, transOut: candidate });
+                    previewFrom(Math.max(0, duration - candidate.dur - 0.1));
+                  }}
                 />
               </div>
             )}
@@ -1098,7 +1167,9 @@ function EditorPage() {
               />
             )}
             {tool === "layout" && <LayoutPanel preedit={pre} onChange={patchPre} />}
-            {tool === "ajustes" && <GradePanel preedit={pre} onChange={patchPre} />}
+            {tool === "ajustes" && (
+              <GradePanel preedit={pre} onChange={patchPre} onPreviewLook={setLookPreview} />
+            )}
             {tool === "texto" && (
               <div className="space-y-3 text-sm">
                 <p className="font-medium">Roteiro e transcrição</p>
@@ -1222,7 +1293,7 @@ function EditorPage() {
                 {templateTab === "cortes" ? (
                   <CutGallery onApply={applyCut} />
                 ) : templateTab === "prontos" ? (
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-3">
                     {READY_TEMPLATES.map((t) => (
                       <button
                         key={t.id}
@@ -1239,10 +1310,10 @@ function EditorPage() {
                           );
                           toast.success(`Template “${t.label}” aplicado.`);
                         }}
-                        className="overflow-hidden rounded-xl border border-border/60 text-left hover:border-primary/60"
+                        className="group overflow-hidden rounded-xl border border-border/60 bg-card/40 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/70 hover:shadow-lg"
                       >
                         <span
-                          className="flex h-16 items-center justify-center text-[11px] font-black uppercase"
+                          className="flex aspect-[9/12] items-end justify-center p-3 text-center text-[11px] font-black uppercase transition-transform group-hover:scale-[1.03]"
                           style={{ background: t.swatch[0], color: t.swatch[1] }}
                         >
                           {t.label}
@@ -1337,7 +1408,7 @@ function EditorPage() {
           selectedId={selectedId}
           removed={cuts}
           onSeek={seek}
-          onSelect={setSelectedId}
+          onSelect={selectLayer}
           onZoom={(z) => patchDoc({ timelineZoom: z }, "zoom")}
           onTrim={(id, startTime, endTime) => updateLayer(id, { startTime, endTime })}
           media={src ? { name: "vídeo", segments: pre.segments ?? [] } : null}

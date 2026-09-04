@@ -133,7 +133,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [dynamicMask, setDynamicMask] = useState(true);
   const [protectSubject, setProtectSubject] = useState(true);
   const [verifyPass, setVerifyPass] = useState(true);
-  const [cropClean, setCropClean] = useState(true);
+  // Recortar muda o enquadramento e não remove a legenda. Deve ser uma escolha
+  // explícita do usuário, nunca o fallback quando a detecção não encontra texto.
+  const [cropClean, setCropClean] = useState(false);
   const [enhanceOutput, setEnhanceOutput] = useState(true);
   // Turbo GPU: o vídeo é dividido em partes que rodam em paralelo na nuvem.
   const [turboGpu, setTurboGpu] = useState(false);
@@ -772,7 +774,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         const headers = await cloudAuthHeaders();
         await saveMasks({ data: { id: target.id, masks: nextMasks }, headers }).catch(() => null);
       } else if (!cropClean) {
-        throw new Error("nada detectado — marque as áreas à mão e processe");
+        throw new Error(
+          "nenhuma legenda foi detectada — ajuste o modo, marque a área manualmente ou escolha o recorte de forma explícita",
+        );
       }
 
       setPipelineStep("inpaint");

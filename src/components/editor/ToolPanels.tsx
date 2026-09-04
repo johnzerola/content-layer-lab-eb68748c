@@ -226,7 +226,15 @@ export function LayoutPanel({ preedit, onChange }: { preedit: PreEdit; onChange:
 }
 
 /** AJUSTES — estilos de edição prontos + controles finos de cor. */
-export function GradePanel({ preedit, onChange }: { preedit: PreEdit; onChange: ToolPatch }) {
+export function GradePanel({
+  preedit,
+  onChange,
+  onPreviewLook,
+}: {
+  preedit: PreEdit;
+  onChange: ToolPatch;
+  onPreviewLook?: (patch: Partial<PreEdit> | null) => void;
+}) {
   return (
     <div className="space-y-3 text-sm">
       <p className="font-mono text-[11px] uppercase text-muted-foreground">Estilos de edição</p>
@@ -235,7 +243,14 @@ export function GradePanel({ preedit, onChange }: { preedit: PreEdit; onChange: 
           <button
             key={l.id}
             type="button"
-            onClick={() => onChange({ ...applyLook(l.id), look: l.id }, "look")}
+            onPointerEnter={() => onPreviewLook?.(applyLook(l.id))}
+            onPointerLeave={() => onPreviewLook?.(null)}
+            onFocus={() => onPreviewLook?.(applyLook(l.id))}
+            onBlur={() => onPreviewLook?.(null)}
+            onClick={() => {
+              onPreviewLook?.(null);
+              onChange({ ...applyLook(l.id), look: l.id }, "look");
+            }}
             title={l.hint}
             className={`overflow-hidden rounded-lg border text-left ${
               preedit.look === l.id ? "border-primary" : "border-border/60"

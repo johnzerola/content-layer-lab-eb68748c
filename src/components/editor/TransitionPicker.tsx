@@ -42,7 +42,7 @@ interface Props {
   /** aplica esta transição em todos os cortes */
   onApplyAll?: (() => void) | undefined;
   /** reproduz a transição no palco/canvas de prévia */
-  onPreview?: (() => void) | undefined;
+  onPreview?: ((transition?: Transition) => void) | undefined;
 }
 
 /** Galeria de transições prontas com duração ajustável e prévia. */
@@ -79,6 +79,10 @@ export function TransitionPicker({ value, onChange, label, onApplyAll, onPreview
             <button
               key={tr.id}
               type="button"
+              onPointerEnter={() => onPreview?.({ ...value, kind: tr.id as TransitionKind })}
+              onPointerLeave={() => onPreview?.()}
+              onFocus={() => onPreview?.({ ...value, kind: tr.id as TransitionKind })}
+              onBlur={() => onPreview?.()}
               onClick={() => onChange({ ...value, kind: tr.id as TransitionKind })}
               aria-pressed={active}
               title={`Transição ${tr.label} — passe o mouse para ver a prévia`}
@@ -151,7 +155,7 @@ export function TransitionPicker({ value, onChange, label, onApplyAll, onPreview
             {onPreview && (
               <button
                 type="button"
-                onClick={onPreview}
+                onClick={() => onPreview(value)}
                 className="rounded-md border border-primary/50 px-2 py-1 font-mono text-[10px] text-primary transition hover:bg-primary/10"
               >
                 Prévia

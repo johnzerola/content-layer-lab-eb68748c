@@ -1,5 +1,6 @@
 /** Galeria de estilos de legenda com preview real e ajustes finos. */
 import { useMemo, useState } from "react";
+import { Check, Search } from "lucide-react";
 import {
   CAPTION_ANIMATIONS,
   CAPTION_CATEGORIES,
@@ -54,57 +55,87 @@ function PreviewLine({ style, animation }: { style: CaptionLayerStyle; animation
 }
 
 export function CaptionStylePanel({ presetId, style, onApplyPreset, onStyleChange }: Props) {
-  const [category, setCategory] = useState<CaptionCategory>("todos");
+  const [category, setCategory] = useState<CaptionCategory>("populares");
   const [query, setQuery] = useState("");
   const presets = useMemo(() => filterCaptionPresets(category, query), [category, query]);
   const current = findCaptionPreset(presetId);
   const [animation, setAnimation] = useState<CaptionAnimation>(current.animation);
 
   return (
-    <div className="flex h-full flex-col gap-3 overflow-hidden">
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Buscar estilo..."
-        aria-label="Buscar estilo de legenda"
-        className="rounded-lg border border-border/60 bg-card/60 px-2 py-1.5 text-sm"
-      />
-      <div className="flex flex-wrap gap-1">
-        {CAPTION_CATEGORIES.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            onClick={() => setCategory(c.id)}
-            className={`rounded-full border px-2.5 py-1 text-xs ${
-              category === c.id ? "border-primary bg-primary/20" : "border-border/60"
-            }`}
-          >
-            {c.label}
-          </button>
-        ))}
+    <div className="flex h-full flex-col gap-2 overflow-hidden">
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar estilos de legenda"
+          aria-label="Buscar estilo de legenda"
+          className="h-10 w-full rounded-xl border border-border/60 bg-card/60 pl-9 pr-3 text-sm outline-none transition focus:border-primary/70 focus:ring-2 focus:ring-primary/15"
+        />
       </div>
+      <label className="space-y-1">
+        <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Categorias</span>
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value as CaptionCategory)}
+          aria-label="Categoria dos estilos"
+          className="h-10 w-full rounded-xl border border-border/60 bg-card/60 px-3 text-xs font-semibold outline-none transition focus:border-primary/70"
+        >
+          {CAPTION_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+        </select>
+      </label>
 
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+      <div className="flex items-center justify-between px-0.5 text-[10px] text-muted-foreground">
+        <span>{presets.length} estilos</span>
+        <span>Clique para aplicar</span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="grid grid-cols-1 gap-2.5">
         {presets.map((p) => (
           <button
             key={p.id}
             type="button"
-            onClick={() => onApplyPreset(p)}
-            className={`w-full rounded-xl border bg-black/40 p-2 text-left transition-colors ${
-              p.id === presetId ? "border-primary" : "border-border/50 hover:border-primary/50"
+            onClick={() => {
+              setAnimation(p.animation);
+              onApplyPreset(p);
+            }}
+            aria-pressed={p.id === presetId}
+            className={`group relative min-w-0 overflow-hidden rounded-2xl border bg-card/40 p-2 text-left transition duration-200 ${
+              p.id === presetId ? "border-primary ring-2 ring-primary/20" : "border-border/60 hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-xl"
             }`}
           >
-            <PreviewLine style={p.style} animation={p.animation} />
-            <div className="mt-1 flex items-baseline justify-between gap-2">
-              <span className="text-sm font-medium">{p.name}</span>
-              <span className="text-[11px] text-muted-foreground">{p.animation}</span>
+            {p.id === presetId && (
+              <span className="absolute right-2 top-2 z-10 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground shadow">
+                <Check className="size-3" />
+              </span>
+            )}
+            <div className="overflow-hidden rounded-xl bg-gradient-to-br from-slate-700 via-slate-800 to-slate-950 py-5 transition group-hover:brightness-110">
+              <PreviewLine style={p.style} animation={p.animation} />
             </div>
-            <p className="text-[11px] text-muted-foreground">{p.description}</p>
+            <div className="flex items-start justify-between gap-3 px-1 pb-1 pt-2.5">
+              <span className="min-w-0">
+                <span className="block truncate text-xs font-semibold">{p.name}</span>
+                <span className="mt-0.5 block line-clamp-1 text-[10px] text-muted-foreground">{p.description}</span>
+              </span>
+              <span className="shrink-0 rounded-md bg-background/70 px-1.5 py-1 font-mono text-[8px] uppercase text-muted-foreground">{p.animation}</span>
+            </div>
           </button>
         ))}
+        </div>
+        {!presets.length && (
+          <div className="grid min-h-40 place-items-center rounded-xl border border-dashed border-border/60 text-xs text-muted-foreground">
+            Nenhum estilo encontrado.
+          </div>
+        )}
       </div>
 
-      <div className="space-y-2 rounded-xl border border-border/50 bg-card/40 p-3 text-xs">
+      <details className="group shrink-0 rounded-xl border border-border/50 bg-card/50 text-xs">
+        <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 font-medium">
+          <span>Personalizar estilo</span>
+          <span className="text-[10px] text-muted-foreground group-open:hidden">Abrir ajustes</span>
+          <span className="hidden text-[10px] text-muted-foreground group-open:inline">Fechar</span>
+        </summary>
+        <div className="max-h-64 space-y-2 overflow-y-auto border-t border-border/50 p-3">
         <p className="font-medium">Ajustes de “{current.name}”</p>
         <label className="flex items-center justify-between gap-2">
           Animação
@@ -194,7 +225,8 @@ export function CaptionStylePanel({ presetId, style, onApplyPreset, onStyleChang
             <option value="karaoke">Karaokê</option>
           </select>
         </label>
-      </div>
+        </div>
+      </details>
     </div>
   );
 }

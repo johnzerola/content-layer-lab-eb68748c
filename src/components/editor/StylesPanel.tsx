@@ -88,7 +88,7 @@ export function StylesPanel({
   onApplySaved,
 }: Props) {
   const [section, setSection] = useState<"templates" | "meus" | "estilos" | "cores" | "tipografia" | "efeitos">(
-    "templates",
+    "estilos",
   );
   const [appliedId, setAppliedId] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedStylePreset[]>([]);
@@ -114,15 +114,15 @@ export function StylesPanel({
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-hidden">
-      <div className="flex rounded-lg border border-border/60 p-0.5 text-[11px]">
+      <div className="flex shrink-0 gap-1 overflow-x-auto rounded-lg border border-border/60 p-1 text-[11px] [scrollbar-width:none]">
         {(["templates", "meus", "estilos", "cores", "tipografia", "efeitos"] as const).map((s) => (
           <button
             key={s}
             type="button"
             onClick={() => setSection(s)}
-            className={`flex-1 rounded-md px-1.5 py-1 capitalize ${section === s ? "bg-primary/20" : "text-muted-foreground"}`}
+            className={`shrink-0 rounded-md px-2.5 py-1.5 capitalize transition ${section === s ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-card/70 hover:text-foreground"}`}
           >
-            {s}
+            {s === "estilos" ? "Legendas" : s}
           </button>
         ))}
       </div>
