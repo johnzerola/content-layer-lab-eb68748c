@@ -133,7 +133,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [dynamicMask, setDynamicMask] = useState(true);
   const [protectSubject, setProtectSubject] = useState(true);
   const [verifyPass, setVerifyPass] = useState(true);
-  const [cropClean, setCropClean] = useState(true);
+  // Recorte é último recurso: por padrão o motor reconstrói o fundo em vez de cortar.
+  const [cropClean, setCropClean] = useState(false);
   const [enhanceOutput, setEnhanceOutput] = useState(true);
   // Turbo GPU: o vídeo é dividido em partes que rodam em paralelo na nuvem.
   const [turboGpu, setTurboGpu] = useState(false);
