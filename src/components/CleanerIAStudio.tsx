@@ -1349,13 +1349,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           ) : (
             <>
               <div className="flex flex-wrap gap-1.5">
-                {(
-                  [
-                    ["Só legendas", (m: CleanerRegion) => /texto|legenda|caption/i.test(m.label || m.role || "")],
-                    ["Só marca d'água", (m: CleanerRegion) => /marca|watermark|logo/i.test(m.label || m.role || "")],
-                    ["Só as minhas", (m: CleanerRegion) => /manual|polígono|pincel|protegida/i.test(m.label || "")],
-                  ] as [string, (m: CleanerRegion) => boolean][]
-                ).map(([label, keep]) => (
+                {Object.keys(MASK_FILTERS).map((label) => (
                   <button
                     key={label}
                     type="button"
