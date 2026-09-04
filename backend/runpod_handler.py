@@ -86,14 +86,24 @@ def _upload(url: str, path: Path) -> None:
     response.raise_for_status()
 
 
+WORKER_VERSION = "v3"
+
+
 def handler(event: dict) -> dict:
     payload = (event or {}).get("input") or {}
     started = time.monotonic()
     index = int(payload.get("chunk_index", 0))
+    if str(payload.get("action") or "") == "health":
+        return {
+            "ok": True,
+            "worker_version": WORKER_VERSION,
+            "gpu_vram_gb": _gpu_vram_gb(),
+        }
     source_url = str(payload.get("source_url") or "")
     source_is_chunk = payload.get("source_is_chunk") is True
     if not source_url:
         return {"ok": False, "chunk_index": index, "error": "source_url ausente"}
+
 
     preset = str(payload.get("preset", "quality"))
     if preset == "max":

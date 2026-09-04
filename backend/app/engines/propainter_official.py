@@ -97,9 +97,12 @@ def _propainter_cuda_available() -> bool:
         return cuda_available()
 
 
-def _processing_size(width: int, height: int, preset: str) -> Tuple[int, int]:
+def _processing_size(
+    width: int, height: int, preset: str, scale_factor: float = 1.0
+) -> Tuple[int, int]:
     default_side = 1280 if preset == "max" else 960
     max_side = max(320, int(os.getenv("PROPAINTER_MAX_SIDE", str(default_side))))
+    max_side = max(320, int(max_side * max(0.2, min(1.0, scale_factor))))
     scale = min(1.0, max_side / float(max(width, height)))
     out_w = max(8, int(width * scale) // 8 * 8)
     out_h = max(8, int(height * scale) // 8 * 8)
@@ -114,9 +117,11 @@ def build_propainter_command(
     height: int,
     fps: float,
     preset: str,
+    scale_factor: float = 1.0,
 ) -> List[str]:
     root = propainter_root()
-    proc_w, proc_h = _processing_size(width, height, preset)
+    proc_w, proc_h = _processing_size(width, height, preset, scale_factor)
+    tight = scale_factor < 1.0
     command = [
         os.getenv("PROPAINTER_PYTHON", sys.executable),
         str(root / "inference_propainter.py"),
@@ -126,14 +131,15 @@ def build_propainter_command(
         "--width", str(proc_w),
         "--height", str(proc_h),
         "--save_fps", str(max(1, round(fps))),
-        "--subvideo_length", "80" if preset == "max" else "64",
-        "--neighbor_length", "12" if preset == "max" else "10",
-        "--ref_stride", "5" if preset == "max" else "10",
+        "--subvideo_length", "40" if tight else ("80" if preset == "max" else "64"),
+        "--neighbor_length", "8" if tight else ("12" if preset == "max" else "10"),
+        "--ref_stride", "10" if tight else ("5" if preset == "max" else "10"),
         "--mask_dilation", "2" if preset == "max" else "1",
     ]
     if _propainter_cuda_available() and os.getenv("PROPAINTER_FP16", "1") == "1":
         command.append("--fp16")
     return command
+
 
 
 def run_propainter(
@@ -155,17 +161,11 @@ def run_propainter(
 
     root = Path(status.root)
     target = Path(output_dir)
-    if target.exists():
-        shutil.rmtree(target)
-    target.mkdir(parents=True, exist_ok=True)
-    log_path = target / "propainter.log"
-    command = build_propainter_command(
-        input_video, mask_dir, output_dir, width, height, fps, preset
-    )
     env = os.environ.copy()
     env["PYTHONPATH"] = os.pathsep.join(
         part for part in (str(root), env.get("PYTHONPATH", "")) if part
     )
+    env.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
     weights_dir = Path(os.getenv("PROPAINTER_WEIGHTS_DIR", str(root / "weights"))).resolve()
 
     # Upstream resolves weights relative to its own root. A custom mounted
@@ -182,40 +182,65 @@ def run_propainter(
                 except OSError:
                     shutil.copy2(source, destination)
 
-    if on_stage:
-        on_stage(f"ProPainter oficial {command[command.index('--width') + 1]}x{command[command.index('--height') + 1]}")
     timeout = max(300, int(os.getenv("PROPAINTER_TIMEOUT_SECONDS", "10800")))
-    with log_path.open("w", encoding="utf-8") as log:
-        process = subprocess.Popen(
-            command,
-            cwd=root,
-            env=env,
-            stdout=log,
-            stderr=subprocess.STDOUT,
+    # RAFT (cálculo de fluxo) escala com a área do quadro: em vertical HD ele
+    # estoura a VRAM. Ao detectar falta de memória, reduz a resolução de
+    # processamento e a janela temporal, em vez de falhar o chunk inteiro.
+    scales = [1.0, 0.72, 0.55, 0.42]
+    last_error = ""
+    for attempt, scale_factor in enumerate(scales):
+        if target.exists():
+            shutil.rmtree(target)
+        target.mkdir(parents=True, exist_ok=True)
+        log_path = target / "propainter.log"
+        command = build_propainter_command(
+            input_video, mask_dir, output_dir, width, height, fps, preset, scale_factor
         )
-        deadline = time.monotonic() + timeout
-        while process.poll() is None:
-            if cancel_file and Path(cancel_file).exists():
-                process.terminate()
-                try:
-                    process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
+        if on_stage:
+            size = f"{command[command.index('--width') + 1]}x{command[command.index('--height') + 1]}"
+            on_stage(f"ProPainter oficial {size}" + (" (memória reduzida)" if attempt else ""))
+        with log_path.open("w", encoding="utf-8") as log:
+            process = subprocess.Popen(
+                command,
+                cwd=root,
+                env=env,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+            )
+            deadline = time.monotonic() + timeout
+            while process.poll() is None:
+                if cancel_file and Path(cancel_file).exists():
+                    process.terminate()
+                    try:
+                        process.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                    raise RuntimeError("job cancelado")
+                if time.monotonic() >= deadline:
                     process.kill()
-                raise RuntimeError("job cancelado")
-            if time.monotonic() >= deadline:
-                process.kill()
-                raise TimeoutError("ProPainter excedeu o tempo limite")
-            time.sleep(1)
-        returncode = process.returncode
-    if returncode != 0:
+                    raise TimeoutError("ProPainter excedeu o tempo limite")
+                time.sleep(1)
+            returncode = process.returncode
+
+        if returncode == 0:
+            candidates = sorted(target.rglob("inpaint_out.mp4"))
+            if not candidates:
+                raise RuntimeError(
+                    f"ProPainter concluiu sem gerar inpaint_out.mp4; log: {log_path}"
+                )
+            return str(candidates[0])
+
         tail = ""
         try:
-            tail = "\n".join(log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-20:])
+            tail = "\n".join(
+                log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-20:]
+            )
         except OSError:
             pass
-        raise RuntimeError(f"ProPainter falhou (codigo {returncode}).\n{tail}")
+        last_error = f"ProPainter falhou (codigo {returncode}).\n{tail}"
+        out_of_memory = "OutOfMemoryError" in tail or "out of memory" in tail.lower()
+        if not out_of_memory or attempt == len(scales) - 1:
+            raise RuntimeError(last_error)
 
-    candidates = sorted(target.rglob("inpaint_out.mp4"))
-    if not candidates:
-        raise RuntimeError(f"ProPainter concluiu sem gerar inpaint_out.mp4; log: {log_path}")
-    return str(candidates[0])
+    raise RuntimeError(last_error or "ProPainter falhou")
+
