@@ -579,7 +579,27 @@ def clean_video(
                 )
             cleaned = restored
 
-
+            # Pós-passe de harmonização: casa grão, cor e nitidez da área
+            # reconstruída com o fundo ao redor. Só entra se não piorar o score.
+            if opts.harmonize:
+                started = time.perf_counter()
+                harmonized, h_stats = harmonize_sequence(
+                    cleaned, masks, grain=opts.harmonize_grain
+                )
+                timer.add("harmonize_ms", started)
+                if h_stats.applied:
+                    started = time.perf_counter()
+                    h_report = quality_score(list(harmonized), masks)
+                    timer.add("quality_ms", started)
+                    if h_report.score >= report.score - 0.5:
+                        cleaned = harmonized
+                        report = h_report
+                        for key, value in h_stats.as_dict().items():
+                            plate_totals[key] = plate_totals.get(key, 0) + value
+                    else:
+                        plate_totals["harmonize_rejected"] = (
+                            plate_totals.get("harmonize_rejected", 0) + 1
+                        )
 
             started = time.perf_counter()
             for i in range(lead, lead + body):
