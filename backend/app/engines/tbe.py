@@ -146,13 +146,18 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
 
     name = "tbe"
 
-    def __init__(self, max_samples: int = _MAX_SAMPLES, feather: int = 3):
+    def __init__(self, max_samples: int = _MAX_SAMPLES, feather: int = 3, flow_refine: bool = False):
         self.max_samples = max(4, max_samples)
         self.feather = feather
+        # Correção residual por fluxo óptico depois do alinhamento global.
+        # Custa ~1 Farneback de baixa resolução por amostra e é o que permite
+        # usar janelas longas (48-64 frames) sem que a mediana borre.
+        self.flow_refine = flow_refine
         # Windows of a static shot repeat the same hole: caching the exemplar
         # plate keeps the expensive block matching out of the per-window budget.
         self._plate_cache: Optional[tuple] = None
         self._alpha_cache: Optional[tuple] = None
+
 
     def _alpha_for(self, mask: np.ndarray) -> np.ndarray:
         key = (mask.shape, int(mask.sum()), bytes(mask[::16, ::16].tobytes()))
