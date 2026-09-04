@@ -143,17 +143,23 @@ export async function purgeChunkArtifacts(jobId: string): Promise<number> {
     .from("cleaner_chunks")
     .select("output_url")
     .eq("job_id", jobId);
-  const paths = ((data ?? []) as { output_url: string | null }[])
-    .map((row) => row.output_url ?? "")
-    .filter(Boolean);
-  if (!paths.length) return 0;
-  await db.storage.from(BUCKET).remove(paths);
+  const paths = new Set(
+    ((data ?? []) as { output_url: string | null }[])
+      .map((row) => row.output_url ?? "")
+      .filter(Boolean),
+  );
+  // Tentativas anteriores também deixam arquivos: varre a pasta do job.
+  const { data: files } = await db.storage.from(BUCKET).list(jobId, { limit: 1000 });
+  for (const file of files ?? []) paths.add(`${jobId}/${file.name}`);
+  if (!paths.size) return 0;
+  await db.storage.from(BUCKET).remove([...paths]);
   await db
     .from("cleaner_chunks")
     .update({ output_url: null } as never)
     .eq("job_id", jobId);
-  return paths.length;
+  return paths.size;
 }
+
 
 async function pauseJob(jobId: string, reason: string, message: string) {
   const db = await admin();
