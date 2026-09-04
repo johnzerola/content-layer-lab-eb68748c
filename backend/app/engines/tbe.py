@@ -133,11 +133,25 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
                     out = plate.copy()
                     out[y0:y1, x0:x1] = cached[2]
                     return out
-        filled_crop = patch_fill(crop, hole, patch=21, search=72)
+        filled_crop = self._fill_crop(crop, hole)
         self._plate_cache = (signature, crop.copy(), filled_crop.copy())
         out = plate.copy()
         out[y0:y1, x0:x1] = filled_crop
         return out
+
+    @staticmethod
+    def _fill_crop(crop: np.ndarray, hole: np.ndarray) -> np.ndarray:
+        """Smooth backgrounds get edge propagation; textured ones get exemplars."""
+        ring = cv2.subtract(
+            cv2.dilate(hole, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (17, 17))), hole
+        )
+        if ring.max() > 0:
+            samples = crop[ring > 0].astype(np.float32)
+            if samples.size and float(samples.reshape(-1, 3).std(axis=0).max()) < 10.0:
+                # flat / softly graded plate: Telea rebuilds it exactly, no smear
+                return cv2.inpaint(crop, hole, 5, cv2.INPAINT_TELEA)
+        return patch_fill(crop, hole, patch=21, search=72)
+
 
 
     def process(self, frames: np.ndarray, masks: np.ndarray) -> np.ndarray:
