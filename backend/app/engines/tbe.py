@@ -243,6 +243,7 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
         if reference not in sample_indices:
             sample_indices.append(reference)
 
+        ref_full_mask = masks[reference]
         transforms: dict[int, np.ndarray] = {reference: np.eye(2, 3, dtype=np.float32)}
         stack: List[np.ndarray] = []
         valid_stack: List[np.ndarray] = []
@@ -267,9 +268,16 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
                 np.full((height, width), 255, np.uint8), matrix, (width, height),
                 flags=cv2.INTER_NEAREST, borderMode=cv2.BORDER_CONSTANT, borderValue=0,
             )
+            if self.flow_refine and index != reference:
+                refined = _refine_flow(
+                    warped, warped_mask, frames[reference], ref_full_mask, scale
+                )
+                if refined is not None:
+                    warped, warped_mask = refined
             usable = cv2.bitwise_and(cv2.bitwise_not(warped_mask), covered)
             stack.append(warped)
             valid_stack.append(usable)
+
 
         plate, plate_valid = self._median_plate(stack, valid_stack)
         del stack, valid_stack
