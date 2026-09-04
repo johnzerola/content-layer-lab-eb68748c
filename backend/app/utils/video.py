@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 from dataclasses import dataclass
 from typing import Iterator, List
@@ -90,8 +91,14 @@ class RawWriter:
 def mux_audio(video_only: str, original: str, output: str, has_audio: bool) -> None:
     """Remonta o vídeo processado com o áudio original intacto."""
     if not has_audio:
-        os.replace(video_only, output)
+        try:
+            os.replace(video_only, output)
+        except OSError:
+            # workdir e saída em discos diferentes (tmpfs x volume): copia.
+            shutil.copyfile(video_only, output)
+            os.remove(video_only)
         return
+
     subprocess.run(
         ["ffmpeg", "-y", "-loglevel", "error",
          "-i", video_only, "-i", original,

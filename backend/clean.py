@@ -137,6 +137,8 @@ def main() -> int:
                         help="área intocável: [rect|ellipse,]x,y,w,h[,inicio_s,fim_s] (repetível)")
     parser.add_argument("--protect-person", action="store_true",
                         help="protege automaticamente rosto/pessoa detectados")
+    parser.add_argument("--flow", action="store_true",
+                        help="correção residual por fluxo óptico no TBE (fundo com parallax)")
     parser.add_argument("--protect-feather", type=int, default=9, help="suavidade da borda protegida")
     parser.add_argument("--workdir", help="pasta de cache (proxy, OCR, cenas)")
     parser.add_argument("--json", action="store_true", help="imprimir relatório em JSON")
@@ -205,6 +207,7 @@ def main() -> int:
         protect_regions=list(args.protect),
         protect_person=bool(args.protect_person),
         protect_feather_px=args.protect_feather,
+        flow_refine=bool(args.flow),
         workdir=args.workdir,
         keep_workdir=True,
     )
