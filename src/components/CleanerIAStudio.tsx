@@ -495,11 +495,11 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     }
   };
 
-  const startUpload = async () => {
+  const startUpload = async (): Promise<CleanerJob | null> => {
 
     if (!health?.online) {
       toast.error("Motor de IA offline — configure o processamento local.");
-      return;
+      return null;
     }
     setUploading(true);
     setInputReady(false);
