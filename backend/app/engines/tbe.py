@@ -142,15 +142,24 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
     @staticmethod
     def _fill_crop(crop: np.ndarray, hole: np.ndarray) -> np.ndarray:
         """Smooth backgrounds get edge propagation; textured ones get exemplars."""
-        ring = cv2.subtract(
-            cv2.dilate(hole, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (17, 17))), hole
-        )
-        if ring.max() > 0:
-            samples = crop[ring > 0].astype(np.float32)
-            if samples.size and float(samples.reshape(-1, 3).std(axis=0).max()) < 10.0:
+        out = crop.copy()
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (17, 17))
+        count, labels = cv2.connectedComponents((hole > 0).astype(np.uint8))
+        exemplar_hole = np.zeros_like(hole)
+        for label in range(1, count):
+            part = (labels == label).astype(np.uint8) * 255
+            ring = cv2.subtract(cv2.dilate(part, kernel), part)
+            samples = crop[ring > 0].astype(np.float32).reshape(-1, 3)
+            if samples.size and float(samples.std(axis=0).max()) < 12.0:
                 # flat / softly graded plate: Telea rebuilds it exactly, no smear
-                return cv2.inpaint(crop, hole, 5, cv2.INPAINT_TELEA)
-        return patch_fill(crop, hole, patch=21, search=72)
+                patched = cv2.inpaint(out, part, 5, cv2.INPAINT_TELEA)
+                out[part > 0] = patched[part > 0]
+            else:
+                exemplar_hole = cv2.bitwise_or(exemplar_hole, part)
+        if exemplar_hole.max() > 0:
+            out = patch_fill(out, exemplar_hole, patch=21, search=72)
+        return out
+
 
 
 
