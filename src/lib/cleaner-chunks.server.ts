@@ -411,8 +411,10 @@ export async function cancelCleanerChunks(jobId: string): Promise<void> {
   }
   await db
     .from("cleaner_chunks")
-    .update({ status: "cancelled" } as never)
+    .update({ status: "cancelled", finished_at: new Date().toISOString() } as never)
     .eq("job_id", jobId)
     .in("status", ["pending", "running"]);
+  // Cancelamento nunca monta vídeo: os temporários saem imediatamente.
+  await purgeChunkArtifacts(jobId).catch(() => null);
   await db.from("cleaner_jobs").update({ lease_until: null } as never).eq("id", jobId);
 }
