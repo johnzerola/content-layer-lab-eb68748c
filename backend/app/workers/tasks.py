@@ -39,6 +39,7 @@ from ..engines.propainter_official import (
     run_propainter,
 )
 from ..services import mask as mask_svc
+from ..services import mask_modes
 from ..services import protect as protect_svc
 from ..services import tracking
 from ..services import verify
