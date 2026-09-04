@@ -51,6 +51,7 @@ def environment() -> dict:
         "gpu": None,
         "vram_mb": None,
         "lama": None,
+        "sam2": None,
     }
     ffmpeg = shutil.which("ffmpeg")
     if ffmpeg:
@@ -78,6 +79,12 @@ def environment() -> dict:
     except Exception:
         pass
     try:
+        from app.providers.sam2_provider import Sam2Provider
+
+        info["sam2"] = Sam2Provider().status()
+    except Exception:
+        pass
+    try:
         import torch  # noqa: WPS433
 
         info["torch"] = torch.__version__
@@ -100,6 +107,9 @@ def _print_env(info: dict) -> None:
     print(f"  OCR         : {'ok' if ocr.get('ready') else 'AUSENTE'} ({ocr.get('engine', '-')})")
     lama = info.get("lama") or {}
     print(f"  LaMa (ONNX) : {'ok' if lama.get('ready') else 'não configurado (CLEANER_LAMA_ONNX)'}")
+    sam2 = info.get("sam2") or {}
+    print(f"  Objetos     : {sam2.get('engine', 'indisponível')} "
+          f"({'SAM2 ONNX' if sam2.get('engine') == 'sam2-onnx' else 'fallback GrabCut — defina CLEANER_SAM2_ENCODER/DECODER'})")
     if info["cuda"]:
         print(f"  GPU         : {info['gpu']} — {info['vram_mb']} MB VRAM (CUDA ok)")
     else:
