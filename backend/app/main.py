@@ -121,7 +121,7 @@ async def security_middleware(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    if request.url.path != "/v1/health":
+    if request.url.path not in ("/v1/health", "/ping"):
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -218,6 +218,12 @@ class RenderCreateRequest(BaseModel):
     preset: dict = Field(default_factory=dict)
     callback_url: Optional[str] = Field(default=None, max_length=2048)
     items: List[RenderItemRequest] = Field(min_length=1, max_length=500)
+
+
+@app.get("/ping")
+async def ping():
+    # Health check leve para o Load Balancer do RunPod (sem carregar status de GPU).
+    return {"ok": True}
 
 
 @app.get("/v1/health")

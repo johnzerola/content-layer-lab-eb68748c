@@ -68,3 +68,23 @@ Custo estimado serverless: ~US$ 0,10–0,40 por minuto de vídeo, conforme GPU
 
 **Recomendação:** comece com o GPU Pod persistente. Quando o volume de jobs
 justificar pagamento por uso, migre para serverless com storage S3.
+
+## Opção 3 — Serverless Load Balancer (HTTP direto, implantada)
+
+Neste modo o RunPod expõe a API FastAPI do worker diretamente em
+`https://<endpoint-id>.api.runpod.ai` (sem fila `/run` + `/status`).
+
+1. Crie o endpoint em **Serverless → Deploy from a Docker image** usando a
+   imagem do `backend/Dockerfile` (API FastAPI), não o `Dockerfile.runpod`.
+2. GPU RTX 4090, min workers `0`, max conforme demanda; Network Volume com os
+   pesos em `/runpod-volume` (mesmos caminhos da Opção 2).
+3. Env vars: `CLEANER_WORKER_SECRET`, `PORT=8000` (o worker já respeita PORT).
+4. O RunPod usa `GET /ping` como health check — rota leve que não carrega
+   status de GPU (já incluída no worker).
+5. No app, configure `CLEANER_WORKER_URL` e `CLEANER_WORKER_PUBLIC_URL` com a
+   URL do endpoint. O app trata o endpoint como worker remoto normal
+   (upload → detect → process → resultado), sem precisar de `RUNPOD_*`.
+
+**Atenção:** vídeos grandes não devem atravessar o gateway do Load Balancer —
+prefira URLs assinadas de storage para entrada/saída. Nunca exponha a API key
+do RunPod no navegador.
