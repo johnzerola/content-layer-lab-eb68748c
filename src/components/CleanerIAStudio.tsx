@@ -700,11 +700,13 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       const headers = await cloudAuthHeaders();
       // Só as áreas realmente ativas vão para o motor; áreas desligadas ou de proteção
       // que cobrem uma área de remoção anulariam o inpainting.
-      const removeMasks = activeMasks.filter((m) => m.role === "remove" && m.enabled !== false);
+      // Área sem papel definido (vinda da detecção do motor) é área de remoção.
+      const removeMasks = activeMasks.filter((m) => m.role !== "protect" && m.enabled !== false);
       const bbox = maskBounds(removeMasks);
       const keepProtect = protectSubject && !bbox;
       const sendMasks = activeMasks
         .filter((m) => m.enabled !== false)
+        .map((m) => ({ ...m, role: m.role === "protect" ? ("protect" as const) : ("remove" as const) }))
         .filter((m) => m.role !== "protect" || !overlapsAny(m, removeMasks));
       // Com áreas marcadas o recorte é ignorado: reenquadrar não apaga legenda que
       // fica dentro do quadro — nesse caso o certo é reconstruir o fundo.
