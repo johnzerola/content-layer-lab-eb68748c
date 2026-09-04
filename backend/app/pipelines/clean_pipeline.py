@@ -51,11 +51,15 @@ Progress = Optional[Callable[[float, str], None]]
 _DETECT_WIDTH = 640
 
 QUALITY_PRESETS: Dict[str, dict] = {
-    # janela temporal / passes de retry / uso de LaMa
-    "fast": {"samples": 16, "key_step": 6, "retries": 0, "lama": False, "chunk": 4.0, "lama_keys": 0},
-    "high": {"samples": 28, "key_step": 4, "retries": 1, "lama": True, "chunk": 5.0, "lama_keys": 2},
-    "max": {"samples": 48, "key_step": 2, "retries": 2, "lama": True, "chunk": 6.0, "lama_keys": 4},
+    # janela temporal / correção por fluxo / passes de retry / uso de LaMa
+    # Janela longa é o remédio direto contra mancha: quanto mais frames em que
+    # aquele pixel de fundo aparece limpo, menos síntese é necessária. Só é
+    # seguro alongar com `flow`, que corrige o desalinhamento residual.
+    "fast": {"samples": 24, "flow": False, "key_step": 6, "retries": 0, "lama": False, "chunk": 4.0, "lama_keys": 0},
+    "high": {"samples": 40, "flow": True, "key_step": 4, "retries": 1, "lama": True, "chunk": 5.0, "lama_keys": 2},
+    "max": {"samples": 64, "flow": True, "key_step": 2, "retries": 2, "lama": True, "chunk": 6.0, "lama_keys": 4},
 }
+
 
 MODES = ("caption", "karaoke", "text", "logo", "object", "auto")
 
@@ -377,7 +381,10 @@ def clean_video(
     scenes = [tuple(s) for s in scenes]
     timer.add("scene_ms", started)
 
-    temporal = TemporalProvider(preset["samples"], opts.mask_feather_px)
+    temporal = TemporalProvider(
+        preset["samples"], opts.mask_feather_px, bool(preset.get("flow", False))
+    )
+
     _lama_state: Dict[str, object] = {
         "provider": LaMaProvider() if preset["lama"] and not opts.gpu else None,
         "tried": bool(preset["lama"]) or bool(opts.gpu),

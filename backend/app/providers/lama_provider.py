@@ -24,9 +24,12 @@ from . import register
 _REPO = "Carve/LaMa-ONNX"
 _FILE = "lama_fp32.onnx"
 _DEFAULT_SIDE = 512
-_CONTEXT = 1.6  # quanto de fundo limpo entra junto na janela
+_CONTEXT = 2.2   # quanto de fundo limpo entra junto na janela
+_STRIP_CONTEXT = 5.0  # altura mínima do tile em relação à faixa de legenda
+_MAX_FILL = 0.30  # fração máxima do tile que pode ser máscara
 _MAX_WINDOWS = 4  # regiões distintas por frame
 _MAX_TILES = 12    # inferências por frame; acima disso o custo em CPU explode
+
 
 
 def models_dir() -> str:
@@ -121,8 +124,7 @@ class LaMaProvider:
             filled = self._infer(crop, hole)
             if filled is None:
                 continue
-            alpha = cv2.GaussianBlur((hole > 0).astype(np.float32), (9, 9), 0)
-            alpha = np.clip(alpha * 1.35, 0.0, 1.0)[..., None]
+            alpha = _distance_alpha(hole)[..., None]
             out[y0:y1, x0:x1] = (
                 crop.astype(np.float32) * (1.0 - alpha) + filled.astype(np.float32) * alpha
             ).astype(np.uint8)
@@ -130,7 +132,13 @@ class LaMaProvider:
 
     # -------------------------------------------------------------- interno
     def _windows(self, mask: np.ndarray, width: int, height: int) -> list[tuple[int, int, int, int]]:
-        """Uma janela quadrada com contexto por região de máscara (limitadas)."""
+        """Tiles quadrados COM contexto real de fundo ao redor da máscara.
+
+        O bloco liso que o LaMa às vezes devolve vem de tile quase todo
+        mascarado: sem fundo verdadeiro dentro da janela, o modelo não tem de
+        onde tirar textura e inventa uma chapa. Por isso cada tile é dimensionado
+        para que a máscara ocupe no máximo `_MAX_FILL` da sua área.
+        """
         binary = (mask > 0).astype(np.uint8)
         count, _labels, stats, _ = cv2.connectedComponentsWithStats(binary, 8)
         boxes: list[tuple[int, int, int, int]] = []
@@ -147,21 +155,30 @@ class LaMaProvider:
         boxes.sort(key=lambda b: (b[2] - b[0]) * (b[3] - b[1]), reverse=True)
         boxes = boxes[:_MAX_WINDOWS]
 
+        limit = min(width, height)
         windows: list[tuple[int, int, int, int]] = []
         for x0, y0, x1, y1 in boxes:
             bw, bh = x1 - x0, y1 - y0
+            # 1) contexto proporcional ao lado maior da região;
             side = int(max(bw, bh) * _CONTEXT)
-            side = int(min(max(side, 128), min(width, height)))
-            # Faixas de legenda são muito mais largas que altas: uma janela
-            # quadrada só cobriria o centro, deixando blocos borrados nas pontas.
-            # Por isso a caixa é varrida por tiles quadrados sobrepostos.
-            step = max(1, int(side * 0.72))
-            xs = list(range(x0, max(x0, x1 - side) + 1, step))
-            ys = list(range(y0, max(y0, y1 - side) + 1, step))
+            # 2) faixa de legenda é larga e baixa: o tile precisa ser alto o
+            #    bastante para pegar fundo acima e abaixo dela, não só nas pontas;
+            side = max(side, int(bh * _STRIP_CONTEXT))
+            # 3) e grande o bastante para a máscara não dominar a janela.
+            hole_area = float(binary[y0:y1, x0:x1].sum())
+            if hole_area > 0:
+                side = max(side, int(np.sqrt(hole_area / _MAX_FILL)))
+            side = int(min(max(side, 160), limit))
+
+            # Varredura horizontal/vertical com sobreposição, centrando a faixa
+            # na janela para que o contexto fique dos dois lados da máscara.
+            step = max(1, int(side * 0.6))
+            xs = list(range(x0, max(x0, x1 - side) + 1, step)) or [x0]
+            ys = list(range(y0, max(y0, y1 - side) + 1, step)) or [y0]
             for oy in ys:
                 for ox in xs:
-                    wx0 = int(min(max(0, ox - (side - min(side, bw)) // 2), max(0, width - side)))
-                    wy0 = int(min(max(0, oy - (side - min(side, bh)) // 2), max(0, height - side)))
+                    wx0 = int(min(max(0, ox - max(0, side - bw) // 2), max(0, width - side)))
+                    wy0 = int(min(max(0, oy - max(0, side - bh) // 2), max(0, height - side)))
                     windows.append((wx0, wy0, min(width, wx0 + side), min(height, wy0 + side)))
         # Deduplica e limita o custo total por frame.
         unique = sorted(set(windows))
@@ -170,6 +187,7 @@ class LaMaProvider:
         # Amostra uniforme: truncar deixaria uma das pontas da faixa sem cobertura.
         idx = np.linspace(0, len(unique) - 1, _MAX_TILES).round().astype(int)
         return [unique[int(i)] for i in sorted(set(idx.tolist()))]
+
 
 
 

@@ -76,6 +76,59 @@ def _feather(mask: np.ndarray, radius: int = 3) -> np.ndarray:
     return np.clip(soft * 1.25, 0.0, 1.0)
 
 
+def _refine_flow(
+    warped: np.ndarray,
+    warped_mask: np.ndarray,
+    reference: np.ndarray,
+    ref_mask: np.ndarray,
+    scale: float,
+) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+    """Residual local warp after the global affine, via dense optical flow.
+
+    The affine only models camera motion. Parallax, zoom in depth and moving
+    background make the warped sample land a few pixels off, so the temporal
+    median mixes misaligned pixels and the plate comes out mushy — exactly the
+    stain we are fighting. A coarse Farneback field fixes that residual.
+
+    Flow is estimated on a downscaled grayscale pair with the holes filled by
+    the neighbour frame, so the mask itself never drives the field.
+    """
+    height, width = warped.shape[:2]
+    small_w = max(64, int(width * scale))
+    small_h = max(64, int(height * scale))
+    a = cv2.cvtColor(cv2.resize(reference, (small_w, small_h), interpolation=cv2.INTER_AREA),
+                     cv2.COLOR_BGR2GRAY)
+    b = cv2.cvtColor(cv2.resize(warped, (small_w, small_h), interpolation=cv2.INTER_AREA),
+                     cv2.COLOR_BGR2GRAY)
+    hole = cv2.resize(cv2.bitwise_or(warped_mask, ref_mask), (small_w, small_h),
+                      interpolation=cv2.INTER_NEAREST)
+    if hole.max() > 0:
+        # Dentro do buraco não há sinal comum: copiar um no outro zera o
+        # gradiente ali e o fluxo passa a ser guiado só pelo fundo real.
+        b = np.where(hole > 0, a, b)
+    try:
+        flow = cv2.calcOpticalFlowFarneback(a, b, None, 0.5, 2, 15, 2, 5, 1.1, 0)
+    except cv2.error:
+        return None
+    magnitude = float(np.abs(flow).max())
+    if magnitude < 0.25 or magnitude > 24.0:
+        # Nada a corrigir, ou fluxo instável (cena/objeto grande em movimento):
+        # aplicar iria colar conteúdo errado. Melhor manter o alinhamento global.
+        return None
+    flow = cv2.resize(flow, (width, height), interpolation=cv2.INTER_LINEAR)
+    flow[..., 0] *= width / float(small_w)
+    flow[..., 1] *= height / float(small_h)
+    grid_x, grid_y = np.meshgrid(np.arange(width, dtype=np.float32),
+                                 np.arange(height, dtype=np.float32))
+    map_x = grid_x + flow[..., 0]
+    map_y = grid_y + flow[..., 1]
+    remapped = cv2.remap(warped, map_x, map_y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+    remapped_mask = cv2.remap(warped_mask, map_x, map_y, cv2.INTER_NEAREST,
+                              borderMode=cv2.BORDER_CONSTANT, borderValue=255)
+    return remapped, remapped_mask
+
+
+
 def _bbox(mask: np.ndarray, margin: int = 24) -> Optional[Tuple[int, int, int, int]]:
     ys, xs = np.where(mask > 0)
     if ys.size == 0:
@@ -93,13 +146,18 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
 
     name = "tbe"
 
-    def __init__(self, max_samples: int = _MAX_SAMPLES, feather: int = 3):
+    def __init__(self, max_samples: int = _MAX_SAMPLES, feather: int = 3, flow_refine: bool = False):
         self.max_samples = max(4, max_samples)
         self.feather = feather
+        # Correção residual por fluxo óptico depois do alinhamento global.
+        # Custa ~1 Farneback de baixa resolução por amostra e é o que permite
+        # usar janelas longas (48-64 frames) sem que a mediana borre.
+        self.flow_refine = flow_refine
         # Windows of a static shot repeat the same hole: caching the exemplar
         # plate keeps the expensive block matching out of the per-window budget.
         self._plate_cache: Optional[tuple] = None
         self._alpha_cache: Optional[tuple] = None
+
 
     def _alpha_for(self, mask: np.ndarray) -> np.ndarray:
         key = (mask.shape, int(mask.sum()), bytes(mask[::16, ::16].tobytes()))
@@ -185,6 +243,7 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
         if reference not in sample_indices:
             sample_indices.append(reference)
 
+        ref_full_mask = masks[reference]
         transforms: dict[int, np.ndarray] = {reference: np.eye(2, 3, dtype=np.float32)}
         stack: List[np.ndarray] = []
         valid_stack: List[np.ndarray] = []
@@ -209,9 +268,16 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
                 np.full((height, width), 255, np.uint8), matrix, (width, height),
                 flags=cv2.INTER_NEAREST, borderMode=cv2.BORDER_CONSTANT, borderValue=0,
             )
+            if self.flow_refine and index != reference:
+                refined = _refine_flow(
+                    warped, warped_mask, frames[reference], ref_full_mask, scale
+                )
+                if refined is not None:
+                    warped, warped_mask = refined
             usable = cv2.bitwise_and(cv2.bitwise_not(warped_mask), covered)
             stack.append(warped)
             valid_stack.append(usable)
+
 
         plate, plate_valid = self._median_plate(stack, valid_stack)
         del stack, valid_stack
