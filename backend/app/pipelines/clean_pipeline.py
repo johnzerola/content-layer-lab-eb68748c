@@ -326,7 +326,35 @@ def clean_video(
     timer.add("scene_ms", started)
 
     temporal = TemporalProvider(preset["samples"], opts.mask_feather_px)
-    lama = LaMaProvider() if preset["lama"] and not opts.gpu else None
+    _lama_state: Dict[str, object] = {
+        "provider": LaMaProvider() if preset["lama"] and not opts.gpu else None,
+        "tried": bool(preset["lama"]) or bool(opts.gpu),
+        "auto_activations": 0,
+    }
+
+    def _lama_for(mask_ratio: float) -> Optional[LaMaProvider]:
+        """Resolve o provider de inpainting para este chunk.
+
+        Regra do modo AUTO: se o preset não pediu LaMa, ele ainda entra quando
+        (a) o TBE não fechou o chunk e (b) a máscara é pequena — pouca área a
+        reconstruir significa poucos tiles 512x512, custo previsível em CPU.
+        Máscara grande fica com TBE + rota GPU, porque LaMa em CPU sobre faixa
+        larga é lento e devolve bloco liso (o borrão que não queremos).
+        """
+        provider = _lama_state["provider"]
+        if provider is not None:
+            return provider  # type: ignore[return-value]
+        if opts.gpu or not opts.auto_lama or _lama_state["tried"]:
+            return None
+        if mask_ratio > opts.auto_lama_max_mask or mask_ratio < opts.auto_lama_min_mask:
+            return None
+        _lama_state["tried"] = True
+        candidate = LaMaProvider()
+        if not candidate.available():
+            return None
+        _lama_state["provider"] = candidate
+        return candidate
+
 
     total_frames = max(1, info.frames)
     chunk_size = max(8, int(round(info.fps * float(preset["chunk"]))))
