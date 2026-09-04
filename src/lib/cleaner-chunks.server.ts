@@ -210,6 +210,37 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
       const state = await chunkStatus(chunk.provider_job_id!);
       if (state.state === "queued" || state.state === "running") continue;
       if (state.state === "completed") {
+        // O provedor pode responder "pronto" sem que o arquivo tenha chegado ao storage.
+        const stored = await chunkArtifactExists(chunk.output_url);
+        if (!stored) {
+          const attempts = chunk.attempts + 1;
+          const dead = attempts >= MAX_ATTEMPTS;
+          chunk.status = dead ? "failed" : "pending";
+          chunk.attempts = attempts;
+          await db
+            .from("cleaner_chunks")
+            .update({
+              status: chunk.status,
+              attempts,
+              error: "arquivo do trecho não chegou ao armazenamento",
+              finished_at: dead ? new Date().toISOString() : null,
+            } as never)
+            .eq("id", chunk.id);
+          if (dead) {
+            await db
+              .from("cleaner_jobs")
+              .update({
+                status: "failed",
+                stage: "falha em uma parte do vídeo",
+                error: "arquivo do trecho não chegou ao armazenamento",
+                lease_until: null,
+              } as never)
+              .eq("id", jobId);
+            await purgeChunkArtifacts(jobId).catch(() => null);
+            return await summarize(jobId);
+          }
+          continue;
+        }
         const residual = state.residualText ?? 0;
         const dirty = residual > RESIDUAL_LIMIT && chunk.attempts < MAX_ATTEMPTS;
         chunk.status = dirty ? "pending" : "done";
@@ -227,6 +258,7 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
             error: dirty ? `resíduo ${residual.toFixed(3)} — reprocessando` : null,
           } as never)
           .eq("id", chunk.id);
+
       } else {
         const attempts = chunk.attempts + 1;
         const dead = attempts >= MAX_ATTEMPTS;
