@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { CopyCheck, Eraser, Plus, ScanSearch, Trash2 } from "lucide-react";
 import { CLEANUP_PRESETS, makeCleanupRegion, type CleanupRegion } from "@/lib/template";
 
@@ -135,9 +136,9 @@ export function CleanupStudio({
           Reconstrói o fundo com placa temporal: funciona bem com legenda/marca fixa. Legenda que muda
           palavra a palavra (karaokê) ou cena com muito movimento pode continuar aparecendo — nesse caso
           use o{" "}
-          <a href="/limpar-ia" className="font-bold underline">
-            CleanerIA (motor GPU)
-          </a>
+          <Link to="/limpar-ia" className="font-bold underline">
+            CleanerIA com Turbo GPU
+          </Link>
           .
         </p>
       </div>
