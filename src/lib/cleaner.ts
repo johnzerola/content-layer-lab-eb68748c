@@ -23,6 +23,8 @@ export type CleanerStatus =
   | "queued"
   | "uploaded"
   | "uploading"
+  | "proxying"
+  | "chunking"
   | "analyzing"
   | "detecting"
   | "tracking"
@@ -30,6 +32,8 @@ export type CleanerStatus =
   | "inpainting"
   | "refining"
   | "encoding"
+  | "assembling"
+  | "cleaning"
   | "completed"
   | "cancelled"
   | "failed";
@@ -37,6 +41,8 @@ export type CleanerStatus =
 export const CLEANER_STAGES: CleanerStatus[] = [
   "queued",
   "uploaded",
+  "proxying",
+  "chunking",
   "analyzing",
   "detecting",
   "tracking",
@@ -44,6 +50,8 @@ export const CLEANER_STAGES: CleanerStatus[] = [
   "inpainting",
   "refining",
   "encoding",
+  "assembling",
+  "cleaning",
   "completed",
 ];
 
@@ -51,6 +59,8 @@ export const STAGE_LABEL: Record<CleanerStatus, string> = {
   queued: "na fila",
   uploaded: "enviado",
   uploading: "enviando",
+  proxying: "gerando prévia",
+  chunking: "dividindo em partes",
   analyzing: "analisando",
   detecting: "detectando",
   tracking: "rastreando",
@@ -58,6 +68,8 @@ export const STAGE_LABEL: Record<CleanerStatus, string> = {
   inpainting: "reconstruindo",
   refining: "refinando",
   encoding: "codificando",
+  assembling: "montando o vídeo final",
+  cleaning: "limpando arquivos temporários",
   completed: "concluído",
   cancelled: "cancelado",
   failed: "falhou",

@@ -84,6 +84,11 @@ export async function planCleanerChunks(jobId: string, userId: string): Promise<
     .single();
   if (error || !job) throw new Error("Job não encontrado");
 
+  await db
+    .from("cleaner_jobs")
+    .update({ status: "chunking", stage: "dividindo o vídeo em partes" } as never)
+    .eq("id", jobId);
+
   const plan = await workerPlanChunks(jobId, {
     targetSeconds: TARGET_SECONDS,
     overlap: OVERLAP_SECONDS,
@@ -108,13 +113,35 @@ export async function planCleanerChunks(jobId: string, userId: string): Promise<
       chunks_total: rows.length,
       chunks_done: 0,
       paused_reason: null,
-      status: "processing",
+      status: "queued",
       stage: `dividido em ${rows.length} partes`,
       progress: 0.05,
       error: null,
     } as never)
     .eq("id", jobId);
   return rows.length;
+}
+
+/**
+ * Apaga os artefatos temporários de um job (chunks de saída no storage).
+ * Idempotente: pode rodar em sucesso, falha, cancelamento ou timeout.
+ */
+export async function purgeChunkArtifacts(jobId: string): Promise<number> {
+  const db = await admin();
+  const { data } = await db
+    .from("cleaner_chunks")
+    .select("output_url")
+    .eq("job_id", jobId);
+  const paths = ((data ?? []) as { output_url: string | null }[])
+    .map((row) => row.output_url ?? "")
+    .filter(Boolean);
+  if (!paths.length) return 0;
+  await db.storage.from(BUCKET).remove(paths);
+  await db
+    .from("cleaner_chunks")
+    .update({ output_url: null } as never)
+    .eq("job_id", jobId);
+  return paths.length;
 }
 
 async function pauseJob(jobId: string, reason: string, message: string) {
@@ -194,6 +221,9 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
             residual_text: residual,
             output_url: chunk.output_url,
             cost_seconds: state.seconds ?? null,
+            checksum: state.checksum ?? null,
+            bytes: state.bytes ?? null,
+            finished_at: new Date().toISOString(),
             error: dirty ? `resíduo ${residual.toFixed(3)} — reprocessando` : null,
           } as never)
           .eq("id", chunk.id);
@@ -204,7 +234,12 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
         chunk.attempts = attempts;
         await db
           .from("cleaner_chunks")
-          .update({ status: chunk.status, attempts, error: state.error ?? null } as never)
+          .update({
+            status: chunk.status,
+            attempts,
+            error: state.error ?? null,
+            finished_at: dead ? new Date().toISOString() : null,
+          } as never)
           .eq("id", chunk.id);
         if (dead) {
           await db
@@ -216,6 +251,8 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
               lease_until: null,
             } as never)
             .eq("id", jobId);
+          // Falha definitiva: nada será montado, então os temporários saem agora.
+          await purgeChunkArtifacts(jobId).catch(() => null);
           return await summarize(jobId);
         }
       }
@@ -258,6 +295,8 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
           attempts: attempt,
           provider_job_id: providerId,
           output_url: path,
+          started_at: new Date().toISOString(),
+          finished_at: null,
           lease_until: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         } as never)
         .eq("id", chunk.id);
@@ -275,7 +314,26 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
         parts.push({ index: chunk.idx, url: link.signedUrl });
       }
       const worst = done.reduce((max, c) => Math.max(max, Number(c.residual_text ?? 0)), 0);
+      await db
+        .from("cleaner_jobs")
+        .update({
+          status: "assembling",
+          stage: "montando o vídeo final na resolução original",
+          progress: 0.98,
+        } as never)
+        .eq("id", jobId);
+      // Só depois da montagem confirmada os temporários podem sair.
       await workerAssemble(jobId, parts, { residual_text: worst, chunks: parts.length });
+      await db
+        .from("cleaner_jobs")
+        .update({
+          status: "cleaning",
+          stage: "removendo arquivos temporários",
+          progress: 0.99,
+          chunks_done: done.length,
+        } as never)
+        .eq("id", jobId);
+      await purgeChunkArtifacts(jobId).catch(() => null);
       await db
         .from("cleaner_jobs")
         .update({
@@ -287,9 +345,6 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
           lease_until: null,
         } as never)
         .eq("id", jobId);
-      await db.storage
-        .from(BUCKET)
-        .remove(done.map((c) => c.output_url ?? "").filter(Boolean));
       return await summarize(jobId);
     }
 
