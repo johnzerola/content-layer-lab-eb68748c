@@ -11,12 +11,31 @@ import cv2
 import numpy as np
 
 
+_FLOW_WIDTH = 384
+
+
+def _flow(src: np.ndarray, dst: np.ndarray) -> np.ndarray:
+    """Farneback em escala reduzida: mesmo transporte, custo ~10x menor na CPU."""
+    h, w = src.shape[:2]
+    scale = min(1.0, _FLOW_WIDTH / float(w))
+    if scale < 1.0:
+        small_src = cv2.resize(src, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+        small_dst = cv2.resize(dst, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    else:
+        small_src, small_dst = src, dst
+    flow = cv2.calcOpticalFlowFarneback(small_src, small_dst, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+    if scale < 1.0:
+        flow = cv2.resize(flow, (w, h), interpolation=cv2.INTER_LINEAR) / scale
+    return flow
+
+
 def _warp(mask: np.ndarray, flow: np.ndarray) -> np.ndarray:
     h, w = mask.shape[:2]
     grid_x, grid_y = np.meshgrid(np.arange(w, dtype=np.float32), np.arange(h, dtype=np.float32))
     map_x = grid_x + flow[..., 0]
     map_y = grid_y + flow[..., 1]
     return cv2.remap(mask, map_x, map_y, cv2.INTER_NEAREST, borderMode=cv2.BORDER_CONSTANT)
+
 
 
 def propagate(
