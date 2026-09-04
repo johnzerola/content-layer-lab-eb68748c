@@ -248,8 +248,21 @@ def _window_masks(
         if keys[-1] != n - 1:
             keys.append(n - 1)
         key_masks = []
+        previous_probe = None
+        previous_mask = None
         for key in keys:
             base = base_masks[key]
+            # Uma legenda parada gera keyframes idênticos: reaproveitar a
+            # detecção evita rodar o OCR à toa e mantém a máscara estável.
+            probe_src = cv2.bitwise_and(frames[key], frames[key], mask=base)
+            probe = cv2.resize(
+                cv2.cvtColor(probe_src, cv2.COLOR_BGR2GRAY), (96, 54),
+                interpolation=cv2.INTER_AREA,
+            ).astype(np.int16)
+            if previous_mask is not None and previous_probe is not None:
+                if float(np.mean(np.abs(probe - previous_probe))) < 1.5:
+                    key_masks.append(previous_mask.copy())
+                    continue
             if mode in ("watermark", "logo"):
                 detected = frame_watermark_mask(frames[key], roi=base)
                 detected = np.maximum(detected, fixed_watermark_masks[key])
@@ -263,7 +276,10 @@ def _window_masks(
                     detected = np.maximum(
                         detected, frame_watermark_mask(frames[key], roi=base)
                     )
+            previous_probe = probe
+            previous_mask = detected
             key_masks.append(detected)
+
         masks = tracking.interpolate_keyframes(frames, keys, key_masks)
     else:
         masks = [base.copy() for base in base_masks]
