@@ -15,16 +15,18 @@ from . import register
 class TemporalProvider:
     name = "tbe"
 
-    def __init__(self, max_samples: int = 28, feather: int = 3) -> None:
+    def __init__(self, max_samples: int = 28, feather: int = 3, flow_refine: bool = False) -> None:
         self.max_samples = max_samples
         self.feather = feather
-        self._engine = TemporalBackgroundExposureEngine(max_samples, feather)
+        self.flow_refine = flow_refine
+        self._engine = TemporalBackgroundExposureEngine(max_samples, feather, flow_refine)
 
     def with_window(self, max_samples: int) -> "TemporalProvider":
         """Janela temporal adaptativa (±15 → ±30 → ±60) sem recriar cache à toa."""
         if max_samples == self.max_samples:
             return self
-        return TemporalProvider(max_samples, self.feather)
+        return TemporalProvider(max_samples, self.feather, self.flow_refine)
+
 
     def available(self) -> bool:
         return True
