@@ -122,6 +122,17 @@ export async function planCleanerChunks(jobId: string, userId: string): Promise<
   return rows.length;
 }
 
+/** Confirma que o arquivo do trecho realmente existe no armazenamento. */
+async function chunkArtifactExists(path: string | null): Promise<boolean> {
+  if (!path) return false;
+  const db = await admin();
+  const slash = path.lastIndexOf("/");
+  const folder = slash > 0 ? path.slice(0, slash) : "";
+  const name = slash > 0 ? path.slice(slash + 1) : path;
+  const { data } = await db.storage.from(BUCKET).list(folder, { search: name, limit: 100 });
+  return (data ?? []).some((item) => item.name === name);
+}
+
 /**
  * Apaga os artefatos temporários de um job (chunks de saída no storage).
  * Idempotente: pode rodar em sucesso, falha, cancelamento ou timeout.
