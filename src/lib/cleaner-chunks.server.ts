@@ -8,7 +8,7 @@
  * Todo o estado vive no banco (`cleaner_jobs`, `cleaner_chunks`), então a fila
  * sobrevive a reload da página, queda de rede e reinício do servidor.
  */
-import { workerAssemble, workerPlanChunks } from "@/lib/cleaner.server";
+import { workerAssemble, workerPlanChunks, workerStatus } from "@/lib/cleaner.server";
 import {
   GpuBlockedError,
   GpuRetryableError,
