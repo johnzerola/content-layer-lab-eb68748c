@@ -17,6 +17,7 @@ import {
   workerUploadToken,
   workerProcess,
   workerStatus,
+  workerCancel,
 } from "@/lib/cleaner.server";
 
 const configuredMaxUploadGb = Number(process.env["CLEANER_MAX_UPLOAD_GB"] ?? "2");
@@ -147,6 +148,38 @@ export const deleteCleanerJob = createServerFn({ method: "POST" })
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+/** Cancela o processamento (VPS + GPU), marca como cancelado e apaga temporários. */
+export const cancelCleanerJob = createServerFn({ method: "POST" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .validator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireOwnedJob(context.supabase, context.userId, data.id);
+
+    // 1) interrompe o worker CPU da VPS
+    await workerCancel(data.id).catch(() => null);
+    // 2) interrompe as partes em GPU e limpa artefatos das partes
+    const { cancelCleanerChunks } = await import("@/lib/cleaner-chunks.server");
+    await cancelCleanerChunks(data.id).catch(() => null);
+    // 3) remove os arquivos temporários do job na VPS
+    await workerDelete(data.id).catch(() => null);
+
+    const { data: row, error } = await context.supabase
+      .from("cleaner_jobs")
+      .update({
+        status: "cancelled",
+        stage: "cancelado pelo usuário; temporários removidos",
+        progress: 0,
+        error: null,
+        lease_until: null,
+      } as never)
+      .eq("id", data.id)
+      .eq("user_id", context.userId)
+      .select("*")
+      .single();
+    if (error) throw new Error(error.message);
+    return row as unknown as CleanerJob;
   });
 
 export const cleanupCleanerRemoteJob = createServerFn({ method: "POST" })
