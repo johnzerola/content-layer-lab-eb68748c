@@ -133,7 +133,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [dynamicMask, setDynamicMask] = useState(true);
   const [protectSubject, setProtectSubject] = useState(true);
   const [verifyPass, setVerifyPass] = useState(true);
-  const [cropClean, setCropClean] = useState(true);
+  // Recorte é último recurso: por padrão o motor reconstrói o fundo em vez de cortar.
+  const [cropClean, setCropClean] = useState(false);
   const [enhanceOutput, setEnhanceOutput] = useState(true);
   // Turbo GPU: o vídeo é dividido em partes que rodam em paralelo na nuvem.
   const [turboGpu, setTurboGpu] = useState(false);
@@ -654,7 +655,13 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       setJob((prev) => (prev ? { ...prev, status: "detecting", stage: "detectando áreas" } : prev));
       const headers = await cloudAuthHeaders();
       const res = (await detectJob({ data: { id: target.id, mode }, headers })) as CleanerJob;
-      const found = (res.detections || []) as CleanerRegion[];
+      // O motor devolve as áreas sem o papel definido; sem isso elas não contariam
+      // como área de remoção e o vídeo acabaria só reenquadrado em vez de limpo.
+      const found = ((res.detections || []) as CleanerRegion[]).map((region) => ({
+        ...region,
+        role: region.role === "protect" ? ("protect" as const) : ("remove" as const),
+        enabled: region.enabled !== false,
+      }));
       setMasks((prev) => [...prev, ...found]);
       setJob({ ...res, status: "queued" });
       toast[found.length ? "success" : "warning"](
@@ -694,11 +701,13 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       const headers = await cloudAuthHeaders();
       // Só as áreas realmente ativas vão para o motor; áreas desligadas ou de proteção
       // que cobrem uma área de remoção anulariam o inpainting.
-      const removeMasks = activeMasks.filter((m) => m.role === "remove" && m.enabled !== false);
+      // Área sem papel definido (vinda da detecção do motor) é área de remoção.
+      const removeMasks = activeMasks.filter((m) => m.role !== "protect" && m.enabled !== false);
       const bbox = maskBounds(removeMasks);
       const keepProtect = protectSubject && !bbox;
       const sendMasks = activeMasks
         .filter((m) => m.enabled !== false)
+        .map((m) => ({ ...m, role: m.role === "protect" ? ("protect" as const) : ("remove" as const) }))
         .filter((m) => m.role !== "protect" || !overlapsAny(m, removeMasks));
       // Com áreas marcadas o recorte é ignorado: reenquadrar não apaga legenda que
       // fica dentro do quadro — nesse caso o certo é reconstruir o fundo.
