@@ -24,11 +24,12 @@ from .engines.inpainting import cuda_available, device_name
 from .engines.propainter_official import propainter_status
 from .engines.tbe import tbe_status
 from .security import TokenError, validate_callback_url, validate_job_token, validate_service_token
+from .services.chunking import concat_videos, plan_chunks
 from .services.media_resolver import MediaResolveError, resolve_public_media
 from .services.text_detect import detector_status
 from .storage import cleanup_expired, directory_size, job_dir, read_state, write_state
 from .render_queue import RenderManager
-from .utils.video import probe
+from .utils.video import mux_audio, probe
 
 
 SETTINGS = get_settings()
@@ -182,6 +183,22 @@ class ProcessRequest(BaseModel):
     masks: List[dict] = Field(default_factory=list, max_length=500)
     options: dict = Field(default_factory=dict)
     callbackUrl: Optional[str] = None
+
+
+class PlanRequest(BaseModel):
+    target_seconds: float = Field(default=15.0, ge=4.0, le=120.0)
+    overlap: float = Field(default=0.5, ge=0.0, le=3.0)
+    use_scenes: bool = True
+
+
+class AssemblePart(BaseModel):
+    index: int = Field(ge=0, le=4096)
+    url: str = Field(min_length=10, max_length=4096)
+
+
+class AssembleRequest(BaseModel):
+    parts: List[AssemblePart] = Field(min_length=1, max_length=512)
+    metrics: dict = Field(default_factory=dict)
 
 
 class MediaResolveRequest(BaseModel):
