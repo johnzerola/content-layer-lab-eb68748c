@@ -27,8 +27,11 @@ import {
   createCleanerJob,
   detectCleanerJob,
   prepareCleanerUpload,
+  listCleanerChunks,
   processCleanerJob,
+  pumpCleanerGpuJob,
   refreshCleanerJob,
+  startCleanerGpuJob,
   saveCleanerMasks,
 } from "@/lib/cleaner.functions";
 import {
@@ -116,6 +119,11 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [verifyPass, setVerifyPass] = useState(true);
   const [cropClean, setCropClean] = useState(true);
   const [enhanceOutput, setEnhanceOutput] = useState(true);
+  // Turbo GPU: o vídeo é dividido em partes que rodam em paralelo na nuvem.
+  const [turboGpu, setTurboGpu] = useState(false);
+  const [chunks, setChunks] = useState<
+    { idx: number; status: string; residual_text: number | null; attempts: number }[]
+  >([]);
   const [masks, setMasks] = useState<CleanerRegion[]>([]);
   const [health, setHealth] = useState<{
     online: boolean;
@@ -167,6 +175,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const processJob = useServerFn(processCleanerJob);
   const refreshJob = useServerFn(refreshCleanerJob);
   const saveMasks = useServerFn(saveCleanerMasks);
+  const startGpu = useServerFn(startCleanerGpuJob);
+  const pumpGpu = useServerFn(pumpCleanerGpuJob);
+  const getChunks = useServerFn(listCleanerChunks);
   const cleanupRemoteJob = useServerFn(cleanupCleanerRemoteJob);
 
   const src = useMemo(() => URL.createObjectURL(item.file), [item.file]);
@@ -642,7 +653,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       // Com áreas marcadas o recorte é ignorado: reenquadrar não apaga legenda que
       // fica dentro do quadro — nesse caso o certo é reconstruir o fundo.
       const useCrop = cropClean && removeMasks.length === 0;
-      await processJob({
+      const gpuRun = turboGpu && !preview;
+      const submit = gpuRun ? startGpu : processJob;
+      await submit({
         data: {
           id: job.id,
           mode,
@@ -673,7 +686,11 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       setPolling(true);
       setJob((prev) => (prev ? { ...prev, status: "inpainting", progress: 1 } : prev));
       toast.success(
-        preview ? "Gerando prévia de 5 segundos…" : "Reconstrução iniciada no motor de IA.",
+        preview
+          ? "Gerando prévia de 5 segundos…"
+          : gpuRun
+            ? "Vídeo dividido em partes e enviado para as GPUs."
+            : "Reconstrução iniciada no motor de IA.",
       );
     } catch (e) {
       toast.error(`Erro ao iniciar: ${e instanceof Error ? e.message : "desconhecido"}`);
