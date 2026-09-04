@@ -25,7 +25,8 @@ _REPO = "Carve/LaMa-ONNX"
 _FILE = "lama_fp32.onnx"
 _DEFAULT_SIDE = 512
 _CONTEXT = 1.6  # quanto de fundo limpo entra junto na janela
-_MAX_WINDOWS = 4  # inferências por frame; acima disso o custo em CPU explode
+_MAX_WINDOWS = 4  # regiões distintas por frame
+_MAX_TILES = 8    # inferências por frame; acima disso o custo em CPU explode
 
 
 def models_dir() -> str:
