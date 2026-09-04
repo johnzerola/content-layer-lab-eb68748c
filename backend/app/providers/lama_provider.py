@@ -148,13 +148,24 @@ class LaMaProvider:
 
         windows: list[tuple[int, int, int, int]] = []
         for x0, y0, x1, y1 in boxes:
-            side = int(max(x1 - x0, y1 - y0) * _CONTEXT)
+            bw, bh = x1 - x0, y1 - y0
+            side = int(max(bw, bh) * _CONTEXT)
             side = int(min(max(side, 128), min(width, height)))
-            cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
-            wx0 = int(min(max(0, cx - side // 2), width - side))
-            wy0 = int(min(max(0, cy - side // 2), height - side))
-            windows.append((wx0, wy0, wx0 + side, wy0 + side))
-        return windows
+            # Faixas de legenda são muito mais largas que altas: uma janela
+            # quadrada só cobriria o centro, deixando blocos borrados nas pontas.
+            # Por isso a caixa é varrida por tiles quadrados sobrepostos.
+            step = max(1, int(side * 0.72))
+            xs = list(range(x0, max(x0, x1 - side) + 1, step))
+            ys = list(range(y0, max(y0, y1 - side) + 1, step))
+            for oy in ys:
+                for ox in xs:
+                    wx0 = int(min(max(0, ox - (side - min(side, bw)) // 2), max(0, width - side)))
+                    wy0 = int(min(max(0, oy - (side - min(side, bh)) // 2), max(0, height - side)))
+                    windows.append((wx0, wy0, min(width, wx0 + side), min(height, wy0 + side)))
+        # Deduplica e limita o custo total por frame.
+        unique = sorted(set(windows))
+        return unique[:_MAX_TILES]
+
 
 
     def _infer(self, crop: np.ndarray, hole: np.ndarray) -> Optional[np.ndarray]:
