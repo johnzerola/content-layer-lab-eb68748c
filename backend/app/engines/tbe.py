@@ -76,6 +76,18 @@ def _feather(mask: np.ndarray, radius: int = 3) -> np.ndarray:
     return np.clip(soft * 1.25, 0.0, 1.0)
 
 
+def _bbox(mask: np.ndarray, margin: int = 24) -> Optional[Tuple[int, int, int, int]]:
+    ys, xs = np.where(mask > 0)
+    if ys.size == 0:
+        return None
+    height, width = mask.shape[:2]
+    y0 = max(0, int(ys.min()) - margin)
+    y1 = min(height, int(ys.max()) + 1 + margin)
+    x0 = max(0, int(xs.min()) - margin)
+    x1 = min(width, int(xs.max()) + 1 + margin)
+    return y0, y1, x0, x1
+
+
 class TemporalBackgroundExposureEngine(InpaintingEngine):
     """Global-motion temporal harvesting — the CPU-efficient default."""
 
@@ -84,6 +96,77 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
     def __init__(self, max_samples: int = _MAX_SAMPLES, feather: int = 3):
         self.max_samples = max(4, max_samples)
         self.feather = feather
+        # Windows of a static shot repeat the same hole: caching the exemplar
+        # plate keeps the expensive block matching out of the per-window budget.
+        self._plate_cache: Optional[tuple] = None
+        self._alpha_cache: Optional[tuple] = None
+
+    def _alpha_for(self, mask: np.ndarray) -> np.ndarray:
+        key = (mask.shape, int(mask.sum()), bytes(mask[::16, ::16].tobytes()))
+        if self._alpha_cache and self._alpha_cache[0] == key:
+            return self._alpha_cache[1]
+        alpha = _feather(mask, self.feather)[..., None]
+        self._alpha_cache = (key, alpha)
+        return alpha
+
+    def _fill_unseen(self, plate: np.ndarray, unseen: np.ndarray) -> np.ndarray:
+        """Exemplar fill limited to the hole neighbourhood, with a shot cache."""
+        box = _bbox(unseen, margin=48)
+        if box is None:
+            return plate
+        y0, y1, x0, x1 = box
+        crop = plate[y0:y1, x0:x1]
+        hole = unseen[y0:y1, x0:x1]
+        signature = (box, int(hole.sum()))
+        cached = self._plate_cache
+        if cached and cached[0] == signature:
+            ring = hole == 0
+            if ring.any():
+                delta = float(
+                    np.mean(
+                        np.abs(
+                            crop[ring].astype(np.float32) - cached[1][ring].astype(np.float32)
+                        )
+                    )
+                )
+                if delta < 6.0:
+                    out = plate.copy()
+                    out[y0:y1, x0:x1] = cached[2]
+                    return out
+        filled_crop = self._fill_crop(crop, hole)
+        self._plate_cache = (signature, crop.copy(), filled_crop.copy())
+        out = plate.copy()
+        out[y0:y1, x0:x1] = filled_crop
+        return out
+
+    @staticmethod
+    def _fill_crop(crop: np.ndarray, hole: np.ndarray) -> np.ndarray:
+        """Smooth backgrounds get edge propagation; textured ones get exemplars."""
+        out = crop.copy()
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (17, 17))
+        count, labels = cv2.connectedComponents((hole > 0).astype(np.uint8))
+        exemplar_hole = np.zeros_like(hole)
+        for label in range(1, count):
+            part = (labels == label).astype(np.uint8) * 255
+            ys, xs = np.where(part > 0)
+            thin = int(ys.max() - ys.min()) <= 44 if ys.size else False
+            ring = cv2.subtract(cv2.dilate(part, kernel), part)
+            samples = crop[ring > 0].astype(np.float32).reshape(-1, 3)
+            flat = bool(samples.size) and float(samples.std(axis=0).max()) < 12.0
+            if flat or thin:
+                # flat plate or a thin glyph stroke: edge propagation rebuilds it
+                # cleanly, while exemplar blocks would leave visible patches.
+                patched = cv2.inpaint(out, part, 6, cv2.INPAINT_TELEA)
+                out[part > 0] = patched[part > 0]
+            else:
+                exemplar_hole = cv2.bitwise_or(exemplar_hole, part)
+
+        if exemplar_hole.max() > 0:
+            out = patch_fill(out, exemplar_hole, patch=21, search=72)
+        return out
+
+
+
 
     def process(self, frames: np.ndarray, masks: np.ndarray) -> np.ndarray:
         count = len(frames)
@@ -147,11 +230,12 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
             )
             unseen = cv2.bitwise_and(unseen, interest)
             if unseen.max() > 0:
-                plate = patch_fill(plate, unseen)
+                plate = self._fill_unseen(plate, unseen)
                 plate_valid = cv2.bitwise_or(plate_valid, unseen)
 
 
         output: List[np.ndarray] = []
+        identity = np.eye(2, 3, dtype=np.float32)
         for index in range(count):
             hole = masks[index]
             frame = frames[index]
@@ -165,23 +249,33 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
             current = frame.copy()
             remaining = hole.copy()
             if matrix is not None and plate_valid.max() > 0:
-                inverse = cv2.invertAffineTransform(matrix)
-                local_plate = cv2.warpAffine(
-                    plate, inverse, (width, height), flags=cv2.INTER_LINEAR,
-                    borderMode=cv2.BORDER_CONSTANT,
-                )
-                local_valid = cv2.warpAffine(
-                    plate_valid, inverse, (width, height), flags=cv2.INTER_NEAREST,
-                    borderMode=cv2.BORDER_CONSTANT, borderValue=0,
-                )
+                if float(np.abs(matrix - identity).max()) < 0.02:
+                    # static shot: the plate already lives in this frame's space
+                    local_plate, local_valid = plate, plate_valid
+                else:
+                    inverse = cv2.invertAffineTransform(matrix)
+                    local_plate = cv2.warpAffine(
+                        plate, inverse, (width, height), flags=cv2.INTER_LINEAR,
+                        borderMode=cv2.BORDER_CONSTANT,
+                    )
+                    local_valid = cv2.warpAffine(
+                        plate_valid, inverse, (width, height), flags=cv2.INTER_NEAREST,
+                        borderMode=cv2.BORDER_CONSTANT, borderValue=0,
+                    )
                 fillable = cv2.bitwise_and(remaining, local_valid)
                 if fillable.max() > 0:
-                    alpha = _feather(fillable, self.feather)[..., None]
-                    current = (
-                        current.astype(np.float32) * (1.0 - alpha)
-                        + local_plate.astype(np.float32) * alpha
-                    ).astype(np.uint8)
+                    box = _bbox(fillable, margin=8)
+                    if box is not None:
+                        y0, y1, x0, x1 = box
+                        alpha = self._alpha_for(fillable)[y0:y1, x0:x1]
+                        region = current[y0:y1, x0:x1].astype(np.float32)
+                        blended = (
+                            region * (1.0 - alpha)
+                            + local_plate[y0:y1, x0:x1].astype(np.float32) * alpha
+                        )
+                        current[y0:y1, x0:x1] = blended.astype(np.uint8)
                     remaining = cv2.bitwise_and(remaining, cv2.bitwise_not(fillable))
+
             leftover = int(np.count_nonzero(remaining))
             if leftover > 0:
                 original = max(1, int(np.count_nonzero(hole)))
@@ -190,7 +284,13 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
                     patched = cv2.inpaint(current, remaining, 3, cv2.INPAINT_TELEA)
                     current[remaining > 0] = patched[remaining > 0]
                 else:
-                    current = patch_fill(current, remaining)
+                    box = _bbox(remaining, margin=48)
+                    if box is not None:
+                        y0, y1, x0, x1 = box
+                        current[y0:y1, x0:x1] = self._fill_crop(
+                            current[y0:y1, x0:x1], remaining[y0:y1, x0:x1]
+                        )
+
             output.append(current)
         return np.asarray(output)
 

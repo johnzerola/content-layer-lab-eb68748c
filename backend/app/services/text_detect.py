@@ -192,7 +192,7 @@ def detect_text_boxes(frame: np.ndarray) -> List[Box]:
 
 
 
-def text_pixel_mask(frame: np.ndarray, box: Box, dilate_ratio: float = 0.18) -> np.ndarray:
+def text_pixel_mask(frame: np.ndarray, box: Box, dilate_ratio: float = 0.32) -> np.ndarray:
     """Mask glyphs, outline, shadow and glow inside a detected text box."""
     h_img, w_img = frame.shape[:2]
     x, y, w, h = box
@@ -212,8 +212,31 @@ def text_pixel_mask(frame: np.ndarray, box: Box, dilate_ratio: float = 0.18) -> 
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
     local = cv2.dilate(local, kernel)
     local = cv2.morphologyEx(local, cv2.MORPH_CLOSE, kernel)
+    # Subtitle boxes: once a line is clearly covered by glyphs, clear the whole
+    # band instead of glyph outlines — leftover strokes/shadows are worse than
+    # rebuilding a slightly larger background plate.
+    rows = np.where(local.mean(axis=1) > 20)[0]
+    if rows.size:
+        pad = max(2, int(round(h * 0.12)))
+        top = max(0, int(rows.min()) - pad)
+        bottom = min(h, int(rows.max()) + 1 + pad)
+        local[top:bottom, :] = 255
     mask[y:y + h, x:x + w] = local
+
     return mask
+
+
+def _roi_bbox(roi: np.ndarray, margin: int = 24):
+    ys, xs = np.where(roi > 0)
+    if ys.size == 0:
+        return None
+    h_img, w_img = roi.shape[:2]
+    return (
+        max(0, int(ys.min()) - margin),
+        min(h_img, int(ys.max()) + 1 + margin),
+        max(0, int(xs.min()) - margin),
+        min(w_img, int(xs.max()) + 1 + margin),
+    )
 
 
 def frame_text_mask(
@@ -223,15 +246,31 @@ def frame_text_mask(
 ) -> np.ndarray:
     h_img, w_img = frame.shape[:2]
     out = np.zeros((h_img, w_img), np.uint8)
-    for box in detect_text_boxes(frame):
+    # Detecting inside the ROI crop instead of the whole frame keeps CPU OCR
+    # roughly an order of magnitude cheaper without changing the result.
+    box_area = _roi_bbox(roi) if roi is not None else None
+    if box_area is not None:
+        y0, y1, x0, x1 = box_area
+        search = frame[y0:y1, x0:x1]
+    else:
+        y0, x0 = 0, 0
+        search = frame
+    if search.size == 0:
+        return out
+    for box in detect_text_boxes(search):
         x, y, w, h = box
-        if subtitle_only and (y + h / 2) < h_img * 0.42:
+        abs_x, abs_y = x + x0, y + y0
+        if subtitle_only and (abs_y + h / 2) < h_img * 0.42:
             continue
         if roi is not None:
-            sub = roi[max(0, y):y + h, max(0, x):x + w]
+            sub = roi[max(0, abs_y):abs_y + h, max(0, abs_x):abs_x + w]
             if sub.size == 0 or (sub > 0).mean() < 0.15:
                 continue
-        out = np.maximum(out, text_pixel_mask(frame, box))
+        local = text_pixel_mask(search, box)
+        out[y0:y0 + local.shape[0], x0:x0 + local.shape[1]] = np.maximum(
+            out[y0:y0 + local.shape[0], x0:x0 + local.shape[1]], local
+        )
     if roi is not None:
         out = cv2.bitwise_and(out, roi)
     return out
+
