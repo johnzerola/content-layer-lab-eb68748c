@@ -519,8 +519,14 @@ def clean_video(
 
             mask_ratio = float(np.count_nonzero(masks) / max(1, masks.size))
             lama = _lama_for(mask_ratio) if report.route != "done" else None
-            small_mask = mask_ratio <= opts.auto_lama_max_mask
+            # O teto de máscara é regra do gatilho AUTO (custo imprevisível em
+            # CPU). Quando o usuário pediu `high`/`max` explicitamente, o LaMa
+            # roda mesmo em faixa larga — era isso que fazia o preset alto
+            # terminar em TBE puro e nunca acionar o inpainting.
+            explicit = bool(preset["lama"])
+            small_mask = explicit or mask_ratio <= opts.auto_lama_max_mask
             if report.route != "done" and lama is not None and lama.available() and small_mask:
+
                 emit(10 + 80 * (position / float(total_frames)), "IA avançada")
                 started = time.perf_counter()
                 # LaMa em poucos keyframes + propagação alinhada: reconstrói
