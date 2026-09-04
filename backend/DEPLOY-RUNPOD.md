@@ -53,6 +53,8 @@ O script instala o Docker se necessário, faz login, builda
    - ProPainter → `/runpod-volume/models`
    - DiffuEraser → `/runpod-volume/max-models`
 5. Env var do endpoint: `CLEANER_WORKER_SECRET=<mesmo segredo do app>`
+   - `PROPAINTER_MAX_SIDE=1280` (Quality; composição no master original)
+   - `DIFFUERASER_MAX_SIDE=960` (Max; composição no master original)
 6. Copie o **Endpoint ID** e configure os secrets no app:
    `RUNPOD_API_KEY` e `RUNPOD_ENDPOINT_ID`
 
@@ -62,6 +64,11 @@ O handler baixa o chunk pela `source_url` (URL assinada do storage do app),
 processa e devolve via `upload_url` (PUT assinado) — portanto o storage
 efêmero do worker não é problema. A VPS da Hostear continua como worker CPU
 (prévia rápida + fallback) e como máquina de build da imagem.
+
+Vídeos 4K não são inteiramente ampliados a partir de 720p/1080p. O motor usa
+proxy para análise e resolução limitada apenas na inferência; depois aplica a
+região reconstruída sobre o chunk original. Assim, tudo fora da máscara e a
+resolução final permanecem iguais ao arquivo enviado pelo cliente.
 
 Custo estimado serverless: ~US$ 0,10–0,40 por minuto de vídeo, conforme GPU
 (4090 ~US$ 0,00034/s; A100 ~US$ 0,0011/s). Sem jobs, custo zero (min workers 0).
