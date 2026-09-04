@@ -559,6 +559,32 @@ def clean_video(
 
 
 
+            # Roteador por chunk: faixa larga (karaokê/legenda cheia) é o caso
+            # em que o LaMa fica caro e devolve chapa. Aí o motor rápido de
+            # atenção temporal (STTN) tenta primeiro; só entra se melhorar o
+            # score — nunca piora o que o TBE já entregou.
+            if report.route != "done" and engine_used == "tbe" and mask_ratio > opts.auto_lama_max_mask:
+                sttn = _sttn_state.get("provider")
+                if sttn is None and not _sttn_state.get("tried"):
+                    _sttn_state["tried"] = True
+                    candidate = SttnProvider()
+                    sttn = candidate if candidate.available() else None
+                    _sttn_state["provider"] = sttn
+                if sttn is not None:
+                    started = time.perf_counter()
+                    guess = sttn.reconstruct(np.asarray(cleaned), masks)
+                    timer.add("sttn_ms", started)
+                    started = time.perf_counter()
+                    sttn_report = quality_score(list(guess), masks)
+                    timer.add("quality_ms", started)
+                    if sttn_report.score > report.score:
+                        cleaned = list(guess)
+                        report = sttn_report
+                        engine_used = "tbe+sttn"
+                        plate_totals["sttn_chunks"] = plate_totals.get("sttn_chunks", 0) + 1
+                    else:
+                        plate_totals["sttn_rejected"] = plate_totals.get("sttn_rejected", 0) + 1
+
             if report.route == "gpu":
                 gpu_recommended = True
 
