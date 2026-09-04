@@ -279,7 +279,13 @@ class TemporalBackgroundExposureEngine(InpaintingEngine):
                     patched = cv2.inpaint(current, remaining, 3, cv2.INPAINT_TELEA)
                     current[remaining > 0] = patched[remaining > 0]
                 else:
-                    current = patch_fill(current, remaining)
+                    box = _bbox(remaining, margin=48)
+                    if box is not None:
+                        y0, y1, x0, x1 = box
+                        current[y0:y1, x0:x1] = self._fill_crop(
+                            current[y0:y1, x0:x1], remaining[y0:y1, x0:x1]
+                        )
+
             output.append(current)
         return np.asarray(output)
 
