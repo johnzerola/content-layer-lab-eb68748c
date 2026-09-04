@@ -140,6 +140,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [polling, setPolling] = useState(false);
   const [tool, setTool] = useState<Tool>("rect");
   const [selected, setSelected] = useState<string | null>(null);
+  const [maskFilter, setMaskFilter] = useState<string | null>(null);
   const [draft, setDraft] = useState<CleanerRegion | null>(null);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
