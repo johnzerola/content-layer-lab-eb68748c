@@ -29,10 +29,11 @@ def test_score_penaliza_texto_residual() -> None:
     masks[:, 100:140, 60:200] = 255
     for _ in range(6):
         f = _frame()
-        f[110:130, 70:190] = 255  # "texto" que sobrou
+        for x in range(70, 190, 6):  # traços finos: assinatura de texto residual
+            f[110:130, x:x + 3] = 255
         frames.append(f)
     report = quality_score(frames, masks)
-    assert report.score < 90.0
+    assert report.score < 90.0, report.metrics
     assert report.route in {"retry", "gpu"}
 
 
