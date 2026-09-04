@@ -685,10 +685,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       const headers = await cloudAuthHeaders();
       // Só as áreas realmente ativas vão para o motor; áreas desligadas ou de proteção
       // que cobrem uma área de remoção anulariam o inpainting.
-      const removeMasks = masks.filter((m) => m.role === "remove" && m.enabled !== false);
+      const removeMasks = activeMasks.filter((m) => m.role === "remove" && m.enabled !== false);
       const bbox = maskBounds(removeMasks);
       const keepProtect = protectSubject && !bbox;
-      const sendMasks = masks
+      const sendMasks = activeMasks
         .filter((m) => m.enabled !== false)
         .filter((m) => m.role !== "protect" || !overlapsAny(m, removeMasks));
       // Com áreas marcadas o recorte é ignorado: reenquadrar não apaga legenda que
@@ -698,7 +698,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       const submit = gpuRun ? startGpu : processJob;
       await submit({
         data: {
-          id: job.id,
+          id: target.id,
           mode,
           preset: preview ? "fast" : preset,
           masks: sendMasks,
