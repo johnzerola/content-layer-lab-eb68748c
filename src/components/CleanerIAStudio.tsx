@@ -69,6 +69,13 @@ type Tool = "select" | "rect" | "poly" | "brush" | "protect" | "erase";
 const MODES: CleanerMode[] = ["smart", "text", "watermark", "object", "passerby"];
 const PRESETS: CleanerPreset[] = ["fast", "quality", "max"];
 
+/** Filtros de VISUALIZAÇÃO da lista de áreas — nunca alteram `masks`. */
+const MASK_FILTERS: Record<string, (m: CleanerRegion) => boolean> = {
+  "Só legendas": (m) => /texto|legenda|caption/i.test(m.label || m.role || ""),
+  "Só marca d'água": (m) => /marca|watermark|logo/i.test(m.label || m.role || ""),
+  "Só as minhas": (m) => /manual|polígono|pincel|protegida/i.test(m.label || ""),
+};
+
 /** Caixa normalizada (0..1) de uma área, seja retângulo, polígono ou pincel. */
 function regionBox(m: CleanerRegion): { x: number; y: number; w: number; h: number } | null {
   if (m.points && m.points.length) {
@@ -140,6 +147,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [polling, setPolling] = useState(false);
   const [tool, setTool] = useState<Tool>("rect");
   const [selected, setSelected] = useState<string | null>(null);
+  const [maskFilter, setMaskFilter] = useState<string | null>(null);
   const [draft, setDraft] = useState<CleanerRegion | null>(null);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -720,6 +728,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
   const running = !!job && job.status !== "completed" && job.status !== "queued" && polling;
   const sel = masks.find((m) => m.id === selected) || null;
+
+  const visibleMasks = maskFilter && MASK_FILTERS[maskFilter] ? masks.filter(MASK_FILTERS[maskFilter]) : masks;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[200px_1fr_300px]">
@@ -1339,26 +1349,33 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           ) : (
             <>
               <div className="flex flex-wrap gap-1.5">
-                {(
-                  [
-                    ["Só legendas", (m: CleanerRegion) => /texto|legenda|caption/i.test(m.label || m.role || "")],
-                    ["Só marca d'água", (m: CleanerRegion) => /marca|watermark|logo/i.test(m.label || m.role || "")],
-                    ["Só as minhas", (m: CleanerRegion) => /manual|polígono|pincel|protegida/i.test(m.label || "")],
-                  ] as [string, (m: CleanerRegion) => boolean][]
-                ).map(([label, keep]) => (
+                {Object.keys(MASK_FILTERS).map((label) => (
                   <button
                     key={label}
                     type="button"
-                    onClick={() => setMasks((prev) => (prev.some(keep) ? prev.filter(keep) : prev))}
-                    className="rounded-full border border-border/60 px-2 py-1 text-[10px] font-semibold text-muted-foreground hover:border-primary hover:text-primary"
+                    onClick={() => setMaskFilter((f) => (f === label ? null : label))}
+                    className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${
+                      maskFilter === label
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border/60 text-muted-foreground hover:border-primary hover:text-primary"
+                    }`}
                   >
                     {label}
                   </button>
                 ))}
+                {maskFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setMaskFilter(null)}
+                    className="rounded-full border border-border/60 px-2 py-1 text-[10px] font-semibold text-muted-foreground hover:border-primary hover:text-primary"
+                  >
+                    Todas
+                  </button>
+                )}
               </div>
 
             <div className="max-h-[220px] space-y-2 overflow-y-auto pr-1">
-              {masks.map((m) => (
+              {visibleMasks.map((m) => (
                 <div
                   key={m.id}
                   onClick={() => setSelected(m.id)}
