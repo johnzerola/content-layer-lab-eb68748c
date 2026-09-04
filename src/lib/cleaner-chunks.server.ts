@@ -377,6 +377,14 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
         } as never)
         .eq("id", jobId);
       await purgeChunkArtifacts(jobId).catch(() => null);
+      // Guarda o link do vídeo montado para a interface abrir/baixar.
+      let resultUrl: string | null = null;
+      try {
+        const final = await workerStatus(jobId);
+        resultUrl = (final as { result_url?: string | null }).result_url ?? null;
+      } catch {
+        resultUrl = null;
+      }
       await db
         .from("cleaner_jobs")
         .update({
@@ -384,10 +392,13 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
           stage: "concluído",
           progress: 1,
           chunks_done: done.length,
+          result_url: resultUrl,
+          metrics: { residual_text: worst, chunks: parts.length, engine: "gpu" },
           error: null,
           lease_until: null,
         } as never)
         .eq("id", jobId);
+
       return await summarize(jobId);
     }
 
