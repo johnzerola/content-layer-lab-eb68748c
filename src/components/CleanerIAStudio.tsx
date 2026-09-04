@@ -41,11 +41,17 @@ import {
   PRESET_LABEL,
   STAGE_LABEL,
   rid,
+  stageIndex,
   type CleanerJob,
   type CleanerMode,
   type CleanerPreset,
   type CleanerRegion,
 } from "@/lib/cleaner";
+import {
+  CleanerPipelineSteps,
+  type PipelineStep,
+  type PipelineStepState,
+} from "@/components/CleanerPipelineSteps";
 import { cloudAuthHeaders } from "@/lib/cloud";
 import {
   DEFAULT_LOCAL_ADVANCED,
