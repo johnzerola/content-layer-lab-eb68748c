@@ -729,6 +729,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const running = !!job && job.status !== "completed" && job.status !== "queued" && polling;
   const sel = masks.find((m) => m.id === selected) || null;
 
+  const visibleMasks = maskFilter && MASK_FILTERS[maskFilter] ? masks.filter(MASK_FILTERS[maskFilter]) : masks;
+
   return (
     <div className="grid gap-6 lg:grid-cols-[200px_1fr_300px]">
       {/* Modos */}
