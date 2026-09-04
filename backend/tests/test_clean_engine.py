@@ -6,7 +6,7 @@ import pytest
 
 from app.quality.scoring import quality_score
 from app.video.roi import Roi
-from app.providers.registry import available_providers
+from app.providers.temporal_provider import TemporalProvider
 
 
 def _frame(color: int = 120) -> np.ndarray:
@@ -45,9 +45,14 @@ def test_roi_crop_e_paste_preservam_fora_da_area() -> None:
     assert np.array_equal(merged[:10], frame[:10])
 
 
-def test_registry_expoe_temporal() -> None:
-    names = available_providers()
-    assert "temporal" in names
+def test_temporal_reconstroi_apenas_sob_a_mascara() -> None:
+    frames = np.stack([_frame() for _ in range(8)])
+    masks = np.zeros((8, 256, 256), np.uint8)
+    masks[:, 100:120, 60:200] = 255
+    frames[:, 100:120, 60:200] = 255
+    out = TemporalProvider(8, 3).reconstruct(frames, masks)
+    assert np.asarray(out).shape == frames.shape
+    assert np.abs(np.asarray(out)[0, :50].astype(int) - frames[0, :50].astype(int)).max() <= 2
 
 
 if __name__ == "__main__":  # pragma: no cover
