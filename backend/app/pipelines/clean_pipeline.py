@@ -425,12 +425,15 @@ def clean_video(
                 timer.add("quality_ms", started)
                 engine_used = "tbe+retry"
 
-            if report.route != "done" and lama is not None and lama.available():
+            mask_ratio = float(np.count_nonzero(masks) / max(1, masks.size))
+            lama = _lama_for(mask_ratio) if report.route != "done" else None
+            small_mask = mask_ratio <= opts.auto_lama_max_mask
+            if report.route != "done" and lama is not None and lama.available() and small_mask:
                 emit(10 + 80 * (position / float(total_frames)), "IA avançada")
                 started = time.perf_counter()
                 # LaMa em poucos keyframes + propagação alinhada: reconstrói
                 # estrutura (linhas, bordas) sem pagar uma inferência por frame.
-                budget = int(preset.get("lama_keys", 2))
+                budget = int(preset.get("lama_keys", 2) or 2)
                 cleaned, plate_stats = reconstruct_with_plates(
                     crops, list(masks), list(cleaned), lama,
                     budget=budget, feather=max(3, opts.mask_feather_px),
@@ -439,10 +442,17 @@ def clean_video(
                 plate_totals["lama_inferences"] = plate_totals.get("lama_inferences", 0) + plate_stats.inferences
                 plate_totals["lama_propagated"] = plate_totals.get("lama_propagated", 0) + plate_stats.propagated
                 plate_totals["lama_fallbacks"] = plate_totals.get("lama_fallbacks", 0) + plate_stats.fallbacks
+                plate_totals["lama_chunks"] = plate_totals.get("lama_chunks", 0) + 1
                 started = time.perf_counter()
-                report = quality_score(list(cleaned), masks)
+                lama_report = quality_score(list(cleaned), masks)
                 timer.add("quality_ms", started)
-                engine_used = "tbe+lama"
+                # Só aceita o resultado do modelo se ele melhorou o score.
+                if lama_report.score >= report.score:
+                    report = lama_report
+                    engine_used = "tbe+lama"
+                else:
+                    plate_totals["lama_rejected"] = plate_totals.get("lama_rejected", 0) + 1
+
 
 
             if report.route == "gpu":
