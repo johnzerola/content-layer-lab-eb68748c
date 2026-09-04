@@ -418,17 +418,23 @@ def clean_video(
             # Guarda de segurança contra borrão: fora da máscara (dilatada e
             # suavizada) o pixel original é restaurado, então nenhum motor pode
             # deixar manchas/blocos em áreas que nunca tiveram texto.
-            union = np.max(np.asarray(masks), axis=0)
-            if union.max() > 0:
-                k = max(3, int(opts.mask_expand_px) * 2 + 5)
-                grow = cv2.dilate(union, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
-                soft = cv2.GaussianBlur(grow.astype(np.float32) / 255.0, (0, 0), max(2.0, k / 4.0))
+            k = max(3, int(opts.mask_expand_px) * 2 + 5)
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))
+            restored = []
+            for i in range(len(cleaned)):
+                m = np.asarray(masks[i])
+                if m.max() == 0:
+                    restored.append(np.asarray(crops[i]))
+                    continue
+                soft = cv2.GaussianBlur(
+                    cv2.dilate(m, kernel).astype(np.float32) / 255.0, (0, 0), max(2.0, k / 4.0)
+                )
                 soft = np.clip(soft, 0.0, 1.0)[..., None]
-                cleaned = [
+                restored.append(
                     (np.asarray(cleaned[i], np.float32) * soft
                      + np.asarray(crops[i], np.float32) * (1.0 - soft)).astype(np.uint8)
-                    for i in range(len(cleaned))
-                ]
+                )
+            cleaned = restored
 
 
 

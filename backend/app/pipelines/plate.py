@@ -125,7 +125,7 @@ def reconstruct_with_plates(
         # A composição usa a união: toda a área que o motor temporal tocou
         # precisa receber a placa reconstruída, senão sobram blocos borrados
         # ao lado do texto.
-        mask = union if union.max() > 0 else masks[i]
+        mask = masks[i]
         if mask is None or mask.max() == 0:
             output.append(np.asarray(temporal_result[i]))
             continue
