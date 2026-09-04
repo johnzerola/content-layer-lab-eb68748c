@@ -112,8 +112,8 @@ def harmonize_frame(
         deficit = float(np.clip(n_rg - n_in, 0.0, 6.0))
         if deficit > 0.4:
             gen = rng or np.random.default_rng(1234)
-            noise = gen.normal(0.0, deficit * 0.8, size=out.shape[:2]).astype(np.float32)
-            noise = cv2.GaussianBlur(noise, (0, 0), 0.55)
+            noise = gen.normal(0.0, deficit * 1.7, size=out.shape[:2]).astype(np.float32)
+            noise = cv2.GaussianBlur(noise, (0, 0), 0.4)
             out[sel_in] += noise[sel_in][..., None] if out.ndim == 3 else noise[sel_in]
             added = deficit
 
