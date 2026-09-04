@@ -738,10 +738,115 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     }
   };
 
+  /**
+   * Fluxo completo em um clique: envio → detecção → máscara → reconstrução → remux.
+   * Cada etapa alimenta a trilha de progresso ao lado do player.
+   */
+  const runFullPipeline = async (preview = false) => {
+    if (pipelineBusy || uploading || polling) return;
+    setPipelineBusy(true);
+    setPipelineError(null);
+    setPipelineStep("upload");
+    try {
+      let target = job;
+      if (!target?.id || !inputReady) {
+        target = await startUpload();
+        if (!target?.id) throw new Error("o vídeo não chegou ao motor");
+      }
+
+      setPipelineStep("detect");
+      const found = await handleDetect(target);
+      const nextMasks = [...masks, ...(found ?? [])];
+
+      setPipelineStep("mask");
+      if (nextMasks.length) {
+        const headers = await cloudAuthHeaders();
+        await saveMasks({ data: { id: target.id, masks: nextMasks }, headers }).catch(() => null);
+      } else if (!cropClean) {
+        throw new Error("nada detectado — marque as áreas à mão e processe");
+      }
+
+      setPipelineStep("inpaint");
+      await handleProcess(preview, { job: target, masks: nextMasks });
+    } catch (e) {
+      setPipelineError(e instanceof Error ? e.message : "falha no fluxo");
+      toast.error(`Fluxo interrompido: ${e instanceof Error ? e.message : "erro"}`);
+    } finally {
+      setPipelineBusy(false);
+    }
+  };
+
   const running = !!job && job.status !== "completed" && job.status !== "queued" && polling;
   const sel = masks.find((m) => m.id === selected) || null;
 
   const visibleMasks = maskFilter && MASK_FILTERS[maskFilter] ? masks.filter(MASK_FILTERS[maskFilter]) : masks;
+
+  // Trilha de etapas do motor, derivada do estado real do job.
+  const pipelineSteps: PipelineStep[] = (() => {
+    const status = job?.status;
+    const stageAt = status ? stageIndex(status) : -1;
+    const failed = status === "failed" || !!pipelineError;
+    const st = (
+      done: boolean,
+      active: boolean,
+      errored = false,
+    ): PipelineStepState => (errored ? "error" : done ? "done" : active ? "active" : "pending");
+
+    const uploadDone = inputReady || (!!job && stageAt >= 1);
+    const detectDone = (job?.detections?.length ?? 0) > 0 || masks.length > 0;
+    const maskDone = masks.length > 0 || (uploadDone && cropClean && stageAt >= 5);
+    const inpaintActive =
+      !!status && ["analyzing", "detecting", "tracking", "processing", "inpainting", "refining"].includes(status);
+    const inpaintDone = !!status && stageAt >= stageIndex("encoding");
+    const remuxActive = status === "encoding";
+    const remuxDone = status === "completed" && !!(job?.result_url || job?.preview_url);
+
+    return [
+      {
+        key: "upload",
+        title: "1. Envio do vídeo",
+        hint: "master original enviado e verificado no motor",
+        state: st(uploadDone, uploading || pipelineStep === "upload", failed && !uploadDone),
+        detail: uploading ? `enviando ${uploadProgress}%` : undefined,
+        progress: uploading ? uploadProgress : undefined,
+      },
+      {
+        key: "detect",
+        title: "2. Detecção",
+        hint: "OCR e busca de legendas, marcas e overlays",
+        state: st(
+          detectDone,
+          status === "detecting" || pipelineStep === "detect",
+          failed && uploadDone && !detectDone,
+        ),
+        detail: job?.detections?.length ? `${job.detections.length} área(s) detectada(s)` : undefined,
+      },
+      {
+        key: "mask",
+        title: "3. Máscara",
+        hint: "áreas confirmadas e salvas para o motor",
+        state: st(maskDone, pipelineStep === "mask", false),
+        detail: masks.length ? `${masks.length} área(s) na máscara` : undefined,
+      },
+      {
+        key: "inpaint",
+        title: "4. Reconstrução",
+        hint: "fundo refeito quadro a quadro, sem borrão",
+        state: st(inpaintDone, inpaintActive || pipelineStep === "inpaint", failed && maskDone && !inpaintDone),
+        detail: inpaintActive ? job?.stage : undefined,
+        progress: inpaintActive ? job?.progress : undefined,
+      },
+      {
+        key: "remux",
+        title: "5. Remux e entrega",
+        hint: "áudio original reencaixado e arquivo final pronto",
+        state: st(remuxDone, remuxActive, status === "failed"),
+        detail: remuxDone ? "vídeo pronto para baixar" : remuxActive ? job?.stage : undefined,
+      },
+    ];
+  })();
+
+
 
   return (
     <div className="grid gap-6 lg:grid-cols-[200px_1fr_300px]">
