@@ -22,6 +22,7 @@ O handler reaproveita a pipeline do worker (`run_pipeline`), então a qualidade
 from __future__ import annotations
 
 import base64
+import hashlib
 import os
 from pathlib import Path
 import shutil
@@ -38,6 +39,28 @@ from app.workers.tasks import run_pipeline
 
 STORAGE_DIR = Path(os.getenv("CLEANER_STORAGE", "storage")).resolve()
 DOWNLOAD_TIMEOUT = (30, 3600)
+# VRAM mínima (GB) para o preset max (DiffuEraser); abaixo disso o erro é explícito.
+MAX_PRESET_MIN_VRAM_GB = float(os.getenv("CLEANER_MAX_PRESET_MIN_VRAM_GB", "16"))
+
+
+def _gpu_vram_gb() -> float | None:
+    """VRAM total da GPU visível, em GB. None quando não há CUDA disponível."""
+    try:
+        import torch  # type: ignore
+
+        if not torch.cuda.is_available():
+            return None
+        return torch.cuda.get_device_properties(0).total_memory / (1024**3)
+    except Exception:
+        return None
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def _download(url: str, destination: Path) -> Path:
@@ -63,14 +86,43 @@ def _upload(url: str, path: Path) -> None:
     response.raise_for_status()
 
 
+WORKER_VERSION = "v3"
+
+
 def handler(event: dict) -> dict:
     payload = (event or {}).get("input") or {}
     started = time.monotonic()
     index = int(payload.get("chunk_index", 0))
+    if str(payload.get("action") or "") == "health":
+        return {
+            "ok": True,
+            "worker_version": WORKER_VERSION,
+            "gpu_vram_gb": _gpu_vram_gb(),
+        }
     source_url = str(payload.get("source_url") or "")
     source_is_chunk = payload.get("source_is_chunk") is True
     if not source_url:
         return {"ok": False, "chunk_index": index, "error": "source_url ausente"}
+
+
+    preset = str(payload.get("preset", "quality"))
+    if preset == "max":
+        vram = _gpu_vram_gb()
+        if vram is None:
+            return {
+                "ok": False,
+                "chunk_index": index,
+                "error": "preset max (DiffuEraser) exige GPU CUDA; nenhuma GPU visível neste worker",
+            }
+        if vram < MAX_PRESET_MIN_VRAM_GB:
+            return {
+                "ok": False,
+                "chunk_index": index,
+                "error": (
+                    f"preset max (DiffuEraser) exige ~{MAX_PRESET_MIN_VRAM_GB:.0f} GB de VRAM; "
+                    f"esta GPU tem {vram:.1f} GB. Use o preset quality (ProPainter)."
+                ),
+            }
 
     start = max(0.0, float(payload.get("start", 0.0)))
     end = float(payload.get("end", 0.0))
@@ -99,7 +151,7 @@ def handler(event: dict) -> dict:
         result = run_pipeline(
             job_id,
             str(payload.get("mode", "subtitle")),
-            str(payload.get("preset", "quality")),
+            preset,
             masks,
             None,
             None,
@@ -113,6 +165,7 @@ def handler(event: dict) -> dict:
         final = trim_edges(str(processed), str(scratch / f"chunk-{index:04d}.mp4"), head, body)
 
         metrics = (result or {}).get("metrics") or {}
+        final_path = Path(final)
         response = {
             "ok": True,
             "chunk_index": index,
@@ -121,13 +174,15 @@ def handler(event: dict) -> dict:
             "residual_text": float(metrics.get("residual_text", 0.0) or 0.0),
             "engine": metrics.get("engine"),
             "device": metrics.get("device"),
+            "checksum": _sha256(final_path),
+            "bytes": final_path.stat().st_size,
         }
         upload_url = payload.get("upload_url")
         if upload_url:
-            _upload(str(upload_url), Path(final))
+            _upload(str(upload_url), final_path)
             response["output_url"] = str(payload.get("output_url") or upload_url).split("?")[0]
         else:
-            response["output_b64"] = base64.b64encode(Path(final).read_bytes()).decode("ascii")
+            response["output_b64"] = base64.b64encode(final_path.read_bytes()).decode("ascii")
         return response
     except Exception as exc:  # pragma: no cover - caminho de erro do provedor
         return {

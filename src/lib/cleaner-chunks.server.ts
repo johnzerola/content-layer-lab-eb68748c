@@ -8,7 +8,7 @@
  * Todo o estado vive no banco (`cleaner_jobs`, `cleaner_chunks`), então a fila
  * sobrevive a reload da página, queda de rede e reinício do servidor.
  */
-import { workerAssemble, workerPlanChunks } from "@/lib/cleaner.server";
+import { workerAssemble, workerPlanChunks, workerStatus } from "@/lib/cleaner.server";
 import {
   GpuBlockedError,
   GpuRetryableError,
@@ -84,6 +84,11 @@ export async function planCleanerChunks(jobId: string, userId: string): Promise<
     .single();
   if (error || !job) throw new Error("Job não encontrado");
 
+  await db
+    .from("cleaner_jobs")
+    .update({ status: "chunking", stage: "dividindo o vídeo em partes" } as never)
+    .eq("id", jobId);
+
   const plan = await workerPlanChunks(jobId, {
     targetSeconds: TARGET_SECONDS,
     overlap: OVERLAP_SECONDS,
@@ -108,7 +113,7 @@ export async function planCleanerChunks(jobId: string, userId: string): Promise<
       chunks_total: rows.length,
       chunks_done: 0,
       paused_reason: null,
-      status: "processing",
+      status: "queued",
       stage: `dividido em ${rows.length} partes`,
       progress: 0.05,
       error: null,
@@ -116,6 +121,45 @@ export async function planCleanerChunks(jobId: string, userId: string): Promise<
     .eq("id", jobId);
   return rows.length;
 }
+
+/** Confirma que o arquivo do trecho realmente existe no armazenamento. */
+async function chunkArtifactExists(path: string | null): Promise<boolean> {
+  if (!path) return false;
+  const db = await admin();
+  const slash = path.lastIndexOf("/");
+  const folder = slash > 0 ? path.slice(0, slash) : "";
+  const name = slash > 0 ? path.slice(slash + 1) : path;
+  const { data } = await db.storage.from(BUCKET).list(folder, { search: name, limit: 100 });
+  return (data ?? []).some((item) => item.name === name);
+}
+
+/**
+ * Apaga os artefatos temporários de um job (chunks de saída no storage).
+ * Idempotente: pode rodar em sucesso, falha, cancelamento ou timeout.
+ */
+export async function purgeChunkArtifacts(jobId: string): Promise<number> {
+  const db = await admin();
+  const { data } = await db
+    .from("cleaner_chunks")
+    .select("output_url")
+    .eq("job_id", jobId);
+  const paths = new Set(
+    ((data ?? []) as { output_url: string | null }[])
+      .map((row) => row.output_url ?? "")
+      .filter(Boolean),
+  );
+  // Tentativas anteriores também deixam arquivos: varre a pasta do job.
+  const { data: files } = await db.storage.from(BUCKET).list(jobId, { limit: 1000 });
+  for (const file of files ?? []) paths.add(`${jobId}/${file.name}`);
+  if (!paths.size) return 0;
+  await db.storage.from(BUCKET).remove([...paths]);
+  await db
+    .from("cleaner_chunks")
+    .update({ output_url: null } as never)
+    .eq("job_id", jobId);
+  return paths.size;
+}
+
 
 async function pauseJob(jobId: string, reason: string, message: string) {
   const db = await admin();
@@ -183,6 +227,37 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
       const state = await chunkStatus(chunk.provider_job_id!);
       if (state.state === "queued" || state.state === "running") continue;
       if (state.state === "completed") {
+        // O provedor pode responder "pronto" sem que o arquivo tenha chegado ao storage.
+        const stored = await chunkArtifactExists(chunk.output_url);
+        if (!stored) {
+          const attempts = chunk.attempts + 1;
+          const dead = attempts >= MAX_ATTEMPTS;
+          chunk.status = dead ? "failed" : "pending";
+          chunk.attempts = attempts;
+          await db
+            .from("cleaner_chunks")
+            .update({
+              status: chunk.status,
+              attempts,
+              error: "arquivo do trecho não chegou ao armazenamento",
+              finished_at: dead ? new Date().toISOString() : null,
+            } as never)
+            .eq("id", chunk.id);
+          if (dead) {
+            await db
+              .from("cleaner_jobs")
+              .update({
+                status: "failed",
+                stage: "falha em uma parte do vídeo",
+                error: "arquivo do trecho não chegou ao armazenamento",
+                lease_until: null,
+              } as never)
+              .eq("id", jobId);
+            await purgeChunkArtifacts(jobId).catch(() => null);
+            return await summarize(jobId);
+          }
+          continue;
+        }
         const residual = state.residualText ?? 0;
         const dirty = residual > RESIDUAL_LIMIT && chunk.attempts < MAX_ATTEMPTS;
         chunk.status = dirty ? "pending" : "done";
@@ -194,9 +269,13 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
             residual_text: residual,
             output_url: chunk.output_url,
             cost_seconds: state.seconds ?? null,
+            checksum: state.checksum ?? null,
+            bytes: state.bytes ?? null,
+            finished_at: new Date().toISOString(),
             error: dirty ? `resíduo ${residual.toFixed(3)} — reprocessando` : null,
           } as never)
           .eq("id", chunk.id);
+
       } else {
         const attempts = chunk.attempts + 1;
         const dead = attempts >= MAX_ATTEMPTS;
@@ -204,7 +283,12 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
         chunk.attempts = attempts;
         await db
           .from("cleaner_chunks")
-          .update({ status: chunk.status, attempts, error: state.error ?? null } as never)
+          .update({
+            status: chunk.status,
+            attempts,
+            error: state.error ?? null,
+            finished_at: dead ? new Date().toISOString() : null,
+          } as never)
           .eq("id", chunk.id);
         if (dead) {
           await db
@@ -216,6 +300,8 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
               lease_until: null,
             } as never)
             .eq("id", jobId);
+          // Falha definitiva: nada será montado, então os temporários saem agora.
+          await purgeChunkArtifacts(jobId).catch(() => null);
           return await summarize(jobId);
         }
       }
@@ -258,6 +344,8 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
           attempts: attempt,
           provider_job_id: providerId,
           output_url: path,
+          started_at: new Date().toISOString(),
+          finished_at: null,
           lease_until: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         } as never)
         .eq("id", chunk.id);
@@ -275,7 +363,34 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
         parts.push({ index: chunk.idx, url: link.signedUrl });
       }
       const worst = done.reduce((max, c) => Math.max(max, Number(c.residual_text ?? 0)), 0);
+      await db
+        .from("cleaner_jobs")
+        .update({
+          status: "assembling",
+          stage: "montando o vídeo final na resolução original",
+          progress: 0.98,
+        } as never)
+        .eq("id", jobId);
+      // Só depois da montagem confirmada os temporários podem sair.
       await workerAssemble(jobId, parts, { residual_text: worst, chunks: parts.length });
+      await db
+        .from("cleaner_jobs")
+        .update({
+          status: "cleaning",
+          stage: "removendo arquivos temporários",
+          progress: 0.99,
+          chunks_done: done.length,
+        } as never)
+        .eq("id", jobId);
+      await purgeChunkArtifacts(jobId).catch(() => null);
+      // Guarda o link do vídeo montado para a interface abrir/baixar.
+      let resultUrl: string | null = null;
+      try {
+        const final = await workerStatus(jobId);
+        resultUrl = (final as { result_url?: string | null }).result_url ?? null;
+      } catch {
+        resultUrl = null;
+      }
       await db
         .from("cleaner_jobs")
         .update({
@@ -283,13 +398,13 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
           stage: "concluído",
           progress: 1,
           chunks_done: done.length,
+          result_url: resultUrl,
+          metrics: { residual_text: worst, chunks: parts.length, engine: "gpu" },
           error: null,
           lease_until: null,
         } as never)
         .eq("id", jobId);
-      await db.storage
-        .from(BUCKET)
-        .remove(done.map((c) => c.output_url ?? "").filter(Boolean));
+
       return await summarize(jobId);
     }
 
@@ -356,8 +471,10 @@ export async function cancelCleanerChunks(jobId: string): Promise<void> {
   }
   await db
     .from("cleaner_chunks")
-    .update({ status: "cancelled" } as never)
+    .update({ status: "cancelled", finished_at: new Date().toISOString() } as never)
     .eq("job_id", jobId)
     .in("status", ["pending", "running"]);
+  // Cancelamento nunca monta vídeo: os temporários saem imediatamente.
+  await purgeChunkArtifacts(jobId).catch(() => null);
   await db.from("cleaner_jobs").update({ lease_until: null } as never).eq("id", jobId);
 }

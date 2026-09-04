@@ -206,10 +206,13 @@ export type Database = {
       cleaner_chunks: {
         Row: {
           attempts: number
+          bytes: number | null
+          checksum: string | null
           cost_seconds: number | null
           created_at: string
           end_seconds: number
           error: string | null
+          finished_at: string | null
           id: string
           idx: number
           job_id: string
@@ -219,16 +222,20 @@ export type Database = {
           provider_job_id: string | null
           residual_text: number | null
           start_seconds: number
+          started_at: string | null
           status: string
           updated_at: string
           user_id: string
         }
         Insert: {
           attempts?: number
+          bytes?: number | null
+          checksum?: string | null
           cost_seconds?: number | null
           created_at?: string
           end_seconds: number
           error?: string | null
+          finished_at?: string | null
           id?: string
           idx: number
           job_id: string
@@ -238,16 +245,20 @@ export type Database = {
           provider_job_id?: string | null
           residual_text?: number | null
           start_seconds: number
+          started_at?: string | null
           status?: string
           updated_at?: string
           user_id: string
         }
         Update: {
           attempts?: number
+          bytes?: number | null
+          checksum?: string | null
           cost_seconds?: number | null
           created_at?: string
           end_seconds?: number
           error?: string | null
+          finished_at?: string | null
           id?: string
           idx?: number
           job_id?: string
@@ -257,6 +268,7 @@ export type Database = {
           provider_job_id?: string | null
           residual_text?: number | null
           start_seconds?: number
+          started_at?: string | null
           status?: string
           updated_at?: string
           user_id?: string

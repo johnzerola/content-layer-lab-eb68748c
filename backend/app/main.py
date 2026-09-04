@@ -578,7 +578,7 @@ async def get_chunk_source(
     cache_dir.mkdir(parents=True, exist_ok=True)
     cached = cache_dir / f"chunk-{chunk_index:04d}.mp4"
     if not cached.is_file() or cached.stat().st_size < 1024:
-        temporary = cache_dir / f".{cached.name}.{os.getpid()}.{threading.get_ident()}.tmp"
+        temporary = cache_dir / f".{cached.stem}.{os.getpid()}.{threading.get_ident()}.tmp.mp4"
         try:
             await asyncio.to_thread(slice_video, str(input_path), str(temporary), start, duration)
             if temporary.stat().st_size < 1024:

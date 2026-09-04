@@ -24,6 +24,7 @@ import {
   cleanerHealth,
   cleanupCleanerRemoteJob,
   confirmCleanerUpload,
+  cancelCleanerJob,
   createCleanerJob,
   detectCleanerJob,
   prepareCleanerUpload,
@@ -198,6 +199,24 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const pumpGpu = useServerFn(pumpCleanerGpuJob);
   const getChunks = useServerFn(listCleanerChunks);
   const cleanupRemoteJob = useServerFn(cleanupCleanerRemoteJob);
+  const cancelJobFn = useServerFn(cancelCleanerJob);
+  const [cancelling, setCancelling] = useState(false);
+
+  const cancelRemoteJob = async () => {
+    if (!job?.id) return;
+    setCancelling(true);
+    try {
+      const headers = await cloudAuthHeaders();
+      const row = (await cancelJobFn({ data: { id: job.id }, headers })) as CleanerJob;
+      setPolling(false);
+      setJob((prev) => ({ ...(prev as CleanerJob), ...row }));
+      toast.info("Processamento cancelado e arquivos temporários removidos.");
+    } catch (e) {
+      toast.error((e as Error)?.message || "Não foi possível cancelar agora.");
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   const src = useMemo(() => URL.createObjectURL(item.file), [item.file]);
   useEffect(() => () => URL.revokeObjectURL(src), [src]);
@@ -656,7 +675,13 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       setJob((prev) => (prev ? { ...prev, status: "detecting", stage: "detectando áreas" } : prev));
       const headers = await cloudAuthHeaders();
       const res = (await detectJob({ data: { id: target.id, mode }, headers })) as CleanerJob;
-      const found = (res.detections || []) as CleanerRegion[];
+      // O motor devolve as áreas sem o papel definido; sem isso elas não contariam
+      // como área de remoção e o vídeo acabaria só reenquadrado em vez de limpo.
+      const found = ((res.detections || []) as CleanerRegion[]).map((region) => ({
+        ...region,
+        role: region.role === "protect" ? ("protect" as const) : ("remove" as const),
+        enabled: region.enabled !== false,
+      }));
       setMasks((prev) => [...prev, ...found]);
       setJob({ ...res, status: "queued" });
       toast[found.length ? "success" : "warning"](
@@ -675,16 +700,30 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     override?: { job?: CleanerJob | null; masks?: CleanerRegion[] },
   ) => {
     const target = override?.job ?? job;
-    const activeMasks = override?.masks ?? masks;
+    let activeMasks = override?.masks ?? masks;
     if (!target?.id) return;
     if (!inputReady && !override?.job) {
       toast.error("O vídeo ainda não foi confirmado no motor. Reenvie o arquivo.");
       return;
     }
-    if (!activeMasks.length && !cropClean) {
-      toast.error("Marque ao menos uma área ou use Detectar.");
-      return;
+    // Sem nenhuma área marcada o motor não tem o que reconstruir. Antes de qualquer
+    // coisa tentamos detectar sozinho — reenquadrar (recorte) nunca é automático,
+    // porque só corta o vídeo em vez de apagar a legenda.
+    const hasRemove = activeMasks.some((m) => m.role !== "protect" && m.enabled !== false);
+    if (!hasRemove) {
+      const found = await handleDetect(target);
+      if (found?.length) {
+        activeMasks = [...activeMasks, ...found];
+      } else if (cropClean) {
+        toast.warning(
+          "Nenhuma área encontrada: o vídeo será apenas reenquadrado, sem reconstruir o fundo.",
+        );
+      } else {
+        toast.error("Nenhuma área encontrada. Marque a legenda ou a marca d'água à mão.");
+        return;
+      }
     }
+
     if (!preview && !creditsAvailable) {
       toast.error(
         `Créditos insuficientes: este vídeo custa ${creditsNeeded} crédito(s). Faça upgrade do plano.`,
@@ -696,11 +735,13 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       const headers = await cloudAuthHeaders();
       // Só as áreas realmente ativas vão para o motor; áreas desligadas ou de proteção
       // que cobrem uma área de remoção anulariam o inpainting.
-      const removeMasks = activeMasks.filter((m) => m.role === "remove" && m.enabled !== false);
+      // Área sem papel definido (vinda da detecção do motor) é área de remoção.
+      const removeMasks = activeMasks.filter((m) => m.role !== "protect" && m.enabled !== false);
       const bbox = maskBounds(removeMasks);
       const keepProtect = protectSubject && !bbox;
       const sendMasks = activeMasks
         .filter((m) => m.enabled !== false)
+        .map((m) => ({ ...m, role: m.role === "protect" ? ("protect" as const) : ("remove" as const) }))
         .filter((m) => m.role !== "protect" || !overlapsAny(m, removeMasks));
       // Com áreas marcadas o recorte é ignorado: reenquadrar não apaga legenda que
       // fica dentro do quadro — nesse caso o certo é reconstruir o fundo.
@@ -810,9 +851,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     const detectDone = (job?.detections?.length ?? 0) > 0 || masks.length > 0;
     const maskDone = masks.length > 0 || (uploadDone && cropClean && stageAt >= 5);
     const inpaintActive =
-      !!status && ["analyzing", "detecting", "tracking", "processing", "inpainting", "refining"].includes(status);
+      !!status &&
+      ["chunking", "analyzing", "detecting", "tracking", "processing", "inpainting", "refining"].includes(status);
     const inpaintDone = !!status && stageAt >= stageIndex("encoding");
-    const remuxActive = status === "encoding";
+    const remuxActive = status === "encoding" || status === "assembling" || status === "cleaning";
     const remuxDone = status === "completed" && !!(job?.result_url || job?.preview_url);
 
     return [
@@ -1006,6 +1048,15 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               <p className="mt-1 text-xs text-muted-foreground">{job!.stage}</p>
               <Progress value={job!.progress} className="mt-4 h-1.5 w-56" />
               <p className="mt-1 font-mono text-[10px]">{Math.round(job!.progress)}%</p>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="mt-4"
+                disabled={cancelling}
+                onClick={cancelRemoteJob}
+              >
+                {cancelling ? "Cancelando…" : "Cancelar processamento"}
+              </Button>
             </div>
           )}
 

@@ -70,5 +70,6 @@ export const ADMIN_EMAILS = ["admin@vaiviral.com", "johnszerola@gmail.com"];
 
 export function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
-  return ADMIN_EMAILS.includes(email.trim().toLowerCase());
+  const normalized = email.trim().toLowerCase().replace(/\./g, "");
+  return ADMIN_EMAILS.map((e) => e.replace(/\./g, "")).includes(normalized);
 }

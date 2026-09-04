@@ -675,7 +675,12 @@ def run_pipeline(
             input_path = trimmed
             tmp_path = str(job_path / "video_only.preview.mp4")
             info = probe(input_path)
-        if str(opts.get("strategy", "inpaint")) == "crop-clean":
+        has_remove_masks = any(
+            (region or {}).get("role") != "protect" for region in (masks_data or [])
+        )
+        # Com áreas marcadas o recorte é ignorado: reenquadrar não apaga o que está
+        # dentro do quadro — nesse caso o correto é reconstruir o fundo.
+        if str(opts.get("strategy", "inpaint")) == "crop-clean" and not has_remove_masks:
             emit(20, "reenquadrando sem legenda", "encoding")
             ffmpeg_filter(
                 input_path,

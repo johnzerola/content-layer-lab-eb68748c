@@ -126,6 +126,8 @@ export type ChunkStatus = {
   residualText?: number;
   outputUrl?: string | null;
   seconds?: number;
+  checksum?: string | null;
+  bytes?: number | null;
   error?: string | null;
 };
 
@@ -149,6 +151,8 @@ export async function chunkStatus(providerJobId: string): Promise<ChunkStatus> {
       residualText: Number(output["residual_text"] ?? 0) || 0,
       outputUrl: (output["output_url"] as string | undefined) ?? null,
       seconds: Number(output["seconds"] ?? (result.executionTime ?? 0) / 1000) || 0,
+      checksum: typeof output["checksum"] === "string" ? (output["checksum"] as string) : null,
+      bytes: Number(output["bytes"] ?? 0) || null,
     };
   }
   return {
