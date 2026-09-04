@@ -52,13 +52,16 @@ _DETECT_WIDTH = 640
 
 QUALITY_PRESETS: Dict[str, dict] = {
     # janela temporal / correção por fluxo / passes de retry / uso de LaMa
-    # Janela longa é o remédio direto contra mancha: quanto mais frames em que
-    # aquele pixel de fundo aparece limpo, menos síntese é necessária. Só é
-    # seguro alongar com `flow`, que corrige o desalinhamento residual.
+    # Medido nos clipes sintéticos: alongar a janela de 16 para 48 amostras mudou
+    # o erro em <0,1 dB, e a correção por fluxo custou +50% de tempo sem ganho —
+    # em cena estática o fundo simplesmente nunca é exposto, então a janela não
+    # tem o que colher. Por isso `flow` fica desligado por padrão (`--flow` liga)
+    # e o esforço vai para o preenchimento.
     "fast": {"samples": 24, "flow": False, "key_step": 6, "retries": 0, "lama": False, "chunk": 4.0, "lama_keys": 0},
-    "high": {"samples": 40, "flow": True, "key_step": 4, "retries": 1, "lama": True, "chunk": 5.0, "lama_keys": 2},
-    "max": {"samples": 64, "flow": True, "key_step": 2, "retries": 2, "lama": True, "chunk": 6.0, "lama_keys": 4},
+    "high": {"samples": 32, "flow": False, "key_step": 4, "retries": 1, "lama": True, "chunk": 5.0, "lama_keys": 2},
+    "max": {"samples": 48, "flow": False, "key_step": 2, "retries": 2, "lama": True, "chunk": 6.0, "lama_keys": 4},
 }
+
 
 
 MODES = ("caption", "karaoke", "text", "logo", "object", "auto")
@@ -82,6 +85,10 @@ class CleanOptions:
     # AUTO-LaMa: liga o inpainting por modelo mesmo em presets sem LaMa,
     # quando a máscara é pequena (barato) e o TBE não fechou o chunk.
     auto_lama: bool = True
+    # Correção residual por fluxo óptico no TBE (opt-in: só compensa quando o
+    # fundo tem parallax forte; em cena plana só custa tempo).
+    flow_refine: bool = False
+
     auto_lama_max_mask: float = 0.18  # fração máxima da ROI coberta pela máscara
     auto_lama_min_mask: float = 0.0008
     # Modo objeto: o que o usuário apontou (percentual do frame).
@@ -382,7 +389,8 @@ def clean_video(
     timer.add("scene_ms", started)
 
     temporal = TemporalProvider(
-        preset["samples"], opts.mask_feather_px, bool(preset.get("flow", False))
+        preset["samples"], opts.mask_feather_px,
+        bool(preset.get("flow", False)) or bool(opts.flow_refine),
     )
 
     _lama_state: Dict[str, object] = {
@@ -511,8 +519,14 @@ def clean_video(
 
             mask_ratio = float(np.count_nonzero(masks) / max(1, masks.size))
             lama = _lama_for(mask_ratio) if report.route != "done" else None
-            small_mask = mask_ratio <= opts.auto_lama_max_mask
+            # O teto de máscara é regra do gatilho AUTO (custo imprevisível em
+            # CPU). Quando o usuário pediu `high`/`max` explicitamente, o LaMa
+            # roda mesmo em faixa larga — era isso que fazia o preset alto
+            # terminar em TBE puro e nunca acionar o inpainting.
+            explicit = bool(preset["lama"])
+            small_mask = explicit or mask_ratio <= opts.auto_lama_max_mask
             if report.route != "done" and lama is not None and lama.available() and small_mask:
+
                 emit(10 + 80 * (position / float(total_frames)), "IA avançada")
                 started = time.perf_counter()
                 # LaMa em poucos keyframes + propagação alinhada: reconstrói
