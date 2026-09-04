@@ -108,3 +108,16 @@ residual, já que o affine global sozinho basta neste tipo de movimento.
 
 Presets mantidos: fast 24 / high 32 / max 48, `flow` desligado por padrão e
 disponível via `--flow` para material com parallax forte.
+
+## Pós-passe de harmonização (CPU) — 2026-09-04
+
+`app/video/harmonize.py` casa cor, nitidez e grão da área reconstruída com o
+anel de fundo ao redor, só dentro da máscara suavizada.
+
+| Métrica (clipe sintético, faixa de legenda) | Antes | Depois |
+|---|---|---|
+| MAE vs fundo real na área tratada | 7,47 | 6,47 |
+| Grão (σ alta frequência) — real 4,18 | 0,47 | 3,17 |
+
+Ligado por padrão (`CleanOptions.harmonize`), desligável com `--no-harmonize`.
+O pipeline só aceita o resultado se o score não cair (tolerância de 0,5).
