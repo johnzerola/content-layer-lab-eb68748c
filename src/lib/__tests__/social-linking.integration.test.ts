@@ -40,7 +40,10 @@ describe("authenticated Meta linking to scheduled publishing", () => {
       )
       .mockResolvedValueOnce(jsonResponse(200, { id: "container-id" }))
       .mockResolvedValueOnce(jsonResponse(200, { status_code: "FINISHED" }))
-      .mockResolvedValueOnce(jsonResponse(200, { id: "published-id" }));
+      .mockResolvedValueOnce(jsonResponse(200, { id: "published-id" }))
+      .mockResolvedValueOnce(
+        jsonResponse(200, { permalink: "https://www.instagram.com/reel/published-id/" }),
+      );
     vi.spyOn(globalThis, "setTimeout").mockImplementation((callback) => {
       if (typeof callback === "function") callback();
       return 0 as unknown as ReturnType<typeof setTimeout>;
@@ -61,6 +64,7 @@ describe("authenticated Meta linking to scheduled publishing", () => {
           provider_account_id: providerAccountId,
         };
         storedConnection = {
+          id: "connection-1",
           provider: "meta",
           provider_account_id: providerAccountId,
           status: "conectado",
@@ -109,10 +113,11 @@ describe("authenticated Meta linking to scheduled publishing", () => {
       expect.objectContaining({ status: "publicado", provider_post_id: "published-id" }),
     );
     expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
-      "https://graph.instagram.com/v26.0/ig-validated?fields=id,username",
+      "https://graph.instagram.com/v26.0/me?fields=id,username",
       "https://graph.instagram.com/v26.0/ig-validated/media",
       "https://graph.instagram.com/v26.0/container-id?fields=status_code",
       "https://graph.instagram.com/v26.0/ig-validated/media_publish",
+      "https://graph.instagram.com/v26.0/published-id?fields=permalink",
     ]);
   });
 
@@ -120,13 +125,11 @@ describe("authenticated Meta linking to scheduled publishing", () => {
     process.env["AYRSHARE_API_KEY"] = "ayrshare-test-key";
     process.env["META_ACCESS_TOKEN"] = "meta-test-token";
     process.env["META_IG_USER_ID"] = "ig-validated";
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(
-        jsonResponse(200, {
-          postIds: [{ id: "ayrshare-post", postUrl: "https://instagram.test/post" }],
-        }),
-      );
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse(200, {
+        postIds: [{ id: "ayrshare-post", postUrl: "https://instagram.test/post" }],
+      }),
+    );
 
     const result = await publish({
       kind: "reels",

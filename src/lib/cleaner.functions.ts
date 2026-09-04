@@ -257,6 +257,7 @@ export const processCleanerJob = createServerFn({ method: "POST" })
         progress: 0.02,
         error: null,
         result_url: null,
+        preview_url: null,
       })
       .eq("id", data.id)
       .eq("user_id", context.userId)
@@ -299,4 +300,70 @@ export const refreshCleanerJob = createServerFn({ method: "POST" })
       : await q.select("*").eq("id", data.id).eq("user_id", context.userId).single();
     if (error) throw new Error(error.message);
     return row as unknown as CleanerJob;
+  });
+
+/** Inicia a remoção em GPU: divide o vídeo em partes e despacha a primeira leva. */
+export const startCleanerGpuJob = createServerFn({ method: "POST" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .validator((d: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        mode: z.enum(["smart", "subtitle", "text", "karaoke", "watermark", "logo", "object", "passerby"]),
+        preset: z.enum(["fast", "quality", "max"]),
+        masks: z.array(cleanerRegionSchema),
+        options: z.record(z.string(), z.any()).default({}),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await requireOwnedJob(context.supabase, context.userId, data.id);
+    const { gpuConfigured } = await import("@/lib/cleaner-gpu.server");
+    if (!gpuConfigured()) {
+      throw new Error("Modo GPU indisponível: configure RUNPOD_API_KEY e RUNPOD_ENDPOINT_ID.");
+    }
+    const { error } = await context.supabase
+      .from("cleaner_jobs")
+      .update({
+        mode: data.mode,
+        preset: data.preset,
+        masks: data.masks as unknown as never,
+        options: data.options as unknown as never,
+        error: null,
+        result_url: null,
+        preview_url: null,
+      })
+      .eq("id", data.id)
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+
+    const { planCleanerChunks, pumpCleanerJob } = await import("@/lib/cleaner-chunks.server");
+    const total = await planCleanerChunks(data.id, context.userId);
+    const progress = await pumpCleanerJob(data.id);
+    return { ...progress, total: total || progress.total };
+  });
+
+/** Avança/consulta o progresso por partes (também chamado pelo cron). */
+export const pumpCleanerGpuJob = createServerFn({ method: "POST" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .validator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireOwnedJob(context.supabase, context.userId, data.id);
+    const { pumpCleanerJob } = await import("@/lib/cleaner-chunks.server");
+    return await pumpCleanerJob(data.id);
+  });
+
+/** Lista o estado de cada parte, para a barra de progresso detalhada. */
+export const listCleanerChunks = createServerFn({ method: "GET" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .validator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase
+      .from("cleaner_chunks")
+      .select("idx, start_seconds, end_seconds, status, attempts, residual_text, error")
+      .eq("job_id", data.id)
+      .eq("user_id", context.userId)
+      .order("idx", { ascending: true });
+    if (error) throw new Error(error.message);
+    return rows ?? [];
   });

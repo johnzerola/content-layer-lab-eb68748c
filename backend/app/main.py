@@ -15,18 +15,21 @@ from urllib.parse import unquote
 from fastapi import BackgroundTasks, FastAPI, File, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from .config import get_settings
 from .engines.diffueraser_official import diffueraser_status
 from .engines.inpainting import cuda_available, device_name
 from .engines.propainter_official import propainter_status
+from .engines.tbe import tbe_status
 from .security import TokenError, validate_callback_url, validate_job_token, validate_service_token
+from .services.chunking import concat_videos, plan_chunks
 from .services.media_resolver import MediaResolveError, resolve_public_media
 from .services.text_detect import detector_status
 from .storage import cleanup_expired, directory_size, job_dir, read_state, write_state
-from .utils.video import probe
+from .render_queue import RenderManager
+from .utils.video import mux_audio, probe
 
 
 SETTINGS = get_settings()
@@ -35,6 +38,12 @@ JOBS: Dict[str, dict] = {}
 ACTIVE_JOBS: set[str] = set()
 ACTIVE_LOCK = threading.Lock()
 RATE_BUCKETS: Dict[str, Deque[float]] = defaultdict(deque)
+RENDER = RenderManager(
+    SETTINGS.storage_dir,
+    SETTINGS.worker_secret,
+    SETTINGS.callback_origins,
+    SETTINGS.max_upload_bytes,
+)
 MAX_RATE_BUCKETS = 10_000
 VIDEO_TYPES = {
     "application/octet-stream",
@@ -56,11 +65,13 @@ async def _cleanup_loop() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     cleanup_expired(SETTINGS.storage_dir, SETTINGS.retention_seconds)
+    RENDER.start()
     task = asyncio.create_task(_cleanup_loop())
     try:
         yield
     finally:
         task.cancel()
+        RENDER.shutdown()
 
 
 app = FastAPI(
@@ -161,34 +172,56 @@ def _validate_video(path: Path) -> dict:
 
 
 class DetectRequest(BaseModel):
-    mode: Literal["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"] = "subtitle"
+    mode: Literal["smart", "subtitle", "text", "karaoke", "watermark", "logo", "object", "passerby"] = "subtitle"
     roi: Optional[dict] = None
 
 
 class ProcessRequest(BaseModel):
     jobId: Optional[str] = None
-    mode: Literal["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"] = "subtitle"
+    mode: Literal["smart", "subtitle", "text", "karaoke", "watermark", "logo", "object", "passerby"] = "subtitle"
     preset: Literal["fast", "quality", "max"] = "quality"
     masks: List[dict] = Field(default_factory=list, max_length=500)
     options: dict = Field(default_factory=dict)
     callbackUrl: Optional[str] = None
 
 
+class PlanRequest(BaseModel):
+    target_seconds: float = Field(default=15.0, ge=4.0, le=120.0)
+    overlap: float = Field(default=0.5, ge=0.0, le=3.0)
+    use_scenes: bool = True
+
+
+class AssemblePart(BaseModel):
+    index: int = Field(ge=0, le=4096)
+    url: str = Field(min_length=10, max_length=4096)
+
+
+class AssembleRequest(BaseModel):
+    parts: List[AssemblePart] = Field(min_length=1, max_length=512)
+    metrics: dict = Field(default_factory=dict)
+
+
 class MediaResolveRequest(BaseModel):
     url: str = Field(min_length=10, max_length=2048)
 
 
-@app.get("/ping", include_in_schema=False)
-async def runpod_ping():
-    """RunPod Load Balancer readiness probe."""
-    if not cuda_available() or not propainter_status().ready:
-        return Response(status_code=204)
-    return {"status": "healthy"}
+class RenderItemRequest(BaseModel):
+    id: str
+    name: str = Field(min_length=1, max_length=300)
+    source_url: Optional[str] = Field(default=None, max_length=2048)
+    overrides: dict = Field(default_factory=dict)
+
+
+class RenderCreateRequest(BaseModel):
+    job_id: str
+    preset: dict = Field(default_factory=dict)
+    callback_url: Optional[str] = Field(default=None, max_length=2048)
+    items: List[RenderItemRequest] = Field(min_length=1, max_length=500)
 
 
 @app.get("/v1/health")
 async def health():
-    propainter = propainter_status()
+    propainter = propainter_status(require_cuda=os.getenv("PROPAINTER_ALLOW_CPU", "0") != "1")
     diffueraser = diffueraser_status()
     disk = shutil.disk_usage(SETTINGS.storage_dir)
     return {
@@ -201,8 +234,11 @@ async def health():
             "propainter": {"ready": propainter.ready, "missing": list(propainter.missing)},
             "diffueraser": {"ready": diffueraser.ready, "missing": list(diffueraser.missing)},
             "temporal_fill": {"ready": True, "quality": "fallback"},
+            "tbe": tbe_status(),
         },
+
         "detectors": {"text": detector_status()},
+        "features": {"batch_render": True},
         "limits": {
             "max_upload_bytes": SETTINGS.max_upload_bytes,
             "max_duration_seconds": SETTINGS.max_duration_seconds,
@@ -213,6 +249,98 @@ async def health():
         },
         "version": app.version,
     }
+
+
+@app.post("/v1/render/jobs")
+async def create_render_job(req: RenderCreateRequest, x_job_token: Optional[str] = Header(None)):
+    verify_token(req.job_id, x_job_token, "control")
+    try:
+        return RENDER.create(req.job_id, req.preset, req.callback_url, [item.model_dump() for item in req.items])
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
+
+
+@app.post("/v1/render/items/{item_id}/upload")
+async def upload_render_item(
+    request: Request,
+    item_id: str,
+    x_job_token: Optional[str] = Header(None),
+    x_file_name: Optional[str] = Header(None),
+):
+    try:
+        batch_id, state, item = RENDER.find_item(item_id)
+    except (KeyError, ValueError):
+        raise HTTPException(404, "render item not found") from None
+    verify_token(batch_id, x_job_token, "upload")
+    if item.get("status") not in {"uploading", "failed"}:
+        return {"ok": True, "existing": True}
+    directory = RENDER.directory(batch_id)
+    destination = directory / f"{item_id}.input.mp4"
+    temporary = directory / f".{item_id}.upload"
+    size = 0
+    try:
+        with temporary.open("wb") as output:
+            async for chunk in request.stream():
+                size += len(chunk)
+                if size > SETTINGS.max_upload_bytes:
+                    raise HTTPException(413, "arquivo excede o limite configurado")
+                output.write(chunk)
+        if size == 0:
+            raise HTTPException(400, "arquivo vazio")
+        metadata = _validate_video(temporary)
+        os.replace(temporary, destination)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
+    item.update(status="queued", progress=0, stage="enviado", size=size, probe=metadata)
+    RENDER.write(batch_id, state)
+    return {"ok": True, "size": size, "probe": metadata, "name": unquote(x_file_name or item["name"])}
+
+
+@app.post("/v1/render/jobs/{batch_id}/start")
+async def start_render_job(batch_id: str, x_job_token: Optional[str] = Header(None)):
+    verify_token(batch_id, x_job_token, "control")
+    state = RENDER.read(batch_id)
+    if not state:
+        raise HTTPException(404, "render batch not found")
+    missing = [item["id"] for item in state.get("items", []) if not item.get("source_url") and not (RENDER.directory(batch_id) / f"{item['id']}.input.mp4").is_file()]
+    if missing:
+        raise HTTPException(409, f"{len(missing)} arquivo(s) ainda não enviado(s)")
+    state["status"] = "queued"
+    RENDER.write(batch_id, state)
+    RENDER.enqueue(batch_id)
+    return {"ok": True}
+
+
+@app.get("/v1/render/jobs/{batch_id}")
+async def render_job_status(batch_id: str, x_job_token: Optional[str] = Header(None)):
+    verify_token(batch_id, x_job_token, "control")
+    state = RENDER.read(batch_id)
+    if not state:
+        raise HTTPException(404, "render batch not found")
+    return state
+
+
+@app.post("/v1/render/jobs/{batch_id}/cancel")
+async def cancel_render_job(batch_id: str, x_job_token: Optional[str] = Header(None)):
+    verify_token(batch_id, x_job_token, "control")
+    try:
+        return RENDER.cancel(batch_id)
+    except KeyError:
+        raise HTTPException(404, "render batch not found") from None
+
+
+@app.get("/v1/render/items/{item_id}/result")
+async def render_item_result(item_id: str, token: Optional[str] = Query(None)):
+    try:
+        batch_id, _, item = RENDER.find_item(item_id)
+    except (KeyError, ValueError):
+        raise HTTPException(404, "render item not found") from None
+    verify_token(batch_id, token, "result")
+    path = RENDER.directory(batch_id) / f"{item_id}.output.mp4"
+    if item.get("status") != "completed" or not path.is_file():
+        raise HTTPException(404, "resultado ainda não disponível")
+    return FileResponse(path, media_type="video/mp4", filename=item.get("name") or f"{item_id}.mp4")
 
 
 @app.post("/v1/media/resolve")
@@ -363,9 +491,6 @@ async def start_process(
         raise HTTPException(400, str(exc)) from None
     if not (job_dir(SETTINGS.storage_dir, job_id) / "input.mp4").is_file():
         raise HTTPException(409, "video ainda nao foi enviado")
-    current_state = read_state(job_dir(SETTINGS.storage_dir, job_id))
-    if current_state.get("status") in {"queued", "processing", "inpainting", "analyzing", "detecting"}:
-        raise HTTPException(409, "job ja esta em processamento")
     with ACTIVE_LOCK:
         if job_id in ACTIVE_JOBS:
             raise HTTPException(409, "job ja esta em processamento")
@@ -409,13 +534,106 @@ async def job_status(job_id: str, x_job_token: Optional[str] = Header(None)):
     return state or {"status": "unknown", "progress": 0}
 
 
+@app.get("/v1/jobs/{job_id}/source")
+async def get_source(job_id: str, token: Optional[str] = Query(None)):
+    """Entrada original — consumida pelos workers GPU que processam um chunk."""
+    verify_token(job_id, token, "result")
+    path = job_dir(SETTINGS.storage_dir, job_id) / "input.mp4"
+    if not path.is_file():
+        raise HTTPException(404, "video de entrada indisponivel")
+    return FileResponse(path, media_type="video/mp4")
+
+
+@app.post("/v1/jobs/{job_id}/plan")
+async def plan_job_chunks(job_id: str, req: PlanRequest, x_job_token: Optional[str] = Header(None)):
+    """Divide o vídeo em janelas com sobreposição, respeitando cortes de cena."""
+    verify_token(job_id, x_job_token, "control")
+    directory = job_dir(SETTINGS.storage_dir, job_id)
+    input_path = directory / "input.mp4"
+    if not input_path.is_file():
+        raise HTTPException(409, "video ainda nao foi enviado")
+    info = await asyncio.to_thread(probe, str(input_path))
+    cuts: List[float] = []
+    if req.use_scenes:
+        from .services.scene import detect_scenes
+
+        try:
+            scenes = await asyncio.to_thread(detect_scenes, str(input_path))
+            cuts = [float(start) / max(info.fps, 1e-6) for start, _ in scenes]
+        except Exception:
+            cuts = []
+    chunks = plan_chunks(info.duration, req.target_seconds, req.overlap, cuts)
+    return {
+        "duration": round(info.duration, 3),
+        "fps": round(info.fps, 3),
+        "chunks": [
+            {
+                "index": chunk.index,
+                "start": round(chunk.start, 3),
+                "end": round(chunk.end, 3),
+                "overlap": round(chunk.overlap, 3),
+            }
+            for chunk in chunks
+        ],
+    }
+
+
+@app.post("/v1/jobs/{job_id}/assemble")
+async def assemble_job(job_id: str, req: AssembleRequest, x_job_token: Optional[str] = Header(None)):
+    """Baixa os chunks prontos, concatena na ordem e remonta o áudio original."""
+    verify_token(job_id, x_job_token, "control")
+    directory = job_dir(SETTINGS.storage_dir, job_id)
+    input_path = directory / "input.mp4"
+    if not input_path.is_file():
+        raise HTTPException(409, "video de entrada ausente")
+    work_dir = directory / "chunks"
+    work_dir.mkdir(parents=True, exist_ok=True)
+
+    def build() -> dict:
+        import requests as _requests
+
+        parts: List[str] = []
+        for order, part in enumerate(sorted(req.parts, key=lambda item: item.index)):
+            destination = work_dir / f"part-{order:04d}.mp4"
+            with _requests.get(part.url, stream=True, timeout=(30, 1800)) as response:
+                response.raise_for_status()
+                with destination.open("wb") as handle:
+                    for block in response.iter_content(chunk_size=1024 * 1024):
+                        if block:
+                            handle.write(block)
+            if destination.stat().st_size < 1024:
+                raise RuntimeError(f"chunk {part.index} veio vazio")
+            parts.append(str(destination))
+        merged = concat_videos(parts, str(work_dir / "merged.mp4"), str(work_dir))
+        info = probe(str(input_path))
+        mux_audio(merged, str(input_path), str(directory / "output.mp4"), info.has_audio)
+        return {"frames": info.frames, "duration": round(info.duration, 3)}
+
+    try:
+        summary = await asyncio.to_thread(build)
+    except Exception as exc:
+        _set_state(job_id, {"status": "failed", "error": f"falha ao remontar: {str(exc)[:300]}"})
+        raise HTTPException(422, f"falha ao remontar: {str(exc)[:300]}") from None
+    shutil.rmtree(work_dir, ignore_errors=True)
+    state = {
+        "status": "completed",
+        "progress": 100,
+        "stage": "concluido",
+        "result_url": f"/v1/jobs/{job_id}/result",
+        "metrics": {**(req.metrics or {}), **summary, "engine": "gpu-chunked"},
+    }
+    _set_state(job_id, state)
+    return {"ok": True, **state}
+
+
+
 @app.post("/v1/jobs/{job_id}/cancel")
 async def cancel(job_id: str, x_job_token: Optional[str] = Header(None)):
     verify_token(job_id, x_job_token, "control")
     directory = job_dir(SETTINGS.storage_dir, job_id)
     directory.mkdir(parents=True, exist_ok=True)
     (directory / ".cancel").touch()
-    _set_state(job_id, {"status": "failed", "error": "cancelado", "progress": 0})
+    _set_state(job_id, {"status": "cancelled", "stage": "cancelado", "error": None, "progress": 0})
     return {"ok": True}
 
 
@@ -443,6 +661,21 @@ async def get_result(job_id: str, background_tasks: BackgroundTasks, token: Opti
         path,
         media_type="video/mp4",
         headers={"Content-Disposition": f'inline; filename="{job_id}-limpo.mp4"'},
+    )
+
+
+@app.get("/v1/jobs/{job_id}/preview")
+async def get_preview(job_id: str, token: Optional[str] = Query(None)):
+    """Prévia curta (ex.: 5s) — servida sem apagar o diretório do job."""
+    verify_token(job_id, token, "result")
+    directory = job_dir(SETTINGS.storage_dir, job_id)
+    path = directory / "preview.mp4"
+    if not path.is_file():
+        raise HTTPException(404, "previa ainda nao disponivel")
+    return FileResponse(
+        path,
+        media_type="video/mp4",
+        headers={"Content-Disposition": f'inline; filename="{job_id}-previa.mp4"'},
     )
 
 

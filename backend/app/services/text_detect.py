@@ -16,22 +16,41 @@ _detector_kind = "uninitialized"
 _detector_tried = False
 
 
+def _try_rapidocr():
+    """RapidOCR (ONNXRuntime / PP-OCR models) — detection only, CPU friendly."""
+    try:
+        from rapidocr_onnxruntime import RapidOCR  # type: ignore
+    except Exception:
+        try:
+            from rapidocr import RapidOCR  # type: ignore
+        except Exception as exc:  # pragma: no cover - optional dependency
+            print(f"[text_detect] RapidOCR unavailable ({exc})")
+            return None
+    try:
+        return RapidOCR()
+    except Exception as exc:  # pragma: no cover
+        print(f"[text_detect] RapidOCR failed to start ({exc})")
+        return None
+
+
 def _get_detector():
     global _detector, _detector_kind, _detector_tried
     if _detector_tried:
         return _detector
     _detector_tried = True
-    requested_detector = os.getenv("CLEANER_TEXT_DETECTOR", "morphology").strip()
-    if requested_detector.lower() == "morphology":
-        _detector_kind = "morphology"
-        return None
+    if os.getenv("CLEANER_OCR_ENGINE", "rapidocr").lower() == "rapidocr":
+        rapid = _try_rapidocr()
+        if rapid is not None:
+            _detector = rapid
+            _detector_kind = "rapidocr-onnx"
+            return _detector
     try:
         # PaddleOCR 3.x direct detector. Recognition is intentionally omitted:
         # masks need geometry, not the transcription.
         from paddleocr import TextDetection  # type: ignore
 
         _detector = TextDetection(
-            model_name=requested_detector,
+            model_name=os.getenv("CLEANER_TEXT_DETECTOR", "PP-OCRv5_server_det"),
             device=os.getenv("CLEANER_OCR_DEVICE", "cpu"),
         )
         _detector_kind = "pp-ocrv5"
@@ -53,15 +72,45 @@ def _get_detector():
 def detector_status(load: bool = False) -> dict:
     if load:
         _get_detector()
+    available = (
+        _detector is not None
+        or importlib.util.find_spec("rapidocr_onnxruntime") is not None
+        or importlib.util.find_spec("rapidocr") is not None
+        or importlib.util.find_spec("paddleocr") is not None
+    )
     return {
-        "ready": (
-            _detector_kind == "morphology"
-            or _detector is not None
-            or importlib.util.find_spec("paddleocr") is not None
-        ),
+        "ready": available,
         "engine": _detector_kind if _detector_tried else "not-loaded",
-        "model": os.getenv("CLEANER_TEXT_DETECTOR", "morphology"),
+        "model": os.getenv("CLEANER_TEXT_DETECTOR", "PP-OCRv5_server_det"),
     }
+
+
+def _boxes_rapidocr(frame: np.ndarray) -> List[Box]:
+    detector = _detector
+    if detector is None:
+        return []
+    try:
+        result = detector(frame, use_det=True, use_cls=False, use_rec=False)
+    except TypeError:
+        result = detector(frame)
+    except Exception as exc:
+        print(f"[text_detect] rapidocr inference failed ({exc})")
+        return []
+    boxes_raw: Any = None
+    if isinstance(result, tuple):
+        boxes_raw = result[0]
+    else:
+        boxes_raw = getattr(result, "boxes", None)
+        if boxes_raw is None:
+            boxes_raw = result
+    boxes: List[Box] = []
+    for item in boxes_raw or []:
+        pts = item[0] if (isinstance(item, (list, tuple)) and len(item) == 3) else item
+        arr = np.asarray(pts, dtype=np.float32)
+        if arr.ndim == 2 and arr.shape[0] >= 4:
+            boxes.append(cv2.boundingRect(arr.astype(np.int32)))
+    return boxes
+
 
 
 def _result_payload(item: Any) -> Any:
@@ -95,7 +144,6 @@ def _modern_polygons(result: Iterable[Any]) -> List[np.ndarray]:
 
 
 def _boxes_paddle(frame: np.ndarray) -> List[Box]:
-    global _detector, _detector_kind
     detector = _get_detector()
     if detector is None:
         return []
@@ -105,9 +153,7 @@ def _boxes_paddle(frame: np.ndarray) -> List[Box]:
             return [cv2.boundingRect(poly.astype(np.int32)) for poly in _modern_polygons(result)]
         result = detector.ocr(frame, cls=False)
     except Exception as exc:
-        print(f"[text_detect] inference failed ({exc}); disabling PaddleOCR")
-        _detector = None
-        _detector_kind = "morphology"
+        print(f"[text_detect] inference failed ({exc}); using morphology for this frame")
         return []
     boxes: List[Box] = []
     for page in result or []:
@@ -140,11 +186,13 @@ def _boxes_morph(frame: np.ndarray) -> List[Box]:
 
 
 def detect_text_boxes(frame: np.ndarray) -> List[Box]:
-    boxes = _boxes_paddle(frame)
+    _get_detector()
+    boxes = _boxes_rapidocr(frame) if _detector_kind == "rapidocr-onnx" else _boxes_paddle(frame)
     return boxes if boxes else _boxes_morph(frame)
 
 
-def text_pixel_mask(frame: np.ndarray, box: Box, dilate_ratio: float = 0.18) -> np.ndarray:
+
+def text_pixel_mask(frame: np.ndarray, box: Box, dilate_ratio: float = 0.32) -> np.ndarray:
     """Mask glyphs, outline, shadow and glow inside a detected text box."""
     h_img, w_img = frame.shape[:2]
     x, y, w, h = box
@@ -164,46 +212,30 @@ def text_pixel_mask(frame: np.ndarray, box: Box, dilate_ratio: float = 0.18) -> 
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
     local = cv2.dilate(local, kernel)
     local = cv2.morphologyEx(local, cv2.MORPH_CLOSE, kernel)
+    # Subtitle boxes: once a line is clearly covered by glyphs, clear the whole
+    # band instead of glyph outlines — leftover strokes/shadows are worse than
+    # rebuilding a slightly larger background plate.
+    rows = np.where(local.mean(axis=1) > 20)[0]
+    if rows.size:
+        pad = max(2, int(round(h * 0.12)))
+        top = max(0, int(rows.min()) - pad)
+        bottom = min(h, int(rows.max()) + 1 + pad)
+        local[top:bottom, :] = 255
     mask[y:y + h, x:x + w] = local
+
     return mask
 
 
-def _bright_subtitle_mask(frame: np.ndarray, roi: np.ndarray) -> np.ndarray:
-    """Recover short white words that morphology may reject as narrow boxes."""
-    h_img, w_img = frame.shape[:2]
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    bright = (
-        (hsv[..., 2] >= 185)
-        & (hsv[..., 1] <= 120)
-        & (roi > 0)
-    ).astype(np.uint8) * 255
-    count, labels, stats, centroids = cv2.connectedComponentsWithStats(bright, 8)
-    candidates = []
-    for label in range(1, count):
-        x, y, w, h, area = stats[label]
-        if area < 20 or w < 2 or h < 8:
-            continue
-        if w > w_img * 0.16 or h > max(32, h_img * 0.08):
-            continue
-        candidates.append((label, x, y, w, h, centroids[label][1]))
-
-    keep = np.zeros((h_img, w_img), dtype=np.uint8)
-    kept_heights = []
-    for label, _x, _y, _w, height, center_y in candidates:
-        peers = sum(
-            1
-            for _other, _ox, _oy, _ow, other_h, other_y in candidates
-            if abs(center_y - other_y) <= max(8, 0.45 * max(height, other_h))
-        )
-        if peers >= 3:
-            keep[labels == label] = 255
-            kept_heights.append(height)
-    if not kept_heights:
-        return keep
-    radius = max(3, int(round(float(np.median(kept_heights)) * 0.18)) | 1)
-    return cv2.dilate(
-        keep,
-        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (radius, radius)),
+def _roi_bbox(roi: np.ndarray, margin: int = 24):
+    ys, xs = np.where(roi > 0)
+    if ys.size == 0:
+        return None
+    h_img, w_img = roi.shape[:2]
+    return (
+        max(0, int(ys.min()) - margin),
+        min(h_img, int(ys.max()) + 1 + margin),
+        max(0, int(xs.min()) - margin),
+        min(w_img, int(xs.max()) + 1 + margin),
     )
 
 
@@ -214,41 +246,31 @@ def frame_text_mask(
 ) -> np.ndarray:
     h_img, w_img = frame.shape[:2]
     out = np.zeros((h_img, w_img), np.uint8)
-    offset_x = 0
-    offset_y = 0
-    detector_frame = frame
-    if roi is not None and roi.max() > 0:
-        ys, xs = np.where(roi > 0)
-        margin = 16
-        offset_x = max(0, int(xs.min()) - margin)
-        offset_y = max(0, int(ys.min()) - margin)
-        x1 = min(w_img, int(xs.max()) + margin + 1)
-        y1 = min(h_img, int(ys.max()) + margin + 1)
-        detector_frame = frame[offset_y:y1, offset_x:x1]
-
-    for detected_box in detect_text_boxes(detector_frame):
-        x, y, w, h = detected_box
-        pad = max(3, int(round(h * 0.18)))
-        box = (
-            max(0, x + offset_x - pad),
-            max(0, y + offset_y - pad),
-            min(w_img, x + offset_x + w + pad) - max(0, x + offset_x - pad),
-            min(h_img, y + offset_y + h + pad) - max(0, y + offset_y - pad),
-        )
+    # Detecting inside the ROI crop instead of the whole frame keeps CPU OCR
+    # roughly an order of magnitude cheaper without changing the result.
+    box_area = _roi_bbox(roi) if roi is not None else None
+    if box_area is not None:
+        y0, y1, x0, x1 = box_area
+        search = frame[y0:y1, x0:x1]
+    else:
+        y0, x0 = 0, 0
+        search = frame
+    if search.size == 0:
+        return out
+    for box in detect_text_boxes(search):
         x, y, w, h = box
-        if subtitle_only and (y + h / 2) < h_img * 0.42:
+        abs_x, abs_y = x + x0, y + y0
+        if subtitle_only and (abs_y + h / 2) < h_img * 0.42:
             continue
         if roi is not None:
-            sub = roi[max(0, y):y + h, max(0, x):x + w]
+            sub = roi[max(0, abs_y):abs_y + h, max(0, abs_x):abs_x + w]
             if sub.size == 0 or (sub > 0).mean() < 0.15:
                 continue
-        out = np.maximum(out, text_pixel_mask(frame, box))
-    if subtitle_only and roi is not None:
-        out = np.maximum(out, _bright_subtitle_mask(frame, roi))
-        out = cv2.dilate(
-            out,
-            cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)),
+        local = text_pixel_mask(search, box)
+        out[y0:y0 + local.shape[0], x0:x0 + local.shape[1]] = np.maximum(
+            out[y0:y0 + local.shape[0], x0:x0 + local.shape[1]], local
         )
     if roi is not None:
         out = cv2.bitwise_and(out, roi)
     return out
+

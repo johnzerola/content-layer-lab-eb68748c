@@ -1,60 +1,177 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { ArrowLeft, CheckCircle2, Facebook, Instagram, Settings2, TriangleAlert, Youtube } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { useCallback, useEffect, useState } from "react";
+import {
+  CheckCircle2,
+  Clock3,
+  ExternalLink,
+  Star,
+  Facebook,
+  HelpCircle,
+  Instagram,
+  Loader2,
+  LogOut,
+  Pencil,
+  RefreshCw,
+  ShieldCheck,
+  Settings2,
+  Trash2,
+  TriangleAlert,
+  UserRound,
+  Youtube,
+} from "lucide-react";
+import { toast } from "sonner";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
-import { listAccounts, type SocialAccount } from "@/lib/social";
+import {
+  listAccounts,
+  removeAccount,
+  renameAccount,
+  socialAccountDetail,
+  socialAccountTitle,
+  type SocialAccount,
+} from "@/lib/social";
+
+import {
+  beginFacebookOAuth,
+  diagnoseFacebookIntegration,
+  syncMetaAccounts,
+} from "@/lib/facebook-oauth.functions";
+import { beginInstagramOAuth, diagnoseInstagramIntegration } from "@/lib/meta-oauth.functions";
+import {
+  beginYoutubeOAuth,
+  refreshYoutubeChannel,
+  syncYoutubeChannels,
+} from "@/lib/youtube-oauth.functions";
+import { setPrimaryAccount } from "@/lib/social-primary.functions";
+import { RECONNECT_GUIDE_STEPS } from "@/lib/meta-reconnect-guide";
+import {
+  YOUTUBE_RECONNECT_GUIDE_STEPS,
+  YOUTUBE_SINGLE_CHANNEL_NOTICE,
+} from "@/lib/youtube-reconnect-guide";
+import {
+  describeSchedule,
+  listSyncSchedules,
+  setSyncSchedule,
+  SYNC_INTERVAL_OPTIONS,
+  type SyncSchedule,
+} from "@/lib/sync-schedule";
+import { AppShell, type AppMode } from "@/components/AppShell";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { listJobs } from "@/lib/jobs";
 
 export const Route = createFileRoute("/integracoes")({
   component: IntegrationsPage,
   head: () => ({
     meta: [
-      { title: "Integrações sociais — VaiViral" },
-      { name: "description", content: "Status verdadeiro das conexões de publicação em redes sociais." },
+      { title: "Minhas contas sociais — VaiViral" },
+      {
+        name: "description",
+        content:
+          "Conecte quantas contas do Instagram e Páginas do Facebook quiser para publicar em lote.",
+      },
+      { property: "og:title", content: "Minhas contas sociais — VaiViral" },
+      {
+        property: "og:description",
+        content: "Gerencie as contas conectadas usadas nas publicações automáticas.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
 });
 
-type IntegrationCard = {
-  platform: "instagram" | "facebook" | "tiktok" | "youtube";
+type PlatformKey = "instagram" | "facebook" | "tiktok" | "youtube";
+type AccountSwitchProvider = "meta" | "youtube";
+
+const META_PLATFORMS: Array<{
+  platform: "instagram" | "facebook";
   name: string;
   description: string;
   icon: typeof Instagram;
-};
-
-const INTEGRATIONS: IntegrationCard[] = [
+}> = [
   {
     platform: "instagram",
     name: "Instagram",
-    description: "Reels e Stories por Meta Graph API ou Ayrshare.",
+    description:
+      "Reels, Feed e Stories via OAuth do Instagram. Use para contas profissionais e criadores em modo profissional.",
     icon: Instagram,
   },
   {
     platform: "facebook",
     name: "Facebook",
-    description: "Adapter de publicação ainda não implementado.",
+    description: "Páginas com Reels e vídeos no Feed via Facebook Login.",
     icon: Facebook,
-  },
-  {
-    platform: "tiktok",
-    name: "TikTok",
-    description: "Content Posting API ainda não configurada.",
-    icon: Settings2,
-  },
-  {
-    platform: "youtube",
-    name: "YouTube",
-    description: "Upload de Shorts ainda não configurado.",
-    icon: Youtube,
   },
 ];
 
+const YOUTUBE_PLATFORM = {
+  platform: "youtube" as const,
+  name: "YouTube",
+  description:
+    "Vídeos longos e Shorts via YouTube Data API. Cada canal ou Conta de marca deve ser adicionado separadamente.",
+  icon: Youtube,
+};
+
 function IntegrationsPage() {
+  const mode: AppMode = "external";
+  const jobs = listJobs();
   const [user, setUser] = useState<CloudUser | null>(null);
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
+  const [busy, setBusy] = useState<PlatformKey | null>(null);
+
+  const startFacebook = useServerFn(beginFacebookOAuth);
+  const startInstagram = useServerFn(beginInstagramOAuth);
+  const startYoutube = useServerFn(beginYoutubeOAuth);
+  const syncYoutube = useServerFn(syncYoutubeChannels);
+  const refreshChannel = useServerFn(refreshYoutubeChannel);
+  const syncMeta = useServerFn(syncMetaAccounts);
+  const [syncingMetaAccounts, setSyncingMetaAccounts] = useState(false);
+  const [syncingYoutube, setSyncingYoutube] = useState(false);
+  const [refreshingYoutube, setRefreshingYoutube] = useState<Set<string>>(new Set());
+  const [accountSwitchProvider, setAccountSwitchProvider] =
+    useState<AccountSwitchProvider | null>(null);
+  const makePrimary = useServerFn(setPrimaryAccount);
+  const [schedules, setSchedules] = useState<Record<string, SyncSchedule>>({});
+
+  const reloadSchedules = useCallback(() => {
+    void listSyncSchedules()
+      .then(setSchedules)
+      .catch(() => setSchedules({}));
+  }, []);
+
+  const changeSchedule = useCallback(
+    async (account: SocialAccount, intervalMinutes: number) => {
+      try {
+        await setSyncSchedule(account.id, intervalMinutes);
+        toast.success(
+          intervalMinutes > 0
+            ? "Sincronização automática agendada."
+            : "Sincronização automática desligada.",
+        );
+        reloadSchedules();
+      } catch {
+        toast.error("Não foi possível salvar o agendamento.");
+      }
+    },
+    [reloadSchedules],
+  );
 
   useEffect(() => {
     void currentUser().then(setUser);
     return onAuth(setUser);
+  }, []);
+
+  const reload = useCallback(() => {
+    void listAccounts()
+      .then(setAccounts)
+      .catch(() => setAccounts([]));
   }, []);
 
   useEffect(() => {
@@ -62,105 +179,1132 @@ function IntegrationsPage() {
       setAccounts([]);
       return;
     }
-    void listAccounts().then(setAccounts).catch(() => setAccounts([]));
-  }, [user]);
+    reload();
+    reloadSchedules();
+  }, [reload, reloadSchedules, user]);
+
+  const connect = useCallback(
+    async (platform: PlatformKey) => {
+      setBusy(platform);
+      try {
+        if (platform === "youtube") {
+          const response = await startYoutube();
+          if (!response.ok) {
+            toast.error(response.error);
+            return;
+          }
+          window.location.href = response.authorizationUrl;
+          return;
+        }
+        if (platform === "instagram") {
+          const response = await startInstagram();
+          if (!response.ok) {
+            toast.error(response.error);
+            return;
+          }
+          window.location.href = response.authorizationUrl;
+          return;
+        }
+        const response = await startFacebook({ data: { forceClassic: true } });
+
+        if (!response.ok) {
+          toast.error(response.error);
+          return;
+        }
+        const authorizationUrl = new URL(response.authorizationUrl);
+        const expectedPath = `/${response.diagnostics.graphVersion}/dialog/oauth`;
+        const expectedRedirect = `${response.diagnostics.redirectOrigin}${response.diagnostics.redirectPath}`;
+        if (authorizationUrl.pathname !== expectedPath) {
+          toast.error(
+            `Versão do Graph divergente: esperado ${expectedPath}, gerado ${authorizationUrl.pathname}.`,
+          );
+          return;
+        }
+        if (authorizationUrl.searchParams.get("redirect_uri") !== expectedRedirect) {
+          toast.error(
+            `URL de retorno divergente: esperado ${expectedRedirect}, gerado ${authorizationUrl.searchParams.get("redirect_uri") ?? "vazio"}.`,
+          );
+          return;
+        }
+        const sentScopes = authorizationUrl.searchParams.get("scope")?.split(",") ?? [];
+        if (
+          response.diagnostics.mode === "classic" &&
+          response.diagnostics.requestedScopes.some((scope) => !sentScopes.includes(scope))
+        ) {
+          toast.error("A URL OAuth não contém todas as permissões obrigatórias.");
+          return;
+        }
+        window.location.href = response.authorizationUrl;
+      } catch {
+        toast.error("Não foi possível iniciar a autorização.");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [startFacebook, startInstagram, startYoutube],
+  );
+
+  const disconnect = useCallback(
+    async (account: SocialAccount) => {
+      try {
+        await removeAccount(account.id);
+        toast.success("Conta removida.");
+        reload();
+      } catch {
+        toast.error("Não foi possível remover a conta.");
+      }
+    },
+    [reload],
+  );
+
+  const rename = useCallback(
+    async (account: SocialAccount, name: string) => {
+      try {
+        await renameAccount(account.id, name);
+        toast.success("Nome atualizado.");
+        reload();
+      } catch {
+        toast.error("Não foi possível renomear o canal.");
+      }
+    },
+    [reload],
+  );
+
+  const choosePrimary = useCallback(
+    async (account: SocialAccount) => {
+      try {
+        const response = await makePrimary({ data: { accountId: account.id } });
+        if (!response.ok) {
+          toast.error(response.error);
+          return;
+        }
+        toast.success(`${account.username} agora é a conta ativa.`);
+        reload();
+      } catch {
+        toast.error("Não foi possível definir a conta ativa.");
+      }
+    },
+    [makePrimary, reload],
+  );
+
+  const refreshMeta = useCallback(async () => {
+    setSyncingMetaAccounts(true);
+    try {
+      const response = await syncMeta();
+      if (!response.ok) {
+        toast.error(response.error);
+        return;
+      }
+      const synchronized = `${response.summary.facebook.length} Página(s) e ${response.summary.instagram.length} Instagram sincronizado(s).`;
+      if (response.summary.failed > 0) {
+        toast.warning(
+          `${synchronized} ${response.summary.failed} conexão(ões) precisa(m) de reautorização.`,
+        );
+      } else {
+        toast.success(synchronized);
+      }
+      reload();
+    } catch {
+      toast.error("Não foi possível sincronizar as contas Meta.");
+    } finally {
+      setSyncingMetaAccounts(false);
+    }
+  }, [reload, syncMeta]);
+
+  const refreshYoutube = useCallback(async () => {
+    setSyncingYoutube(true);
+    try {
+      const response = await syncYoutube();
+      if (!response.ok) {
+        toast.error(response.error);
+        return;
+      }
+      toast.success(
+        `${response.accounts.length} canal(is) sincronizado(s): ${response.summary.channels.join(", ")}`,
+      );
+      reload();
+    } catch {
+      toast.error("Não foi possível sincronizar os canais do YouTube.");
+    } finally {
+      setSyncingYoutube(false);
+    }
+  }, [reload, syncYoutube]);
+
+  const refreshYoutubeAccount = useCallback(
+    async (account: SocialAccount) => {
+      setRefreshingYoutube((prev) => new Set(prev).add(account.id));
+      try {
+        const response = await refreshChannel({ data: { accountId: account.id } });
+        if (!response.ok) {
+          toast.error(response.error);
+          return;
+        }
+        toast.success(
+          `Canal ${response.account.display_name ?? response.account.username} atualizado.`,
+        );
+        reload();
+      } catch {
+        toast.error("Não foi possível atualizar o canal do YouTube.");
+      } finally {
+        setRefreshingYoutube((prev) => {
+          const next = new Set(prev);
+          next.delete(account.id);
+          return next;
+        });
+      }
+    },
+    [refreshChannel, reload],
+  );
+
+  const continueWithOtherAccount = useCallback(
+    async (provider: AccountSwitchProvider) => {
+      setAccountSwitchProvider(null);
+      await connect(provider === "meta" ? "facebook" : "youtube");
+    },
+    [connect],
+  );
+
+  const facebookAccounts = accounts.filter((account) => account.platform === "facebook");
+  const instagramAccounts = accounts.filter((account) => account.platform === "instagram");
+  const youtubeAccounts = accounts.filter((account) => account.platform === "youtube");
+  const hasMetaAccounts = facebookAccounts.length + instagramAccounts.length > 0;
+  const hasYoutubeAccounts = youtubeAccounts.length > 0;
+  const connectingFacebook = busy === "facebook";
+  const connectingInstagram = busy === "instagram";
+  const syncingMeta = connectingFacebook || connectingInstagram;
 
   return (
-    <div className="theme-lote min-h-dvh bg-background">
-      <header className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-5xl items-center gap-3 px-4 py-3 sm:px-6">
-          <Link
-            to="/"
-            className="flex items-center gap-2 rounded-xl border border-border bg-surface-2 px-3 py-1.5 text-sm text-muted-foreground transition hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" /> Voltar
-          </Link>
+    <AppShell
+      mode={mode}
+      onMode={() => {}}
+      count={jobs.length}
+      onLibrary={() => {}}
+      onCloud={() => {}}
+    >
+      <main className="w-full min-w-0">
+        <header className="mb-6 flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="font-display text-lg font-bold tracking-tight">Integrações</h1>
-            <p className="font-mono text-[11px] text-muted-foreground">conexões e capacidades de publicação</p>
+            <p className="mono-label text-primary">Contas sociais</p>
+            <h1 className="mt-2 font-display text-2xl font-bold">Canais de publicação</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              Sincronize Páginas, contas profissionais e canais autorizados para publicar sem
+              precisar compartilhar senhas.
+            </p>
           </div>
-        </div>
-      </header>
+          {user && (
+            <div className="flex flex-wrap gap-2">
+              {hasMetaAccounts && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={syncingMetaAccounts}
+                  onClick={() => void refreshMeta()}
+                  className="min-h-10 shrink-0"
+                >
+                  {syncingMetaAccounts ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="size-4" />
+                  )}
+                  Verificar conexões
+                </Button>
+              )}
+              <Button
+                type="button"
+                disabled={connectingFacebook}
+                onClick={() => setAccountSwitchProvider("meta")}
+                className="min-h-10 shrink-0"
+              >
+                {connectingFacebook ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : facebookAccounts.length > 0 ? (
+                  <RefreshCw className="size-4" />
+                ) : (
+                  <Facebook className="size-4" />
+                )}
+                {facebookAccounts.length > 0 ? "Adicionar/selecionar Páginas" : "Conectar Facebook/Páginas"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={connectingInstagram}
+                onClick={() => void connect("instagram")}
+                className="min-h-10 shrink-0"
+              >
+                {connectingInstagram ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Instagram className="size-4" />
+                )}
+                {instagramAccounts.length > 0 ? "Adicionar Instagram" : "Conectar Instagram"}
+              </Button>
+              {hasMetaAccounts && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={syncingMeta}
+                  onClick={() => setAccountSwitchProvider("meta")}
+                  className="min-h-10 shrink-0"
+                >
+                  <UserRound className="size-4" />
+                  Outro Facebook
+                </Button>
+              )}
+              {hasYoutubeAccounts && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={syncingYoutube}
+                  onClick={() => void refreshYoutube()}
+                  className="min-h-10 shrink-0"
+                >
+                  {syncingYoutube ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="size-4" />
+                  )}
+                  Sincronizar canais
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy === "youtube"}
+                onClick={() => void connect("youtube")}
+                className="min-h-10 shrink-0"
+              >
+                {busy === "youtube" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : hasYoutubeAccounts ? (
+                  <RefreshCw className="size-4" />
+                ) : (
+                  <Youtube className="size-4" />
+                )}
+                {hasYoutubeAccounts ? "Adicionar canal/Conta de marca" : "Conectar YouTube"}
+              </Button>
+              {hasYoutubeAccounts && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy === "youtube"}
+                  onClick={() => setAccountSwitchProvider("youtube")}
+                  className="min-h-10 shrink-0"
+                >
+                  <UserRound className="size-4" />
+                  Outro Google
+                </Button>
+              )}
+            </div>
+          )}
+        </header>
 
-      <main className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
-        <section className="mb-6 rounded-2xl border border-border/70 bg-[var(--gradient-surface)] p-5">
-          <p className="mono-label text-primary">Configurações · APIs sociais</p>
-          <h2 className="mt-2 font-display text-2xl font-bold">Conecte somente por autorização oficial</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Senhas e tokens nunca são solicitados nesta tela. Uma plataforma só aparece como conectada depois que
-            o backend confirma uma autorização válida.
-          </p>
-        </section>
+        <AccountSwitchDialog
+          provider={accountSwitchProvider}
+          busy={busy}
+          onOpenChange={(open) => {
+            if (!open) setAccountSwitchProvider(null);
+          }}
+          onContinue={continueWithOtherAccount}
+        />
 
-        {!user && (
-          <div className="rounded-2xl border border-border bg-surface/60 p-6 text-center text-sm text-muted-foreground">
-            Faça login na Nuvem para consultar suas conexões.
+        {user && <MetaDiagnosticsPanel />}
+
+        {!user ? (
+          <div className="border border-border bg-surface/60 p-6 text-center text-sm text-muted-foreground">
+            Faça login na Nuvem para conectar suas contas.
           </div>
+        ) : (
+          <section className="border border-border/70 bg-surface/50">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <ShieldCheck className="size-4 text-emerald-400" />
+                Conexão oficial Meta
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {facebookAccounts.length} Página(s) · {instagramAccounts.length} Instagram
+              </p>
+            </div>
+            <div className="grid md:grid-cols-2">
+              {META_PLATFORMS.map((platform, index) => (
+                <AccountsColumn
+                  key={platform.platform}
+                  platform={platform}
+                  accounts={platform.platform === "facebook" ? facebookAccounts : instagramAccounts}
+                  divided={index > 0}
+                  onPrimary={choosePrimary}
+                  onRemove={disconnect}
+                  reconnectHelp
+                />
+              ))}
+            </div>
+          </section>
         )}
 
         {user && (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {INTEGRATIONS.map((integration) => {
-              const Icon = integration.icon;
-              const platformAccounts = accounts.filter((account) => account.platform === integration.platform);
-              const connected = platformAccounts.filter(
-                (account) => account.status === "conectado" && account.provider !== "pending",
-              );
-              const available = integration.platform === "instagram";
-              return (
-                <article key={integration.platform} className="rounded-2xl border border-border/70 bg-surface/60 p-5">
-                  <div className="flex items-start gap-3">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-primary/35 bg-primary/12 text-primary">
-                      <Icon className="size-5" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-display text-lg font-semibold">{integration.name}</h3>
-                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{integration.description}</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-xl border border-border bg-surface-2 p-3">
-                    {connected.length > 0 ? (
-                      <div className="flex items-center gap-2 text-sm text-emerald-400">
-                        <CheckCircle2 className="size-4" /> Conectado
-                      </div>
-                    ) : platformAccounts.length > 0 ? (
-                      <div>
-                        <div className="flex items-center gap-2 text-sm text-amber-400">
-                          <TriangleAlert className="size-4" /> Atenção necessária
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {platformAccounts.map((account) => `@${account.username}`).join(", ")} ainda não possui
-                          autorização real.
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Não conectado</p>
-                    )}
-                  </div>
-
-                  {available ? (
-                    <Link
-                      to="/agenda"
-                      className="mt-4 flex w-full items-center justify-center rounded-xl border border-border px-3 py-2.5 text-sm text-muted-foreground transition hover:text-foreground"
-                    >
-                      Gerenciar contas da agenda
-                    </Link>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled
-                      className="mt-4 w-full rounded-xl border border-border px-3 py-2.5 text-sm text-muted-foreground opacity-60"
-                    >
-                      Em preparação
-                    </button>
-                  )}
-                </article>
-              );
-            })}
-          </div>
+          <section className="mt-4 border border-border/70 bg-surface/50">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <ShieldCheck className="size-4 text-emerald-400" />
+                Conexão oficial Google
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {youtubeAccounts.length} canal(is) conectado(s)
+              </p>
+            </div>
+            <YoutubeChannels
+              accounts={youtubeAccounts}
+              syncing={syncingYoutube}
+              refreshing={refreshingYoutube}
+              onPrimary={choosePrimary}
+              onRemove={disconnect}
+              onRename={rename}
+              onRefresh={refreshYoutubeAccount}
+              schedules={schedules}
+              onSchedule={changeSchedule}
+            />
+          </section>
         )}
+
+        <section className="mt-6 grid gap-4 border-t border-border pt-5 text-xs text-muted-foreground sm:grid-cols-[1fr_auto] sm:items-start">
+          <div>
+            <p className="font-medium text-foreground">Segurança da conexão</p>
+            <p className="mt-1 max-w-3xl leading-relaxed">
+              O VaiViral recebe tokens oficiais da Meta e do Google, armazena-os criptografados e
+              nunca solicita sua senha. Você pode autorizar outros perfis da Meta, manter várias
+              Páginas e contas do Instagram e remover cada conexão separadamente.
+            </p>
+          </div>
+          <div className="flex gap-4">
+            <Link to="/privacidade" className="underline hover:text-foreground">
+              Privacidade
+            </Link>
+            <Link to="/exclusao-de-dados" className="underline hover:text-foreground">
+              Excluir dados
+            </Link>
+          </div>
+        </section>
+
+        <section className="mt-6 border-t border-border pt-5">
+          <p className="mono-label text-muted-foreground">Próximas integrações</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <ComingSoon icon={Settings2} name="TikTok" />
+          </div>
+        </section>
       </main>
+    </AppShell>
+  );
+}
+
+function AccountSwitchDialog({
+  provider,
+  busy,
+  onOpenChange,
+  onContinue,
+}: {
+  provider: AccountSwitchProvider | null;
+  busy: PlatformKey | null;
+  onOpenChange: (open: boolean) => void;
+  onContinue: (provider: AccountSwitchProvider) => Promise<void>;
+}) {
+  const isMeta = provider === "meta";
+  const activePlatform = isMeta ? "facebook" : "youtube";
+  const title = isMeta ? "Conectar Meta pelo perfil pessoal" : "Conectar outro Google/YouTube";
+  const description = isMeta
+    ? "A Página pode ser o perfil ativo no Facebook, mas a autorização precisa começar pelo perfil pessoal que administra essa Página."
+    : YOUTUBE_SINGLE_CHANNEL_NOTICE;
+  const steps = isMeta
+    ? [
+        "Abra o menu do Facebook no canto superior direito.",
+        "Clique em Ver todos os perfis e selecione seu perfil pessoal, não a Página.",
+        "Confirme que o nome e a foto do perfil pessoal aparecem no topo do Facebook.",
+        "Volte aqui e continue para autorizar as Páginas que esse perfil administra.",
+      ]
+    : YOUTUBE_RECONNECT_GUIDE_STEPS;
+
+  return (
+    <Dialog open={!!provider} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+          {steps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+        <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+          {isMeta && (
+            <>
+              <Button asChild variant="outline" size="sm">
+                <a href="https://www.facebook.com/logout.php" target="_blank" rel="noreferrer">
+                  <LogOut className="size-4" />
+                  Sair do Facebook
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <a href="https://www.facebook.com/" target="_blank" rel="noreferrer">
+                  <ExternalLink className="size-4" />
+                  Trocar perfil no Facebook
+                </a>
+              </Button>
+            </>
+          )}
+          {!isMeta && (
+            <>
+              <Button asChild variant="outline" size="sm">
+                <a href="https://accounts.google.com/Logout" target="_blank" rel="noreferrer">
+                  <LogOut className="size-4" />
+                  Sair do Google
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <a href="https://www.youtube.com/account" target="_blank" rel="noreferrer">
+                  <ExternalLink className="size-4" />
+                  Ver canais
+                </a>
+              </Button>
+            </>
+          )}
+          <Button
+            type="button"
+            size="sm"
+            disabled={!provider || busy === activePlatform}
+            onClick={() => {
+              if (provider) void onContinue(provider);
+            }}
+          >
+            {busy === activePlatform && <Loader2 className="size-4 animate-spin" />}
+            Continuar OAuth
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AccountsColumn({
+  platform,
+  accounts,
+  divided,
+  onPrimary,
+  onRemove,
+  reconnectHelp = false,
+}: {
+  platform: (typeof META_PLATFORMS)[number] | typeof YOUTUBE_PLATFORM;
+  accounts: SocialAccount[];
+  divided: boolean;
+  onPrimary: (account: SocialAccount) => Promise<void>;
+  onRemove: (account: SocialAccount) => Promise<void>;
+  reconnectHelp?: boolean;
+}) {
+  const Icon = platform.icon;
+  const [reconnectHelpAccount, setReconnectHelpAccount] = useState<SocialAccount | null>(null);
+  const hasDisconnected = accounts.some(
+    (account) => account.status !== "conectado" || account.provider === "pending",
+  );
+  return (
+    <div
+      className={`min-w-0 p-4 sm:p-5 ${divided ? "border-t border-border md:border-l md:border-t-0" : ""}`}
+    >
+      <div className="flex items-start gap-3">
+        <span className="grid size-9 shrink-0 place-items-center border border-primary/35 bg-primary/10 text-primary">
+          <Icon className="size-4" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="font-display text-base font-semibold">{platform.name}</h2>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            {platform.description}
+          </p>
+        </div>
+      </div>
+
+      <ul className="mt-4 space-y-2">
+        {accounts.length === 0 && (
+          <li className="border border-dashed border-border p-4 text-sm text-muted-foreground">
+            Nenhuma conta vinculada.
+          </li>
+        )}
+        {accounts.map((account) => {
+          const connected = account.status === "conectado" && account.provider !== "pending";
+          const accountName = socialAccountTitle(account);
+          return (
+            <li
+              key={account.id}
+              className="flex min-h-16 items-center gap-3 border border-border bg-surface-2 p-3"
+            >
+              {connected ? (
+                <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />
+              ) : (
+                <TriangleAlert className="size-4 shrink-0 text-amber-400" />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{accountName}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {account.is_primary
+                    ? "Conta principal"
+                    : connected
+                      ? "Pronta para publicar"
+                      : "Reconexão necessária"}
+                </p>
+                <p className="truncate text-[11px] text-muted-foreground/80">
+                  {socialAccountDetail(account)}
+                </p>
+                {!connected && reconnectHelp && (
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    onClick={() => setReconnectHelpAccount(account)}
+                    className="mt-1 h-auto p-0 text-xs text-amber-300"
+                  >
+                    <HelpCircle className="size-3.5" />
+                    Como reconectar
+                  </Button>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={!connected || account.is_primary}
+                onClick={() => void onPrimary(account)}
+                aria-label={`Definir ${accountName} como conta principal`}
+                title={account.is_primary ? "Conta principal" : "Definir como conta principal"}
+                className={account.is_primary ? "text-amber-400" : "text-muted-foreground"}
+              >
+                <Star className={`size-4 ${account.is_primary ? "fill-current" : ""}`} />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => void onRemove(account)}
+                aria-label={`Remover ${accountName}`}
+                title="Remover conexão"
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+      <MetaReconnectDialog
+        account={reconnectHelp && hasDisconnected ? reconnectHelpAccount : null}
+        onOpenChange={(open) => {
+          if (!open) setReconnectHelpAccount(null);
+        }}
+      />
+    </div>
+  );
+}
+
+function MetaReconnectDialog({
+  account,
+  onOpenChange,
+}: {
+  account: SocialAccount | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const accountName = account ? socialAccountTitle(account) : "esta conta";
+  return (
+    <Dialog open={!!account} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Como reconectar</DialogTitle>
+          <DialogDescription>
+            Resolva as permissões da Meta para {accountName} e conecte novamente pelo VaiViral.
+          </DialogDescription>
+        </DialogHeader>
+        <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+          {RECONNECT_GUIDE_STEPS.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+        <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+          <Button asChild variant="outline" size="sm">
+            <a
+              href="https://www.facebook.com/settings?tab=business_tools"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Apps e sites
+            </a>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <a href="https://business.facebook.com/settings" target="_blank" rel="noreferrer">
+              Business Manager
+            </a>
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function formatSync(value?: string | null) {
+  if (!value) return "Sincronização pendente";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Sincronização pendente";
+  return `Sincronizado em ${date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}`;
+}
+
+function YoutubeChannels({
+  accounts,
+  syncing,
+  refreshing,
+  onPrimary,
+  onRemove,
+  onRename,
+  onRefresh,
+  schedules,
+  onSchedule,
+}: {
+  accounts: SocialAccount[];
+  syncing: boolean;
+  refreshing: Set<string>;
+  onPrimary: (account: SocialAccount) => Promise<void>;
+  onRemove: (account: SocialAccount) => Promise<void>;
+  onRename: (account: SocialAccount, name: string) => Promise<void>;
+  onRefresh: (account: SocialAccount) => Promise<void>;
+  schedules: Record<string, SyncSchedule>;
+  onSchedule: (account: SocialAccount, intervalMinutes: number) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+
+  return (
+    <div className="min-w-0 p-4 sm:p-5">
+      <div className="flex items-start gap-3">
+        <span className="grid size-9 shrink-0 place-items-center border border-primary/35 bg-primary/10 text-primary">
+          <Youtube className="size-4" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="font-display text-base font-semibold">Canais do YouTube</h2>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            {YOUTUBE_PLATFORM.description}
+          </p>
+        </div>
+      </div>
+
+      <ul className="mt-4 space-y-2">
+        {accounts.length === 0 && (
+          <li className="border border-dashed border-border p-4 text-sm text-muted-foreground">
+            Nenhum canal conectado. Use “Conectar YouTube” para autorizar o primeiro canal.
+          </li>
+        )}
+        {accounts.map((account) => {
+          const connected = account.status === "conectado" && account.provider !== "pending";
+          const name = socialAccountTitle(account);
+          const isEditing = editing === account.id;
+          const isRefreshing = refreshing.has(account.id);
+          const schedule = schedules[account.id];
+          const scheduleValue = schedule?.enabled ? schedule.interval_minutes : 0;
+          return (
+            <li
+              key={account.id}
+              className="flex min-h-16 flex-wrap items-center gap-3 border border-border bg-surface-2 p-3"
+            >
+              {isRefreshing || syncing ? (
+                <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
+              ) : connected ? (
+                <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />
+              ) : (
+                <TriangleAlert className="size-4 shrink-0 text-amber-400" />
+              )}
+              <div className="min-w-0 flex-1">
+                {isEditing ? (
+                  <form
+                    className="flex flex-wrap items-center gap-2"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void onRename(account, draft).then(() => setEditing(null));
+                    }}
+                  >
+                    <input
+                      autoFocus
+                      value={draft}
+                      onChange={(event) => setDraft(event.target.value)}
+                      aria-label={`Novo nome para ${name}`}
+                      className="min-w-0 flex-1 border border-border bg-surface px-2 py-1 text-sm outline-none focus:border-primary"
+                    />
+                    <Button type="submit" size="sm" className="min-h-9">
+                      Salvar
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="min-h-9"
+                      onClick={() => setEditing(null)}
+                    >
+                      Cancelar
+                    </Button>
+                  </form>
+                ) : (
+                  <>
+                    <p className="truncate text-sm font-medium">{name}</p>
+                    <p className="truncate text-[11px] text-muted-foreground/80">
+                      {socialAccountDetail(account)}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {account.is_primary ? "Canal principal · " : ""}
+                      {isRefreshing
+                        ? "Atualizando status…"
+                        : syncing
+                          ? "Sincronizando…"
+                          : connected
+                            ? formatSync(account.updated_at ?? account.created_at)
+                            : "Reconexão necessária"}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {describeSchedule(schedule)}
+                    </p>
+                  </>
+                )}
+              </div>
+              {!isEditing && (
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span className="sr-only">{`Sincronização automática de ${name}`}</span>
+                    <select
+                      value={scheduleValue}
+                      disabled={!connected}
+                      onChange={(event) => void onSchedule(account, Number(event.target.value))}
+                      aria-label={`Sincronização automática de ${name}`}
+                      title="Sincronização automática"
+                      className="min-h-9 border border-border bg-surface px-2 py-1 text-xs outline-none focus:border-primary"
+                    >
+                      {SYNC_INTERVAL_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={isRefreshing || !connected}
+                    onClick={() => void onRefresh(account)}
+                    aria-label={`Atualizar status de ${name}`}
+                    title="Atualizar status"
+                    className="text-muted-foreground"
+                  >
+                    {isRefreshing ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="size-4" />
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={!connected || account.is_primary}
+                    onClick={() => void onPrimary(account)}
+                    aria-label={`Definir ${name} como canal principal`}
+                    title={account.is_primary ? "Canal principal" : "Definir como canal principal"}
+                    className={account.is_primary ? "text-amber-400" : "text-muted-foreground"}
+                  >
+                    <Star className={`size-4 ${account.is_primary ? "fill-current" : ""}`} />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setDraft(name);
+                      setEditing(account.id);
+                    }}
+                    aria-label={`Renomear ${name}`}
+                    title="Renomear canal"
+                    className="text-muted-foreground"
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => void onRemove(account)}
+                    aria-label={`Remover ${name}`}
+                    title="Remover canal"
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function ComingSoon({ icon: Icon, name }: { icon: typeof Settings2; name: string }) {
+  return (
+    <div className="flex items-center gap-3 border border-border px-4 py-3 text-sm text-muted-foreground">
+      <Icon className="size-4" />
+      <span className="font-medium text-foreground">{name}</span>
+      <span className="ml-auto flex items-center gap-1 text-xs">
+        <Clock3 className="size-3.5" /> Em preparação
+      </span>
+    </div>
+  );
+}
+
+type MetaCheck = {
+  graphVersion: string;
+  appId: string | null;
+  configId: string | null;
+  mode: "classic" | "business";
+  usesConfigId: boolean;
+  requiredScopes: string[];
+  effectiveScopes: string[];
+  permissionSource: "manual-scope" | "meta-business-configuration";
+  permissionWarning: string | null;
+  redirectUri: string | null;
+  siteUrl: string | null;
+  authorizationUrl: string | null;
+  issues: string[];
+  loginConfiguration: { checked: boolean; ok: boolean; detail: string };
+};
+
+type InstagramCheck = {
+  appId: string | null;
+  authEndpoint: string;
+  redirectUri: string | null;
+  siteUrl: string | null;
+  requiredScopes: string[];
+  authorizationUrl: string | null;
+  issues: string[];
+};
+
+function MetaDiagnosticsPanel() {
+  const runDiagnosis = useServerFn(diagnoseFacebookIntegration);
+  const runInstagramDiagnosis = useServerFn(diagnoseInstagramIntegration);
+  const [state, setState] = useState<
+    | { status: "idle" }
+    | { status: "loading" }
+    | { status: "denied" }
+    | { status: "ready"; check: MetaCheck; instagram: InstagramCheck }
+  >({ status: "idle" });
+
+  const run = useCallback(async () => {
+    setState({ status: "loading" });
+    try {
+      const [response, instagramResponse] = await Promise.all([
+        runDiagnosis(),
+        runInstagramDiagnosis(),
+      ]);
+      setState(
+        response.ok && instagramResponse.ok
+          ? {
+              status: "ready",
+              check: response.check as MetaCheck,
+              instagram: instagramResponse.check as InstagramCheck,
+            }
+          : { status: "denied" },
+      );
+    } catch {
+      setState({ status: "denied" });
+    }
+  }, [runDiagnosis, runInstagramDiagnosis]);
+
+  return (
+    <section className="mb-6 rounded-lg border border-border/70 bg-surface/60 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-display text-base font-semibold">Diagnóstico da integração Meta</h2>
+          <p className="text-xs text-muted-foreground">
+            Disponível para administradores. Nenhum segredo é exibido.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void run()}
+          disabled={state.status === "loading"}
+        >
+          {state.status === "loading" ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+          Verificar configuração
+        </Button>
+      </div>
+
+      {state.status === "denied" && (
+        <p className="mt-3 text-sm text-muted-foreground">
+          Diagnóstico disponível apenas para administradores.
+        </p>
+      )}
+
+      {state.status === "ready" && (
+        <div className="mt-4 space-y-3 text-sm">
+          <dl className="grid gap-2 sm:grid-cols-2">
+            <Row label="Versão do Graph" value={state.check.graphVersion} />
+            <Row label="App ID" value={state.check.appId ?? "não definido"} />
+            <Row
+              label="Modo efetivo"
+              value={state.check.mode === "classic" ? "Login clássico" : "Login para Empresas"}
+            />
+            <Row
+              label="Usando config_id"
+              value={
+                state.check.usesConfigId ? `Sim (${state.check.configId ?? "configurado"})` : "Não"
+              }
+            />
+            <Row label="Scopes obrigatórios" value={state.check.requiredScopes.join(",")} />
+            <Row
+              label="Scopes enviados pelo app"
+              value={
+                state.check.mode === "classic"
+                  ? state.check.effectiveScopes.join(",")
+                  : "Nenhum — definidos na configuração da Meta"
+              }
+            />
+            <Row label="URL de retorno" value={state.check.redirectUri ?? "não definida"} />
+            <Row label="Site público" value={state.check.siteUrl ?? "não definido"} />
+          </dl>
+
+          {state.check.permissionWarning && (
+            <p className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-300">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+              <span>{state.check.permissionWarning}</span>
+            </p>
+          )}
+
+          <p
+            className={
+              state.check.loginConfiguration.ok
+                ? "flex items-start gap-2 text-emerald-400"
+                : "flex items-start gap-2 text-amber-400"
+            }
+          >
+            {state.check.loginConfiguration.ok ? (
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+            ) : (
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+            )}
+            <span>{state.check.loginConfiguration.detail}</span>
+          </p>
+
+          {state.check.issues.length > 0 ? (
+            <ul className="space-y-1 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-amber-300">
+              {state.check.issues.map((issue) => (
+                <li key={issue}>• {issue}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-emerald-400">Configuração do servidor completa.</p>
+          )}
+
+          {state.check.authorizationUrl && (
+            <p className="break-all rounded-lg border border-border bg-surface-2 p-3 text-xs text-muted-foreground">
+              {state.check.authorizationUrl}
+            </p>
+          )}
+
+          <div className="rounded-lg border border-border bg-surface-2 p-3 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">Checklist no painel da Meta</p>
+            <ul className="mt-1 space-y-1">
+              <li>• URIs de redirecionamento válidos: {state.check.redirectUri ?? "—"}</li>
+              <li>
+                • Adicione também {state.check.siteUrl ?? "https://seu-dominio"}
+                /integracoes/instagram/callback
+              </li>
+              <li>• Domínio do SDK do JavaScript sem barra final</li>
+              <li>• Ícone quadrado do app e Página do app associada</li>
+              {state.check.mode === "business" ? (
+                <li>
+                  • Configuração do Login para Empresas publicada com todos os scopes obrigatórios
+                </li>
+              ) : (
+                <li>
+                  • Em Permissões e recursos, pages_read_engagement deve estar adicionada, não
+                  apenas encontrada no caso de uso
+                </li>
+              )}
+            </ul>
+          </div>
+
+          <InstagramOAuthChecklist check={state.instagram} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function InstagramOAuthChecklist({ check }: { check: InstagramCheck }) {
+  return (
+    <div className="rounded-lg border border-border bg-surface-2 p-3 text-xs text-muted-foreground">
+      <div className="flex items-start gap-2">
+        <Instagram className="mt-0.5 size-4 shrink-0 text-primary" />
+        <div>
+          <p className="font-medium text-foreground">Checklist Instagram + Lovable</p>
+          <p className="mt-1">
+            Use este bloco quando o login abrir apenas o feed do Instagram ou não voltar para o
+            VaiViral.
+          </p>
+        </div>
+      </div>
+
+      <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+        <Row label="Endpoint OAuth esperado" value={check.authEndpoint} />
+        <Row label="Instagram App ID" value={check.appId ?? "não definido"} />
+        <Row label="URL de retorno Instagram" value={check.redirectUri ?? "não definida"} />
+        <Row label="Scopes Instagram" value={check.requiredScopes.join(",")} />
+      </dl>
+
+      {check.issues.length > 0 ? (
+        <ul className="mt-3 space-y-1 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-amber-300">
+          {check.issues.map((issue) => (
+            <li key={issue}>• {issue}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 text-emerald-400">Configuração do Instagram completa no servidor.</p>
+      )}
+
+      <div className="mt-3 rounded-lg border border-border bg-background/40 p-3">
+        <p className="font-medium text-foreground">Variáveis no Lovable Cloud</p>
+        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-background p-3 text-[12px] text-muted-foreground">
+{`INSTAGRAM_APP_ID=ID do app Instagram
+INSTAGRAM_APP_SECRET=secret do app Instagram
+INSTAGRAM_REDIRECT_URI=${check.redirectUri ?? "https://content-layer-lab.lovable.app/integracoes/instagram/callback"}`}
+        </pre>
+      </div>
+
+      <div className="mt-3">
+        <p className="font-medium text-foreground">Conferir na Meta</p>
+        <ul className="mt-1 space-y-1">
+          <li>• API do Instagram: adicione o mesmo redirect URI em URLs de redirecionamento OAuth.</li>
+          <li>• Permissões: instagram_business_basic e instagram_business_content_publish.</li>
+          <li>• O app precisa estar publicado quando outras contas forem conectar.</li>
+          <li>
+            • Se a conta Instagram pertence a uma Página do Facebook, ela precisa estar profissional
+            e vinculada corretamente nessa Página.
+          </li>
+        </ul>
+      </div>
+
+      {check.authorizationUrl && (
+        <p className="mt-3 break-all rounded-lg border border-border bg-background/40 p-3">
+          {check.authorizationUrl}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-surface-2 p-3">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="break-all text-sm">{value}</dd>
     </div>
   );
 }

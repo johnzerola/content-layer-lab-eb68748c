@@ -90,6 +90,24 @@ export interface CaptionStyle extends BoxLayer {
   boxRadius?: number;
   /** opacidade da caixa de fundo (0–1) */
   boxOpacity?: number;
+  /** espaçamento entre letras, em px do canvas 1080 */
+  letterSpacing?: number;
+  /** cor da sombra do texto */
+  shadowColor?: string;
+  /** desfoque da sombra (multiplicador do tamanho da fonte) */
+  shadowBlur?: number;
+  /** deslocamento vertical da sombra (multiplicador do tamanho da fonte) */
+  shadowY?: number;
+  /** deslocamento horizontal da sombra (multiplicador do tamanho da fonte) */
+  shadowX?: number;
+  /** opacidade da sombra (0–1) */
+  shadowOpacity?: number;
+  /** cor da borda da caixa de fundo */
+  boxBorderColor?: string;
+  /** espessura da borda da caixa de fundo, em px do canvas 1080 */
+  boxBorderWidth?: number;
+  /** sincronia da legenda em segundos: negativo adianta, positivo atrasa */
+  offset?: number;
 }
 
 
@@ -202,6 +220,8 @@ export const CAPTION_PRESETS: { id: string; label: string; style: Partial<Captio
 export interface CustomFont {
   name: string;
   dataUrl: string;
+  /** peso do arquivo (400, 700, 800...). Sem valor, vale para toda a faixa. */
+  weight?: string;
 }
 
 /** Máscara para remover legenda queimada, marca d'água ou texto do vídeo original.
@@ -350,6 +370,7 @@ export function defaultCaptions(): CaptionStyle {
     highlightColor: "#c6f24e",
     maxLines: 2,
     lineHeight: 1.2,
+    offset: 0,
   };
 
 }
@@ -522,6 +543,28 @@ export const PLATFORM_PRESETS: PlatformPreset[] = [
     bitrate: 10,
     maxDur: 180,
     hint: "1080×1920 · 30fps · H.264 · até 3min",
+  },
+  {
+    id: "fb-reels",
+    label: "Facebook Reels",
+    short: "fb",
+    w: 1080,
+    h: 1920,
+    fps: 30,
+    bitrate: 12,
+    maxDur: 90,
+    hint: "1080×1920 · 30fps · H.264 · até 90s",
+  },
+  {
+    id: "universal-916",
+    label: "9:16 Universal",
+    short: "9x16",
+    w: 1080,
+    h: 1920,
+    fps: 30,
+    bitrate: 12,
+    maxDur: 90,
+    hint: "Instagram + Facebook + TikTok num arquivo só",
   },
   {
     id: "shorts",

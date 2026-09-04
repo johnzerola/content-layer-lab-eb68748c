@@ -1,10 +1,21 @@
 import { ArrayBufferTarget, Muxer } from "mp4-muxer";
-import { drawFrame } from "./draw";
+import { setBackdropQuality, drawFrame } from "./draw";
 import { CANVAS_H, CANVAS_W, type Template } from "./template";
-import type { Variation } from "./variation";
+import { motionAt, type Variation } from "./variation";
 import type { CaptionCue } from "./captions";
 import { keptSegments, segmentsDuration, srcTimeAt, type PreEdit } from "./preedit";
 import { cleanMp4Metadata } from "./mp4meta";
+import { bgSleep } from "./keepalive";
+import { FrameReader, videoDecoderSupported, type DecodedFrame } from "./decode";
+import { audioEnvelope, envelopeAt, renderAudioTrack } from "./audio-track";
+import {
+  pickAudioCodec,
+  pickBitrate,
+  pickVideoCodec,
+  type QualityTier,
+} from "./encode-presets";
+
+
 
 export interface EncodeOptions {
   file: File;
@@ -15,6 +26,8 @@ export interface EncodeOptions {
   headline?: string | undefined;
   fps?: number | undefined;
   bitrate?: number | undefined;
+  /** qualidade alvo quando o bitrate não é informado */
+  tier?: QualityTier | undefined;
   /** aceleração de leitura do vídeo fonte (1 = tempo real) */
   turbo?: number | undefined;
   /** recorte do vídeo fonte (clipagem automática) */
@@ -26,7 +39,16 @@ export interface EncodeOptions {
   /** placa de fundo (mediana temporal) para remover overlays com pixels reais */
   plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null | undefined;
   onProgress?: ((p: number) => void) | undefined;
+  /** telemetria: qual caminho de leitura está sendo usado e a taxa real */
+  onStats?:
+    | ((s: {
+        path: "worker" | "turbo" | "reprodução" | "busca precisa" | "gravação em tempo real";
+        fps: number;
+      }) => void)
+    | undefined;
+
   signal?: AbortSignal | undefined;
+  jobId?: string | undefined;
 }
 
 type VideoWithRvfc = HTMLVideoElement & {
@@ -67,49 +89,10 @@ export function webCodecsSupported() {
   );
 }
 
-async function pickVideoCodec(width: number, height: number, bitrate: number, framerate: number) {
-  const candidates: { codec: string; mux: "avc" | "vp9" }[] = [
-    { codec: "avc1.640028", mux: "avc" },
-    { codec: "avc1.4d0032", mux: "avc" },
-    { codec: "avc1.42003c", mux: "avc" },
-    { codec: "avc1.42001f", mux: "avc" },
-    // último recurso: VP9 dentro do MP4 (quando o navegador não tem H.264)
-    { codec: "vp09.00.10.08", mux: "vp9" },
-  ];
-  for (const { codec, mux } of candidates) {
-    try {
-      const cfg: VideoEncoderConfig = {
-        codec,
-        width,
-        height,
-        bitrate,
-        framerate,
-        latencyMode: "quality",
-        ...(mux === "avc" ? { avc: { format: "avc" as const } } : {}),
-      };
-      const sup = await VideoEncoder.isConfigSupported(cfg);
-      if (sup.supported) return { cfg, mux };
-    } catch {
-      /* tenta o próximo */
-    }
-  }
-  return null;
-}
+// escolha de codec/bitrate vive em ./encode-presets (compartilhado com o worker)
 
-async function pickAudioCodec(channels: number, sampleRate: number): Promise<"aac" | "opus" | null> {
-  const Enc = window.AudioEncoder;
-  if (!Enc) return null;
-  for (const [mux, codec] of [["aac", "mp4a.40.2"], ["opus", "opus"]] as const) {
-    try {
-      const sup = await Enc.isConfigSupported({ codec, sampleRate, numberOfChannels: channels, bitrate: 128_000 });
-      if (sup.supported) return mux;
-    } catch {
-      /* próximo */
-    }
-  }
-  return null;
-}
 
+/** Faixa de áudio da variação — o arquivo é decodificado uma vez só (cache). */
 async function decodeAudio(
   file: File,
   segments: { start: number; end: number }[],
@@ -117,68 +100,24 @@ async function decodeAudio(
   pitchCents = 0,
   eqDb = 0,
 ) {
-  try {
-    const buf = await file.arrayBuffer();
-    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const ac = new Ctx();
-    const decoded = await ac.decodeAudioData(buf);
-    void ac.close();
-    if (!decoded.length) return null;
-
-    const sampleRate = 48000;
-    const channels = Math.min(2, decoded.numberOfChannels);
-    const dur = segments.reduce((a, s) => a + Math.max(0, s.end - s.start), 0);
-    const outLen = Math.max(1, Math.floor((dur / speed) * sampleRate));
-    const off = new OfflineAudioContext(channels, outLen, sampleRate);
-
-    let cursor = 0;
-    for (const seg of segments) {
-      const len = Math.max(0, seg.end - seg.start);
-      if (len <= 0.01) continue;
-      const src = off.createBufferSource();
-      src.buffer = decoded;
-      src.playbackRate.value = speed;
-      // anti-duplicidade: leve alteração de tom (cents) sem mudar a duração de saída
-      if (pitchCents) {
-        try {
-          src.detune.value = pitchCents;
-        } catch {
-          /* navegador sem detune */
-        }
-      }
-      let node: AudioNode = src;
-      if (eqDb) {
-        // realce/corte sutil de agudos: muda o fingerprint do áudio sem soar diferente
-        const shelf = off.createBiquadFilter();
-        shelf.type = "highshelf";
-        shelf.frequency.value = 5200;
-        shelf.gain.value = eqDb;
-        node.connect(shelf);
-        node = shelf;
-      }
-      node.connect(off.destination);
-      src.start(cursor, seg.start, len);
-      cursor += len / speed;
-    }
-
-    const rendered = await off.startRendering();
-    return { rendered, channels, sampleRate };
-  } catch {
-    return null;
-  }
+  return renderAudioTrack(file, segments, speed, pitchCents, eqDb);
 }
+
+
+const clampOffset = (n: number) => Math.max(-1, Math.min(1, n));
 
 
 /** Renderiza para MP4 (H.264 + AAC) usando WebCodecs — mais rápido que tempo real. */
 export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
   const fps = opts.fps ?? 30;
-  const bitrate = opts.bitrate ?? 10_000_000;
   const t = opts.template;
   const W = t.canvasW ?? CANVAS_W;
   const H = t.canvasH ?? CANVAS_H;
+  const tier = opts.tier ?? "balanced";
+  const bitrate = opts.bitrate ?? pickBitrate({ width: W, height: H, fps, tier });
   const v = opts.variation;
 
-  const picked = await pickVideoCodec(W, H, bitrate, fps);
+  const picked = await pickVideoCodec(W, H, bitrate, fps, tier);
   if (!picked) throw new Error("Codificação de vídeo não suportada neste navegador");
   const videoConfig = picked.cfg;
 
@@ -269,21 +208,49 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       ...(opts.plate ? { plate: opts.plate } : {}),
     };
 
+    // envoltória de energia do áudio (20Hz) — usada pelo movimento "pulso no ritmo"
+    const envelope = audio ? audioEnvelope(audio.rendered) : null;
+    const hasMotion = v.motion && v.motion.preset !== "none";
 
     let frameIndex = 0;
     const frameDur = Math.round(1_000_000 / fps);
 
     let averageFrameMs = 1000 / fps;
-    const emit = async () => {
+    let bgQuality: "alta" | "media" | "baixa" = "alta";
+    setBackdropQuality("alta");
+    /** caminho de leitura em uso — reportado para o painel de diagnóstico */
+    let path: "turbo" | "reprodução" | "busca precisa" = "turbo";
+    const emit = async (src?: { el: CanvasImageSource; width: number; height: number }) => {
       const startedAt = performance.now();
+
       // tempo do vídeo fonte correspondente a este frame (legendas sincronizadas)
-      const srcTime = srcTimeAt(segments, (frameIndex / fps) * v.speed);
+      const outTime = frameIndex / fps;
+      const srcTime = srcTimeAt(segments, outTime * v.speed);
+      const mo = hasMotion
+        ? motionAt(v, outTime, outDur, envelope ? envelopeAt(envelope, outTime) : 0)
+        : null;
       drawFrame(
         ctx,
         tpl,
-        { el: video, width: video.videoWidth, height: video.videoHeight },
-        { ...drawOpts, time: srcTime, quality: "hq" as const },
+        src ?? { el: video, width: video.videoWidth, height: video.videoHeight },
+        {
+          ...drawOpts,
+          ...(mo
+            ? {
+                zoom: mo.zoom,
+                brightness: mo.brightness,
+                saturation: mo.saturation,
+                rotate: mo.rotate,
+                offsetX: clampOffset(opts.offsetX + mo.panX),
+                offsetY: clampOffset(opts.offsetY + mo.panY),
+              }
+            : {}),
+          time: srcTime,
+          quality: "hq" as const,
+        },
       );
+
+
       const frame = new VideoFrame(canvas, {
         timestamp: frameIndex * frameDur,
         duration: frameDur,
@@ -294,21 +261,44 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       // Não deixe o encoder acumular uma fila grande. Uma fila sem limite faz
       // o desenho continuar enquanto o vídeo fonte avança, provocando saltos
       // que aparecem como congelamentos no MP4 final.
-      const queueWaitStarted = performance.now();
+      let queueWaitStarted = performance.now();
+      let recovered = false;
       while (encoder.encodeQueueSize > 6) {
         if (encoderError) throw encoderError;
         if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
-        if (performance.now() - queueWaitStarted > 15_000) {
-          throw new RenderStalledError("O codificador de vídeo parou de responder");
+        // Codificadores por hardware costumam engasgar quando a aba fica em
+        // segundo plano. Antes de desistir, forçamos um flush: quase sempre
+        // isso libera a fila e o lote continua normalmente.
+        if (performance.now() - queueWaitStarted > 20_000) {
+          if (recovered) throw new RenderStalledError("O codificador de vídeo parou de responder");
+          recovered = true;
+          await encoder.flush().catch(() => {});
+          queueWaitStarted = performance.now();
+          continue;
         }
-        await new Promise((r) => setTimeout(r, 2));
+        await bgSleep(2);
       }
-      // Libera a thread principal regularmente para a barra de progresso e o
-      // botão de cancelar continuarem respondendo durante renders pesados.
-      if (frameIndex % 4 === 0) await new Promise((r) => setTimeout(r, 0));
+
+      // Libera a thread principal periodicamente para a barra de progresso e o
+      // botão de cancelar continuarem respondendo. Com a fila do codificador
+      // vazia dá para espaçar mais essas pausas e ganhar velocidade.
+      const breathe = encoder.encodeQueueSize > 2 ? 8 : 24;
+      if (frameIndex % breathe === 0) await bgSleep(0);
       const elapsed = Math.max(0.1, performance.now() - startedAt);
+
       averageFrameMs = averageFrameMs * 0.85 + elapsed * 0.15;
+      // desenho muito caro (fundo desfocado em resolução cheia): degrada o
+      // fundo em vez de deixar a exportação levar horas
+      if (frameIndex % 12 === 0) {
+        const next = averageFrameMs > 120 ? "baixa" : averageFrameMs > 45 ? "media" : null;
+        if (next && next !== bgQuality) {
+          bgQuality = next;
+          setBackdropQuality(next);
+        }
+      }
+      if (frameIndex % 15 === 0) opts.onStats?.({ path, fps: 1000 / averageFrameMs });
     };
+
 
     /** Espera o navegador realmente apresentar um quadro novo após a busca. */
     const awaitPresented = (ms: number) =>
@@ -357,15 +347,138 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     await seekTo(trimStart);
     await awaitPresented(300);
 
+    // ---- Caminho turbo: decodificação direta do arquivo (WebCodecs) ----
+    // Sem reprodução em tempo real: cada quadro sai do decodificador com o
+    // carimbo de tempo exato, na velocidade máxima da máquina.
+    if (frameIndex < totalFrames && videoDecoderSupported()) {
+      path = "turbo";
+      const reader = await FrameReader.open(opts.file).catch((err) => {
+        console.warn("Turbo indisponível (leitor de quadros):", err);
+        return null;
+      });
+      if (reader) {
+        let cur: DecodedFrame | null = null;
+        try {
+          await reader.seek(srcTimeAt(segments, 0));
+          cur = await reader.read();
+          while (cur && frameIndex < totalFrames) {
+            if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
+            const target = srcTimeAt(segments, (frameIndex / fps) * v.speed);
+            // salto grande (corte multi-segmento): reposiciona no keyframe
+            if (target < cur.time - 0.25 || target > cur.time + 2) {
+              await reader.seek(target);
+              cur.frame.close();
+              cur = await reader.read();
+              continue;
+            }
+            while (cur && cur.time + cur.duration <= target - 1e-4) {
+              const nxt = await reader.read();
+              if (!nxt) break;
+              cur.frame.close();
+              cur = nxt;
+            }
+            if (!cur) break;
+            await emit({
+              el: cur.frame,
+              width: cur.frame.displayWidth,
+              height: cur.frame.displayHeight,
+            });
+            if (frameIndex % 3 === 0) opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
+          }
+        } catch (err) {
+          if ((err as Error)?.name === "AbortError") throw err;
+          // qualquer falha na decodificação direta: segue pelos caminhos antigos
+          console.warn("Turbo interrompido, caindo para reprodução:", err);
+        } finally {
+          cur?.frame.close();
+          reader.close();
+        }
+      }
+    }
+
+
+
+
+    // Caminho rápido: em vez de buscar quadro a quadro (lento, ~1 seek por
+    // frame), o vídeo é reproduzido e cada quadro de saída é capturado quando o
+    // tempo da fonte alcança o instante correspondente. A reprodução é pausada
+    // sempre que a fonte fica à frente do quadro que estamos codificando, para
+    // que imagem, áudio e legendas continuem alinhados mesmo em máquinas lentas.
+    const canFast = segments.length === 1 && typeof video.play === "function";
+    if (canFast && frameIndex < totalFrames) {
+      path = "reprodução";
+
+      // tolerância: a fonte pode adiantar no máximo ~1 quadro
+      const LEAD_TOLERANCE = Math.max(1 / fps, 0.04);
+      // acima disto o quadro capturado já não corresponde ao carimbo de tempo;
+      // abandonamos o caminho rápido e usamos a busca precisa
+      const MAX_DRIFT = 0.25;
+      try {
+        video.playbackRate = Math.max(1, Math.min(4, opts.turbo ?? 3));
+        video.muted = true;
+        await video.play();
+        let playing = true;
+        let lastIdx = -1;
+        let lastMoveAt = performance.now();
+        let drifted = false;
+        while (frameIndex < totalFrames) {
+          if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
+          const cur = video.currentTime;
+          const target = srcTimeAt(segments, (frameIndex / fps) * v.speed);
+          if (cur - target > MAX_DRIFT) {
+            drifted = true;
+            break;
+          }
+          if (target <= cur + 1e-3) {
+            await emit();
+            if (frameIndex % 3 === 0) opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
+          }
+          const nextTarget = srcTimeAt(segments, (frameIndex / fps) * v.speed);
+          const lead = video.currentTime - nextTarget;
+          if (lead > LEAD_TOLERANCE && playing) {
+            video.pause();
+            playing = false;
+          } else if (lead <= 0 && !playing) {
+            await video.play();
+            playing = true;
+          }
+          if (frameIndex !== lastIdx) {
+            lastIdx = frameIndex;
+            lastMoveAt = performance.now();
+          } else if (performance.now() - lastMoveAt > 12_000) {
+            // fonte travou: cai para o caminho preciso a partir daqui
+            break;
+          }
+          if (frameIndex >= totalFrames) break;
+          if (video.ended) break;
+          await bgSleep(2);
+        }
+        void drifted;
+
+      } catch (err) {
+        if ((err as Error)?.name === "AbortError") throw err;
+        // qualquer problema na leitura contínua: segue no caminho preciso
+      } finally {
+        try {
+          video.pause();
+        } catch {
+          /* ignora */
+        }
+      }
+    }
+
+
     // Exportação determinística: cada quadro de saída vem do instante exato do
-    // vídeo fonte. É mais lento que a leitura contínua, mas elimina os saltos e
-    // repetições que faziam o MP4 baixado parecer travando.
+    // vídeo fonte. Usada como fallback e para cortes multi-segmento.
+    if (frameIndex < totalFrames) path = "busca precisa";
     while (frameIndex < totalFrames) {
       if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
+
       await seekTo(srcTimeAt(segments, (frameIndex / fps) * v.speed));
       await emit();
       if (frameIndex % 3 === 0) opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
     }
+
 
 
 
@@ -418,7 +531,9 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     opts.onProgress?.(1);
     const raw = muxer.target.buffer as ArrayBuffer;
     const clean = t.antiDup?.cleanMetadata === false ? raw : cleanMp4Metadata(raw);
-    return new Blob([clean], { type: "video/mp4" });
+    const blob = new Blob([clean], { type: "video/mp4" });
+
+    return blob;
   } finally {
     URL.revokeObjectURL(url);
     video.src = "";

@@ -1,7 +1,9 @@
 import { useEffect, useRef } from "react";
+import { useInView } from "@/hooks/use-in-view";
 import { drawFrame } from "@/lib/draw";
 import { createTemplate, type Template } from "@/lib/template";
 import type { PreEdit } from "@/lib/preedit";
+
 
 /** Mini saída 9:16 desenhada com o MESMO pipeline da exportação (draw.ts),
  *  para o layout escolhido aparecer igualzinho antes de processar. */
@@ -17,6 +19,7 @@ export function LayoutPreview({
   className?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const visible = useInView(canvasRef);
   const preRef = useRef(pre);
   preRef.current = pre;
   const clipRef = useRef(clip);
@@ -24,9 +27,10 @@ export function LayoutPreview({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !visible) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
 
     const t: Template = createTemplate("layout-preview");
     const W = t.canvasW ?? 1080;
@@ -64,7 +68,7 @@ export function LayoutPreview({
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [videoRef]);
+  }, [videoRef, visible]);
 
   return (
     <canvas

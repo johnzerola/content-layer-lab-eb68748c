@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pause, Play, Scissors, Trash2, ZoomIn, ZoomOut } from "lucide-react";
+import { Pause, Play, Scissors, Trash2, Volume2, VolumeX, ZoomIn, ZoomOut } from "lucide-react";
 import type { CaptionCue, CaptionWord } from "@/lib/captions";
 
 interface Props {
@@ -32,6 +32,7 @@ export function CaptionTimeline({ file, cues, onChange }: Props) {
   const [dur, setDur] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [pps, setPps] = useState(120); // pixels por segundo
+  const [muted, setMuted] = useState(false);
   const [sel, setSel] = useState<Sel>(null);
 
   const url = useMemo(() => URL.createObjectURL(file), [file]);
@@ -195,6 +196,17 @@ export function CaptionTimeline({ file, cues, onChange }: Props) {
             +0.1s
           </button>
         </div>
+        <button
+          onClick={() => {
+            const v = videoRef.current;
+            if (v) v.muted = !v.muted;
+            setMuted((m) => !m);
+          }}
+          className="rounded-md border border-border px-2 py-1 font-mono text-[11px] hover:border-primary"
+          aria-label={muted ? "ativar som" : "silenciar"}
+        >
+          {muted ? <VolumeX className="inline size-3" /> : <Volume2 className="inline size-3" />}
+        </button>
         <span className="font-mono text-[11px] text-primary">{activeWord?.text ?? "—"}</span>
       </div>
 
@@ -202,7 +214,7 @@ export function CaptionTimeline({ file, cues, onChange }: Props) {
         <video
           ref={videoRef}
           src={url}
-          muted
+          muted={muted}
           playsInline
           onLoadedMetadata={(e) => setDur(e.currentTarget.duration || 0)}
           onPause={() => setPlaying(false)}

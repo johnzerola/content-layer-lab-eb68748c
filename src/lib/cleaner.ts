@@ -31,6 +31,7 @@ export type CleanerStatus =
   | "refining"
   | "encoding"
   | "completed"
+  | "cancelled"
   | "failed";
 
 export const CLEANER_STAGES: CleanerStatus[] = [
@@ -58,6 +59,7 @@ export const STAGE_LABEL: Record<CleanerStatus, string> = {
   refining: "refinando",
   encoding: "codificando",
   completed: "concluído",
+  cancelled: "cancelado",
   failed: "falhou",
 };
 
@@ -174,7 +176,7 @@ export function stageIndex(s: CleanerStatus) {
 }
 
 export function isRunning(s: CleanerStatus) {
-  return s !== "completed" && s !== "failed";
+  return s !== "completed" && s !== "cancelled" && s !== "failed";
 }
 
 export function rid() {

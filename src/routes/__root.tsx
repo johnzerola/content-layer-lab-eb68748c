@@ -12,6 +12,13 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { ActivityDock } from "../components/ActivityDock";
+import { Toaster } from "../components/ui/sonner";
+import { TooltipProvider } from "../components/ui/base";
+import { BatchProgressDock } from "../components/BatchProgressDock";
+import { CommandPalette } from "../components/CommandPalette";
+import { installSessionScope } from "../lib/session-scope";
+
+
 
 function NotFoundComponent() {
   return (
@@ -61,12 +68,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           >
             Try again
           </button>
-          <a
-            href="/"
+          <Link
+            to="/"
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
             Go home
-          </a>
+          </Link>
         </div>
       </div>
     </div>
@@ -96,7 +103,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Figtree:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap",
+      },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Bebas+Neue&family=Luckiest+Guy&family=Montserrat:wght@700;800;900&family=Playfair+Display:ital,wght@0,700;1,700&family=Poppins:wght@600;700;800&family=Permanent+Marker&family=Oswald:wght@500;700&family=Rubik+Mono+One&display=swap",
       },
     ],
   }),
@@ -123,11 +134,21 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  // cada conta tem seu próprio workspace local (lote, templates, preferências)
+  useEffect(() => installSessionScope(), []);
+
+
+
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
-      <ActivityDock />
+      <TooltipProvider delayDuration={200}>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+        <CommandPalette />
+        <ActivityDock />
+        <BatchProgressDock />
+        <Toaster />
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }

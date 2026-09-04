@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { listExports, type ExportRow } from "@/lib/cloud";
+import { supabase } from "@/integrations/supabase/client";
+import { listAccounts, type SocialAccount } from "@/lib/social";
+import { BulkScheduleModal, type BulkScheduleItem } from "@/components/BulkScheduleModal";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Download,
@@ -11,6 +15,8 @@ import {
   Layers,
   Monitor,
   Search,
+  Send,
+  Loader2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -22,13 +28,37 @@ export function ResultLibrary() {
   const [exports, setExports] = useState<ExportRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [accounts, setAccounts] = useState<SocialAccount[]>([]);
+  const [preparing, setPreparing] = useState<string | null>(null);
+  const [publishItem, setPublishItem] = useState<BulkScheduleItem | null>(null);
 
   useEffect(() => {
     listExports(100)
       .then(setExports)
       .catch(console.error)
       .finally(() => setLoading(false));
+    listAccounts().then(setAccounts).catch(() => undefined);
   }, []);
+
+  const openPublish = async (row: ExportRow) => {
+    if (!row.storage_path) return;
+    setPreparing(row.id);
+    try {
+      const { data, error } = await supabase.storage
+        .from("posts")
+        .createSignedUrl(row.storage_path, 60 * 60);
+      if (error || !data?.signedUrl) throw error ?? new Error("Link indisponível.");
+      const res = await fetch(data.signedUrl);
+      if (!res.ok) throw new Error("Não foi possível carregar o vídeo salvo.");
+      const blob = await res.blob();
+      const file = new File([blob], row.file_name, { type: blob.type || "video/mp4" });
+      setPublishItem({ file, ...(row.caption ? { caption: row.caption } : {}) });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao preparar a publicação.");
+    } finally {
+      setPreparing(null);
+    }
+  };
 
   const filtered = exports.filter((e) =>
     (e.file_name + (e.source_name || "")).toLowerCase().includes(search.toLowerCase()),
@@ -81,66 +111,109 @@ export function ResultLibrary() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((e) => (
             <Card
               key={e.id}
-              className="overflow-hidden border-border/50 bg-surface/30 transition-colors hover:bg-surface/50"
+              className="group overflow-hidden border-border/60 bg-surface/40 p-0 transition-colors hover:border-[var(--border-hover)] hover:bg-surface/60"
             >
-              <CardContent className="p-4">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                  <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    <FileVideo className="size-6" />
-                  </div>
+              <div className="relative grid aspect-[16/9] place-items-center overflow-hidden border-b border-border/60 bg-surface-2">
+                {e.thumb_url ? (
+                  <img
+                    src={e.thumb_url}
+                    alt={`Miniatura de ${e.file_name}`}
+                    loading="lazy"
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  <FileVideo className="size-8 text-primary/70" />
+                )}
+                <Badge
+                  variant="outline"
+                  className="absolute left-2 top-2 h-5 bg-background/70 font-mono text-[10px] uppercase tracking-[0.1em] backdrop-blur"
+                >
+                  {e.mode}
+                </Badge>
+                {e.platform && (
+                  <span className="absolute right-2 top-2 flex items-center gap-1 rounded-md bg-background/70 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground backdrop-blur">
+                    <Monitor className="size-3" /> {e.platform}
+                  </span>
+                )}
+              </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="truncate font-medium text-sm sm:text-base">{e.file_name}</h4>
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] uppercase font-mono h-5 bg-background/50"
-                      >
-                        {e.mode}
-                      </Badge>
-                    </div>
+              <CardContent className="space-y-2 p-3.5">
+                <h4 className="truncate text-sm font-medium" title={e.file_name}>
+                  {e.file_name}
+                </h4>
 
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                      {e.source_name && (
-                        <span className="flex items-center gap-1">
-                          <ExternalLink className="size-3" /> {e.source_name}
-                        </span>
-                      )}
-                      <span className="flex items-center gap-1">
-                        <Calendar className="size-3" />
-                        {formatDistanceToNow(new Date(e.created_at), {
-                          addSuffix: true,
-                          locale: ptBR,
-                        })}
-                      </span>
-                      {e.platform && (
-                        <span className="flex items-center gap-1">
-                          <Monitor className="size-3" /> {e.platform}
-                        </span>
-                      )}
-                      {e.bytes > 0 && (
-                        <span className="flex items-center gap-1 font-mono">
-                          {formatSize(e.bytes)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                {e.caption && (
+                  <p
+                    className="line-clamp-2 text-xs leading-snug text-muted-foreground"
+                    title={e.caption}
+                  >
+                    {e.caption}
+                  </p>
+                )}
 
-                  <div className="flex items-center gap-2 sm:ml-4">
-                    <Button variant="outline" size="sm" className="h-9 gap-2" disabled>
-                      <Download className="size-4" /> Baixar
-                    </Button>
-                  </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                  {e.source_name && (
+                    <span className="flex min-w-0 items-center gap-1">
+                      <ExternalLink className="size-3 shrink-0" />
+                      <span className="truncate">{e.source_name}</span>
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1">
+                    <Calendar className="size-3" />
+                    {formatDistanceToNow(new Date(e.created_at), {
+                      addSuffix: true,
+                      locale: ptBR,
+                    })}
+                  </span>
+                  {e.bytes > 0 && (
+                    <span className="font-mono">{formatSize(e.bytes)}</span>
+                  )}
                 </div>
+
+                {e.storage_path ? (
+                  <Button
+                    size="sm"
+                    className="h-9 w-full gap-2"
+                    onClick={() => void openPublish(e)}
+                    disabled={preparing === e.id}
+                  >
+                    {preparing === e.id ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Send className="size-4" />
+                    )}
+                    Publicar
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 w-full gap-2"
+                    disabled
+                    title="Este arquivo não foi guardado no servidor: ele foi salvo no seu computador no momento do download."
+                  >
+                    <Download className="size-4" /> Salvo localmente
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      <BulkScheduleModal
+        open={!!publishItem}
+        onClose={() => setPublishItem(null)}
+        accounts={accounts}
+        items={publishItem ? [publishItem] : []}
+        hideFilePicker
+        subtitle="Publique este clipe da biblioteca na conta escolhida."
+        onDone={() => setPublishItem(null)}
+      />
     </div>
   );
 }

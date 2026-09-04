@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
+  Coins,
   Eraser,
+  Eye,
   MousePointer2,
   PenTool,
   Pentagon,
@@ -12,6 +14,7 @@ import {
   Target,
   Trash2,
   Upload,
+  Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -24,28 +27,43 @@ import {
   createCleanerJob,
   detectCleanerJob,
   prepareCleanerUpload,
+  listCleanerChunks,
   processCleanerJob,
+  pumpCleanerGpuJob,
   refreshCleanerJob,
+  startCleanerGpuJob,
   saveCleanerMasks,
 } from "@/lib/cleaner.functions";
 import {
-  CLEANER_DEFAULT_CROP,
-  CLEANER_DEFAULT_ENHANCE,
-  CLEANER_DEFAULT_MODE,
-  CLEANER_DEFAULT_PRESET,
-  CLEANER_DEFAULT_STRATEGY,
   MODE_HINT,
   MODE_LABEL,
   PRESET_HINT,
   PRESET_LABEL,
   STAGE_LABEL,
   rid,
+  stageIndex,
   type CleanerJob,
   type CleanerMode,
   type CleanerPreset,
   type CleanerRegion,
 } from "@/lib/cleaner";
+import {
+  CleanerPipelineSteps,
+  type PipelineStep,
+  type PipelineStepState,
+} from "@/components/CleanerPipelineSteps";
 import { cloudAuthHeaders } from "@/lib/cloud";
+import {
+  DEFAULT_LOCAL_ADVANCED,
+  LOCAL_ADVANCED_LIMITS,
+  localCleanSupported,
+  runLocalClean,
+  type LocalCleanAdvanced,
+} from "@/lib/cleaner-local";
+
+import { consumeCredits, useAccess } from "@/lib/subscription";
+import { planFromId } from "@/lib/plan";
+
 
 type Props = {
   item: { id: string; file: File; poster: string | null; w: number; h: number };
@@ -54,21 +72,74 @@ type Props = {
 
 type Tool = "select" | "rect" | "poly" | "brush" | "protect" | "erase";
 
-const MODES: CleanerMode[] = ["subtitle", "smart", "text", "watermark", "object", "passerby"];
+const MODES: CleanerMode[] = ["smart", "text", "watermark", "object", "passerby"];
 const PRESETS: CleanerPreset[] = ["fast", "quality", "max"];
+
+/** Filtros de VISUALIZAÇÃO da lista de áreas — nunca alteram `masks`. */
+const MASK_FILTERS: Record<string, (m: CleanerRegion) => boolean> = {
+  "Só legendas": (m) => /texto|legenda|caption/i.test(m.label || m.role || ""),
+  "Só marca d'água": (m) => /marca|watermark|logo/i.test(m.label || m.role || ""),
+  "Só as minhas": (m) => /manual|polígono|pincel|protegida/i.test(m.label || ""),
+};
+
+/** Caixa normalizada (0..1) de uma área, seja retângulo, polígono ou pincel. */
+function regionBox(m: CleanerRegion): { x: number; y: number; w: number; h: number } | null {
+  if (m.points && m.points.length) {
+    const xs = m.points.map((p) => p.x);
+    const ys = m.points.map((p) => p.y);
+    const r = (m.size ?? 0) / 2;
+    const x = Math.min(...xs) - r;
+    const y = Math.min(...ys) - r;
+    return { x, y, w: Math.max(...xs) + r - x, h: Math.max(...ys) + r - y };
+  }
+  if (m.w != null && m.h != null && m.x != null && m.y != null) {
+    return { x: Math.min(m.x, m.x + m.w), y: Math.min(m.y, m.y + m.h), w: Math.abs(m.w), h: Math.abs(m.h) };
+  }
+  return null;
+}
+
+/** União das áreas de remoção, com folga, para o motor focar a reconstrução. */
+function maskBounds(list: CleanerRegion[]): { x: number; y: number; w: number; h: number } | null {
+  const boxes = list.map(regionBox).filter(Boolean) as { x: number; y: number; w: number; h: number }[];
+  if (!boxes.length) return null;
+  const x0 = Math.max(0, Math.min(...boxes.map((b) => b.x)) - 0.02);
+  const y0 = Math.max(0, Math.min(...boxes.map((b) => b.y)) - 0.02);
+  const x1 = Math.min(1, Math.max(...boxes.map((b) => b.x + b.w)) + 0.02);
+  const y1 = Math.min(1, Math.max(...boxes.map((b) => b.y + b.h)) + 0.02);
+  return { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
+}
+
+function overlapsAny(m: CleanerRegion, list: CleanerRegion[]): boolean {
+  const a = regionBox(m);
+  if (!a) return false;
+  return list.some((other) => {
+    const b = regionBox(other);
+    if (!b) return false;
+    return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  });
+}
+
 
 export function CleanerIAStudio({ item, onComplete }: Props) {
   const [job, setJob] = useState<CleanerJob | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [inputReady, setInputReady] = useState(false);
-  const [mode, setMode] = useState<CleanerMode>(CLEANER_DEFAULT_MODE);
-  const [preset, setPreset] = useState<CleanerPreset>(CLEANER_DEFAULT_PRESET);
+  const [pipelineBusy, setPipelineBusy] = useState(false);
+  const [pipelineStep, setPipelineStep] = useState<string | null>(null);
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
+  const [mode, setMode] = useState<CleanerMode>("smart");
+  const [preset, setPreset] = useState<CleanerPreset>("quality");
   const [dynamicMask, setDynamicMask] = useState(true);
   const [protectSubject, setProtectSubject] = useState(true);
   const [verifyPass, setVerifyPass] = useState(true);
-  const [cropClean, setCropClean] = useState(CLEANER_DEFAULT_CROP);
-  const [enhanceOutput, setEnhanceOutput] = useState(CLEANER_DEFAULT_ENHANCE);
+  const [cropClean, setCropClean] = useState(true);
+  const [enhanceOutput, setEnhanceOutput] = useState(true);
+  // Turbo GPU: o vídeo é dividido em partes que rodam em paralelo na nuvem.
+  const [turboGpu, setTurboGpu] = useState(false);
+  const [chunks, setChunks] = useState<
+    { idx: number; status: string; residual_text: number | null; attempts: number }[]
+  >([]);
   const [masks, setMasks] = useState<CleanerRegion[]>([]);
   const [health, setHealth] = useState<{
     online: boolean;
@@ -77,14 +148,36 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     cuda?: boolean;
     gpu?: string;
     reason?: string;
+    action?: string;
+    diagnosis?: string;
+    engines?: Record<string, { ready?: boolean; missing?: string[] }>;
   } | null>(null);
+
   const [polling, setPolling] = useState(false);
   const [tool, setTool] = useState<Tool>("rect");
   const [selected, setSelected] = useState<string | null>(null);
+  const [maskFilter, setMaskFilter] = useState<string | null>(null);
   const [draft, setDraft] = useState<CleanerRegion | null>(null);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [brushSize, setBrushSize] = useState(0.015);
+  const [workMode, setWorkMode] = useState<"auto" | "manual">("auto");
+  const [localBusy, setLocalBusy] = useState(false);
+  const [localProgress, setLocalProgress] = useState(0);
+  const [localPhase, setLocalPhase] = useState("");
+  const [localUrl, setLocalUrl] = useState<string | null>(null);
+  const localCancel = useRef(false);
+  const [advanced, setAdvanced] = useState<LocalCleanAdvanced>(DEFAULT_LOCAL_ADVANCED);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+
+
+  const access = useAccess();
+  const isAdmin = access?.isAdmin ?? false;
+  const creditsNeeded = Math.max(1, Math.ceil((duration || 60) / 60));
+  const planUnlimited = planFromId(access?.sub?.plan ?? null).credits === null;
+  const creditsAvailable = isAdmin || planUnlimited || (access?.sub?.credits ?? 0) >= creditsNeeded;
+  const previewDone = !!job?.preview_url && !job?.result_url && job?.status === "completed";
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -99,6 +192,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const processJob = useServerFn(processCleanerJob);
   const refreshJob = useServerFn(refreshCleanerJob);
   const saveMasks = useServerFn(saveCleanerMasks);
+  const startGpu = useServerFn(startCleanerGpuJob);
+  const pumpGpu = useServerFn(pumpCleanerGpuJob);
+  const getChunks = useServerFn(listCleanerChunks);
   const cleanupRemoteJob = useServerFn(cleanupCleanerRemoteJob);
 
   const src = useMemo(() => URL.createObjectURL(item.file), [item.file]);
@@ -135,6 +231,27 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     };
   }, [getHealth]);
 
+  // Progresso por partes: a fila roda no servidor, então basta acompanhar.
+  useEffect(() => {
+    if (!turboGpu || !job?.id || !polling) return;
+    let alive = true;
+    const tick = async () => {
+      try {
+        const rows = (await getChunks({ data: { id: job.id } })) as typeof chunks;
+        if (alive) setChunks(rows ?? []);
+        await pumpGpu({ data: { id: job.id } });
+      } catch {
+        // a batida do servidor (cron) continua avançando o job
+      }
+    };
+    void tick();
+    const timer = window.setInterval(tick, 8000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [turboGpu, job?.id, polling, getChunks, pumpGpu]);
+
   useEffect(() => {
     if (job || !health?.online) return;
     if (health.ai_ready === false && preset !== "fast") setPreset("fast");
@@ -150,8 +267,15 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         setJob((prev) => ({ ...(prev as CleanerJob), ...status }));
         if (status.status === "completed") {
           setPolling(false);
-          if (status.result_url) onComplete(status.result_url);
-          toast.success("Vídeo limpo com sucesso.");
+          if (status.result_url) {
+            onComplete(status.result_url);
+            toast.success("Vídeo limpo com sucesso.");
+          } else if (status.preview_url) {
+            toast.success("Prévia de 5s pronta — confira e processe o vídeo completo.");
+          }
+        } else if (status.status === "cancelled") {
+          setPolling(false);
+          toast.info("Processamento cancelado.");
         } else if (status.status === "failed") {
           setPolling(false);
           toast.error(`Falhou: ${status.error || "erro desconhecido"}`);
@@ -334,10 +458,57 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     setDraft(null);
   };
 
-  const startUpload = async () => {
+  /** Fallback sem GPU: reconstrói o fundo no navegador (mais lento, sem blur). */
+  const runLocal = async (previewOnly: boolean) => {
+    if (!localCleanSupported()) {
+      toast.error("Este navegador não suporta o modo local (requer WebCodecs).");
+      return;
+    }
+    const usable = masks.filter((m) => m.role === "remove" && m.enabled !== false);
+    if (!usable.length) {
+      toast.error("Marque ao menos uma área para remover antes de processar localmente.");
+      return;
+    }
+    localCancel.current = false;
+    setLocalBusy(true);
+    setLocalProgress(0);
+    setLocalPhase("iniciando");
+    try {
+      const blob = await runLocalClean({
+        file: item.file,
+        masks: usable,
+        seconds: previewOnly ? 5 : undefined,
+        advanced,
+        onProgress: (p) => setLocalProgress(Math.round(p * 100)),
+        onPhase: setLocalPhase,
+        isCancelled: () => localCancel.current,
+      });
+
+      const url = URL.createObjectURL(blob);
+      setLocalUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return url;
+      });
+      if (!previewOnly) onComplete(url);
+      toast.success(
+        previewOnly
+          ? "Prévia local de 5s pronta."
+          : "Vídeo limpo localmente — confira o resultado no player.",
+      );
+    } catch (e) {
+      if ((e as DOMException)?.name === "AbortError") toast.info("Processamento local cancelado.");
+      else toast.error(e instanceof Error ? e.message : "Falha no processamento local");
+    } finally {
+      setLocalBusy(false);
+      setLocalPhase("");
+    }
+  };
+
+  const startUpload = async (): Promise<CleanerJob | null> => {
+
     if (!health?.online) {
       toast.error("Motor de IA offline — configure o processamento local.");
-      return;
+      return null;
     }
     setUploading(true);
     setInputReady(false);
@@ -454,86 +625,238 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         confirmed ??= await verifyUpload();
         setJob(confirmed);
         setInputReady(true);
+        toast.success("Vídeo enviado. Detecte as áreas ou marque à mão.");
+        return confirmed;
       }
       toast.success("Vídeo enviado. Detecte as áreas ou marque à mão.");
+      return newJob;
     } catch (e) {
       toast.error(`Erro no upload: ${e instanceof Error ? e.message : "desconhecido"}`);
+      return null;
     } finally {
       setUploading(false);
     }
   };
 
-  const handleDetect = async () => {
-    if (!inputReady) {
+  const handleDetect = async (jobArg?: CleanerJob | null): Promise<CleanerRegion[] | null> => {
+    const target = jobArg ?? job;
+    if (!target?.id || (!inputReady && !jobArg)) {
       toast.error("O vídeo ainda não foi confirmado no motor. Reenvie o arquivo.");
-      return;
+      return null;
     }
     // Primeiro salva as máscaras atuais para garantir persistência antes da detecção
-    if (masks.length > 0 && job?.id) {
+    if (masks.length > 0) {
       const headers = await cloudAuthHeaders();
-      await saveMasks({ data: { id: job.id, masks }, headers }).catch(() => null);
+      await saveMasks({ data: { id: target.id, masks }, headers }).catch(() => null);
     }
 
-    if (!job?.id) return;
     try {
       setJob((prev) => (prev ? { ...prev, status: "detecting", stage: "detectando áreas" } : prev));
       const headers = await cloudAuthHeaders();
-      const res = (await detectJob({ data: { id: job.id, mode }, headers })) as CleanerJob;
+      const res = (await detectJob({ data: { id: target.id, mode }, headers })) as CleanerJob;
       const found = (res.detections || []) as CleanerRegion[];
       setMasks((prev) => [...prev, ...found]);
       setJob({ ...res, status: "queued" });
       toast[found.length ? "success" : "warning"](
         found.length ? `${found.length} área(s) encontrada(s).` : "Nada detectado — marque à mão.",
       );
+      return found;
     } catch (e) {
       setJob((prev) => (prev ? { ...prev, status: "queued" } : prev));
       toast.error(`Erro na detecção: ${e instanceof Error ? e.message : "desconhecido"}`);
+      return null;
     }
   };
 
-  const handleProcess = async () => {
-    if (!job?.id) return;
-    if (!inputReady) {
+  const handleProcess = async (
+    preview = false,
+    override?: { job?: CleanerJob | null; masks?: CleanerRegion[] },
+  ) => {
+    const target = override?.job ?? job;
+    const activeMasks = override?.masks ?? masks;
+    if (!target?.id) return;
+    if (!inputReady && !override?.job) {
       toast.error("O vídeo ainda não foi confirmado no motor. Reenvie o arquivo.");
       return;
     }
-    if (!masks.length && !cropClean && (mode === "object" || mode === "passerby")) {
+    if (!activeMasks.length && !cropClean) {
       toast.error("Marque ao menos uma área ou use Detectar.");
       return;
     }
+    if (!preview && !creditsAvailable) {
+      toast.error(
+        `Créditos insuficientes: este vídeo custa ${creditsNeeded} crédito(s). Faça upgrade do plano.`,
+      );
+      return;
+    }
+
     try {
       const headers = await cloudAuthHeaders();
-      await processJob({
+      // Só as áreas realmente ativas vão para o motor; áreas desligadas ou de proteção
+      // que cobrem uma área de remoção anulariam o inpainting.
+      const removeMasks = activeMasks.filter((m) => m.role === "remove" && m.enabled !== false);
+      const bbox = maskBounds(removeMasks);
+      const keepProtect = protectSubject && !bbox;
+      const sendMasks = activeMasks
+        .filter((m) => m.enabled !== false)
+        .filter((m) => m.role !== "protect" || !overlapsAny(m, removeMasks));
+      // Com áreas marcadas o recorte é ignorado: reenquadrar não apaga legenda que
+      // fica dentro do quadro — nesse caso o certo é reconstruir o fundo.
+      const useCrop = cropClean && removeMasks.length === 0;
+      const gpuRun = turboGpu && !preview;
+      const submit = gpuRun ? startGpu : processJob;
+      await submit({
         data: {
-          id: job.id,
+          id: target.id,
           mode,
-          preset,
-          masks,
+          preset: preview ? "fast" : preset,
+          masks: sendMasks,
           options: {
             dynamic: dynamicMask,
-            protect_subject: protectSubject,
+            protect_subject: keepProtect,
             verify: verifyPass,
-            strategy: cropClean ? "crop-clean" : CLEANER_DEFAULT_STRATEGY,
-            crop_clean: { y: 0.26, h: 0.435 },
+            strategy: useCrop ? "crop-clean" : "inpaint",
+            ...(useCrop ? { crop_clean: { y: 0.26, h: 0.435 } } : {}),
+            ...(bbox ? { mask_bbox: bbox } : {}),
             enhance: enhanceOutput ? { mode: "hq", scale: 1 } : { mode: "off" },
-            crf: enhanceOutput ? 12 : 16,
-            key_step: dynamicMask ? (mode === "subtitle" || mode === "text" ? 1 : 3) : 8,
+            crf: enhanceOutput ? 14 : 16,
+            key_step: dynamicMask ? 3 : 8,
+            ...(preview ? { preview_seconds: 5 } : {}),
           },
         },
         headers,
       });
+      if (protectSubject && !keepProtect) {
+        toast.info("Proteção de pessoa desativada nesta passada para apagar as áreas marcadas.");
+      }
+
+      if (!preview && !isAdmin && !planUnlimited) {
+        void consumeCredits(creditsNeeded);
+      }
       setPolling(true);
       setJob((prev) => (prev ? { ...prev, status: "inpainting", progress: 1 } : prev));
       toast.success(
-        cropClean ? "Recorte iniciado." : "Remoção e reconstrução iniciadas no CleanerIA.",
+        preview
+          ? "Gerando prévia de 5 segundos…"
+          : gpuRun
+            ? "Vídeo dividido em partes e enviado para as GPUs."
+            : "Reconstrução iniciada no motor de IA.",
       );
     } catch (e) {
       toast.error(`Erro ao iniciar: ${e instanceof Error ? e.message : "desconhecido"}`);
     }
   };
 
+  /**
+   * Fluxo completo em um clique: envio → detecção → máscara → reconstrução → remux.
+   * Cada etapa alimenta a trilha de progresso ao lado do player.
+   */
+  const runFullPipeline = async (preview = false) => {
+    if (pipelineBusy || uploading || polling) return;
+    setPipelineBusy(true);
+    setPipelineError(null);
+    setPipelineStep("upload");
+    try {
+      let target = job;
+      if (!target?.id || !inputReady) {
+        target = await startUpload();
+        if (!target?.id) throw new Error("o vídeo não chegou ao motor");
+      }
+
+      setPipelineStep("detect");
+      const found = await handleDetect(target);
+      const nextMasks = [...masks, ...(found ?? [])];
+
+      setPipelineStep("mask");
+      if (nextMasks.length) {
+        const headers = await cloudAuthHeaders();
+        await saveMasks({ data: { id: target.id, masks: nextMasks }, headers }).catch(() => null);
+      } else if (!cropClean) {
+        throw new Error("nada detectado — marque as áreas à mão e processe");
+      }
+
+      setPipelineStep("inpaint");
+      await handleProcess(preview, { job: target, masks: nextMasks });
+    } catch (e) {
+      setPipelineError(e instanceof Error ? e.message : "falha no fluxo");
+      toast.error(`Fluxo interrompido: ${e instanceof Error ? e.message : "erro"}`);
+    } finally {
+      setPipelineBusy(false);
+      setPipelineStep(null);
+    }
+  };
+
   const running = !!job && job.status !== "completed" && job.status !== "queued" && polling;
   const sel = masks.find((m) => m.id === selected) || null;
+
+  const visibleMasks = maskFilter && MASK_FILTERS[maskFilter] ? masks.filter(MASK_FILTERS[maskFilter]) : masks;
+
+  // Trilha de etapas do motor, derivada do estado real do job.
+  const pipelineSteps: PipelineStep[] = (() => {
+    const status = job?.status;
+    const stageAt = status ? stageIndex(status) : -1;
+    const failed = status === "failed" || !!pipelineError;
+    const st = (
+      done: boolean,
+      active: boolean,
+      errored = false,
+    ): PipelineStepState => (errored ? "error" : done ? "done" : active ? "active" : "pending");
+
+    const uploadDone = inputReady || (!!job && stageAt >= 1);
+    const detectDone = (job?.detections?.length ?? 0) > 0 || masks.length > 0;
+    const maskDone = masks.length > 0 || (uploadDone && cropClean && stageAt >= 5);
+    const inpaintActive =
+      !!status && ["analyzing", "detecting", "tracking", "processing", "inpainting", "refining"].includes(status);
+    const inpaintDone = !!status && stageAt >= stageIndex("encoding");
+    const remuxActive = status === "encoding";
+    const remuxDone = status === "completed" && !!(job?.result_url || job?.preview_url);
+
+    return [
+      {
+        key: "upload",
+        title: "1. Envio do vídeo",
+        hint: "master original enviado e verificado no motor",
+        state: st(uploadDone, uploading || pipelineStep === "upload", failed && !uploadDone),
+        detail: uploading ? `enviando ${uploadProgress}%` : undefined,
+        progress: uploading ? uploadProgress : undefined,
+      },
+      {
+        key: "detect",
+        title: "2. Detecção",
+        hint: "OCR e busca de legendas, marcas e overlays",
+        state: st(
+          detectDone,
+          status === "detecting" || pipelineStep === "detect",
+          failed && uploadDone && !detectDone,
+        ),
+        detail: job?.detections?.length ? `${job.detections.length} área(s) detectada(s)` : undefined,
+      },
+      {
+        key: "mask",
+        title: "3. Máscara",
+        hint: "áreas confirmadas e salvas para o motor",
+        state: st(maskDone, pipelineStep === "mask", false),
+        detail: masks.length ? `${masks.length} área(s) na máscara` : undefined,
+      },
+      {
+        key: "inpaint",
+        title: "4. Reconstrução",
+        hint: "fundo refeito quadro a quadro, sem borrão",
+        state: st(inpaintDone, inpaintActive || pipelineStep === "inpaint", failed && maskDone && !inpaintDone),
+        detail: inpaintActive ? job?.stage : undefined,
+        progress: inpaintActive ? job?.progress : undefined,
+      },
+      {
+        key: "remux",
+        title: "5. Remux e entrega",
+        hint: "áudio original reencaixado e arquivo final pronto",
+        state: st(remuxDone, remuxActive, status === "failed"),
+        detail: remuxDone ? "vídeo pronto para baixar" : remuxActive ? job?.stage : undefined,
+      },
+    ];
+  })();
+
+
 
   return (
     <div className="grid gap-6 lg:grid-cols-[200px_1fr_300px]">
@@ -567,7 +890,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           onPointerMove={onMove}
           onPointerUp={onUp}
           onDoubleClick={() => tool === "poly" && finishPolygon()}
-          className={`panel relative aspect-video overflow-hidden rounded-2xl border border-border/60 bg-black touch-none z-0 ${
+          style={{ aspectRatio: `${item.w || 16} / ${item.h || 9}` }}
+          className={`panel relative mx-auto max-h-[70vh] w-full overflow-hidden rounded-2xl border border-border/60 bg-black touch-none z-0 ${
+            item.h > item.w ? "max-w-[min(100%,42vh)]" : ""
+          } ${
             tool === "select"
               ? "cursor-default"
               : tool === "erase"
@@ -577,13 +903,23 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         >
           <video
             ref={videoRef}
-            src={job?.status === "completed" && job.result_url ? job.result_url : src}
-            controls={job?.status === "completed"}
+            src={
+              localUrl ?? (job?.status === "completed" ? (job.result_url ?? job.preview_url ?? src) : src)
+            }
+
+            controls={!!localUrl || job?.status === "completed"}
             playsInline
+            muted
+            preload="auto"
+            poster={item.poster ?? undefined}
             className="absolute inset-0 size-full object-contain z-0"
-            onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+            onLoadedMetadata={(e) => {
+              setDuration(e.currentTarget.duration || 0);
+              if (e.currentTarget.currentTime === 0) e.currentTarget.currentTime = 0.05;
+            }}
             onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
           />
+
 
           {job?.status !== "completed" &&
             [...visible, ...(draft ? [draft] : [])].map((m) => {
@@ -868,10 +1204,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 : health.online && health.ai_ready
                   ? "IA pronta"
                   : health.online && health.cuda === false
-                    ? "modo CPU"
-                    : health.online
-                      ? "modo básico"
-                      : "offline"}
+                    ? "modo CPU · TBE"
+                  : health.online
+                    ? "modo básico"
+                    : "offline"}
             </button>
           </div>
 
@@ -905,6 +1241,48 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             ))}
           </div>
 
+          <button
+            type="button"
+            onClick={() => !job && setTurboGpu((v) => !v)}
+            disabled={!!job}
+            className={`w-full rounded-lg border p-2.5 text-left text-xs transition ${
+              turboGpu ? "border-primary bg-primary/10" : "border-border/60 bg-background/40"
+            } disabled:opacity-60`}
+          >
+            <span className="block font-semibold">Turbo GPU {turboGpu ? "· ligado" : "· desligado"}</span>
+            <span className="block text-[10px] text-muted-foreground">
+              Divide o vídeo em partes e processa em paralelo na nuvem — muito mais rápido em
+              vídeos longos. Continua mesmo se você fechar a página.
+            </span>
+          </button>
+
+          {turboGpu && chunks.length > 0 && (
+            <div className="space-y-2 rounded-lg border border-border/60 bg-background/40 p-3">
+              <span className="mono-label">
+                Partes {chunks.filter((c) => c.status === "done").length}/{chunks.length}
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {chunks.map((c) => (
+                  <span
+                    key={c.idx}
+                    title={`Parte ${c.idx + 1} · ${c.status}${
+                      c.residual_text != null ? ` · resíduo ${c.residual_text.toFixed(3)}` : ""
+                    }`}
+                    className={`h-2 w-4 rounded-sm ${
+                      c.status === "done"
+                        ? "bg-primary"
+                        : c.status === "running"
+                          ? "bg-primary/50 animate-pulse"
+                          : c.status === "failed"
+                            ? "bg-destructive"
+                            : "bg-border"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2 rounded-lg border border-border/60 bg-background/40 p-3">
             <span className="mono-label">Precisão</span>
             {[
@@ -933,15 +1311,16 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 key: "crop",
                 on: cropClean,
                 set: setCropClean,
-                title: "Recortar área da legenda",
-                hint: "Alternativa sem IA: recorta e reenquadra o vídeo; mantenha desligado para reconstruir o fundo",
+                title: "Legenda por recorte limpo",
+                hint: "Reenquadra para fora da legenda — usado só quando nenhuma área é marcada",
+
               },
               {
                 key: "enh",
                 on: enhanceOutput,
                 set: setEnhanceOutput,
                 title: "Melhorar qualidade",
-                hint: "Exporta em HQ com nitidez reforÃ§ada apÃ³s limpar o vÃ­deo",
+                hint: "Exporta em HQ com nitidez reforçada após limpar o vídeo",
               },
             ].map((o) => (
               <label key={o.key} className="flex cursor-pointer items-start gap-2 text-xs">
@@ -960,15 +1339,51 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             ))}
           </div>
 
+          {/* Trilha do motor completo */}
+          <div className="rounded-xl border border-border/70 bg-background/40 p-3">
+            <p className="mono-label mb-2">Etapas do motor</p>
+            <CleanerPipelineSteps steps={pipelineSteps} />
+            {pipelineError && (
+              <p className="flex items-center gap-1.5 text-[11px] text-destructive">
+                <AlertCircle className="size-3.5" /> {pipelineError}
+              </p>
+            )}
+          </div>
+
           {!job || !inputReady ? (
-            <Button
-              className="w-full shadow-glow"
-              onClick={startUpload}
-              disabled={!health?.online || uploading}
-            >
-              <Upload className="mr-2 size-4" /> {job ? "Reenviar vídeo" : "Enviar para IA"}
-            </Button>
-          ) : job.status === "completed" ? (
+            health && !health.online ? (
+              <Button
+                className="w-full"
+                variant="secondary"
+                onClick={() => runLocal(false)}
+                disabled={localBusy}
+              >
+                <Wand2 className="mr-2 size-4" />
+                {localBusy ? "Processando local…" : "Processar no modo local"}
+              </Button>
+            ) : (
+              <div className="space-y-2">
+                <Button
+                  className="w-full shadow-glow"
+                  onClick={() => void runFullPipeline(false)}
+                  disabled={!health?.online || uploading || pipelineBusy || !creditsAvailable}
+                >
+                  <Sparkles className="mr-2 size-4" />
+                  {pipelineBusy ? "Executando fluxo…" : "Limpar automático (fluxo completo)"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => void startUpload()}
+                  disabled={!health?.online || uploading || pipelineBusy}
+                >
+                  <Upload className="mr-2 size-4" /> {job ? "Reenviar vídeo" : "Só enviar para IA"}
+                </Button>
+              </div>
+            )
+
+          ) : job.status === "completed" && !previewDone ? (
+
             <a
               href={job.result_url ?? "#"}
               download
@@ -978,27 +1393,107 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                   void cleanupRemoteJob({ data: { id } });
                 }, 15000);
               }}
-              className="block w-full rounded-lg bg-primary py-2 text-center text-sm font-semibold text-primary-foreground"
+              className="interactive block w-full rounded-lg bg-primary py-2 text-center text-sm font-semibold text-primary-foreground"
             >
               Baixar vídeo limpo
             </a>
           ) : (
             <div className="space-y-2">
+              {previewDone && (
+                <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-3">
+                  <p className="flex items-center gap-1.5 text-[11px] font-medium text-primary">
+                    <Eye className="size-3.5" /> Prévia de 5s pronta — confira no player acima.
+                  </p>
+                  <div className="flex gap-2">
+                    <a
+                      href={job?.preview_url ?? "#"}
+                      download
+                      className="interactive flex-1 rounded-lg border border-border/70 py-1.5 text-center text-xs font-medium"
+                    >
+                      Baixar prévia
+                    </a>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-xs"
+                      onClick={() => void handleProcess(true)}
+                      disabled={polling}
+                    >
+                      Refazer
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-1 rounded-xl border border-border/70 bg-background/40 p-1 text-xs font-medium">
+                <button
+                  onClick={() => setWorkMode("auto")}
+                  className={`flex items-center justify-center gap-1 rounded-lg py-1.5 transition-colors ${
+                    workMode === "auto" ? "bg-primary/15 text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  <Wand2 className="size-3.5" /> Automático
+                </button>
+                <button
+                  onClick={() => setWorkMode("manual")}
+                  className={`flex items-center justify-center gap-1 rounded-lg py-1.5 transition-colors ${
+                    workMode === "manual" ? "bg-primary/15 text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  <PenTool className="size-3.5" /> Manual
+                </button>
+              </div>
+              {workMode === "auto" ? (
+                <div className="space-y-2">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => void handleDetect()}
+                    disabled={polling || pipelineBusy || !inputReady}
+                  >
+                    <Target className="mr-2 size-4" /> Detectar automaticamente
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => void runFullPipeline(false)}
+                    disabled={polling || pipelineBusy || !inputReady || !creditsAvailable}
+                  >
+                    <Sparkles className="mr-2 size-4" />
+                    {pipelineBusy ? "Executando fluxo…" : "Detectar e limpar em sequência"}
+                  </Button>
+                </div>
+              ) : (
+                <p className="rounded-lg border border-border/50 bg-background/30 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+                  Use as ferramentas à esquerda para desenhar sobre o que remover, depois gere a
+                  prévia ou processe.
+                </p>
+              )}
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={handleDetect}
+                onClick={() => void handleProcess(true)}
                 disabled={polling || !inputReady}
               >
-                <Target className="mr-2 size-4" /> Detectar
+                <Eye className="mr-2 size-4" /> Prévia (5s, grátis)
               </Button>
               <Button
                 className="w-full shadow-glow"
-                onClick={handleProcess}
-                disabled={polling || !inputReady}
+                onClick={() => void handleProcess(false)}
+                disabled={polling || !inputReady || !creditsAvailable}
               >
-                <Sparkles className="mr-2 size-4" /> Remover
+                <Sparkles className="mr-2 size-4" /> Processar completo
+                {!isAdmin && !planUnlimited && (
+                  <span className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-primary-foreground/15 px-1.5 py-0.5 text-[10px]">
+                    <Coins className="size-3" /> {creditsNeeded}
+                  </span>
+                )}
               </Button>
+              {!creditsAvailable && (
+                <p className="flex items-center gap-1.5 text-[11px] text-destructive">
+                  <AlertCircle className="size-3.5" />
+                  Créditos insuficientes ({access?.sub?.credits ?? 0} disponíveis).
+                </p>
+              )}
             </div>
           )}
         </section>
@@ -1013,8 +1508,35 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               reconstruído com contexto temporal — nunca borrado.
             </p>
           ) : (
+            <>
+              <div className="flex flex-wrap gap-1.5">
+                {Object.keys(MASK_FILTERS).map((label) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setMaskFilter((f) => (f === label ? null : label))}
+                    className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${
+                      maskFilter === label
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border/60 text-muted-foreground hover:border-primary hover:text-primary"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+                {maskFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setMaskFilter(null)}
+                    className="rounded-full border border-border/60 px-2 py-1 text-[10px] font-semibold text-muted-foreground hover:border-primary hover:text-primary"
+                  >
+                    Todas
+                  </button>
+                )}
+              </div>
+
             <div className="max-h-[220px] space-y-2 overflow-y-auto pr-1">
-              {masks.map((m) => (
+              {visibleMasks.map((m) => (
                 <div
                   key={m.id}
                   onClick={() => setSelected(m.id)}
@@ -1042,7 +1564,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 </div>
               ))}
             </div>
+            </>
           )}
+
           {masks.length > 0 && (
             <Button
               variant="ghost"
@@ -1125,24 +1649,146 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         )}
 
         {health && !health.online && (
-          <div className="flex items-start gap-2 rounded-xl bg-destructive/10 p-4 text-destructive">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <div className="text-[11px] leading-relaxed">
-              <p className="font-bold uppercase tracking-tight">Backend offline</p>
-              <p className="opacity-80">{health.reason || "processamento local não configurado"}</p>
+          <div className="space-y-3 rounded-xl bg-destructive/10 p-4 text-destructive">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <div className="text-[11px] leading-relaxed">
+                <p className="font-bold uppercase tracking-tight">
+                  {health.diagnosis === "not_configured"
+                    ? "Motor GPU não configurado"
+                    : health.diagnosis === "edge_blocked"
+                      ? "Acesso ao motor bloqueado pela borda"
+                      : health.diagnosis === "unauthorized"
+                        ? "Credencial do motor inválida"
+                        : health.diagnosis === "unreachable"
+                          ? "Motor GPU sem resposta"
+                          : "Motor GPU offline"}
+                </p>
+                <p className="opacity-80">
+                  {health.reason || "endpoint do worker não configurado"}
+                </p>
+                {health.action && <p className="mt-1 font-semibold">{health.action}</p>}
+                <p className="opacity-80">Use o modo local abaixo para não travar seu fluxo.</p>
+              </div>
+            </div>
+
+            <div className="space-y-2 rounded-lg bg-background/40 p-3 text-foreground">
+              <p className="text-[11px] font-semibold">Modo local (sem GPU)</p>
+              <p className="text-[10px] text-muted-foreground">
+                Modelo próprio de fundo: reestima o fundo em blocos, usando uma janela de quadros
+                vizinhos e analisando só o recorte das máscaras — por isso aguenta vídeos longos.
+                Sem blur, sem mosaico.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((v) => !v)}
+                className="text-[10px] font-bold uppercase tracking-tight text-primary"
+              >
+                {showAdvanced ? "Ocultar ajustes avançados" : "Ajustes avançados do inpainting"}
+              </button>
+              {showAdvanced && (
+                <div className="space-y-3 rounded-lg border border-border/60 bg-background/50 p-3">
+                  {(Object.keys(LOCAL_ADVANCED_LIMITS) as (keyof LocalCleanAdvanced)[]).map((k) => {
+                    const l = LOCAL_ADVANCED_LIMITS[k];
+                    return (
+                      <label key={k} className="block space-y-1">
+                        <span className="flex items-center justify-between text-[10px] font-semibold">
+                          {l.label}
+                          <span className="font-mono text-muted-foreground">
+                            {k === "cropPadding"
+                              ? `${Math.round(advanced[k] * 100)}%`
+                              : advanced[k]}
+                          </span>
+                        </span>
+                        <input
+                          type="range"
+                          min={l.min}
+                          max={l.max}
+                          step={l.step}
+                          value={advanced[k]}
+                          disabled={localBusy}
+                          onChange={(e) =>
+                            setAdvanced((prev) => ({ ...prev, [k]: Number(e.target.value) }))
+                          }
+                          className="w-full accent-[var(--primary)]"
+                        />
+                        <span className="block text-[10px] leading-snug text-muted-foreground">
+                          {l.hint}
+                        </span>
+                      </label>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setAdvanced(DEFAULT_LOCAL_ADVANCED)}
+                    disabled={localBusy}
+                    className="text-[10px] font-bold uppercase text-muted-foreground"
+                  >
+                    Restaurar padrão
+                  </button>
+                </div>
+              )}
+
+              {localBusy ? (
+                <div className="space-y-2">
+                  <Progress value={localProgress} />
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span>
+                      {localPhase} · {localProgress}%
+                    </span>
+                    <button
+                      className="font-bold text-destructive"
+                      onClick={() => {
+                        localCancel.current = true;
+                      }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => runLocal(true)}>
+                    <Eye className="mr-1 size-3.5" /> Prévia local 5s
+                  </Button>
+                  <Button size="sm" onClick={() => runLocal(false)}>
+                    <Wand2 className="mr-1 size-3.5" /> Processar local
+                  </Button>
+                  {localUrl && (
+                    <a
+                      href={localUrl}
+                      download={`limpo-${item.file.name.replace(/\.[^.]+$/, "")}.mp4`}
+                      className="inline-flex items-center rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground"
+                    >
+                      Baixar resultado
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {health?.online && health.cuda === false && (
+
+        {health?.online && (health.cuda === false || health.ai_ready === false) && (
           <div className="flex items-start gap-2 rounded-xl bg-amber-500/10 p-4 text-amber-600">
             <AlertCircle className="mt-0.5 size-4 shrink-0" />
             <div className="text-[11px] leading-relaxed">
-              <p className="font-bold uppercase">Processamento em CPU</p>
-              <p className="opacity-80">O motor está disponível, mas vídeos podem demorar mais.</p>
+              <p className="font-bold uppercase">
+                {health.cuda === false ? "Processamento em CPU" : "Motor sem pesos completos"}
+              </p>
+              <p className="opacity-80">
+                {health.cuda === false
+                  ? `Motor disponível${health.gpu ? ` (${health.gpu})` : ""}, mas sem GPU CUDA: mais lento e com qualidade abaixo do preset máximo.`
+                  : "O worker respondeu, porém os modelos de reconstrução ainda não estão prontos."}
+                {health.engines?.["propainter"]?.missing?.length
+                  ? ` Faltando: ${health.engines["propainter"].missing.join(", ")}.`
+                  : ""}
+              </p>
             </div>
           </div>
         )}
+
       </div>
     </div>
   );

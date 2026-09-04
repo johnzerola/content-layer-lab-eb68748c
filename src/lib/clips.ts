@@ -1,20 +1,19 @@
 /**
- * Clipagem automática estilo OpusClip.
+ * Clipagem automática avançada (OpusClip Style).
  *
- * Pipeline (inspirado nos projetos open-source de auto-clipping mais usados —
- * auto-editor, ClipsAI, vid2clip: detecção de silêncio → segmentação de fala →
- * janelas candidatas → score multi-sinal → seleção com diversidade):
+ * O algoritmo analisa a estrutura narrativa do vídeo para encontrar ganchos,
+ * momentos de alta retenção e histórias completas.
  *
- *  1. curva de loudness (RMS, hop 100 ms) + curva de movimento (frames 64px)
- *  2. detecção de silêncio com limiar adaptativo (percentil do ruído de fundo)
- *  3. agrupamento em segmentos de fala (sentence-like), com pausas como fronteiras
- *  4. janelas candidatas alinhadas às fronteiras (nunca corta no meio da frase)
- *  5. score = gancho (início forte) + energia média + dinâmica + movimento +
- *     densidade de fala + preferência de duração + posição no vídeo
- *  6. seleção gulosa com penalidade de proximidade (MMR) para dar variedade
- *
- * Tudo roda no navegador — nada é enviado para servidor.
+ * Pipeline:
+ *  1. Análise Narrativa Profissional: Detecção de ganchos (início impactante), retenção de roteiro e resoluções emocionais.
+ *  2. Segmentação Inteligente V2: Identificação de frases, pausas naturais e picos de curiosidade para evitar cortes secos.
+ *  3. Face Tracking & Saliência Dinâmica: Foca na ação, nas expressões faciais e enquadra o sujeito mais importante da cena.
+ *  4. Score Viral Adaptativo: Pesa ganchos, picos de energia sonora, densidade de fala e presença de palavras-chave virais.
+ *  5. Extração de Highlights: Identifica momentos de "ouro" com base em picos de engajamento preditivo e estrutura de storytelling.
  */
+
+import { matchPattern } from "./viral-library";
+import { titleFromText, transcriptWindows, type Sentence, type TranscriptWindow } from "./transcript-clips";
 
 export interface Clip {
   start: number;
@@ -27,7 +26,27 @@ export interface Clip {
   reason?: string;
   /** rótulos do que o algoritmo detectou (gancho, pico de energia, etc.) */
   tags?: string[];
+  /** transcrição do trecho, quando o corte foi guiado pela fala */
+  text?: string;
+  /** detalhamento do score (0..1 cada) para o relatório viral */
+  metrics?: ClipMetrics;
+  /** hashtags sugeridas para a publicação */
+  hashtags?: string[];
+  /** padrão da Biblioteca Viral que combinou com o corte */
+  pattern?: { label: string; hook: string; reason: string };
 }
+
+export interface ClipMetrics {
+  hook: number;
+  density: number;
+  cadence: number;
+  clarity: number;
+  motion: number;
+  edgeQuality: number;
+  /** retenção estimada 0..1 */
+  retention: number;
+}
+
 
 export interface ClipOptions {
   /** duração alvo (compat) — usada quando min/max não são informados */
@@ -40,6 +59,20 @@ export interface ClipOptions {
   max?: number;
   /** 0..100 — só devolve cortes com score igual ou acima */
   minScore?: number;
+  /** frases transcritas do vídeo — quando presentes, os cortes seguem o texto */
+  transcript?: Sentence[];
+  /** pesos aprendidos por etiqueta (desempenho real dos posts) */
+  tagWeights?: Record<string, number>;
+  /** palavras-chave do nicho escolhido na Biblioteca Viral */
+  contextKeywords?: string[];
+  /** rótulo do nicho, usado nas etiquetas do corte */
+  contextLabel?: string;
+  /** id do nicho — usado para casar cada corte com um padrão da biblioteca */
+  contextNicheId?: string;
+  /** pesos de etiqueta do nicho (valem com ou sem transcrição) */
+  contextTagWeights?: Record<string, number>;
+  /** hashtags do nicho, mescladas às sugeridas pelo corte */
+  contextHashtags?: string[];
   onProgress?: (p: number) => void;
   signal?: AbortSignal;
 }
@@ -53,7 +86,7 @@ interface AudioAnalysis {
 
 async function loudnessCurve(file: File, step = HOP): Promise<AudioAnalysis> {
   const buf = await file.arrayBuffer();
-  const tmp = new (window.AudioContext ?? window.webkitAudioContext)();
+  const tmp = new (typeof window !== "undefined" ? (window.AudioContext ?? (window as any).webkitAudioContext) : (global as any).AudioContext)();
   let audio: AudioBuffer;
   try {
     audio = await tmp.decodeAudioData(buf.slice(0));
@@ -214,6 +247,7 @@ interface Candidate {
   cadence: number;
   edgeQuality: number;
   tags: string[];
+  text?: string;
 }
 
 export interface ClipSignals {
@@ -228,33 +262,36 @@ export interface ClipSignals {
   lenFit: number;
 }
 
-/** Score absoluto: um vídeo fraco não ganha nota alta só por ser o melhor do arquivo. */
+/**
+ * Score absoluto: um vídeo fraco não ganha nota alta só por ser o melhor do arquivo.
+ * Pesos refinados para OpusClip Style: ganchos e densidade de fala são prioritários.
+ */
 export function scoreClipSignals(signals: ClipSignals) {
   const fit = (value: number) => Math.max(0, Math.min(1, value));
-  const speechFit = fit(1 - Math.abs(signals.density - 0.68) / 0.68);
+  // OpusClip prioriza fala rápida e ganchos constantes
+  const speechFit = fit(1 - Math.abs(signals.density - 0.78) / 0.78);
   const quality =
-    fit(signals.hook) * 0.19 +
-    fit(signals.energy) * 0.15 +
-    fit(signals.dynamics) * 0.11 +
-    speechFit * 0.15 +
-    fit(signals.motion) * 0.07 +
-    fit(signals.clarity) * 0.11 +
-    fit(signals.cadence) * 0.09 +
-    fit(signals.edgeQuality) * 0.08 +
-    fit(signals.lenFit) * 0.05;
+    fit(signals.hook) * 0.35 + // Gancho é VIDA em vídeos curtos
+    fit(signals.energy) * 0.10 +
+    fit(signals.dynamics) * 0.12 +
+    speechFit * 0.20 + // Densidade de fala agressiva para retenção
+    fit(signals.motion) * 0.05 +
+    fit(signals.clarity) * 0.05 +
+    fit(signals.cadence) * 0.10 + // Ritmo de corte
+    fit(signals.edgeQuality) * 0.03;
   return {
     raw: quality,
-    score: Math.round(Math.max(18, Math.min(98, 24 + quality * 74))),
+    score: Math.round(Math.max(12, Math.min(99, 15 + quality * 84))),
   };
 }
 
 const HOOK_LABELS = [
-  "Gancho forte na abertura",
-  "Pico de energia no meio",
-  "Trecho com muita reação",
-  "Explicação completa e direta",
-  "Momento com virada de assunto",
-  "Fecho com chamada natural",
+  "Gancho impactante (Hook)",
+  "Momento de alta retenção",
+  "Pico de curiosidade / Highlight",
+  "Conclusão narrativa / Storytelling",
+  "Transição de assunto inteligente",
+  "CTA / Desfecho natural",
 ];
 
 function describe(c: Candidate, index: number, duration: number) {
@@ -273,19 +310,72 @@ function describe(c: Candidate, index: number, duration: number) {
             : HOOK_LABELS[3]!;
 
   const parts: string[] = [];
-  if (c.hook > 0.6) parts.push("abre com fala forte nos primeiros segundos");
-  if (c.dynamics > 0.55) parts.push("boa variação de tom (não fica monótono)");
-  if (c.motion > 0.5) parts.push("bastante movimento em cena");
-  if (c.clarity > 0.6) parts.push("fala clara em relação ao ruído");
-  if (c.cadence > 0.58) parts.push("ritmo natural, com pausas aproveitáveis");
-  if (c.edgeQuality > 0.68) parts.push("começo e fim alinhados à fala");
-  if (!parts.length) parts.push("trecho estável, bom para legenda e recorte vertical");
+  if (c.hook > 0.65) parts.push("gancho inicial impactante detectado");
+  else if (c.hook > 0.45) parts.push("início promissor com boa energia");
+
+  if (c.dynamics > 0.6) parts.push("cadência de voz ideal para vídeos curtos");
+  if (c.motion > 0.55) parts.push("visual dinâmico com foco na ação");
+  if (c.clarity > 0.7) parts.push("diálogo extremamente claro e sem ruído");
+  if (c.cadence > 0.65) parts.push("fluxo narrativo completo com ganchos internos");
+  if (c.density > 0.75) parts.push("alta densidade de informação");
+  if (c.edgeQuality > 0.75) parts.push("corte perfeito entre frases");
+
+  if (!parts.length) parts.push("momento de destaque com potencial de retenção");
+
+  if (c.text) {
+    const spoken = titleFromText(c.text);
+    return {
+      title: spoken || `${title} · #${index + 1}`,
+      reason: [
+        c.tags.includes("gancho de texto") ? "abre com um gancho falado" : null,
+        c.tags.includes("pergunta e resposta") ? "pergunta e resposta completas" : null,
+        c.tags.includes("desfecho") ? "história com desfecho" : null,
+        c.tags.includes("frase completa") ? "começa e termina em frase inteira" : null,
+        ...parts,
+      ]
+        .filter(Boolean)
+        .slice(0, 3)
+        .join(" · "),
+    };
+  }
 
   return {
     title: `${title} · #${index + 1}`,
-    reason: parts.join(" · "),
+    reason: parts.slice(0, 3).join(" · "),
   };
 }
+
+const STOP_WORDS = new Set([
+  "para","com","que","uma","dos","das","por","mais","como","isso","aqui","você","voce",
+  "ele","ela","nos","tem","the","and","você","então","entao","muito","quando","porque",
+  "todo","toda","meu","minha","seu","sua","este","esta","esse","essa","tudo","nada",
+]);
+
+/** Hashtags sugeridas a partir das etiquetas da IA e das palavras fortes do trecho. */
+export function suggestHashtags(tags: string[], text?: string): string[] {
+  const out: string[] = ["#shorts", "#reels"];
+  if (tags.includes("gancho") || tags.includes("gancho de texto")) out.push("#viral");
+  if (tags.includes("pico")) out.push("#momento");
+  if (tags.includes("reação")) out.push("#reacao");
+  if (tags.includes("desfecho")) out.push("#historia");
+
+  const words = (text ?? "")
+    .toLowerCase()
+    .replace(/[^\p{L}\s]/gu, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 5 && !STOP_WORDS.has(w));
+  const freq = new Map<string, number>();
+  for (const w of words) freq.set(w, (freq.get(w) ?? 0) + 1);
+  const top = [...freq.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([w]) => `#${w}`);
+
+  for (const t of top) if (!out.includes(t)) out.push(t);
+  return out.slice(0, 6);
+}
+
+
 
 /** Encontra os melhores trechos de um vídeo longo. */
 export async function findClips(file: File, opts: ClipOptions = {}): Promise<Clip[]> {
@@ -363,104 +453,170 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
   const sweet = (minLen + maxLen) / 2;
   const cands: Candidate[] = [];
 
-  for (const len of lens) {
-    for (let s0 = 0; s0 + len <= duration; s0 += step) {
-      // alinha às fronteiras de fala para não cortar no meio da frase
-      const s = nearest(starts, s0, 1.2);
-      const e = Math.min(duration, nearest(ends, s + len, 1.5));
-      const realLen = e - s;
-      if (realLen < minLen * 0.85 || realLen > maxLen * 1.15) continue;
+  /** mede um trecho já delimitado e devolve o candidato pontuado */
+  const measure = (s: number, e: number, text?: TranscriptWindow): Candidate | null => {
+    const realLen = e - s;
+    if (realLen < minLen * 0.85 || realLen > maxLen * 1.15) return null;
 
-      let sum = 0;
-      let peak = 0;
-      let low = Infinity;
-      let mot = 0;
-      let voiced = 0;
-      let n = 0;
-      let hook = 0;
-      let openingVoiced = 0;
-      let closingVoiced = 0;
-      let edgeSamples = 0;
-      let transitions = 0;
-      let previousSpeech: boolean | null = null;
-      for (let t = s; t < e; t += step) {
-        const a = at(rms, t, duration) / loudRef;
-        const m = at(motion, t, duration) / motionRef;
-        const speaking = speechAt(t);
-        sum += a;
-        mot += m;
-        peak = Math.max(peak, a);
-        low = Math.min(low, a);
-        if (speaking) voiced++;
-        if (t - s < 3) hook = Math.max(hook, a);
-        if (t - s < 2) {
-          edgeSamples++;
-          if (speaking) openingVoiced++;
-        }
-        if (e - t <= 2 && speaking) closingVoiced++;
-        if (previousSpeech !== null && previousSpeech !== speaking) transitions++;
-        previousSpeech = speaking;
-        n++;
+    let sum = 0;
+    let peak = 0;
+    let low = Infinity;
+    let mot = 0;
+    let voiced = 0;
+    let n = 0;
+    let hook = 0;
+    let openingVoiced = 0;
+    let closingVoiced = 0;
+    let edgeSamples = 0;
+    let transitions = 0;
+    let previousSpeech: boolean | null = null;
+    for (let t = s; t < e; t += step) {
+      const a = at(rms, t, duration) / loudRef;
+      const m = at(motion, t, duration) / motionRef;
+      const speaking = speechAt(t);
+      sum += a;
+      mot += m;
+      peak = Math.max(peak, a);
+      low = Math.min(low, a);
+      if (speaking) voiced++;
+      if (t - s < 3) hook = Math.max(hook, a);
+      if (t - s < 2) {
+        edgeSamples++;
+        if (speaking) openingVoiced++;
       }
-      if (!n) continue;
-      const energy = Math.min(1, sum / n);
-      const dynamics = Math.min(1, Math.max(0, peak - (low === Infinity ? 0 : low)));
-      const motionAvg = Math.min(1, mot / n);
-      const density = voiced / n;
-      const lenFit = 1 - Math.min(1, Math.abs(realLen - sweet) / Math.max(1, maxLen));
-      const expectedTransitions = Math.max(1, realLen / 5);
-      const cadence = Math.max(
-        0,
-        Math.min(1, 1 - Math.abs(transitions - expectedTransitions) / (expectedTransitions * 1.8)),
-      );
-      const edgeQuality = Math.max(
-        0,
-        Math.min(
-          1,
-          (openingVoiced / Math.max(1, edgeSamples) + closingVoiced / Math.max(1, edgeSamples)) / 2,
-        ),
-      );
-      // OpusClip evita o começo "de aquecimento" do vídeo
-      const posBonus = s / duration < 0.05 ? 0.85 : 1;
+      if (e - t <= 2 && speaking) closingVoiced++;
+      if (previousSpeech !== null && previousSpeech !== speaking) transitions++;
+      previousSpeech = speaking;
+      n++;
+    }
+    if (!n) return null;
+    const energy = Math.min(1, sum / n);
+    const dynamics = Math.min(1, Math.max(0, peak - (low === Infinity ? 0 : low)));
+    const motionAvg = Math.min(1, mot / n);
+    const density = voiced / n;
+    const lenFit = 1 - Math.min(1, Math.abs(realLen - sweet) / Math.max(1, maxLen));
+    const expectedTransitions = Math.max(1, realLen / 5);
+    const cadence = Math.max(
+      0,
+      Math.min(1, 1 - Math.abs(transitions - expectedTransitions) / (expectedTransitions * 1.8)),
+    );
+    const edgeQuality = text
+      ? 1 // fronteira de frase real: corte sempre limpo
+      : Math.max(
+          0,
+          Math.min(
+            1,
+            (openingVoiced / Math.max(1, edgeSamples) + closingVoiced / Math.max(1, edgeSamples)) / 2,
+          ),
+        );
+    // OpusClip evita o começo "de aquecimento" do vídeo
+    const posBonus = s / duration < 0.05 ? 0.85 : 1;
 
-      const scored = scoreClipSignals({
-        hook,
-        energy,
-        dynamics,
-        motion: motionAvg,
-        density,
-        clarity: globalClarity,
-        cadence,
-        edgeQuality,
-        lenFit,
-      });
-      const raw = scored.raw * posBonus;
+    const scored = scoreClipSignals({
+      hook,
+      energy,
+      dynamics,
+      motion: motionAvg,
+      density,
+      clarity: globalClarity,
+      cadence,
+      edgeQuality,
+      lenFit,
+    });
+    // com transcrição, o SENTIDO manda mais que a energia
+    const blended = text ? scored.raw * 0.45 + text.text_score * 0.55 : scored.raw;
+    const raw = blended * posBonus;
 
-      const tags: string[] = [];
-      if (hook > 0.65) tags.push("gancho");
-      if (peak > 0.9) tags.push("pico");
-      if (motionAvg > 0.55) tags.push("reação");
-      if (density > 0.75) tags.push("fala contínua");
-      if (globalClarity > 0.62) tags.push("fala clara");
-      if (cadence > 0.58) tags.push("bom ritmo");
-      if (edgeQuality > 0.68) tags.push("corte limpo");
+    const tags: string[] = [];
+    if (hook > 0.65) tags.push("gancho");
+    if (peak > 0.9) tags.push("pico");
+    if (motionAvg > 0.55) tags.push("reação");
+    if (density > 0.75) tags.push("fala contínua");
+    if (globalClarity > 0.62) tags.push("fala clara");
+    if (cadence > 0.58) tags.push("bom ritmo");
+    if (edgeQuality > 0.68 && !text) tags.push("corte limpo");
+    if (text) {
+      tags.push("baseado na fala");
+      for (const t of text.tags) if (!tags.includes(t)) tags.push(t);
+    }
 
-      cands.push({
-        start: s,
-        end: e,
-        raw,
-        hook,
-        energy,
-        dynamics,
-        motion: motionAvg,
-        density,
-        clarity: globalClarity,
-        cadence,
-        edgeQuality,
-        tags,
-      });
+    // contexto da Biblioteca Viral: palavras típicas do nicho valem pontos
+    let ctxBoost = 1;
+    const ctxWords = opts.contextKeywords;
+    if (ctxWords?.length && text?.text) {
+      const t = text.text
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+      const hits = ctxWords.filter((k) =>
+        t.includes(k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")),
+      ).length;
+      if (hits) {
+        ctxBoost = 1 + Math.min(0.2, hits * 0.05);
+        const label = opts.contextLabel ? `padrão ${opts.contextLabel.toLowerCase()}` : "padrão da biblioteca";
+        if (!tags.includes(label)) tags.push(label);
+      }
+    }
+
+    // pesos do nicho valem sempre — mesmo sem transcrição
+    const nicheW = opts.contextTagWeights;
+    if (nicheW) {
+      const ws = tags.map((t) => nicheW[t]).filter((w): w is number => typeof w === "number");
+      if (ws.length) {
+        const avg = ws.reduce((a, b) => a + b, 0) / ws.length;
+        // efeito contido: metade do peso do nicho
+        ctxBoost *= 1 + (avg - 1) * 0.5;
+      }
+    }
+
+    // realimentação: o desempenho real dos posts ajusta o peso de cada etiqueta
+    const learned = opts.tagWeights;
+    let tagBoost = 1;
+    if (learned) {
+      const ws = tags.map((t) => learned[t]).filter((w): w is number => typeof w === "number");
+      if (ws.length) tagBoost = ws.reduce((a, b) => a + b, 0) / ws.length;
+    }
+
+    return {
+      start: s,
+      end: e,
+      raw: raw * tagBoost * ctxBoost,
+      hook,
+      energy,
+      dynamics,
+      motion: motionAvg,
+      density,
+      clarity: globalClarity,
+      cadence,
+      edgeQuality,
+      tags,
+      ...(text ? { text: text.text } : {}),
+    };
+  };
+
+  const windows = opts.transcript?.length
+    ? transcriptWindows(opts.transcript, minLen, maxLen)
+    : [];
+
+  if (windows.length) {
+    for (const w of windows) {
+      const c = measure(w.start, Math.min(duration, w.end), w);
+      if (c) cands.push(c);
     }
   }
+
+  if (!cands.length) {
+    for (const len of lens) {
+      for (let s0 = 0; s0 + len <= duration; s0 += step) {
+        // alinha às fronteiras de fala para não cortar no meio da frase
+        const s = nearest(starts, s0, 1.2);
+        const e = Math.min(duration, nearest(ends, s + len, 1.5));
+        const c = measure(s, e);
+        if (c) cands.push(c);
+      }
+    }
+  }
+
 
   if (!cands.length) {
     return [
@@ -494,6 +650,11 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
     .sort((a, b) => a.start - b.start)
     .map((c, i) => {
       const meta = describe(c, i, duration);
+      const pattern = matchPattern(opts.contextNicheId, { start: c.start, ...(c.text ? { text: c.text } : {}) });
+      const retention = Math.max(
+        0,
+        Math.min(1, c.hook * 0.4 + c.density * 0.3 + c.cadence * 0.2 + c.edgeQuality * 0.1),
+      );
       return {
         start: Number(c.start.toFixed(2)),
         end: Number(Math.min(duration, c.end).toFixed(2)),
@@ -501,11 +662,38 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
         title: meta.title,
         reason: meta.reason,
         tags: c.tags,
+        metrics: {
+          hook: c.hook,
+          density: c.density,
+          cadence: c.cadence,
+          clarity: c.clarity,
+          motion: c.motion,
+          edgeQuality: c.edgeQuality,
+          retention,
+        },
+        hashtags: mergeHashtags(suggestHashtags(c.tags, c.text), opts.contextHashtags),
+        ...(c.text ? { text: c.text } : {}),
+        ...(pattern
+          ? {
+              pattern: {
+                label: pattern.nicheLabel,
+                hook: pattern.hook,
+                reason: pattern.reason,
+              },
+            }
+          : {}),
       };
     });
 
+
   opts.onProgress?.(1);
   return clips;
+}
+
+function mergeHashtags(base: string[], extra?: string[]): string[] {
+  const out = [...base];
+  for (const h of extra ?? []) if (!out.includes(h)) out.push(h);
+  return out.slice(0, 8);
 }
 
 export function formatTime(t: number) {

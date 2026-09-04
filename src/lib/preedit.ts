@@ -9,7 +9,21 @@ export interface PreCrop {
   h: number;
 }
 
-export type TransitionKind = "none" | "fade" | "zoom" | "slide-up" | "slide-left" | "whip";
+export type TransitionKind =
+  | "none"
+  | "fade"
+  | "zoom"
+  | "zoom-out"
+  | "slide-up"
+  | "slide-down"
+  | "slide-left"
+  | "slide-right"
+  | "whip"
+  | "whip-vertical"
+  | "punch"
+  | "drift"
+  | "swing"
+  | "flash";
 
 export interface Transition {
   kind: TransitionKind;
@@ -63,6 +77,9 @@ export interface PreEdit {
   transIn: Transition;
   /** transição de saída */
   transOut: Transition;
+  /** transição de cada emenda entre trechos (índice i = corte entre o trecho i e i+1) */
+  transitions?: Transition[];
+
   /** giro em passos de 90° */
   rotate: 0 | 90 | 180 | 270;
   flipH: boolean;
@@ -78,6 +95,16 @@ export interface PreEdit {
   grayscale: number;
   /** px */
   blur: number;
+  /** temperatura de cor: -1 (frio/azulado) a 1 (quente/dourado) */
+  temp?: number;
+  /** vinheta escura nas bordas: 0..1 */
+  vignette?: number;
+  /** granulado de filme (pontinhos): 0..1 */
+  grain?: number;
+  /** preto lavado / névoa de filme: 0..1 */
+  fade?: number;
+  /** id do estilo de edição aplicado (só informativo) */
+  look?: string;
   /** 0..150 (%) */
   voiceLevel?: number;
   /** 0..150 (%) */
@@ -98,6 +125,8 @@ export function defaultPreEdit(): PreEdit {
     bgColor: "#000000",
     transIn: { kind: "none", dur: 0.5 },
     transOut: { kind: "none", dur: 0.5 },
+    transitions: [],
+
     rotate: 0,
     flipH: false,
     flipV: false,
@@ -108,6 +137,10 @@ export function defaultPreEdit(): PreEdit {
     sepia: 0,
     grayscale: 0,
     blur: 0,
+    temp: 0,
+    vignette: 0,
+    grain: 0,
+    fade: 0,
     voiceLevel: 100,
     musicLevel: 100,
   };
@@ -198,6 +231,8 @@ export function hasPreEdit(p?: PreEdit | null) {
     (p.transIn?.kind ?? "none") !== "none" ||
 
     (p.transOut?.kind ?? "none") !== "none" ||
+    (p.transitions ?? []).some((t) => t.kind !== "none" && t.dur > 0) ||
+
     p.rotate !== 0 ||
     p.flipH ||
     p.flipV ||
@@ -207,8 +242,15 @@ export function hasPreEdit(p?: PreEdit | null) {
     p.hue !== 0 ||
     p.sepia > 0 ||
     p.grayscale > 0 ||
-    p.blur > 0
+    p.blur > 0 ||
+    hasGrade(p)
   );
+}
+
+/** true quando o estilo de edição (vinheta, grão, fade, temperatura) muda o quadro. */
+export function hasGrade(p?: PreEdit | null) {
+  if (!p) return false;
+  return Boolean((p.temp ?? 0) || (p.vignette ?? 0) > 0 || (p.grain ?? 0) > 0 || (p.fade ?? 0) > 0);
 }
 
 /** Filtro CSS/canvas combinando a pré-edição com o ajuste anti-duplicidade. */
@@ -251,49 +293,111 @@ export function cropAt(p: PreEdit | null | undefined, t?: number): PreCrop | nul
   };
 }
 
+export type TransitionState = { alpha: number; scale: number; dx: number; dy: number };
+
+const NO_TRANSITION: TransitionState = { alpha: 1, scale: 1, dx: 0, dy: 0 };
+
+const easeOutCubic = (k: number) => 1 - Math.pow(1 - k, 3);
+
+/** Curva de uma transição: `k` de 0 (início do efeito) a 1 (quadro normal). */
+export function applyTransition(kind: TransitionKind, k: number, outward = false): TransitionState {
+  const e = easeOutCubic(Math.min(1, Math.max(0, k)));
+  const dir = outward ? -1 : 1;
+  switch (kind) {
+    case "fade":
+      return { alpha: e, scale: 1, dx: 0, dy: 0 };
+    case "zoom":
+      return { alpha: e, scale: 1 + (1 - e) * 0.18, dx: 0, dy: 0 };
+    case "zoom-out":
+      return { alpha: e, scale: 1 - (1 - e) * 0.16, dx: 0, dy: 0 };
+    case "slide-up":
+      return { alpha: e, scale: 1, dx: 0, dy: dir * (1 - e) * 0.25 };
+    case "slide-down":
+      return { alpha: e, scale: 1, dx: 0, dy: -dir * (1 - e) * 0.25 };
+    case "slide-left":
+      return { alpha: e, scale: 1, dx: dir * (1 - e) * 0.25, dy: 0 };
+    case "slide-right":
+      return { alpha: e, scale: 1, dx: -dir * (1 - e) * 0.25, dy: 0 };
+    case "whip":
+      return { alpha: e, scale: 1 + (1 - e) * 0.06, dx: dir * (1 - e) * 0.4, dy: 0 };
+    case "whip-vertical":
+      return { alpha: e, scale: 1 + (1 - e) * 0.06, dx: 0, dy: dir * (1 - e) * 0.4 };
+    case "punch":
+      return { alpha: e, scale: 1 + Math.sin(e * Math.PI) * 0.12, dx: 0, dy: 0 };
+    case "drift":
+      return { alpha: e, scale: 1 + (1 - e) * 0.04, dx: dir * (1 - e) * 0.08, dy: (1 - e) * 0.05 };
+    case "swing":
+      return { alpha: e, scale: 1, dx: dir * Math.sin((1 - e) * Math.PI * 1.5) * 0.12, dy: 0 };
+    case "flash":
+      return { alpha: Math.min(1, e * 1.6), scale: 1 + (1 - e) * 0.02, dx: 0, dy: 0 };
+    default:
+      return NO_TRANSITION;
+  }
+}
+
+/** Combina duas transições (abertura/saída + emenda entre cortes). */
+export function composeTransitions(a: TransitionState, b: TransitionState): TransitionState {
+  return {
+    alpha: a.alpha * b.alpha,
+    scale: a.scale * b.scale,
+    dx: a.dx + b.dx,
+    dy: a.dy + b.dy,
+  };
+}
+
 /** Estado da transição de abertura/saída no instante `t` do trecho exportado. */
 export function transitionAt(
   p: PreEdit | null | undefined,
   t?: number,
   clip?: { start: number; end: number } | null,
-): { alpha: number; scale: number; dx: number; dy: number } {
-  const none = { alpha: 1, scale: 1, dx: 0, dy: 0 };
-  if (!p || t === undefined) return none;
+): TransitionState {
+  if (!p || t === undefined) return NO_TRANSITION;
   const start = clip?.start ?? 0;
   const end = clip?.end;
   const local = t - start;
-  const easeOut = (k: number) => 1 - Math.pow(1 - k, 3);
-
-  const apply = (kind: TransitionKind, k: number, outward: boolean) => {
-    const e = easeOut(Math.min(1, Math.max(0, k)));
-    const dir = outward ? -1 : 1;
-    switch (kind) {
-      case "fade":
-        return { alpha: e, scale: 1, dx: 0, dy: 0 };
-      case "zoom":
-        return { alpha: e, scale: 1 + (1 - e) * 0.18, dx: 0, dy: 0 };
-      case "slide-up":
-        return { alpha: e, scale: 1, dx: 0, dy: dir * (1 - e) * 0.25 };
-      case "slide-left":
-        return { alpha: e, scale: 1, dx: dir * (1 - e) * 0.25, dy: 0 };
-      case "whip":
-        return { alpha: e, scale: 1 + (1 - e) * 0.06, dx: dir * (1 - e) * 0.4, dy: 0 };
-      default:
-        return none;
-    }
-  };
 
   const tin = p.transIn;
   if (tin && tin.kind !== "none" && tin.dur > 0 && local < tin.dur) {
-    return apply(tin.kind, local / tin.dur, false);
+    return applyTransition(tin.kind, local / tin.dur, false);
   }
   const tout = p.transOut;
   if (tout && tout.kind !== "none" && tout.dur > 0 && end !== undefined) {
     const left = end - t;
-    if (left < tout.dur) return apply(tout.kind, Math.max(0, left) / tout.dur, true);
+    if (left < tout.dur) return applyTransition(tout.kind, Math.max(0, left) / tout.dur, true);
   }
-  return none;
+  return NO_TRANSITION;
 }
+
+/** Transição da emenda entre dois trechos, no instante `t` do vídeo original. */
+export function segmentTransitionAt(
+  p: PreEdit | null | undefined,
+  t?: number,
+  clip?: { start: number; end: number } | null,
+  duration?: number,
+): TransitionState {
+  const list = p?.transitions;
+  if (!p || t === undefined || !list || list.length === 0) return NO_TRANSITION;
+  const segs = keptSegments(p, clip, duration);
+  if (segs.length < 2) return NO_TRANSITION;
+  for (let i = 1; i < segs.length; i++) {
+    const tr = list[i - 1];
+    if (!tr || tr.kind === "none" || tr.dur <= 0) continue;
+    const seg = segs[i]!;
+    const local = t - seg.start;
+    if (local >= 0 && local < tr.dur) return applyTransition(tr.kind, local / tr.dur, false);
+  }
+  return NO_TRANSITION;
+}
+
+/** Lista de transições ajustada para `count` emendas. */
+export function normalizeTransitions(list: Transition[] | undefined, count: number): Transition[] {
+  const out: Transition[] = [];
+  for (let i = 0; i < Math.max(0, count); i++) {
+    out.push(list?.[i] ?? { kind: "none", dur: 0.4 });
+  }
+  return out;
+}
+
 
 /** Retângulo em pixels de um recorte normalizado + dimensões após o giro. */
 export function rectForCrop(c: PreCrop, w: number, h: number, rotate = 0) {
@@ -325,6 +429,14 @@ export const TRANSITIONS: { id: TransitionKind; label: string }[] = [
   { id: "slide-up", label: "Subir" },
   { id: "slide-left", label: "Deslizar" },
   { id: "whip", label: "Whip" },
+  { id: "zoom-out", label: "Zoom out" },
+  { id: "slide-down", label: "Descer" },
+  { id: "slide-right", label: "Deslizar →" },
+  { id: "whip-vertical", label: "Whip vertical" },
+  { id: "punch", label: "Punch" },
+  { id: "drift", label: "Drift" },
+  { id: "swing", label: "Swing" },
+  { id: "flash", label: "Flash" },
 ];
 
 export const CROP_PRESETS: { id: string; label: string; ratio: number | null }[] = [

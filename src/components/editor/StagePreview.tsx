@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react";
+import { useInView } from "@/hooks/use-in-view";
 import { drawFrame } from "@/lib/draw";
 import { createTemplate, type Template } from "@/lib/template";
 import type { PreEdit } from "@/lib/preedit";
 import type { CaptionCue } from "@/lib/captions";
+
 
 /** Palco de saída 9:16 desenhado com o MESMO pipeline da exportação (draw.ts):
  *  o que aparece aqui é exatamente o que sai no MP4. */
@@ -27,6 +29,7 @@ export function StagePreview({
   className?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const visible = useInView(canvasRef);
   const preRef = useRef(pre);
   preRef.current = pre;
   const clipRef = useRef(clip);
@@ -38,7 +41,8 @@ export function StagePreview({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !visible) return;
+
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -88,7 +92,7 @@ export function StagePreview({
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [videoRef]);
+  }, [videoRef, visible]);
 
   return (
     <div className={`relative ${className ?? ""}`}>

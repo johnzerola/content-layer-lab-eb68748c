@@ -10,30 +10,65 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as ArmazenamentoRouteImport } from './routes/armazenamento'
 import { Route as BibliotecaRouteImport } from './routes/biblioteca'
+import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as CompararRouteImport } from './routes/comparar'
 import { Route as ContaRouteImport } from './routes/conta'
+import { Route as ContasRouteImport } from './routes/contas'
+import { Route as CortesRouteImport } from './routes/cortes'
+import { Route as EditorRouteImport } from './routes/editor'
+import { Route as EstilosRouteImport } from './routes/estilos'
+import { Route as EstudioRouteImport } from './routes/estudio'
+import { Route as ExclusaoDeDadosRouteImport } from './routes/exclusao-de-dados'
+import { Route as FotosRouteImport } from './routes/fotos'
 import { Route as IntegracoesRouteImport } from './routes/integracoes'
 import { Route as LimparIaRouteImport } from './routes/limpar-ia'
 import { Route as LiveRouteImport } from './routes/live'
 import { Route as McpRouteImport } from './routes/mcp'
+import { Route as MetricasRouteImport } from './routes/metricas'
+import { Route as PerfisRouteImport } from './routes/perfis'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
+import { Route as ProjetosRouteImport } from './routes/projetos'
+import { Route as RemoverRouteImport } from './routes/remover'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as VendasRouteImport } from './routes/vendas'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as TemplatesIndexRouteImport } from './routes/templates.index'
+import { Route as TemplatesNewRouteImport } from './routes/templates.new'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as ApiPublicCleanerCallbackRouteImport } from './routes/api/public/cleaner-callback'
+import { Route as ApiPublicCleanerChunkTickRouteImport } from './routes/api/public/cleaner-chunk-tick'
+import { Route as ApiPublicCleanerHealthRouteImport } from './routes/api/public/cleaner-health'
 import { Route as ApiPublicCleanerUploadRouteImport } from './routes/api/public/cleaner-upload'
 import { Route as ApiPublicHlsProxyRouteImport } from './routes/api/public/hls-proxy'
 import { Route as ApiPublicMediaProxyRouteImport } from './routes/api/public/media-proxy'
+import { Route as ApiPublicRenderHookRouteImport } from './routes/api/public/render-hook'
+import { Route as ApiPublicRenderUploadRouteImport } from './routes/api/public/render-upload'
+import { Route as IntegracoesFacebookCallbackRouteImport } from './routes/integracoes_.facebook.callback'
+import { Route as IntegracoesInstagramCallbackRouteImport } from './routes/integracoes_.instagram.callback'
+import { Route as IntegracoesTiktokCallbackRouteImport } from './routes/integracoes_.tiktok.callback'
+import { Route as IntegracoesYoutubeCallbackRouteImport } from './routes/integracoes_.youtube.callback'
+import { Route as TemplatesIdEditRouteImport } from './routes/templates.$id.edit'
+import { Route as ApiPublicHooksProcessBatchRouteImport } from './routes/api/public/hooks/process-batch'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
+import { Route as ApiPublicHooksSyncSocialRouteImport } from './routes/api/public/hooks/sync-social'
+import { Route as ApiPublicMetaDataDeletionRouteImport } from './routes/api/public/meta.data-deletion'
+import { Route as ApiPublicMetaDeauthorizeRouteImport } from './routes/api/public/meta.deauthorize'
+import { Route as ProjectsProjectIdEditorVideoIdRouteImport } from './routes/projects.$projectId.editor.$videoId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgendaRoute = AgendaRouteImport.update({
@@ -51,9 +86,54 @@ const BibliotecaRoute = BibliotecaRouteImport.update({
   path: '/biblioteca',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CheckoutRoute = CheckoutRouteImport.update({
+  id: '/checkout',
+  path: '/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompararRoute = CompararRouteImport.update({
+  id: '/comparar',
+  path: '/comparar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ContaRoute = ContaRouteImport.update({
   id: '/conta',
   path: '/conta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContasRoute = ContasRouteImport.update({
+  id: '/contas',
+  path: '/contas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CortesRoute = CortesRouteImport.update({
+  id: '/cortes',
+  path: '/cortes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EditorRoute = EditorRouteImport.update({
+  id: '/editor',
+  path: '/editor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EstilosRoute = EstilosRouteImport.update({
+  id: '/estilos',
+  path: '/estilos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EstudioRoute = EstudioRouteImport.update({
+  id: '/estudio',
+  path: '/estudio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExclusaoDeDadosRoute = ExclusaoDeDadosRouteImport.update({
+  id: '/exclusao-de-dados',
+  path: '/exclusao-de-dados',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FotosRoute = FotosRouteImport.update({
+  id: '/fotos',
+  path: '/fotos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IntegracoesRoute = IntegracoesRouteImport.update({
@@ -76,9 +156,29 @@ const McpRoute = McpRouteImport.update({
   path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MetricasRoute = MetricasRouteImport.update({
+  id: '/metricas',
+  path: '/metricas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PerfisRoute = PerfisRouteImport.update({
+  id: '/perfis',
+  path: '/perfis',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PrivacidadeRoute = PrivacidadeRouteImport.update({
   id: '/privacidade',
   path: '/privacidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjetosRoute = ProjetosRouteImport.update({
+  id: '/projetos',
+  path: '/projetos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RemoverRoute = RemoverRouteImport.update({
+  id: '/remover',
+  path: '/remover',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermosRoute = TermosRouteImport.update({
@@ -103,6 +203,16 @@ const Char91DotwellKnownChar93OauthProtectedResourceRoute =
     path: '/.well-known/oauth-protected-resource',
     getParentRoute: () => rootRouteImport,
   } as any)
+const TemplatesIndexRoute = TemplatesIndexRouteImport.update({
+  id: '/templates/',
+  path: '/templates/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TemplatesNewRoute = TemplatesNewRouteImport.update({
+  id: '/templates/new',
+  path: '/templates/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   id: '/.lovable/oauth/consent',
   path: '/.lovable/oauth/consent',
@@ -120,6 +230,17 @@ const ApiPublicCleanerCallbackRoute =
     path: '/api/public/cleaner-callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCleanerChunkTickRoute =
+  ApiPublicCleanerChunkTickRouteImport.update({
+    id: '/api/public/cleaner-chunk-tick',
+    path: '/api/public/cleaner-chunk-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicCleanerHealthRoute = ApiPublicCleanerHealthRouteImport.update({
+  id: '/api/public/cleaner-health',
+  path: '/api/public/cleaner-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicCleanerUploadRoute = ApiPublicCleanerUploadRouteImport.update({
   id: '/api/public/cleaner-upload',
   path: '/api/public/cleaner-upload',
@@ -135,177 +256,456 @@ const ApiPublicMediaProxyRoute = ApiPublicMediaProxyRouteImport.update({
   path: '/api/public/media-proxy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicRenderHookRoute = ApiPublicRenderHookRouteImport.update({
+  id: '/api/public/render-hook',
+  path: '/api/public/render-hook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicRenderUploadRoute = ApiPublicRenderUploadRouteImport.update({
+  id: '/api/public/render-upload',
+  path: '/api/public/render-upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IntegracoesFacebookCallbackRoute =
+  IntegracoesFacebookCallbackRouteImport.update({
+    id: '/integracoes_/facebook/callback',
+    path: '/integracoes/facebook/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const IntegracoesInstagramCallbackRoute =
+  IntegracoesInstagramCallbackRouteImport.update({
+    id: '/integracoes_/instagram/callback',
+    path: '/integracoes/instagram/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const IntegracoesTiktokCallbackRoute =
+  IntegracoesTiktokCallbackRouteImport.update({
+    id: '/integracoes_/tiktok/callback',
+    path: '/integracoes/tiktok/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const IntegracoesYoutubeCallbackRoute =
+  IntegracoesYoutubeCallbackRouteImport.update({
+    id: '/integracoes_/youtube/callback',
+    path: '/integracoes/youtube/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const TemplatesIdEditRoute = TemplatesIdEditRouteImport.update({
+  id: '/templates/$id/edit',
+  path: '/templates/$id/edit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicHooksProcessBatchRoute =
+  ApiPublicHooksProcessBatchRouteImport.update({
+    id: '/api/public/hooks/process-batch',
+    path: '/api/public/hooks/process-batch',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksPublishDueRoute =
   ApiPublicHooksPublishDueRouteImport.update({
     id: '/api/public/hooks/publish-due',
     path: '/api/public/hooks/publish-due',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksSyncSocialRoute =
+  ApiPublicHooksSyncSocialRouteImport.update({
+    id: '/api/public/hooks/sync-social',
+    path: '/api/public/hooks/sync-social',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicMetaDataDeletionRoute =
+  ApiPublicMetaDataDeletionRouteImport.update({
+    id: '/api/public/meta/data-deletion',
+    path: '/api/public/meta/data-deletion',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicMetaDeauthorizeRoute =
+  ApiPublicMetaDeauthorizeRouteImport.update({
+    id: '/api/public/meta/deauthorize',
+    path: '/api/public/meta/deauthorize',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ProjectsProjectIdEditorVideoIdRoute =
+  ProjectsProjectIdEditorVideoIdRouteImport.update({
+    id: '/projects/$projectId/editor/$videoId',
+    path: '/projects/$projectId/editor/$videoId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
   '/biblioteca': typeof BibliotecaRoute
+  '/checkout': typeof CheckoutRoute
+  '/comparar': typeof CompararRoute
   '/conta': typeof ContaRoute
+  '/contas': typeof ContasRoute
+  '/cortes': typeof CortesRoute
+  '/editor': typeof EditorRoute
+  '/estilos': typeof EstilosRoute
+  '/estudio': typeof EstudioRoute
+  '/exclusao-de-dados': typeof ExclusaoDeDadosRoute
+  '/fotos': typeof FotosRoute
   '/integracoes': typeof IntegracoesRoute
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
+  '/metricas': typeof MetricasRoute
+  '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/projetos': typeof ProjetosRoute
+  '/remover': typeof RemoverRoute
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/templates/new': typeof TemplatesNewRoute
+  '/templates/': typeof TemplatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
+  '/api/public/cleaner-chunk-tick': typeof ApiPublicCleanerChunkTickRoute
+  '/api/public/cleaner-health': typeof ApiPublicCleanerHealthRoute
   '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
+  '/api/public/render-hook': typeof ApiPublicRenderHookRoute
+  '/api/public/render-upload': typeof ApiPublicRenderUploadRoute
+  '/integracoes/facebook/callback': typeof IntegracoesFacebookCallbackRoute
+  '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
+  '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
+  '/integracoes/youtube/callback': typeof IntegracoesYoutubeCallbackRoute
+  '/templates/$id/edit': typeof TemplatesIdEditRoute
+  '/api/public/hooks/process-batch': typeof ApiPublicHooksProcessBatchRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
+  '/api/public/hooks/sync-social': typeof ApiPublicHooksSyncSocialRoute
+  '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
+  '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
+  '/projects/$projectId/editor/$videoId': typeof ProjectsProjectIdEditorVideoIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
   '/biblioteca': typeof BibliotecaRoute
+  '/checkout': typeof CheckoutRoute
+  '/comparar': typeof CompararRoute
   '/conta': typeof ContaRoute
+  '/contas': typeof ContasRoute
+  '/cortes': typeof CortesRoute
+  '/editor': typeof EditorRoute
+  '/estilos': typeof EstilosRoute
+  '/estudio': typeof EstudioRoute
+  '/exclusao-de-dados': typeof ExclusaoDeDadosRoute
+  '/fotos': typeof FotosRoute
   '/integracoes': typeof IntegracoesRoute
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
+  '/metricas': typeof MetricasRoute
+  '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/projetos': typeof ProjetosRoute
+  '/remover': typeof RemoverRoute
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/templates/new': typeof TemplatesNewRoute
+  '/templates': typeof TemplatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
+  '/api/public/cleaner-chunk-tick': typeof ApiPublicCleanerChunkTickRoute
+  '/api/public/cleaner-health': typeof ApiPublicCleanerHealthRoute
   '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
+  '/api/public/render-hook': typeof ApiPublicRenderHookRoute
+  '/api/public/render-upload': typeof ApiPublicRenderUploadRoute
+  '/integracoes/facebook/callback': typeof IntegracoesFacebookCallbackRoute
+  '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
+  '/integracoes/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
+  '/integracoes/youtube/callback': typeof IntegracoesYoutubeCallbackRoute
+  '/templates/$id/edit': typeof TemplatesIdEditRoute
+  '/api/public/hooks/process-batch': typeof ApiPublicHooksProcessBatchRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
+  '/api/public/hooks/sync-social': typeof ApiPublicHooksSyncSocialRoute
+  '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
+  '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
+  '/projects/$projectId/editor/$videoId': typeof ProjectsProjectIdEditorVideoIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
   '/biblioteca': typeof BibliotecaRoute
+  '/checkout': typeof CheckoutRoute
+  '/comparar': typeof CompararRoute
   '/conta': typeof ContaRoute
+  '/contas': typeof ContasRoute
+  '/cortes': typeof CortesRoute
+  '/editor': typeof EditorRoute
+  '/estilos': typeof EstilosRoute
+  '/estudio': typeof EstudioRoute
+  '/exclusao-de-dados': typeof ExclusaoDeDadosRoute
+  '/fotos': typeof FotosRoute
   '/integracoes': typeof IntegracoesRoute
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
+  '/metricas': typeof MetricasRoute
+  '/perfis': typeof PerfisRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/projetos': typeof ProjetosRoute
+  '/remover': typeof RemoverRoute
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/templates/new': typeof TemplatesNewRoute
+  '/templates/': typeof TemplatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
+  '/api/public/cleaner-chunk-tick': typeof ApiPublicCleanerChunkTickRoute
+  '/api/public/cleaner-health': typeof ApiPublicCleanerHealthRoute
   '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
+  '/api/public/render-hook': typeof ApiPublicRenderHookRoute
+  '/api/public/render-upload': typeof ApiPublicRenderUploadRoute
+  '/integracoes_/facebook/callback': typeof IntegracoesFacebookCallbackRoute
+  '/integracoes_/instagram/callback': typeof IntegracoesInstagramCallbackRoute
+  '/integracoes_/tiktok/callback': typeof IntegracoesTiktokCallbackRoute
+  '/integracoes_/youtube/callback': typeof IntegracoesYoutubeCallbackRoute
+  '/templates/$id/edit': typeof TemplatesIdEditRoute
+  '/api/public/hooks/process-batch': typeof ApiPublicHooksProcessBatchRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
+  '/api/public/hooks/sync-social': typeof ApiPublicHooksSyncSocialRoute
+  '/api/public/meta/data-deletion': typeof ApiPublicMetaDataDeletionRoute
+  '/api/public/meta/deauthorize': typeof ApiPublicMetaDeauthorizeRoute
+  '/projects/$projectId/editor/$videoId': typeof ProjectsProjectIdEditorVideoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/agenda'
     | '/armazenamento'
     | '/biblioteca'
+    | '/checkout'
+    | '/comparar'
     | '/conta'
+    | '/contas'
+    | '/cortes'
+    | '/editor'
+    | '/estilos'
+    | '/estudio'
+    | '/exclusao-de-dados'
+    | '/fotos'
     | '/integracoes'
     | '/limpar-ia'
     | '/live'
     | '/mcp'
+    | '/metricas'
+    | '/perfis'
     | '/privacidade'
+    | '/projetos'
+    | '/remover'
     | '/termos'
     | '/vendas'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/templates/new'
+    | '/templates/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/cleaner-callback'
+    | '/api/public/cleaner-chunk-tick'
+    | '/api/public/cleaner-health'
     | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
+    | '/api/public/render-hook'
+    | '/api/public/render-upload'
+    | '/integracoes/facebook/callback'
+    | '/integracoes/instagram/callback'
+    | '/integracoes/tiktok/callback'
+    | '/integracoes/youtube/callback'
+    | '/templates/$id/edit'
+    | '/api/public/hooks/process-batch'
     | '/api/public/hooks/publish-due'
+    | '/api/public/hooks/sync-social'
+    | '/api/public/meta/data-deletion'
+    | '/api/public/meta/deauthorize'
+    | '/projects/$projectId/editor/$videoId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/agenda'
     | '/armazenamento'
     | '/biblioteca'
+    | '/checkout'
+    | '/comparar'
     | '/conta'
+    | '/contas'
+    | '/cortes'
+    | '/editor'
+    | '/estilos'
+    | '/estudio'
+    | '/exclusao-de-dados'
+    | '/fotos'
     | '/integracoes'
     | '/limpar-ia'
     | '/live'
     | '/mcp'
+    | '/metricas'
+    | '/perfis'
     | '/privacidade'
+    | '/projetos'
+    | '/remover'
     | '/termos'
     | '/vendas'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/templates/new'
+    | '/templates'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/cleaner-callback'
+    | '/api/public/cleaner-chunk-tick'
+    | '/api/public/cleaner-health'
     | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
+    | '/api/public/render-hook'
+    | '/api/public/render-upload'
+    | '/integracoes/facebook/callback'
+    | '/integracoes/instagram/callback'
+    | '/integracoes/tiktok/callback'
+    | '/integracoes/youtube/callback'
+    | '/templates/$id/edit'
+    | '/api/public/hooks/process-batch'
     | '/api/public/hooks/publish-due'
+    | '/api/public/hooks/sync-social'
+    | '/api/public/meta/data-deletion'
+    | '/api/public/meta/deauthorize'
+    | '/projects/$projectId/editor/$videoId'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/agenda'
     | '/armazenamento'
     | '/biblioteca'
+    | '/checkout'
+    | '/comparar'
     | '/conta'
+    | '/contas'
+    | '/cortes'
+    | '/editor'
+    | '/estilos'
+    | '/estudio'
+    | '/exclusao-de-dados'
+    | '/fotos'
     | '/integracoes'
     | '/limpar-ia'
     | '/live'
     | '/mcp'
+    | '/metricas'
+    | '/perfis'
     | '/privacidade'
+    | '/projetos'
+    | '/remover'
     | '/termos'
     | '/vendas'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/templates/new'
+    | '/templates/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/cleaner-callback'
+    | '/api/public/cleaner-chunk-tick'
+    | '/api/public/cleaner-health'
     | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
+    | '/api/public/render-hook'
+    | '/api/public/render-upload'
+    | '/integracoes_/facebook/callback'
+    | '/integracoes_/instagram/callback'
+    | '/integracoes_/tiktok/callback'
+    | '/integracoes_/youtube/callback'
+    | '/templates/$id/edit'
+    | '/api/public/hooks/process-batch'
     | '/api/public/hooks/publish-due'
+    | '/api/public/hooks/sync-social'
+    | '/api/public/meta/data-deletion'
+    | '/api/public/meta/deauthorize'
+    | '/projects/$projectId/editor/$videoId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   AgendaRoute: typeof AgendaRoute
   ArmazenamentoRoute: typeof ArmazenamentoRoute
   BibliotecaRoute: typeof BibliotecaRoute
+  CheckoutRoute: typeof CheckoutRoute
+  CompararRoute: typeof CompararRoute
   ContaRoute: typeof ContaRoute
+  ContasRoute: typeof ContasRoute
+  CortesRoute: typeof CortesRoute
+  EditorRoute: typeof EditorRoute
+  EstilosRoute: typeof EstilosRoute
+  EstudioRoute: typeof EstudioRoute
+  ExclusaoDeDadosRoute: typeof ExclusaoDeDadosRoute
+  FotosRoute: typeof FotosRoute
   IntegracoesRoute: typeof IntegracoesRoute
   LimparIaRoute: typeof LimparIaRoute
   LiveRoute: typeof LiveRoute
   McpRoute: typeof McpRoute
+  MetricasRoute: typeof MetricasRoute
+  PerfisRoute: typeof PerfisRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
+  ProjetosRoute: typeof ProjetosRoute
+  RemoverRoute: typeof RemoverRoute
   TermosRoute: typeof TermosRoute
   VendasRoute: typeof VendasRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  TemplatesNewRoute: typeof TemplatesNewRoute
+  TemplatesIndexRoute: typeof TemplatesIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicCleanerCallbackRoute: typeof ApiPublicCleanerCallbackRoute
+  ApiPublicCleanerChunkTickRoute: typeof ApiPublicCleanerChunkTickRoute
+  ApiPublicCleanerHealthRoute: typeof ApiPublicCleanerHealthRoute
   ApiPublicCleanerUploadRoute: typeof ApiPublicCleanerUploadRoute
   ApiPublicHlsProxyRoute: typeof ApiPublicHlsProxyRoute
   ApiPublicMediaProxyRoute: typeof ApiPublicMediaProxyRoute
+  ApiPublicRenderHookRoute: typeof ApiPublicRenderHookRoute
+  ApiPublicRenderUploadRoute: typeof ApiPublicRenderUploadRoute
+  IntegracoesFacebookCallbackRoute: typeof IntegracoesFacebookCallbackRoute
+  IntegracoesInstagramCallbackRoute: typeof IntegracoesInstagramCallbackRoute
+  IntegracoesTiktokCallbackRoute: typeof IntegracoesTiktokCallbackRoute
+  IntegracoesYoutubeCallbackRoute: typeof IntegracoesYoutubeCallbackRoute
+  TemplatesIdEditRoute: typeof TemplatesIdEditRoute
+  ApiPublicHooksProcessBatchRoute: typeof ApiPublicHooksProcessBatchRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
+  ApiPublicHooksSyncSocialRoute: typeof ApiPublicHooksSyncSocialRoute
+  ApiPublicMetaDataDeletionRoute: typeof ApiPublicMetaDataDeletionRoute
+  ApiPublicMetaDeauthorizeRoute: typeof ApiPublicMetaDeauthorizeRoute
+  ProjectsProjectIdEditorVideoIdRoute: typeof ProjectsProjectIdEditorVideoIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -315,6 +715,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agenda': {
@@ -338,11 +745,74 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BibliotecaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/checkout': {
+      id: '/checkout'
+      path: '/checkout'
+      fullPath: '/checkout'
+      preLoaderRoute: typeof CheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/comparar': {
+      id: '/comparar'
+      path: '/comparar'
+      fullPath: '/comparar'
+      preLoaderRoute: typeof CompararRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/conta': {
       id: '/conta'
       path: '/conta'
       fullPath: '/conta'
       preLoaderRoute: typeof ContaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contas': {
+      id: '/contas'
+      path: '/contas'
+      fullPath: '/contas'
+      preLoaderRoute: typeof ContasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cortes': {
+      id: '/cortes'
+      path: '/cortes'
+      fullPath: '/cortes'
+      preLoaderRoute: typeof CortesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/editor': {
+      id: '/editor'
+      path: '/editor'
+      fullPath: '/editor'
+      preLoaderRoute: typeof EditorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/estilos': {
+      id: '/estilos'
+      path: '/estilos'
+      fullPath: '/estilos'
+      preLoaderRoute: typeof EstilosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/estudio': {
+      id: '/estudio'
+      path: '/estudio'
+      fullPath: '/estudio'
+      preLoaderRoute: typeof EstudioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/exclusao-de-dados': {
+      id: '/exclusao-de-dados'
+      path: '/exclusao-de-dados'
+      fullPath: '/exclusao-de-dados'
+      preLoaderRoute: typeof ExclusaoDeDadosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fotos': {
+      id: '/fotos'
+      path: '/fotos'
+      fullPath: '/fotos'
+      preLoaderRoute: typeof FotosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/integracoes': {
@@ -373,11 +843,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/metricas': {
+      id: '/metricas'
+      path: '/metricas'
+      fullPath: '/metricas'
+      preLoaderRoute: typeof MetricasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/perfis': {
+      id: '/perfis'
+      path: '/perfis'
+      fullPath: '/perfis'
+      preLoaderRoute: typeof PerfisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/privacidade': {
       id: '/privacidade'
       path: '/privacidade'
       fullPath: '/privacidade'
       preLoaderRoute: typeof PrivacidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projetos': {
+      id: '/projetos'
+      path: '/projetos'
+      fullPath: '/projetos'
+      preLoaderRoute: typeof ProjetosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/remover': {
+      id: '/remover'
+      path: '/remover'
+      fullPath: '/remover'
+      preLoaderRoute: typeof RemoverRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/termos': {
@@ -408,6 +906,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/templates/': {
+      id: '/templates/'
+      path: '/templates'
+      fullPath: '/templates/'
+      preLoaderRoute: typeof TemplatesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/templates/new': {
+      id: '/templates/new'
+      path: '/templates/new'
+      fullPath: '/templates/new'
+      preLoaderRoute: typeof TemplatesNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/.lovable/oauth/consent': {
       id: '/.lovable/oauth/consent'
       path: '/.lovable/oauth/consent'
@@ -427,6 +939,20 @@ declare module '@tanstack/react-router' {
       path: '/api/public/cleaner-callback'
       fullPath: '/api/public/cleaner-callback'
       preLoaderRoute: typeof ApiPublicCleanerCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cleaner-chunk-tick': {
+      id: '/api/public/cleaner-chunk-tick'
+      path: '/api/public/cleaner-chunk-tick'
+      fullPath: '/api/public/cleaner-chunk-tick'
+      preLoaderRoute: typeof ApiPublicCleanerChunkTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cleaner-health': {
+      id: '/api/public/cleaner-health'
+      path: '/api/public/cleaner-health'
+      fullPath: '/api/public/cleaner-health'
+      preLoaderRoute: typeof ApiPublicCleanerHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/cleaner-upload': {
@@ -450,6 +976,62 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMediaProxyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/render-hook': {
+      id: '/api/public/render-hook'
+      path: '/api/public/render-hook'
+      fullPath: '/api/public/render-hook'
+      preLoaderRoute: typeof ApiPublicRenderHookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/render-upload': {
+      id: '/api/public/render-upload'
+      path: '/api/public/render-upload'
+      fullPath: '/api/public/render-upload'
+      preLoaderRoute: typeof ApiPublicRenderUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/integracoes_/facebook/callback': {
+      id: '/integracoes_/facebook/callback'
+      path: '/integracoes/facebook/callback'
+      fullPath: '/integracoes/facebook/callback'
+      preLoaderRoute: typeof IntegracoesFacebookCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/integracoes_/instagram/callback': {
+      id: '/integracoes_/instagram/callback'
+      path: '/integracoes/instagram/callback'
+      fullPath: '/integracoes/instagram/callback'
+      preLoaderRoute: typeof IntegracoesInstagramCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/integracoes_/tiktok/callback': {
+      id: '/integracoes_/tiktok/callback'
+      path: '/integracoes/tiktok/callback'
+      fullPath: '/integracoes/tiktok/callback'
+      preLoaderRoute: typeof IntegracoesTiktokCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/integracoes_/youtube/callback': {
+      id: '/integracoes_/youtube/callback'
+      path: '/integracoes/youtube/callback'
+      fullPath: '/integracoes/youtube/callback'
+      preLoaderRoute: typeof IntegracoesYoutubeCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/templates/$id/edit': {
+      id: '/templates/$id/edit'
+      path: '/templates/$id/edit'
+      fullPath: '/templates/$id/edit'
+      preLoaderRoute: typeof TemplatesIdEditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/process-batch': {
+      id: '/api/public/hooks/process-batch'
+      path: '/api/public/hooks/process-batch'
+      fullPath: '/api/public/hooks/process-batch'
+      preLoaderRoute: typeof ApiPublicHooksProcessBatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/publish-due': {
       id: '/api/public/hooks/publish-due'
       path: '/api/public/hooks/publish-due'
@@ -457,32 +1039,90 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksPublishDueRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/sync-social': {
+      id: '/api/public/hooks/sync-social'
+      path: '/api/public/hooks/sync-social'
+      fullPath: '/api/public/hooks/sync-social'
+      preLoaderRoute: typeof ApiPublicHooksSyncSocialRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/meta/data-deletion': {
+      id: '/api/public/meta/data-deletion'
+      path: '/api/public/meta/data-deletion'
+      fullPath: '/api/public/meta/data-deletion'
+      preLoaderRoute: typeof ApiPublicMetaDataDeletionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/meta/deauthorize': {
+      id: '/api/public/meta/deauthorize'
+      path: '/api/public/meta/deauthorize'
+      fullPath: '/api/public/meta/deauthorize'
+      preLoaderRoute: typeof ApiPublicMetaDeauthorizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects/$projectId/editor/$videoId': {
+      id: '/projects/$projectId/editor/$videoId'
+      path: '/projects/$projectId/editor/$videoId'
+      fullPath: '/projects/$projectId/editor/$videoId'
+      preLoaderRoute: typeof ProjectsProjectIdEditorVideoIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   AgendaRoute: AgendaRoute,
   ArmazenamentoRoute: ArmazenamentoRoute,
   BibliotecaRoute: BibliotecaRoute,
+  CheckoutRoute: CheckoutRoute,
+  CompararRoute: CompararRoute,
   ContaRoute: ContaRoute,
+  ContasRoute: ContasRoute,
+  CortesRoute: CortesRoute,
+  EditorRoute: EditorRoute,
+  EstilosRoute: EstilosRoute,
+  EstudioRoute: EstudioRoute,
+  ExclusaoDeDadosRoute: ExclusaoDeDadosRoute,
+  FotosRoute: FotosRoute,
   IntegracoesRoute: IntegracoesRoute,
   LimparIaRoute: LimparIaRoute,
   LiveRoute: LiveRoute,
   McpRoute: McpRoute,
+  MetricasRoute: MetricasRoute,
+  PerfisRoute: PerfisRoute,
   PrivacidadeRoute: PrivacidadeRoute,
+  ProjetosRoute: ProjetosRoute,
+  RemoverRoute: RemoverRoute,
   TermosRoute: TermosRoute,
   VendasRoute: VendasRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  TemplatesNewRoute: TemplatesNewRoute,
+  TemplatesIndexRoute: TemplatesIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicCleanerCallbackRoute: ApiPublicCleanerCallbackRoute,
+  ApiPublicCleanerChunkTickRoute: ApiPublicCleanerChunkTickRoute,
+  ApiPublicCleanerHealthRoute: ApiPublicCleanerHealthRoute,
   ApiPublicCleanerUploadRoute: ApiPublicCleanerUploadRoute,
   ApiPublicHlsProxyRoute: ApiPublicHlsProxyRoute,
   ApiPublicMediaProxyRoute: ApiPublicMediaProxyRoute,
+  ApiPublicRenderHookRoute: ApiPublicRenderHookRoute,
+  ApiPublicRenderUploadRoute: ApiPublicRenderUploadRoute,
+  IntegracoesFacebookCallbackRoute: IntegracoesFacebookCallbackRoute,
+  IntegracoesInstagramCallbackRoute: IntegracoesInstagramCallbackRoute,
+  IntegracoesTiktokCallbackRoute: IntegracoesTiktokCallbackRoute,
+  IntegracoesYoutubeCallbackRoute: IntegracoesYoutubeCallbackRoute,
+  TemplatesIdEditRoute: TemplatesIdEditRoute,
+  ApiPublicHooksProcessBatchRoute: ApiPublicHooksProcessBatchRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
+  ApiPublicHooksSyncSocialRoute: ApiPublicHooksSyncSocialRoute,
+  ApiPublicMetaDataDeletionRoute: ApiPublicMetaDataDeletionRoute,
+  ApiPublicMetaDeauthorizeRoute: ApiPublicMetaDeauthorizeRoute,
+  ProjectsProjectIdEditorVideoIdRoute: ProjectsProjectIdEditorVideoIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

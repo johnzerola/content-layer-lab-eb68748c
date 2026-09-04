@@ -1,14 +1,17 @@
+import { RequireAuth } from "@/components/RequireAuth";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { ResultLibrary } from "@/components/ResultLibrary";
+import { CutLibrary } from "@/components/CutLibrary";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
 import { listJobs } from "@/lib/jobs";
 import type { Template } from "@/lib/template";
+import { currentUser } from "@/lib/cloud";
 
 export const Route = createFileRoute("/biblioteca")({
-  component: BibliotecaPage,
+  component: GuardedBibliotecaPage,
   head: () => ({
     meta: [
       { title: "Biblioteca de Resultados — VaiViral" },
@@ -24,7 +27,7 @@ export const Route = createFileRoute("/biblioteca")({
 });
 
 function BibliotecaPage() {
-  const [mode, setMode] = useState<AppMode>("lote");
+  const [mode, setMode] = useState<AppMode>("external");
   const [libOpen, setLibOpen] = useState(false);
   const [cloudOpen, setCloudOpen] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -32,7 +35,8 @@ function BibliotecaPage() {
 
   return (
     <AppShell
-      mode={mode}
+      mode="lote"
+
       onMode={setMode}
       count={jobs.length}
       onLibrary={() => setLibOpen(true)}
@@ -49,6 +53,10 @@ function BibliotecaPage() {
         </header>
 
         <ResultLibrary />
+
+        <div className="mt-10">
+          <CutLibrary />
+        </div>
       </div>
 
       {libOpen && (
@@ -73,5 +81,16 @@ function BibliotecaPage() {
         />
       )}
     </AppShell>
+  );
+}
+
+function GuardedBibliotecaPage() {
+  return (
+    <RequireAuth
+      title={"Biblioteca requer login"}
+      description={"Entre para ver o histórico de vídeos exportados na sua conta."}
+    >
+      <BibliotecaPage />
+    </RequireAuth>
   );
 }

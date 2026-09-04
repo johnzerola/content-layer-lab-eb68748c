@@ -77,6 +77,8 @@ describe("publishing policy", () => {
     expect(canPublish("instagram", "feed")).toBe(true);
     expect(canPublish("tiktok", "reels")).toBe(false);
     expect(canPublish("youtube", "reels")).toBe(false);
+    expect(canPublish("youtube", "shorts")).toBe(true);
+    expect(canPublish("youtube", "feed")).toBe(true);
     expect(canPublish("facebook", "stories")).toBe(false);
   });
 
@@ -119,6 +121,60 @@ describe("publishing policy", () => {
   });
 });
 
+describe("YouTube publisher", () => {
+  it("uploads a scheduled video through YouTube Data API with the channel token", async () => {
+    process.env["YOUTUBE_PRIVACY_STATUS"] = "unlisted";
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 200,
+          headers: { location: "https://upload.youtube.test/resumable" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response("video-bytes", {
+          status: 200,
+          headers: { "content-type": "video/mp4" },
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse(200, { id: "yt-video-1" }));
+
+    await expect(
+      publish({
+        kind: "shorts",
+        caption: "Titulo do video\n#shorts",
+        videoUrl: "https://storage.example/fresh-signed-url",
+        username: "canal",
+        platform: "youtube",
+        provider: "youtube",
+        providerAccountId: "UC-1",
+        providerAccessToken: "youtube-access-token",
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      providerPostId: "yt-video-1",
+      permalink: "https://www.youtube.com/watch?v=yt-video-1",
+    });
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      "https://www.googleapis.com/upload/youtube/v3/videos?part=snippet%2Cstatus&uploadType=resumable",
+    );
+    expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(
+      "Bearer youtube-access-token",
+    );
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({
+      snippet: { title: "Titulo do video", description: "Titulo do video\n#shorts" },
+      status: { privacyStatus: "unlisted", selfDeclaredMadeForKids: false },
+    });
+    expect(String(fetchMock.mock.calls[1]?.[0])).toBe("https://storage.example/fresh-signed-url");
+    expect(String(fetchMock.mock.calls[2]?.[0])).toBe("https://upload.youtube.test/resumable");
+    expect(new Headers(fetchMock.mock.calls[2]?.[1]?.headers).get("authorization")).toBe(
+      "Bearer youtube-access-token",
+    );
+  });
+});
+
 describe("Meta Instagram Login publisher", () => {
   it("publishes a Reel through graph.instagram.com with the configured version and Bearer auth", async () => {
     configureMeta("v25.0");
@@ -130,17 +186,24 @@ describe("Meta Instagram Login publisher", () => {
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(jsonResponse(200, { id: "container-id" }))
       .mockResolvedValueOnce(jsonResponse(200, { status_code: "FINISHED" }))
-      .mockResolvedValueOnce(jsonResponse(200, { id: "published-id" }));
+      .mockResolvedValueOnce(jsonResponse(200, { id: "published-id" }))
+      .mockResolvedValueOnce(jsonResponse(200, { permalink: "https://www.instagram.com/reel/abc/" }));
 
-    await expect(publish(metaInput)).resolves.toEqual({ ok: true, providerPostId: "published-id" });
+    await expect(publish(metaInput)).resolves.toEqual({
+      ok: true,
+      providerPostId: "published-id",
+      permalink: "https://www.instagram.com/reel/abc/",
+    });
 
     const requests = fetchMock.mock.calls;
     expect(requests.map(([url]) => String(url))).toEqual([
       "https://graph.instagram.com/v25.0/instagram-user-id/media",
       "https://graph.instagram.com/v25.0/container-id?fields=status_code",
       "https://graph.instagram.com/v25.0/instagram-user-id/media_publish",
+      "https://graph.instagram.com/v25.0/published-id?fields=permalink",
     ]);
     expectBearer(requests);
+
 
     const createBody = JSON.parse(String(requests[0]?.[1]?.body));
     expect(createBody).toEqual({
@@ -230,8 +293,9 @@ describe("Meta Instagram Login publisher", () => {
       ok: false,
       code: "PROVIDER_TEMPORARY_ERROR",
       retryable: true,
+      pendingContainerId: "container-id",
     });
-    expect(fetchMock).toHaveBeenCalledTimes(21);
+    expect(fetchMock).toHaveBeenCalledTimes(41);
   });
 
   it.each([401, 403])(
@@ -271,6 +335,59 @@ describe("Meta Instagram Login publisher", () => {
       ok: false,
       code: "PROVIDER_TEMPORARY_ERROR",
       retryable: true,
+    });
+  });
+});
+
+describe("Instagram via Página conectada (Page Access Token)", () => {
+  it("publica Reels pelo graph.facebook.com usando o token salvo", async () => {
+    delete process.env["META_ACCESS_TOKEN"];
+    delete process.env["META_IG_USER_ID"];
+    process.env["META_GRAPH_VERSION"] = "v26.0";
+    vi.spyOn(globalThis, "setTimeout").mockImplementation((callback) => {
+      if (typeof callback === "function") callback();
+      return 0 as unknown as ReturnType<typeof setTimeout>;
+    });
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse(200, { id: "c1" }))
+      .mockResolvedValueOnce(jsonResponse(200, { status_code: "FINISHED" }))
+      .mockResolvedValueOnce(jsonResponse(200, { id: "m1" }))
+      .mockResolvedValueOnce(jsonResponse(200, { permalink: "https://www.instagram.com/reel/x/" }));
+
+    const result = await publish({ ...metaInput, providerAccessToken: "page-token" });
+
+    expect(result).toEqual({ ok: true, providerPostId: "m1", permalink: "https://www.instagram.com/reel/x/" });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      "https://graph.facebook.com/v26.0/instagram-user-id/media?access_token=page-token",
+    );
+  });
+
+  it("envia Stories sem legenda usando o token da Página", async () => {
+    delete process.env["META_ACCESS_TOKEN"];
+    delete process.env["META_IG_USER_ID"];
+    vi.spyOn(globalThis, "setTimeout").mockImplementation((callback) => {
+      if (typeof callback === "function") callback();
+      return 0 as unknown as ReturnType<typeof setTimeout>;
+    });
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse(200, { id: "c2" }))
+      .mockResolvedValueOnce(jsonResponse(200, { status_code: "FINISHED" }))
+      .mockResolvedValueOnce(jsonResponse(200, { id: "m2" }))
+      .mockResolvedValueOnce(jsonResponse(200, {}));
+
+    const result = await publish({
+      ...metaInput,
+      kind: "stories",
+      caption: "nao deve ir",
+      providerAccessToken: "page-token",
+    });
+
+    expect(result).toEqual({ ok: true, providerPostId: "m2" });
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+      media_type: "STORIES",
+      video_url: metaInput.videoUrl,
     });
   });
 });

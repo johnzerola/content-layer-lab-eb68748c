@@ -55,7 +55,7 @@ def cleanup_expired(storage_dir: Path, retention_seconds: int) -> int:
         if not directory.is_dir():
             continue
         state = read_state(directory)
-        if state.get("status") in {"processing", "inpainting", "queued", "analyzing", "detecting"}:
+        if state.get("status") in {"processing", "uploading", "inpainting", "queued", "analyzing", "detecting"}:
             continue
         try:
             updated = float(state.get("updated_at") or directory.stat().st_mtime)

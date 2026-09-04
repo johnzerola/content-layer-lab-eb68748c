@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AudioLines,
@@ -54,27 +54,31 @@ import {
   isFullCrop,
   keptSegments,
   LAYOUTS,
+  normalizeTransitions,
   preEditFilter,
   segmentsDuration,
   splitAt,
-  TRANSITIONS,
   type FrameKey,
   type LayoutKind,
   type PreEdit,
-  type TransitionKind,
+  type Transition,
 } from "@/lib/preedit";
+import { LOOKS, applyLook, lookPreviewFilter } from "@/lib/looks";
+
 import { translateWords } from "@/lib/translate.functions";
 import { detectSpeechSegments } from "@/lib/silence";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
 import { FramingStudio } from "@/components/FramingStudio";
 import { EditorTimeline } from "@/components/EditorTimeline";
+import { TransitionPicker } from "@/components/editor/TransitionPicker";
+
 import { StagePreview } from "@/components/editor/StagePreview";
 import { useEditorHistory } from "@/components/editor/useEditorHistory";
 import type { CaptionCue } from "@/lib/captions";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/base";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -97,7 +101,7 @@ type Props = {
   texts?: { headline: string; name: string; handle: string; cta: string } | undefined;
   onTextsChange?: ((t: { headline: string; name: string; handle: string; cta: string }) => void) | undefined;
   onClose: () => void;
-  onSave: (v: PreEditResult) => void;
+  onSave: (v: PreEditResult, schedule?: boolean) => void;
 };
 
 const fmt = (s: number) => {
@@ -309,9 +313,15 @@ export function VideoStudio({
     if (!v) return;
     let raf = 0;
     const tick = () => {
-      if (v.currentTime >= end - 0.03) {
-        if (loop) v.currentTime = start;
-        else if (!v.paused) v.pause();
+      // Usamos uma margem um pouco maior (0.1s) para o loop ser mais fluido
+      if (v.currentTime >= end - 0.1) {
+        if (loop) {
+          v.currentTime = start;
+          // Se estiver pausado e for loop, não força o play aqui para evitar loops infinitos de erros
+        } else if (!v.paused) {
+          v.pause();
+          setPlaying(false);
+        }
       }
       setTime(v.currentTime);
       raf = requestAnimationFrame(tick);
@@ -338,14 +348,25 @@ export function VideoStudio({
     const v = videoRef.current;
     if (!v) return;
     if (v.paused) {
+      if (v.readyState < 2) v.load();
       if (v.currentTime < start || v.currentTime > end) v.currentTime = start;
-      void v.play();
-      setPlaying(true);
+      const promise = v.play();
+      if (promise !== undefined) {
+        promise
+          .then(() => setPlaying(true))
+          .catch((e) => {
+            console.error("Erro ao dar play no estúdio:", e);
+            if (e.name !== "AbortError") {
+              toast.error("Erro ao reproduzir o vídeo.");
+            }
+          });
+      }
     } else {
       v.pause();
       setPlaying(false);
     }
   }, [start, end]);
+
 
   const step = (frames: number) => seek(Math.min(end, Math.max(start, time + frames / 30)));
 
@@ -462,6 +483,42 @@ export function VideoStudio({
   /** trechos mantidos na sequência final */
   const segs = keptSegments(pre, { start, end }, duration);
   const outDur = segmentsDuration(segs);
+
+  /** transições das emendas, sempre com o tamanho certo */
+  const transitionList = normalizeTransitions(pre.transitions, Math.max(0, segs.length - 1));
+
+  const setJunction = useCallback(
+    (index: number, tr: Transition) =>
+      setPre((v) => {
+        const base = normalizeTransitions(v.transitions, Math.max(index + 1, (v.transitions ?? []).length));
+        const next = base.slice();
+        next[index] = tr;
+        return { ...v, transitions: next };
+      }, "transição"),
+    [setPre],
+  );
+
+  const applyJunctionToAll = useCallback(
+    (index: number) =>
+      setPre((v) => {
+        const base = normalizeTransitions(v.transitions, Math.max(index + 1, (v.transitions ?? []).length));
+        const tr = base[index] ?? { kind: "none" as const, dur: 0.4 };
+        return { ...v, transitions: base.map(() => ({ ...tr })) };
+      }, "transição"),
+    [setPre],
+  );
+
+  const [focusJoin, setFocusJoin] = useState<number | null>(null);
+  const focusJoinRef = useRef<HTMLDivElement | null>(null);
+  const pickTransition = useCallback((index: number) => {
+    setTab("trans");
+    setFocusJoin(index);
+  }, []);
+  useEffect(() => {
+    if (focusJoin === null) return;
+    focusJoinRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [focusJoin, tab]);
+
 
   /** divide o trecho no playhead (tesoura) */
   const split = useCallback(
@@ -631,6 +688,27 @@ export function VideoStudio({
   const srcAR = width && height ? width / height : 9 / 16;
   const quarter = ((pre.rotate / 90) | 0) % 4;
 
+  // O retângulo de recorte é posicionado em % da caixa. Se a caixa não tiver
+  // exatamente a proporção do vídeo, o vídeo fica com barras (object-contain)
+  // e o recorte deixa de bater com a imagem. Por isso a caixa é medida em px.
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const [stageBox, setStageBox] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const fit = () => {
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      const w = Math.min(r.width, r.height * srcAR);
+      setStageBox({ w, h: w / srcAR });
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [srcAR, view]);
+
+
   const clipWindow = useMemo(() => ({ start, end }), [start, end]);
 
   const save = () =>
@@ -687,7 +765,7 @@ export function VideoStudio({
                   {g.group}
                 </span>
                 {g.items.map((t) => (
-                  <TooltipProvider key={t.id}>
+                  <Fragment key={t.id}>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
@@ -696,13 +774,13 @@ export function VideoStudio({
                             "group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200",
                             tab === t.id
                               ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                              : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                              : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
                           )}
                         >
                           <t.icon className={cn("size-4 shrink-0 transition-transform group-hover:scale-110", tab === t.id ? "animate-pulse" : "")} />
                           <span className="font-display text-xs font-medium">{t.label}</span>
                           {tab === t.id && (
-                            <div className="absolute left-0 top-1/2 h-4 w-1 -translate-y-1/2 rounded-full bg-white md:block hidden" />
+                            <div className="absolute left-0 top-1/2 h-4 w-1 -translate-y-1/2 rounded-full bg-primary-foreground md:block hidden" />
                           )}
                         </button>
                       </TooltipTrigger>
@@ -710,7 +788,7 @@ export function VideoStudio({
                         <p>{t.label} ({t.shortcut})</p>
                       </TooltipContent>
                     </Tooltip>
-                  </TooltipProvider>
+                  </Fragment>
                 ))}
                 <Separator className="my-2 hidden opacity-20 md:block" />
               </div>
@@ -766,14 +844,21 @@ export function VideoStudio({
                   </button>
                 </div>
 
-                <div className="relative flex min-h-0 flex-1 items-center justify-center">
+                <div ref={stageRef} className="relative flex min-h-0 flex-1 items-center justify-center">
                   {/* fonte (sempre montada: alimenta o canvas de saída) */}
                   <div
                     ref={boxRef}
                     className={`relative overflow-hidden rounded-xl border border-border bg-black ${
-                      view === "out" ? "pointer-events-none invisible absolute size-px opacity-0" : "h-full max-h-full"
+                      view === "out" ? "pointer-events-none invisible absolute size-px opacity-0" : ""
                     }`}
-                    style={view === "out" ? undefined : { aspectRatio: String(srcAR), maxWidth: "100%" }}
+                    style={
+                      view === "out"
+                        ? undefined
+                        : stageBox
+                          ? { width: `${stageBox.w}px`, height: `${stageBox.h}px` }
+                          : { aspectRatio: String(srcAR), maxWidth: "100%", maxHeight: "100%" }
+                    }
+
                     onPointerMove={onPointerMove}
                     onPointerUp={() => (dragRef.current = null)}
                     onPointerCancel={() => (dragRef.current = null)}
@@ -924,6 +1009,9 @@ export function VideoStudio({
               segments={segs}
               onSplit={split}
               onDeleteSegment={deleteSegment}
+              transitions={transitionList}
+              onPickTransition={pickTransition}
+
             />
           </section>
 
@@ -1294,43 +1382,59 @@ export function VideoStudio({
             {tab === "trans" && (
               <div className="space-y-5">
                 {(["transIn", "transOut"] as const).map((key) => (
-                  <div key={key} className="space-y-2">
-                    <span className="font-mono text-[11px] text-muted-foreground">
-                      {key === "transIn" ? "Transição de abertura" : "Transição de saída"}
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {TRANSITIONS.map((tr) => (
-                        <button
-                          key={tr.id}
-                          onClick={() =>
-                            set({ [key]: { ...pre[key], kind: tr.id as TransitionKind } } as Partial<PreEdit>, "transição")
-                          }
-                          className={`rounded-md border px-2.5 py-1 font-mono text-[11px] transition ${
-                            pre[key].kind === tr.id
-                              ? "border-primary text-primary"
-                              : "border-border text-muted-foreground hover:border-primary/50"
-                          }`}
-                        >
-                          {tr.label}
-                        </button>
-                      ))}
-                    </div>
-                    <Field label={`Duração · ${pre[key].dur.toFixed(2)}s`}>
-                      <Slider
-                        value={[pre[key].dur]}
-                        min={0.1}
-                        max={2}
-                        step={0.05}
-                        onValueChange={([v]) => set({ [key]: { ...pre[key], dur: v ?? 0.5 } } as Partial<PreEdit>, "transição")}
-                      />
-                    </Field>
-                  </div>
+                  <TransitionPicker
+                    key={key}
+                    label={key === "transIn" ? "Transição de abertura" : "Transição de saída"}
+                    value={pre[key]}
+                    onChange={(t) => set({ [key]: t } as Partial<PreEdit>, "transição")}
+                    onPreview={() => {
+                      const target = key === "transIn" ? start : Math.max(start, end - (pre[key]?.dur ?? 0.4) - 0.2);
+                      seek(target);
+                      void videoRef.current?.play().catch(() => undefined);
+                    }}
+                  />
                 ))}
+
+                <div className="space-y-3 border-t border-border pt-4">
+                  <span className="font-mono text-[11px] text-muted-foreground">
+                    Emendas entre cortes ({Math.max(0, segs.length - 1)})
+                  </span>
+                  {segs.length < 2 ? (
+                    <p className="font-mono text-[11px] text-muted-foreground">
+                      Divida o vídeo com a tesoura (tecla S) para liberar transições entre cortes.
+                    </p>
+                  ) : (
+                    segs.slice(1).map((_, i) => (
+                      <div
+                        key={`join-${i}`}
+                        ref={i === focusJoin ? focusJoinRef : undefined}
+                        className={`rounded-lg border p-2 transition ${
+                          i === focusJoin ? "border-primary/70 bg-primary/5" : "border-border"
+                        }`}
+                      >
+                        <TransitionPicker
+                          label={`Corte ${i + 1} → ${i + 2}`}
+                          value={transitionList[i] ?? { kind: "none", dur: 0.4 }}
+                          onChange={(t) => setJunction(i, t)}
+                          onApplyAll={() => applyJunctionToAll(i)}
+                          onPreview={() => {
+                            const seg = segs[i + 1];
+                            if (!seg) return;
+                            seek(Math.max(start, seg.start - 0.2));
+                            void videoRef.current?.play().catch(() => undefined);
+                          }}
+                        />
+                      </div>
+                    ))
+                  )}
+                </div>
+
                 <p className="font-mono text-[11px] text-muted-foreground">
                   As transições aparecem no palco e na exportação.
                 </p>
               </div>
             )}
+
 
             {tab === "caps" && (
               <div className="space-y-3">
@@ -1473,6 +1577,41 @@ export function VideoStudio({
               )}
               {tab === "color" && (
               <div className="space-y-4">
+                <div className="space-y-2">
+                  <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Estilos de edição
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {LOOKS.map((l) => {
+                      const active = (pre.look ?? "original") === l.id;
+                      return (
+                        <button
+                          key={l.id}
+                          onClick={() => set(applyLook(l.id), `estilo ${l.label}`)}
+                          title={l.hint}
+                          className={`overflow-hidden rounded-lg border text-left transition ${
+                            active
+                              ? "border-primary ring-1 ring-primary/40"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                        >
+                          <div
+                            className="h-10 w-full"
+                            style={{
+                              background: `linear-gradient(120deg, ${l.swatch[0]}, ${l.swatch[1]})`,
+                              filter: lookPreviewFilter(l),
+                            }}
+                          />
+                          <div className="px-2 py-1.5">
+                            <p className="font-mono text-[11px] text-foreground">{l.label}</p>
+                            <p className="text-[10px] leading-tight text-muted-foreground">{l.hint}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="flex flex-wrap gap-1.5">
                   {COLOR_PRESETS.map((p) => (
                     <button
@@ -1529,6 +1668,42 @@ export function VideoStudio({
                 <Field label={`Desfoque · ${pre.blur.toFixed(1)}px`}>
                   <Slider value={[pre.blur]} min={0} max={8} step={0.1} onValueChange={([v]) => set({ blur: v ?? 0 }, "cor")} />
                 </Field>
+                <Field label={`Temperatura · ${(pre.temp ?? 0) > 0 ? "quente" : (pre.temp ?? 0) < 0 ? "frio" : "neutro"} ${Math.round((pre.temp ?? 0) * 100)}`}>
+                  <Slider
+                    value={[pre.temp ?? 0]}
+                    min={-1}
+                    max={1}
+                    step={0.01}
+                    onValueChange={([v]) => set({ temp: v ?? 0 }, "temperatura")}
+                  />
+                </Field>
+                <Field label={`Vinheta · ${Math.round((pre.vignette ?? 0) * 100)}%`}>
+                  <Slider
+                    value={[pre.vignette ?? 0]}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onValueChange={([v]) => set({ vignette: v ?? 0 }, "vinheta")}
+                  />
+                </Field>
+                <Field label={`Granulado (pontinhos) · ${Math.round((pre.grain ?? 0) * 100)}%`}>
+                  <Slider
+                    value={[pre.grain ?? 0]}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onValueChange={([v]) => set({ grain: v ?? 0 }, "granulado")}
+                  />
+                </Field>
+                <Field label={`Preto lavado (fade) · ${Math.round((pre.fade ?? 0) * 100)}%`}>
+                  <Slider
+                    value={[pre.fade ?? 0]}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onValueChange={([v]) => set({ fade: v ?? 0 }, "fade")}
+                  />
+                </Field>
                 </div>
                 )}
               </div>
@@ -1542,6 +1717,21 @@ export function VideoStudio({
                 <kbd className="rounded bg-muted px-1 text-foreground">S</kbd> dividir ·
                 <kbd className="rounded bg-muted px-1 text-foreground">K</kbd> keyframe.
               </p>
+            </div>
+            <div className="flex gap-2 border-t border-border p-4 bg-surface/80 backdrop-blur-sm">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => onSave({ pre, clip: clipWindow })}
+              >
+                Salvar
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={() => onSave({ pre, clip: clipWindow }, true)}
+              >
+                Salvar e Agendar
+              </Button>
             </div>
           </aside>
         </div>

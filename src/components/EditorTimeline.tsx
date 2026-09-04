@@ -30,6 +30,11 @@ interface Props {
   cues?: CaptionCue[] | undefined;
   /** trechos mantidos (corte multi-segmento) */
   segments?: Segment[] | undefined;
+  /** transição de cada emenda entre trechos */
+  transitions?: Transition[] | undefined;
+  /** abre o seletor de transição da emenda `index` */
+  onPickTransition?: ((index: number) => void) | undefined;
+
   onSeek: (t: number) => void;
   onTogglePlay: () => void;
   onTrim: (start: number, end: number) => void;
@@ -72,6 +77,9 @@ export function EditorTimeline({
   transOut,
   cues,
   segments,
+  transitions,
+  onPickTransition,
+
   onSeek,
   onTogglePlay,
   onTrim,
@@ -618,6 +626,33 @@ export function EditorTimeline({
                   )}
                 </span>
               ))}
+              {/* emendas: escolher a transição entre dois trechos */}
+              {onPickTransition &&
+                segments.slice(1).map((s, i) => {
+                  const tr = transitions?.[i];
+                  const on = Boolean(tr && tr.kind !== "none" && tr.dur > 0);
+                  return (
+                    <button
+                      key={`join-${i}-${s.start}`}
+                      type="button"
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        onPickTransition(i);
+                      }}
+                      style={{ left: s.start * pps }}
+                      title={on ? `transição: ${tr!.kind}` : "adicionar transição"}
+                      aria-label={`transição do corte ${i + 1}`}
+                      className={`absolute top-2 z-10 -ml-2.5 grid size-5 place-items-center rounded-full border text-[11px] leading-none transition ${
+                        on
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-surface text-muted-foreground hover:border-primary hover:text-primary"
+                      }`}
+                    >
+                      {on ? "◆" : "+"}
+                    </button>
+                  );
+                })}
+
             </div>
           )}
 
@@ -686,8 +721,11 @@ export function EditorTimeline({
           )}
 
           {/* playhead */}
-          <div className="pointer-events-none absolute inset-y-0 z-20 w-px bg-destructive" style={{ left: time * pps }}>
-            <span className="absolute -left-[5px] top-0 size-2.5 rounded-full bg-destructive" />
+          <div
+            className="aurora-playhead pointer-events-none absolute inset-y-0 z-20 w-[2px] rounded-full"
+            style={{ left: time * pps }}
+          >
+            <span className="progress-light absolute -left-[5px] top-0 size-2.5 rounded-full bg-primary" />
           </div>
         </div>
       </div>

@@ -8,7 +8,19 @@ import {
   type TextLayer,
 } from "./template";
 import type { CaptionCue } from "./captions";
-import { cropRect, cropAt, isFullCrop, preEditFilter, rectForCrop, transitionAt, type PreEdit } from "./preedit";
+import {
+  composeTransitions,
+  cropRect,
+  cropAt,
+  hasGrade,
+  isFullCrop,
+  preEditFilter,
+  rectForCrop,
+  segmentTransitionAt,
+  transitionAt,
+  type PreEdit,
+} from "./preedit";
+
 import { resolveFraming } from "./framing";
 
 
@@ -29,10 +41,8 @@ function inpaintArea(
   const sw = Math.min(canvas.width - sx, w + pad * 2);
   const sh = Math.min(canvas.height - sy, h + pad * 2);
   if (sw < 4 || sh < 4) return;
-  const work = document.createElement("canvas");
-  work.width = sw;
-  work.height = sh;
-  const wc = work.getContext("2d", { willReadFrequently: true });
+  const work = makeCanvas(sw, sh);
+  const wc = work.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D | null;
   if (!wc) return;
   wc.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
   const data = wc.getImageData(0, 0, sw, sh).data;
@@ -47,15 +57,66 @@ function inpaintArea(
   ctx.fillRect(x, y, w, h);
 }
 
+/**
+ * Canvas de trabalho compatível com a thread principal e com Web Workers.
+ * No worker não existe `document`: usamos `OffscreenCanvas`.
+ */
+export function makeCanvas(w = 1, h = 1): HTMLCanvasElement {
+  if (typeof document !== "undefined") {
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    return c;
+  }
+  return new OffscreenCanvas(w, h) as unknown as HTMLCanvasElement;
+}
 
+/**
+ * Cache do fundo desfocado dos layouts (blur/spotlight/centered/split).
+ *
+ * Desfocar o quadro inteiro em resolução final custa centenas de ms por frame
+ * — era isto que fazia uma exportação de 1 minuto levar horas. O fundo é
+ * gerado uma vez em baixa resolução e reaproveitado por uma fração de segundo
+ * de vídeo; visualmente é idêntico, porque já está borrado.
+ */
+const backdropCache = new WeakMap<
+  object,
+  { canvas: HTMLCanvasElement; key: string; time: number; uses: number }
+>();
+/** Largura máxima do fundo auxiliar (reduzida automaticamente se estiver lento). */
+let backdropMaxWidth = 320;
+/** Quantos segundos de vídeo o mesmo fundo pode ser reaproveitado. */
+let backdropHold = 0.15;
 
-
+/** Degrada (ou restaura) a qualidade do fundo quando a renderização está lenta. */
+export function setBackdropQuality(level: "alta" | "media" | "baixa") {
+  if (level === "alta") {
+    backdropMaxWidth = 320;
+    backdropHold = 0.15;
+  } else if (level === "media") {
+    backdropMaxWidth = 240;
+    backdropHold = 0.25;
+  } else {
+    backdropMaxWidth = 160;
+    backdropHold = 0.4;
+  }
+}
 
 const imgCache = new Map<string, HTMLImageElement>();
 
+/** Registra uma imagem já decodificada (usado pelos workers, que não têm `Image`). */
+export function setImageSource(src: string, img: CanvasImageSource) {
+  imgCache.set(src, img as unknown as HTMLImageElement);
+}
+
 export function getImage(src: string): HTMLImageElement | null {
   const cached = imgCache.get(src);
-  if (cached) return cached.complete && cached.naturalWidth ? cached : null;
+  if (cached) {
+    // ImageBitmap (worker) não tem `complete`; nesse caso já está pronto
+    if (!("complete" in cached)) return cached;
+    return cached.complete && cached.naturalWidth ? cached : null;
+  }
+  if (typeof Image === "undefined") return null;
   const img = new Image();
   img.crossOrigin = "anonymous";
   img.src = src;
@@ -65,6 +126,7 @@ export function getImage(src: string): HTMLImageElement | null {
 
 export function preloadImage(src: string) {
   return new Promise<void>((resolve) => {
+    if (typeof Image === "undefined") return resolve();
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
@@ -74,6 +136,18 @@ export function preloadImage(src: string) {
     img.onerror = () => resolve();
     img.src = src;
   });
+}
+
+/** aplica opacidade a uma cor hex (#rgb/#rrggbb); outras notações passam direto */
+export function withAlpha(color: string, alpha: number) {
+  const a = Math.min(1, Math.max(0, alpha));
+  const hex = color.trim();
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const h = m[1]!;
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const n = parseInt(full, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -204,21 +278,31 @@ export function drawCaptions(
   ctx: CanvasRenderingContext2D,
   s: CaptionStyle,
   cues: CaptionCue[],
-  time: number,
+  rawTime: number,
 ) {
   if (!s.visible || !cues.length) return;
-  const cue = cues.find((c) => time >= c.start && time <= c.end);
+  // sincronia: a legenda entra um pouco antes da fala (percepção de "no tempo"),
+  // e o usuário pode ajustar com s.offset (negativo adianta, positivo atrasa)
+  const LEAD = 0.12;
+  const time = rawTime + LEAD - (s.offset ?? 0);
+  const cue =
+    cues.find((c) => time >= c.start && time <= c.end) ??
+    // dentro de um respiro curto entre blocos, mantém a última legenda na tela
+    [...cues].reverse().find((c) => time > c.end && time - c.end <= 0.25);
   if (!cue) return;
 
   const groups = chunkWords(cue.words, Math.max(1, s.maxWords));
-  const gi = groups.findIndex(
-    (g) => time >= (g[0]?.start ?? 0) && time <= (g[g.length - 1]?.end ?? 0),
-  );
-  const group = groups[gi >= 0 ? gi : groups.length - 1];
+  // o bloco atual é o último cujo início já passou — evita "buracos" entre blocos
+  let gi = -1;
+  for (let i = 0; i < groups.length; i++) {
+    if (time >= (groups[i]![0]?.start ?? 0)) gi = i;
+  }
+  const group = groups[gi >= 0 ? gi : 0];
   if (!group || !group.length) return;
 
   const groupStart = group[0]?.start ?? 0;
-  const activeIdx = group.findIndex((w) => time >= w.start && time <= w.end);
+  let activeIdx = -1;
+  for (let i = 0; i < group.length; i++) if (time >= (group[i]?.start ?? 0)) activeIdx = i;
   const shown = s.mode === "word" ? [group[Math.max(0, activeIdx)]!] : group;
 
   // animação de entrada do bloco
@@ -237,6 +321,13 @@ export function drawCaptions(
   ctx.globalAlpha = (s.opacity ?? 1) * alphaIn;
   ctx.font = `${s.weight} ${s.size}px ${s.font}`;
   ctx.textBaseline = "top";
+  // espaçamento entre letras (Chrome/Edge; ignorado silenciosamente onde não há suporte)
+  const ls = s.letterSpacing ?? 0;
+  try {
+    (ctx as unknown as { letterSpacing: string }).letterSpacing = `${ls}px`;
+  } catch {
+    /* sem suporte */
+  }
 
   const norm = (txt: string) => (s.uppercase ? txt.toUpperCase() : txt);
   const space = ctx.measureText(" ").width;
@@ -310,6 +401,12 @@ export function drawCaptions(
       s.size * (s.boxRadius ?? 0.18),
     );
     ctx.fill();
+    if ((s.boxBorderWidth ?? 0) > 0) {
+      ctx.globalAlpha = prev;
+      ctx.lineWidth = s.boxBorderWidth!;
+      ctx.strokeStyle = s.boxBorderColor ?? "#ffffff";
+      ctx.stroke();
+    }
     ctx.globalAlpha = prev;
   }
 
@@ -341,9 +438,10 @@ export function drawCaptions(
       }
 
       if (s.bg === "shadow") {
-        ctx.shadowColor = "rgba(0,0,0,0.65)";
-        ctx.shadowBlur = s.size * 0.25;
-        ctx.shadowOffsetY = s.size * 0.06;
+        ctx.shadowColor = withAlpha(s.shadowColor ?? "#000000", s.shadowOpacity ?? 0.65);
+        ctx.shadowBlur = s.size * (s.shadowBlur ?? 0.25);
+        ctx.shadowOffsetY = s.size * (s.shadowY ?? 0.06);
+        ctx.shadowOffsetX = s.size * (s.shadowX ?? 0);
       }
       if (s.stroke > 0) {
         ctx.lineJoin = "round";
@@ -389,9 +487,7 @@ export interface FrameSource {
 let noiseTile: HTMLCanvasElement | null = null;
 function getNoiseTile() {
   if (noiseTile) return noiseTile;
-  const c = document.createElement("canvas");
-  c.width = 128;
-  c.height = 128;
+  const c = makeCanvas(128, 128);
   const cx = c.getContext("2d")!;
   const img = cx.createImageData(128, 128);
   for (let i = 0; i < img.data.length; i += 4) {
@@ -403,6 +499,89 @@ function getNoiseTile() {
   noiseTile = c;
   return c;
 }
+
+/** tiles de grão sorteados: alternam por quadro pra o granulado "andar" como filme */
+let grainTiles: HTMLCanvasElement[] | null = null;
+function getGrainTile(i: number) {
+  if (!grainTiles) {
+    grainTiles = Array.from({ length: 4 }, () => {
+      const c = makeCanvas(160, 160);
+      const cx = c.getContext("2d")!;
+      const img = cx.createImageData(160, 160);
+      for (let p = 0; p < img.data.length; p += 4) {
+        const v = Math.random() < 0.5 ? 90 + Math.random() * 40 : 130 + Math.random() * 50;
+        img.data[p] = img.data[p + 1] = img.data[p + 2] = v;
+        img.data[p + 3] = 255;
+      }
+      cx.putImageData(img, 0, 0);
+      return c;
+    });
+  }
+  return grainTiles[Math.abs(i) % grainTiles.length]!;
+}
+
+/** Estilo de edição aplicado sobre o vídeo já desenhado (dentro da caixa). */
+function paintGrade(
+  ctx: CanvasRenderingContext2D,
+  box: { x: number; y: number; w: number; h: number },
+  pre: PreEdit | null | undefined,
+  time: number,
+) {
+  if (!pre || !hasGrade(pre)) return;
+  const temp = pre.temp ?? 0;
+  const fade = pre.fade ?? 0;
+  const vig = pre.vignette ?? 0;
+  const grain = pre.grain ?? 0;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(box.x, box.y, box.w, box.h);
+  ctx.clip();
+
+  if (temp) {
+    ctx.globalCompositeOperation = "soft-light";
+    ctx.globalAlpha = Math.min(0.6, Math.abs(temp) * 0.6);
+    ctx.fillStyle = temp > 0 ? "#ff9a3c" : "#3ca6ff";
+    ctx.fillRect(box.x, box.y, box.w, box.h);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+  }
+
+  if (fade > 0) {
+    ctx.globalAlpha = Math.min(0.28, fade * 0.28);
+    ctx.fillStyle = "#b9c2cc";
+    ctx.fillRect(box.x, box.y, box.w, box.h);
+    ctx.globalAlpha = 1;
+  }
+
+  if (grain > 0) {
+    const tile = getGrainTile(Math.floor(time * 12));
+    const pat = ctx.createPattern(tile, "repeat");
+    if (pat) {
+      ctx.globalCompositeOperation = "overlay";
+      ctx.globalAlpha = Math.min(0.5, grain * 0.5);
+      ctx.fillStyle = pat;
+      ctx.fillRect(box.x, box.y, box.w, box.h);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  if (vig > 0) {
+    const cx = box.x + box.w / 2;
+    const cy = box.y + box.h / 2;
+    const r = Math.hypot(box.w, box.h) / 2;
+    const g = ctx.createRadialGradient(cx, cy, r * 0.35, cx, cy, r);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(1, `rgba(0,0,0,${Math.min(0.85, vig * 0.85).toFixed(3)})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(box.x, box.y, box.w, box.h);
+  }
+
+  ctx.restore();
+}
+
+
 
 export interface DrawOpts {
   mirror?: boolean;
@@ -492,7 +671,7 @@ function drawVideoLayer(
       box: { x: number; y: number; w: number; h: number },
       mode: "cover" | "contain",
       rect: typeof cr = cr,
-      style?: { blur?: number; dim?: number; useOffset?: boolean; voiceLevel?: number; musicLevel?: number },
+      style?: { blur?: number; dim?: number; useOffset?: boolean; voiceLevel?: number; musicLevel?: number; raw?: boolean },
     ) => {
 
       const fitScale =
@@ -512,7 +691,10 @@ function drawVideoLayer(
       ctx.rect(box.x, box.y, box.w, box.h);
       ctx.clip();
       const extraBlur = style?.blur ? ` blur(${style.blur}px)` : "";
-      ctx.filter = (baseFilter === "none" ? "" : baseFilter) + extraBlur || "none";
+      // raw: fundo desfocado fica natural — os ajustes (cor, desfoque etc.)
+      // valem só para a área do vídeo em primeiro plano
+      const base = style?.raw ? "" : baseFilter === "none" ? "" : baseFilter;
+      ctx.filter = (base + extraBlur).trim() || "none";
       ctx.translate(dx + dw / 2, dy + dh / 2);
       if (rect.quarter) ctx.rotate((rect.quarter * Math.PI) / 2);
       if (pre?.flipH) ctx.scale(-1, 1);
@@ -563,15 +745,86 @@ function drawVideoLayer(
         ctx.restore();
         return;
       }
-      paint(target, "cover", full, {
-        blur: Math.max(0, baseBlur * bgIntensity),
-        dim: dim * Math.min(1, bgIntensity),
-        useOffset: false,
-      });
+      const blurPx = Math.max(0, baseBlur * bgIntensity);
+      const dimPx = dim * Math.min(1, bgIntensity);
+      if (!blurPx) {
+        paint(target, "cover", full, { dim: dimPx, useOffset: false, raw: true });
+        return;
+      }
+
+      // fundo desfocado em baixa resolução, reaproveitado entre quadros
+      const scale = Math.min(1, backdropMaxWidth / Math.max(1, target.w));
+      const bw = Math.max(16, Math.round(target.w * scale));
+      const bh = Math.max(16, Math.round(target.h * scale));
+      const key = [
+        bw,
+        bh,
+        blurPx.toFixed(1),
+        zoom.toFixed(3),
+        full.quarter,
+        pre?.flipH ? 1 : 0,
+        pre?.flipV ? 1 : 0,
+        source.width,
+        source.height,
+      ].join("|");
+      const time = opts?.time ?? 0;
+      const cached = backdropCache.get(ctx.canvas as object);
+      const reusable =
+        cached &&
+        cached.key === key &&
+        cached.uses < 60 &&
+        Math.abs(time - cached.time) < backdropHold;
+
+      let bc = cached?.canvas;
+      if (reusable && bc) {
+        cached.uses++;
+      } else {
+        bc = bc && bc.width === bw && bc.height === bh ? bc : makeCanvas(bw, bh);
+        const bctx = bc.getContext("2d") as CanvasRenderingContext2D | null;
+        if (!bctx) {
+          paint(target, "cover", full, { blur: blurPx, dim: dimPx, useOffset: false, raw: true });
+          return;
+        }
+        bctx.clearRect(0, 0, bw, bh);
+        // fundo sem os ajustes de cor — eles valem só para a área do vídeo
+        bctx.filter = `blur(${Math.max(1, blurPx * scale).toFixed(2)}px)`;
+        const fit = Math.max(bw / full.ew, bh / full.eh) * zoom;
+        const dw = full.ew * fit;
+        const dh = full.eh * fit;
+        bctx.save();
+        bctx.translate(bw / 2, bh / 2);
+        if (full.quarter) bctx.rotate((full.quarter * Math.PI) / 2);
+        if (pre?.flipH) bctx.scale(-1, 1);
+        if (pre?.flipV) bctx.scale(1, -1);
+        const rw = full.quarter % 2 ? dh : dw;
+        const rh = full.quarter % 2 ? dw : dh;
+        bctx.drawImage(source.el, full.sx, full.sy, full.sw, full.sh, -rw / 2, -rh / 2, rw, rh);
+        bctx.restore();
+        bctx.filter = "none";
+        backdropCache.set(ctx.canvas as object, { canvas: bc, key, time, uses: 0 });
+      }
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(target.x, target.y, target.w, target.h);
+      ctx.clip();
+      ctx.filter = "none";
+      ctx.drawImage(bc, target.x, target.y, target.w, target.h);
+      if (dimPx) {
+        ctx.fillStyle = `rgba(0,0,0,${dimPx})`;
+        ctx.fillRect(target.x, target.y, target.w, target.h);
+      }
+      ctx.restore();
+    };
+
+    /** O primeiro plano já cobre a caixa inteira? Então nem desenha o fundo. */
+    const coversBox = (target: { w: number; h: number }, rect: typeof cr) => {
+      const fit = Math.min(target.w / rect.ew, target.h / rect.eh) * zoom;
+      return rect.ew * fit >= target.w - 1 && rect.eh * fit >= target.h - 1;
     };
 
     if (layout === "blur") {
-      paintBackdrop(box, 34, 0.35);
+      if (!coversBox(box, cr)) paintBackdrop(box, 34, 0.35);
       dest = paint(box, "contain");
     } else if (layout === "fit") {
       ctx.save();
@@ -616,7 +869,7 @@ function drawVideoLayer(
       ctx.fillRect(v.x, v.y + topH - 1, v.w, 2);
       ctx.restore();
     } else if (layout === "centered") {
-      paintBackdrop(box, 60, 0.55);
+      if (!coversBox(box, full)) paintBackdrop(box, 60, 0.55);
       dest = paint(box, "contain", full, { useOffset: false });
     } else if (layout === "horizontal") {
       ctx.save();
@@ -625,21 +878,35 @@ function drawVideoLayer(
       ctx.restore();
       dest = paint(box, "contain", full, { useOffset: false });
     } else {
-      // "auto": só recorta quando a orientação bate com a do quadro; senão mostra inteiro
+      // "auto": recorte manual/enquadramento dinâmico PREENCHE a caixa (cover),
+      // sem bordas pretas — a região escolhida pelo usuário vira o quadro inteiro.
+      // Sem recorte, só encolhe (contain) quando a orientação não bate com a do quadro.
       const useContain =
         v.fit === "contain" ||
-        ((v.fit === "auto" || manualCrop) && Math.abs(srcAR - boxAR) / boxAR > 0.02);
+        (v.fit === "auto" && !manualCrop && Math.abs(srcAR - boxAR) / boxAR > 0.02);
       dest = paint(box, useContain ? "contain" : "cover");
     }
     ctx.filter = "none";
+
+    // estilo de edição: temperatura, preto lavado, vinheta e granulado —
+    // apenas na área real do vídeo (não no fundo desfocado/barras)
+    const gb = dest
+      ? {
+          x: Math.max(v.x, dest.dx),
+          y: Math.max(v.y, dest.dy),
+          w: Math.min(v.x + v.w, dest.dx + dest.dw) - Math.max(v.x, dest.dx),
+          h: Math.min(v.y + v.h, dest.dy + dest.dh) - Math.max(v.y, dest.dy),
+        }
+      : { x: v.x, y: v.y, w: v.w, h: v.h };
+    if (gb.w > 0 && gb.h > 0) paintGrade(ctx, gb, pre, opts?.time ?? 0);
 
     if (opts?.noise) {
       ctx.globalAlpha = Math.min(0.12, opts.noise);
       ctx.globalCompositeOperation = "overlay";
       const pat = ctx.createPattern(getNoiseTile(), "repeat");
-      if (pat) {
+      if (pat && gb.w > 0 && gb.h > 0) {
         ctx.fillStyle = pat;
-        ctx.fillRect(v.x, v.y, v.w, v.h);
+        ctx.fillRect(gb.x, gb.y, gb.w, gb.h);
       }
       ctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = 1;
@@ -660,7 +927,7 @@ function drawVideoLayer(
 
 let scratch: HTMLCanvasElement | null = null;
 function getScratch(w: number, h: number) {
-  if (!scratch) scratch = document.createElement("canvas");
+  if (!scratch) scratch = makeCanvas(w, h);
   if (scratch.width !== w || scratch.height !== h) {
     scratch.width = w;
     scratch.height = h;
@@ -820,7 +1087,11 @@ export function drawFrame(
   ctx.fillRect(0, 0, W, H);
 
   // transição de abertura/saída: afeta o quadro montado inteiro
-  const tr = transitionAt(opts?.pre, opts?.time, opts?.clip ?? null);
+  const tr = composeTransitions(
+    transitionAt(opts?.pre, opts?.time, opts?.clip ?? null),
+    segmentTransitionAt(opts?.pre, opts?.time, opts?.clip ?? null),
+  );
+
   const animating = tr.alpha < 1 || tr.scale !== 1 || tr.dx !== 0 || tr.dy !== 0;
   if (animating) {
     ctx.save();
@@ -851,7 +1122,18 @@ export function drawFrame(
     push(t.captions.z, 70, () => drawCaptions(ctx, t.captions!, cues, time));
   }
 
-  jobs.sort((a, b) => a.z - b.z || a.i - b.i).forEach((j) => j.run());
+  // cada camada desenha isolada: espelho/rotação do vídeo nunca vaza para
+  // legendas, textos ou marca d'água
+  jobs
+    .sort((a, b) => a.z - b.z || a.i - b.i)
+    .forEach((j) => {
+      ctx.save();
+      try {
+        j.run();
+      } finally {
+        ctx.restore();
+      }
+    });
   if (animating) ctx.restore();
   ctx.restore();
 }

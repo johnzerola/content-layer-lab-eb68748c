@@ -1,4 +1,4 @@
-export type PostKind = "reels" | "feed" | "stories";
+export type PostKind = "reels" | "feed" | "stories" | "shorts";
 export type SocialPlatform = "instagram" | "facebook" | "tiktok" | "youtube";
 export type SocialProvider = "ayrshare" | "meta" | "tiktok" | "youtube" | "pending";
 
@@ -33,9 +33,9 @@ export const PLATFORM_CAPABILITIES: Record<SocialPlatform, PlatformCapabilities>
     canRefreshToken: false,
   },
   facebook: {
-    canPublishReels: false,
+    canPublishReels: true,
     canPublishStories: false,
-    canPublishFeed: false,
+    canPublishFeed: true,
     canPublishShorts: false,
     canRefreshToken: false,
   },
@@ -49,15 +49,16 @@ export const PLATFORM_CAPABILITIES: Record<SocialPlatform, PlatformCapabilities>
   youtube: {
     canPublishReels: false,
     canPublishStories: false,
-    canPublishFeed: false,
-    canPublishShorts: false,
-    canRefreshToken: false,
+    canPublishFeed: true,
+    canPublishShorts: true,
+    canRefreshToken: true,
   },
 };
 
 export function canPublish(platform: string, kind: PostKind): boolean {
   const capabilities = PLATFORM_CAPABILITIES[platform as SocialPlatform];
   if (!capabilities) return false;
+  if (kind === "shorts") return capabilities.canPublishShorts;
   if (kind === "reels") return capabilities.canPublishReels;
   if (kind === "stories") return capabilities.canPublishStories;
   return capabilities.canPublishFeed;

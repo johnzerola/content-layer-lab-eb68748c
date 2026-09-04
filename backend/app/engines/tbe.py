@@ -1,0 +1,391 @@
+"""Temporal Background Exposure (TBE).
+
+CPU-first background reconstruction. Instead of running a dense optical flow per
+frame pair (Farneback: O(N x R) and unusable on CPU), TBE exploits the fact that
+the background hidden behind a subtitle or a watermark is *exposed* in other
+frames of the same shot. The pipeline is:
+
+1. estimate global motion (RANSAC affine/homography on ORB features computed on
+   the unmasked area) between every frame of the window and a reference frame;
+2. warp every frame + its mask into the reference space and build a temporal
+   median plate from the pixels that are visible (never masked);
+3. warp the plate back per frame and composite it only inside the mask, with a
+   feathered border so there is no visible seam;
+4. anything the timeline never exposed (truly static overlay on a static shot)
+   falls back to the exemplar `patch_fill`.
+
+No blur, no mosaic: every filled pixel is either a real background pixel from
+another frame or an exemplar patch from the same frame.
+"""
+from __future__ import annotations
+
+from typing import List, Optional, Tuple
+
+import cv2
+import numpy as np
+
+from .inpainting import InpaintingEngine, patch_fill
+
+_MAX_SAMPLES = 28
+_ALIGN_WIDTH = 480
+
+
+def _prepare(frame: np.ndarray, mask: np.ndarray, scale: float) -> Tuple[np.ndarray, np.ndarray]:
+    small = cv2.resize(frame, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+    small_mask = cv2.resize(mask, (gray.shape[1], gray.shape[0]), interpolation=cv2.INTER_NEAREST)
+    return gray, cv2.bitwise_not(small_mask)
+
+
+def _estimate_motion(
+    detector,
+    ref_kp,
+    ref_desc,
+    gray: np.ndarray,
+    valid: np.ndarray,
+    scale: float,
+) -> Optional[np.ndarray]:
+    """2x3 affine matrix mapping `gray` (full res) into the reference space."""
+    if ref_desc is None or len(ref_kp) < 8:
+        return np.eye(2, 3, dtype=np.float32)
+    kp, desc = detector.detectAndCompute(gray, valid)
+    if desc is None or len(kp) < 8:
+        return None
+    matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
+    try:
+        pairs = matcher.knnMatch(desc, ref_desc, k=2)
+    except cv2.error:
+        return None
+    good = [m for m, n in (p for p in pairs if len(p) == 2) if m.distance < 0.78 * n.distance]
+    if len(good) < 8:
+        return None
+    src = np.float32([kp[m.queryIdx].pt for m in good]).reshape(-1, 1, 2) / scale
+    dst = np.float32([ref_kp[m.trainIdx].pt for m in good]).reshape(-1, 1, 2) / scale
+    matrix, inliers = cv2.estimateAffinePartial2D(
+        src, dst, method=cv2.RANSAC, ransacReprojThreshold=3.0, maxIters=1500
+    )
+    if matrix is None or inliers is None or int(inliers.sum()) < 6:
+        return None
+    return matrix.astype(np.float32)
+
+
+def _feather(mask: np.ndarray, radius: int = 3) -> np.ndarray:
+    if radius <= 0:
+        return (mask > 0).astype(np.float32)
+    soft = cv2.GaussianBlur((mask > 0).astype(np.float32), (0, 0), radius)
+    return np.clip(soft * 1.25, 0.0, 1.0)
+
+
+def _refine_flow(
+    warped: np.ndarray,
+    warped_mask: np.ndarray,
+    reference: np.ndarray,
+    ref_mask: np.ndarray,
+    scale: float,
+) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+    """Residual local warp after the global affine, via dense optical flow.
+
+    The affine only models camera motion. Parallax, zoom in depth and moving
+    background make the warped sample land a few pixels off, so the temporal
+    median mixes misaligned pixels and the plate comes out mushy — exactly the
+    stain we are fighting. A coarse Farneback field fixes that residual.
+
+    Flow is estimated on a downscaled grayscale pair with the holes filled by
+    the neighbour frame, so the mask itself never drives the field.
+    """
+    height, width = warped.shape[:2]
+    small_w = max(64, int(width * scale))
+    small_h = max(64, int(height * scale))
+    a = cv2.cvtColor(cv2.resize(reference, (small_w, small_h), interpolation=cv2.INTER_AREA),
+                     cv2.COLOR_BGR2GRAY)
+    b = cv2.cvtColor(cv2.resize(warped, (small_w, small_h), interpolation=cv2.INTER_AREA),
+                     cv2.COLOR_BGR2GRAY)
+    hole = cv2.resize(cv2.bitwise_or(warped_mask, ref_mask), (small_w, small_h),
+                      interpolation=cv2.INTER_NEAREST)
+    if hole.max() > 0:
+        # Dentro do buraco não há sinal comum: copiar um no outro zera o
+        # gradiente ali e o fluxo passa a ser guiado só pelo fundo real.
+        b = np.where(hole > 0, a, b)
+    try:
+        flow = cv2.calcOpticalFlowFarneback(a, b, None, 0.5, 2, 15, 2, 5, 1.1, 0)
+    except cv2.error:
+        return None
+    magnitude = float(np.abs(flow).max())
+    if magnitude < 0.25 or magnitude > 24.0:
+        # Nada a corrigir, ou fluxo instável (cena/objeto grande em movimento):
+        # aplicar iria colar conteúdo errado. Melhor manter o alinhamento global.
+        return None
+    flow = cv2.resize(flow, (width, height), interpolation=cv2.INTER_LINEAR)
+    flow[..., 0] *= width / float(small_w)
+    flow[..., 1] *= height / float(small_h)
+    grid_x, grid_y = np.meshgrid(np.arange(width, dtype=np.float32),
+                                 np.arange(height, dtype=np.float32))
+    map_x = grid_x + flow[..., 0]
+    map_y = grid_y + flow[..., 1]
+    remapped = cv2.remap(warped, map_x, map_y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+    remapped_mask = cv2.remap(warped_mask, map_x, map_y, cv2.INTER_NEAREST,
+                              borderMode=cv2.BORDER_CONSTANT, borderValue=255)
+    return remapped, remapped_mask
+
+
+
+def _bbox(mask: np.ndarray, margin: int = 24) -> Optional[Tuple[int, int, int, int]]:
+    ys, xs = np.where(mask > 0)
+    if ys.size == 0:
+        return None
+    height, width = mask.shape[:2]
+    y0 = max(0, int(ys.min()) - margin)
+    y1 = min(height, int(ys.max()) + 1 + margin)
+    x0 = max(0, int(xs.min()) - margin)
+    x1 = min(width, int(xs.max()) + 1 + margin)
+    return y0, y1, x0, x1
+
+
+class TemporalBackgroundExposureEngine(InpaintingEngine):
+    """Global-motion temporal harvesting — the CPU-efficient default."""
+
+    name = "tbe"
+
+    def __init__(self, max_samples: int = _MAX_SAMPLES, feather: int = 3, flow_refine: bool = False):
+        self.max_samples = max(4, max_samples)
+        self.feather = feather
+        # Correção residual por fluxo óptico depois do alinhamento global.
+        # Custa ~1 Farneback de baixa resolução por amostra e é o que permite
+        # usar janelas longas (48-64 frames) sem que a mediana borre.
+        self.flow_refine = flow_refine
+        # Windows of a static shot repeat the same hole: caching the exemplar
+        # plate keeps the expensive block matching out of the per-window budget.
+        self._plate_cache: Optional[tuple] = None
+        self._alpha_cache: Optional[tuple] = None
+
+
+    def _alpha_for(self, mask: np.ndarray) -> np.ndarray:
+        key = (mask.shape, int(mask.sum()), bytes(mask[::16, ::16].tobytes()))
+        if self._alpha_cache and self._alpha_cache[0] == key:
+            return self._alpha_cache[1]
+        alpha = _feather(mask, self.feather)[..., None]
+        self._alpha_cache = (key, alpha)
+        return alpha
+
+    def _fill_unseen(self, plate: np.ndarray, unseen: np.ndarray) -> np.ndarray:
+        """Exemplar fill limited to the hole neighbourhood, with a shot cache."""
+        box = _bbox(unseen, margin=48)
+        if box is None:
+            return plate
+        y0, y1, x0, x1 = box
+        crop = plate[y0:y1, x0:x1]
+        hole = unseen[y0:y1, x0:x1]
+        signature = (box, int(hole.sum()))
+        cached = self._plate_cache
+        if cached and cached[0] == signature:
+            ring = hole == 0
+            if ring.any():
+                delta = float(
+                    np.mean(
+                        np.abs(
+                            crop[ring].astype(np.float32) - cached[1][ring].astype(np.float32)
+                        )
+                    )
+                )
+                if delta < 6.0:
+                    out = plate.copy()
+                    out[y0:y1, x0:x1] = cached[2]
+                    return out
+        filled_crop = self._fill_crop(crop, hole)
+        self._plate_cache = (signature, crop.copy(), filled_crop.copy())
+        out = plate.copy()
+        out[y0:y1, x0:x1] = filled_crop
+        return out
+
+    @staticmethod
+    def _fill_crop(crop: np.ndarray, hole: np.ndarray) -> np.ndarray:
+        """Smooth backgrounds get edge propagation; textured ones get exemplars."""
+        out = crop.copy()
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (17, 17))
+        count, labels = cv2.connectedComponents((hole > 0).astype(np.uint8))
+        exemplar_hole = np.zeros_like(hole)
+        for label in range(1, count):
+            part = (labels == label).astype(np.uint8) * 255
+            ys, xs = np.where(part > 0)
+            thin = int(ys.max() - ys.min()) <= 44 if ys.size else False
+            ring = cv2.subtract(cv2.dilate(part, kernel), part)
+            samples = crop[ring > 0].astype(np.float32).reshape(-1, 3)
+            flat = bool(samples.size) and float(samples.std(axis=0).max()) < 12.0
+            if flat or thin:
+                # flat plate or a thin glyph stroke: edge propagation rebuilds it
+                # cleanly, while exemplar blocks would leave visible patches.
+                patched = cv2.inpaint(out, part, 6, cv2.INPAINT_TELEA)
+                out[part > 0] = patched[part > 0]
+            else:
+                exemplar_hole = cv2.bitwise_or(exemplar_hole, part)
+
+        if exemplar_hole.max() > 0:
+            out = patch_fill(out, exemplar_hole, patch=21, search=72)
+        return out
+
+
+
+
+    def process(self, frames: np.ndarray, masks: np.ndarray) -> np.ndarray:
+        count = len(frames)
+        if count == 0:
+            return frames
+        height, width = frames[0].shape[:2]
+        scale = min(1.0, _ALIGN_WIDTH / float(width))
+        detector = cv2.ORB_create(nfeatures=1200, fastThreshold=7)
+
+        reference = count // 2
+        ref_gray, ref_valid = _prepare(frames[reference], masks[reference], scale)
+        ref_kp, ref_desc = detector.detectAndCompute(ref_gray, ref_valid)
+
+        step = max(1, count // self.max_samples)
+        sample_indices = list(range(0, count, step))
+        if reference not in sample_indices:
+            sample_indices.append(reference)
+
+        ref_full_mask = masks[reference]
+        transforms: dict[int, np.ndarray] = {reference: np.eye(2, 3, dtype=np.float32)}
+        stack: List[np.ndarray] = []
+        valid_stack: List[np.ndarray] = []
+        for index in sample_indices:
+            if index == reference:
+                matrix = transforms[reference]
+            else:
+                gray, valid = _prepare(frames[index], masks[index], scale)
+                matrix = _estimate_motion(detector, ref_kp, ref_desc, gray, valid, scale)
+                if matrix is None:
+                    continue
+                transforms[index] = matrix
+            warped = cv2.warpAffine(
+                frames[index], matrix, (width, height), flags=cv2.INTER_LINEAR,
+                borderMode=cv2.BORDER_CONSTANT,
+            )
+            warped_mask = cv2.warpAffine(
+                masks[index], matrix, (width, height), flags=cv2.INTER_NEAREST,
+                borderMode=cv2.BORDER_CONSTANT, borderValue=255,
+            )
+            covered = cv2.warpAffine(
+                np.full((height, width), 255, np.uint8), matrix, (width, height),
+                flags=cv2.INTER_NEAREST, borderMode=cv2.BORDER_CONSTANT, borderValue=0,
+            )
+            if self.flow_refine and index != reference:
+                refined = _refine_flow(
+                    warped, warped_mask, frames[reference], ref_full_mask, scale
+                )
+                if refined is not None:
+                    warped, warped_mask = refined
+            usable = cv2.bitwise_and(cv2.bitwise_not(warped_mask), covered)
+            stack.append(warped)
+            valid_stack.append(usable)
+
+
+        plate, plate_valid = self._median_plate(stack, valid_stack)
+        del stack, valid_stack
+
+        # Pixels the timeline never exposed (a truly static overlay on a static
+        # shot) are reconstructed ONCE in reference space with the exemplar
+        # filler: cheap on CPU and temporally coherent, since every frame then
+        # reuses the same plate instead of hallucinating its own patch.
+        if plate_valid.max() > 0:
+            unseen = cv2.bitwise_not(plate_valid)
+            interest = np.zeros_like(plate_valid)
+            for index in range(0, count, max(1, count // 8)):
+                interest = np.maximum(interest, masks[index])
+            interest = cv2.dilate(
+                interest, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (61, 61))
+            )
+            unseen = cv2.bitwise_and(unseen, interest)
+            if unseen.max() > 0:
+                plate = self._fill_unseen(plate, unseen)
+                plate_valid = cv2.bitwise_or(plate_valid, unseen)
+
+
+        output: List[np.ndarray] = []
+        identity = np.eye(2, 3, dtype=np.float32)
+        for index in range(count):
+            hole = masks[index]
+            frame = frames[index]
+            if hole.max() == 0:
+                output.append(frame.copy())
+                continue
+            matrix = transforms.get(index)
+            if matrix is None:
+                gray, valid = _prepare(frame, hole, scale)
+                matrix = _estimate_motion(detector, ref_kp, ref_desc, gray, valid, scale)
+            current = frame.copy()
+            remaining = hole.copy()
+            if matrix is not None and plate_valid.max() > 0:
+                if float(np.abs(matrix - identity).max()) < 0.02:
+                    # static shot: the plate already lives in this frame's space
+                    local_plate, local_valid = plate, plate_valid
+                else:
+                    inverse = cv2.invertAffineTransform(matrix)
+                    local_plate = cv2.warpAffine(
+                        plate, inverse, (width, height), flags=cv2.INTER_LINEAR,
+                        borderMode=cv2.BORDER_CONSTANT,
+                    )
+                    local_valid = cv2.warpAffine(
+                        plate_valid, inverse, (width, height), flags=cv2.INTER_NEAREST,
+                        borderMode=cv2.BORDER_CONSTANT, borderValue=0,
+                    )
+                fillable = cv2.bitwise_and(remaining, local_valid)
+                if fillable.max() > 0:
+                    box = _bbox(fillable, margin=8)
+                    if box is not None:
+                        y0, y1, x0, x1 = box
+                        alpha = self._alpha_for(fillable)[y0:y1, x0:x1]
+                        region = current[y0:y1, x0:x1].astype(np.float32)
+                        blended = (
+                            region * (1.0 - alpha)
+                            + local_plate[y0:y1, x0:x1].astype(np.float32) * alpha
+                        )
+                        current[y0:y1, x0:x1] = blended.astype(np.uint8)
+                    remaining = cv2.bitwise_and(remaining, cv2.bitwise_not(fillable))
+
+            leftover = int(np.count_nonzero(remaining))
+            if leftover > 0:
+                original = max(1, int(np.count_nonzero(hole)))
+                if leftover / original < 0.2:
+                    # thin residual border: Telea is instant and visually identical
+                    patched = cv2.inpaint(current, remaining, 3, cv2.INPAINT_TELEA)
+                    current[remaining > 0] = patched[remaining > 0]
+                else:
+                    box = _bbox(remaining, margin=48)
+                    if box is not None:
+                        y0, y1, x0, x1 = box
+                        current[y0:y1, x0:x1] = self._fill_crop(
+                            current[y0:y1, x0:x1], remaining[y0:y1, x0:x1]
+                        )
+
+            output.append(current)
+        return np.asarray(output)
+
+    @staticmethod
+    def _median_plate(
+        stack: List[np.ndarray], valid_stack: List[np.ndarray]
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Per-pixel temporal median over the frames where the pixel is exposed."""
+        if not stack:
+            empty = np.zeros((1, 1, 3), np.uint8)
+            return empty, np.zeros((1, 1), np.uint8)
+        height, width = stack[0].shape[:2]
+        samples = np.asarray(stack, dtype=np.float32)
+        valid = np.asarray([(v > 0) for v in valid_stack])
+        counts = valid.sum(axis=0)
+        # Push invisible samples to +inf, sort once, then read the middle of the
+        # visible run per pixel. Much cheaper than nanmedian and NaN-free.
+        big = np.float32(1e9)
+        filled = np.where(valid[..., None], samples, big)
+        filled.sort(axis=0)
+        idx = np.clip((counts - 1) // 2, 0, len(stack) - 1)
+        plate = np.take_along_axis(
+            filled, idx[None, ..., None].repeat(3, axis=3).astype(np.intp), axis=0
+        )[0]
+        plate_valid = (counts > 0).astype(np.uint8) * 255
+        plate[plate >= big] = 0
+        return plate.astype(np.uint8), plate_valid
+
+
+
+def tbe_status() -> dict:
+    return {"ready": True, "quality": "cpu-optimized", "engine": TemporalBackgroundExposureEngine.name}

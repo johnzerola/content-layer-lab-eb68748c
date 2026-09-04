@@ -52,7 +52,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const inputCls =
-  "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary";
+  "field text-sm";
 
 function Slider({
   label,
@@ -383,67 +383,97 @@ export function TemplateEditor({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 sm:p-6">
-      <div className="panel flex h-full w-full max-w-6xl flex-col overflow-hidden">
-        <header className="flex items-start justify-between border-b border-border p-5">
-          <div>
-            <h2 className="text-lg font-semibold">Personalizar template</h2>
-            <p className="text-sm text-muted-foreground">
-              Ajuste textos, cores e elementos. Preview atualiza em tempo real.
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/85 p-2 backdrop-blur-md sm:p-6">
+      <div className="panel glass pop-in flex h-full w-full max-w-7xl flex-col overflow-hidden">
+        <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b border-border px-5 py-4">
+          <div className="min-w-0">
+            <p className="eyebrow">
+              <span className="size-1.5 rounded-full bg-primary" aria-hidden />
+              Editor visual
+            </p>
+            <h2 className="title-editorial mt-1 truncate !text-[26px]">
+              {t.name || (
+                <>
+                  Personalizar <span className="title-em">template</span>
+                </>
+              )}
+            </h2>
+            <p className="truncate text-[12px] text-muted-foreground">
+              Ajuste textos, cores e elementos — o preview atualiza em tempo real.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
             <button
               onClick={undo}
               disabled={!past.current.length}
-              className="rounded-md border border-border p-2 disabled:opacity-40 hover:border-primary"
+              className="btn-ghost interactive h-12 w-14 flex-col gap-0.5 disabled:opacity-40"
               title="Desfazer (Ctrl+Z)"
             >
               <Undo2 className="size-4" />
+              <span className="font-mono text-[9px] uppercase tracking-[0.1em]">desfazer</span>
             </button>
             <button
               onClick={redo}
               disabled={!future.current.length}
-              className="rounded-md border border-border p-2 disabled:opacity-40 hover:border-primary"
+              className="btn-ghost interactive h-12 w-14 flex-col gap-0.5 disabled:opacity-40"
               title="Refazer (Ctrl+Shift+Z)"
             >
               <Redo2 className="size-4" />
+              <span className="font-mono text-[9px] uppercase tracking-[0.1em]">refazer</span>
             </button>
             <button
               onClick={() => setSnap((s) => !s)}
-              className={`rounded-md border p-2 ${snap ? "border-primary text-primary" : "border-border"}`}
+              className={`btn-ghost interactive h-12 w-14 flex-col gap-0.5 ${snap ? "bg-primary/15 text-primary" : ""}`}
               title="Snap e guias de alinhamento (segure Alt para ignorar)"
             >
               <Magnet className="size-4" />
+              <span className="font-mono text-[9px] uppercase tracking-[0.1em]">snap</span>
             </button>
             <button
               onClick={() => setDebug((d) => !d)}
-              className={`rounded-md border p-2 ${debug ? "border-primary text-primary" : "border-border"}`}
+              className={`btn-ghost interactive h-12 w-14 flex-col gap-0.5 ${debug ? "bg-primary/15 text-primary" : ""}`}
               title="Modo de depuração: grade, safe areas e bounding boxes"
             >
               <Bug className="size-4" />
+              <span className="font-mono text-[9px] uppercase tracking-[0.1em]">grade</span>
             </button>
-            <button onClick={onCancel} className="rounded-md p-2 hover:bg-surface-2" aria-label="Fechar">
+            <button
+              onClick={onCancel}
+              className="btn-ghost interactive h-12 w-14 flex-col gap-0.5"
+              aria-label="Fechar"
+            >
               <X className="size-4" />
+              <span className="font-mono text-[9px] uppercase tracking-[0.1em]">fechar</span>
             </button>
           </div>
         </header>
 
-        <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto p-5 lg:grid-cols-[1fr_400px]">
-          <div className="space-y-3">
-            <TemplateCanvas
-              template={t}
-              selected={selected}
-              onSelect={setSelected}
-              onChange={setT}
-              snap={snap}
-              debug={debug}
-              debugGrid={debugGrid}
-              debugSafeArea={debugSafe}
-              debugBoxes={debugBoxes}
-              drawOpts={adOpts}
-              speed={adPreview ? adVariation.speed : 1}
-            />
+        <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto p-5 lg:grid-cols-[minmax(0,1fr)_400px]">
+
+          <div className="space-y-3 lg:sticky lg:top-0 lg:self-start">
+            <div className="flex items-center justify-between gap-2">
+              <p className="mono-label">Preview em tempo real</p>
+              <span className="mono-label rounded-full border border-border px-2 py-0.5 text-muted-foreground">
+                {(t.canvasW ?? 1080)}×{(t.canvasH ?? 1920)}
+              </span>
+            </div>
+            <div className="grid place-items-center rounded-2xl border border-border bg-[repeating-conic-gradient(var(--color-surface-2)_0%_25%,transparent_0%_50%)] bg-[length:22px_22px] p-4">
+              <TemplateCanvas
+                frameClassName="h-[min(62vh,660px)] w-auto max-w-full shadow-[0_24px_60px_-24px_rgba(0,0,0,0.8)]"
+                template={t}
+                selected={selected}
+                onSelect={setSelected}
+                onChange={setT}
+                snap={snap}
+                debug={debug}
+                debugGrid={debugGrid}
+                debugSafeArea={debugSafe}
+                debugBoxes={debugBoxes}
+                drawOpts={adOpts}
+                motionVar={adPreview ? adVariation : null}
+                speed={adPreview ? adVariation.speed : 1}
+              />
+            </div>
 
             {debug ? <DebugPanel
               t={t}
@@ -456,14 +486,14 @@ export function TemplateEditor({
               setBoxes={setDebugBoxes}
             /> : (
               <p className="text-center text-xs text-muted-foreground">
-                Arraste elementos direto no preview · guias grudam nas bordas e no centro (Alt ignora)
+                Arraste para mover · alças nos 8 pontos para redimensionar · Shift mantém proporção · Alt redimensiona pelo centro · setas movem 1px (Shift 10px)
               </p>
             )}
           </div>
 
-
-          <div className="space-y-4 lg:max-h-[62vh] lg:overflow-y-auto lg:pr-1">
+          <div className="space-y-4 lg:max-h-[70vh] lg:overflow-y-auto lg:pr-1">
             <Field label="Nome do template">
+
               <input className={inputCls} value={t.name} onChange={(e) => setT({ ...t, name: e.target.value })} />
             </Field>
 
@@ -611,6 +641,7 @@ export function TemplateEditor({
                           <Slider label="Tamanho" value={caps.size} min={28} max={140} onChange={(v) => patch(id, { size: v })} />
                           <Slider label="Contorno" value={caps.stroke} min={0} max={24} onChange={(v) => patch(id, { stroke: v })} />
                           <Slider label="Palavras por bloco" value={caps.maxWords} min={1} max={8} onChange={(v) => patch(id, { maxWords: v })} />
+                          <Slider label="Sincronia (s)" value={caps.offset ?? 0} min={-1} max={1} step={0.05} onChange={(v) => patch(id, { offset: v })} />
                           <Slider label="X" value={caps.x} min={0} max={1080} onChange={(v) => patch(id, { x: v })} />
                           <Slider label="Y" value={caps.y} min={0} max={1920} onChange={(v) => patch(id, { y: v })} />
                           <Slider label="Largura" value={caps.w} min={200} max={1080} onChange={(v) => patch(id, { w: v })} />
@@ -1000,15 +1031,21 @@ export function TemplateEditor({
           </div>
         </div>
 
-        <footer className="flex justify-end gap-2 border-t border-border p-4">
-          <Button variant="ghost" onClick={onCancel}>
-            Cancelar
-          </Button>
-          <Button variant="outline" onClick={() => onUse(t)}>
-            Usar sem salvar
-          </Button>
-          <Button onClick={() => onSave(t)}>Salvar e usar</Button>
+        <footer className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t border-border bg-surface-2/40 px-5 py-3">
+          <p className="mono-label truncate text-muted-foreground">
+            alterações aplicadas no preview · nada é salvo até confirmar
+          </p>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <Button variant="ghost" onClick={onCancel}>
+              Cancelar
+            </Button>
+            <Button variant="outline" onClick={() => onUse(t)}>
+              Usar sem salvar
+            </Button>
+            <Button onClick={() => onSave(t)}>Salvar e usar</Button>
+          </div>
         </footer>
+
       </div>
     </div>
   );

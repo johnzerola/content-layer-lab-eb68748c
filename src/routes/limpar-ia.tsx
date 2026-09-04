@@ -1,9 +1,12 @@
+import { RequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Eraser, Sparkles, Upload, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { RouteShell } from "@/components/RouteShell";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
-import { AuthGate } from "@/components/AuthGate";
+import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { listCleanerJobs } from "@/lib/cleaner.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { STAGE_LABEL, type CleanerJob } from "@/lib/cleaner";
@@ -32,7 +35,7 @@ export const Route = createFileRoute("/limpar-ia")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: LimparIAPage,
+  component: GuardedLimparIAPage,
 });
 
 interface UploadItem {
@@ -155,9 +158,7 @@ function LimparIAPage() {
               </a>
             )}
           </div>
-          <AuthGate>
-            <CleanerIAStudio item={item} onComplete={(url) => setResultUrl(url)} />
-          </AuthGate>
+          <CleanerIAStudio item={item} onComplete={(url) => setResultUrl(url)} />
         </div>
       </div>
     );
@@ -240,5 +241,18 @@ function LimparIAPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function GuardedLimparIAPage() {
+  return (
+    <RouteShell>
+      <RequireAuth
+        title={"Entre para usar o CleanerIA"}
+        description={"Os jobs de limpeza ficam salvos na sua conta com histórico e link de download."}
+      >
+        <LimparIAPage />
+      </RequireAuth>
+    </RouteShell>
   );
 }

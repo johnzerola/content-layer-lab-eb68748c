@@ -30,8 +30,13 @@ services:
       CLEANER_RETENTION_HOURS: ${CLEANER_RETENTION_HOURS:-72}
       CLEANER_MAX_CONCURRENT_JOBS: "1"
       CLEANER_RATE_LIMIT_PER_MINUTE: ${CLEANER_RATE_LIMIT_PER_MINUTE:-120}
-      OMP_NUM_THREADS: "2"
-      MKL_NUM_THREADS: "2"
+      OMP_NUM_THREADS: "4"
+      MKL_NUM_THREADS: "4"
+      # ProPainter oficial (modo CPU — lento; use GPU para produção)
+      PROPAINTER_ALLOW_CPU: ${PROPAINTER_ALLOW_CPU:-1}
+      PROPAINTER_ROOT: ${PROPAINTER_ROOT:-/app/models/propainter-code}
+      PROPAINTER_WEIGHTS_DIR: ${PROPAINTER_WEIGHTS_DIR:-/app/models/propainter-weights}
+      PROPAINTER_MAX_SIDE: ${PROPAINTER_MAX_SIDE:-640}
     ports:
       - "127.0.0.1:${CLEANER_BIND_PORT:-8095}:8000"
     volumes:
@@ -42,7 +47,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "2.0"
+          cpus: "3.5"
           memory: 4g
           pids: 512
     security_opt:

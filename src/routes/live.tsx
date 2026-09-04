@@ -1,4 +1,5 @@
-﻿import { createFileRoute, useNavigate } from "@tanstack/react-router";
+﻿import { RequireAuth } from "@/components/RequireAuth";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Download, Loader2, Pencil, Radio, Scissors, Sparkles, Square, Trash2 } from "lucide-react";
@@ -11,18 +12,20 @@ import { checkXLive, type LiveCheck } from "@/lib/live.functions";
 import { LiveClipper, analyzeLiveClip, attachHls, clipTitle, type LiveClip } from "@/lib/live";
 import { markPendingTool, sendItemsToTool } from "@/lib/handoff";
 import { downloadAsZip } from "@/lib/zip";
+import { listPosts, STATUS_LABEL, type ScheduledPost } from "@/lib/social";
+import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 
 export const Route = createFileRoute("/live")({
-  component: LivePage,
+  component: GuardedLivePage,
   head: () => ({
     meta: [
-      { title: "Monitora Live â€” cortes automÃ¡ticos de lives do X" },
+      { title: "Monitora Live — cortes automáticos de lives do X" },
       {
         name: "description",
         content:
-          "Monitore transmissÃµes pÃºblicas do X, Kick, TikTok ou HLS direto, gere cortes automÃ¡ticos pontuados por energia de fala e edite cada corte antes de baixar.",
+          "Monitore transmissões públicas do X, Kick, TikTok ou HLS direto, gere cortes automáticos pontuados por energia de fala e edite cada corte antes de baixar.",
       },
-      { property: "og:title", content: "Monitora Live â€” cortes automÃ¡ticos de lives" },
+      { property: "og:title", content: "Monitora Live — cortes automáticos de lives" },
       {
         property: "og:description",
         content: "Acompanhe uma live do X e receba cortes prontos, com score e editor de recorte.",
@@ -61,14 +64,14 @@ function ScoreRing({ value }: { value: number }) {
           strokeDashoffset={c * (1 - value / 100)}
         />
       </svg>
-      <span className={`font-mono text-[11px] font-bold ${tone}`}>{value}</span>
+      <span className={`text-[12px] font-bold ${tone}`}>{value}</span>
     </span>
   );
 }
 
 function LivePage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<AppMode>("lote");
+  const [mode, setMode] = useState<AppMode>("external");
   const [libOpen, setLibOpen] = useState(false);
   const [cloudOpen, setCloudOpen] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -81,6 +84,9 @@ function LivePage() {
   const [info, setInfo] = useState<LiveCheck | null>(null);
   const [clips, setClips] = useState<LiveClip[]>([]);
   const [busy, setBusy] = useState(false);
+  const [user, setUser] = useState<CloudUser | null>(null);
+  const [posts, setPosts] = useState<ScheduledPost[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const detachRef = useRef<(() => void) | null>(null);
@@ -100,6 +106,35 @@ function LivePage() {
   }, []);
 
   useEffect(() => () => teardown(), [teardown]);
+
+  const refreshPosts = useCallback(async () => {
+    setLoadingPosts(true);
+    try {
+      const p = await listPosts();
+      setPosts(p);
+    } catch (e) {
+      console.error("Falha ao carregar posts na Live:", e);
+    } finally {
+      setLoadingPosts(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void currentUser().then(setUser);
+    return onAuth(setUser);
+  }, []);
+
+  useEffect(() => {
+    if (user) void refreshPosts();
+    else setPosts([]);
+  }, [user, refreshPosts]);
+
+  const postStats = useMemo(() => {
+    const total = posts.length;
+    const published = posts.filter((p) => p.status === "publicado").length;
+    const pending = posts.filter((p) => p.status === "agendado" || p.status === "processando").length;
+    return { total, published, pending };
+  }, [posts]);
 
   const onClipReady = useCallback(async (blob: Blob, at: number, duration: number) => {
     const analysis = await analyzeLiveClip(blob, duration);
@@ -129,7 +164,7 @@ function LivePage() {
 
   function editInCorteIA(selected: LiveClip[]) {
     if (!selected.length) {
-      toast.info("Nenhum corte atingiu o score atual. Reduza o score mÃ­nimo ou escolha um corte.");
+      toast.info("Nenhum corte atingiu o score atual. Reduza o score mínimo ou escolha um corte.");
       return;
     }
     sendItemsToTool(
@@ -143,9 +178,10 @@ function LivePage() {
         clip: clip.trim ?? { start: 0, end: clip.duration },
         score: clip.score,
         clipTitle: clip.title,
-        clipReason: clip.reason,
-        clipTags: clip.tags,
+        ...(clip.reason ? { clipReason: clip.reason } : {}),
+        ...(clip.tags ? { clipTags: clip.tags } : {}),
       })),
+
       "Monitora Live",
     );
     markPendingTool("clip");
@@ -162,7 +198,7 @@ function LivePage() {
       const capture = (video as HTMLVideoElement & { captureStream?: () => MediaStream })
         .captureStream;
       if (!capture) {
-        toast.error("Este navegador nÃ£o permite gravar a live (use Chrome ou Edge).");
+        toast.error("Este navegador não permite gravar a live (use Chrome ou Edge).");
         return;
       }
       const stream = capture.call(video);
@@ -184,7 +220,7 @@ function LivePage() {
     if (res.live && res.hls && !clipperRef.current && runningRef.current) {
       setStatus("ao-vivo");
       await startCapture(res.hls);
-      toast.success("Live encontrada â€” cortando automaticamente.");
+      toast.success("Live encontrada — cortando automaticamente.");
     } else if (!res.live) {
       setStatus(runningRef.current ? "procurando" : "parado");
     }
@@ -252,7 +288,8 @@ function LivePage() {
 
   return (
     <AppShell
-      mode={mode}
+      mode="lote"
+
       onMode={setMode}
       count={jobs.length}
       onLibrary={() => setLibOpen(true)}
@@ -264,12 +301,12 @@ function LivePage() {
             <h1 className="truncate font-display text-lg font-bold tracking-tight">
               Monitora Live
             </h1>
-            <p className="truncate font-mono text-[11px] text-muted-foreground">
+            <p className="truncate text-[12px] text-muted-foreground">
               cortes automaticos de X, Kick, TikTok e HLS
             </p>
           </div>
           <span
-            className={`rounded-full border px-3 py-1 font-mono text-[11px] ${statusChip[status]}`}
+            className={`rounded-full border px-3 py-1 text-[12px] ${statusChip[status]}`}
           >
             {status}
           </span>
@@ -284,12 +321,12 @@ function LivePage() {
               className="aspect-video w-full bg-black"
             />
             <div className="flex flex-wrap items-center gap-2 border-t border-border/70 px-4 py-3">
-              <span className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-2 text-[12px] text-muted-foreground">
                 <Radio className="size-3.5" />
                 {info?.title ??
                   (info?.handle
-                    ? `${info.platform === "kick" ? "Kick" : info.platform === "tiktok" ? "TikTok" : "X"} Â· @${info.handle}`
-                    : "aguardando transmissÃ£o")}
+                    ? `${info.platform === "kick" ? "Kick" : info.platform === "tiktok" ? "TikTok" : "X"} · @${info.handle}`
+                    : "aguardando transmissão")}
               </span>
               <button
                 onClick={() => clipperRef.current?.cutNow()}
@@ -311,7 +348,7 @@ function LivePage() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 className="font-display text-base font-bold">Cortes ({clips.length})</h2>
-                <p className="font-mono text-[11px] text-muted-foreground">
+                <p className="text-[12px] text-muted-foreground">
                   {recommendedClips.length} recomendado(s), ordenados por potencial
                 </p>
               </div>
@@ -363,9 +400,9 @@ function LivePage() {
                     <ScoreRing value={c.score} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{c.title}</p>
-                      <p className="font-mono text-[11px] text-muted-foreground">
-                        {fmt(c.at)} Â·{" "}
-                        {Math.round((c.trim?.end ?? c.duration) - (c.trim?.start ?? 0))}s Ãºteis
+                      <p className="text-[12px] text-muted-foreground">
+                        {fmt(c.at)} ·{" "}
+                        {Math.round((c.trim?.end ?? c.duration) - (c.trim?.start ?? 0))}s úteis
                       </p>
                     </div>
                   </div>
@@ -375,7 +412,7 @@ function LivePage() {
                       {c.tags.map((tag) => (
                         <span
                           key={tag}
-                          className="rounded-full border border-border px-2 py-0.5 font-mono text-[9px] text-muted-foreground"
+                          className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground"
                         >
                           {tag}
                         </span>
@@ -411,7 +448,7 @@ function LivePage() {
 
         <aside className="space-y-4">
           <div className="space-y-3 rounded-2xl border border-border bg-surface p-4">
-            <p className="mono-label">TransmissÃ£o</p>
+            <p className="mono-label">Transmissão</p>
             <input
               value={target}
               onChange={(e) => setTarget(e.target.value)}
@@ -419,7 +456,7 @@ function LivePage() {
               className="w-full rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary/50"
             />
             <label className="block text-sm">
-              <span className="mono-label">duraÃ§Ã£o do corte: {clipLen}s</span>
+              <span className="mono-label">duração do corte: {clipLen}s</span>
               <input
                 type="range"
                 min={15}
@@ -431,7 +468,7 @@ function LivePage() {
               />
             </label>
             <label className="block text-sm">
-              <span className="mono-label">score mÃ­nimo recomendado: {minScore}</span>
+              <span className="mono-label">score mínimo recomendado: {minScore}</span>
               <input
                 type="range"
                 min={40}
@@ -474,12 +511,52 @@ function LivePage() {
             )}
           </div>
 
+          <div className="space-y-3 rounded-2xl border border-border bg-surface p-4">
+            <div className="flex items-center justify-between">
+              <p className="mono-label">Publicações</p>
+              {loadingPosts && <Loader2 className="size-3 animate-spin text-muted-foreground" />}
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="rounded-xl border border-border bg-surface-2 p-2">
+                <span className="block text-lg font-bold text-primary">{postStats.published}</span>
+                <span className="text-[11px] uppercase text-muted-foreground">feitas</span>
+              </div>
+              <div className="rounded-xl border border-border bg-surface-2 p-2">
+                <span className="block text-lg font-bold text-amber-400">{postStats.pending}</span>
+                <span className="text-[11px] uppercase text-muted-foreground">aguardando</span>
+              </div>
+            </div>
+            
+            {posts.length > 0 ? (
+              <ul className="max-h-48 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {posts.slice(0, 10).map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-surface-2/50 px-2 py-1.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[11px] text-foreground">
+                        {new Date(p.scheduled_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    <span className={`shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[8px] uppercase ${
+                      p.status === 'publicado' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' :
+                      p.status === 'falhou' ? 'border-red-500/30 bg-red-500/10 text-red-400' :
+                      'border-amber-500/30 bg-amber-500/10 text-amber-400'
+                    }`}>
+                      {STATUS_LABEL[p.status] ?? p.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="py-2 text-center text-[11px] text-muted-foreground">nenhum agendamento</p>
+            )}
+          </div>
+
           <div className="rounded-2xl border border-border bg-surface p-4 text-sm text-muted-foreground">
             <p className="mono-label mb-2">como funciona</p>
             <ol className="list-decimal space-y-1 pl-4">
-              <li>O sistema procura live pÃºblica no X, Kick, TikTok ou HLS direto.</li>
-              <li>Ao encontrar, comeÃ§a a gravar e fecha um corte a cada {clipLen}s.</li>
-              <li>Fala, ruÃ­do, pausas, ritmo e comeÃ§o/fim limpos formam o score.</li>
+              <li>O sistema procura live pública no X, Kick, TikTok ou HLS direto.</li>
+              <li>Ao encontrar, começa a gravar e fecha um corte a cada {clipLen}s.</li>
+              <li>Fala, ruído, pausas, ritmo e começo/fim limpos formam o score.</li>
               <li>
                 Os melhores cortes seguem para o CorteIA, onde podem ser ajustados e exportados.
               </li>
@@ -510,5 +587,16 @@ function LivePage() {
         />
       )}
     </AppShell>
+  );
+}
+
+function GuardedLivePage() {
+  return (
+    <RequireAuth
+      title={"Monitora Live requer login"}
+      description={"Entre para monitorar lives e gerar cortes automáticos salvos na sua conta."}
+    >
+      <LivePage />
+    </RequireAuth>
   );
 }

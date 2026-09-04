@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   Scissors,
   Play,
@@ -12,9 +12,21 @@ import {
   Check,
   Flame,
   GripVertical,
+  Volume2,
+  VolumeX,
+  BarChart3,
+  Copy,
+  AudioLines,
+  Gauge,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatTime } from "@/lib/clips";
+import { formatTime, type ClipMetrics } from "@/lib/clips";
+import { analyzeAudio, unlockAudioOnGesture, type AudioHealth } from "@/lib/audio-health";
+import { ViralLibrary } from "@/components/ViralLibrary";
+import { toast } from "sonner";
+
+
 
 export interface ClipItem {
   id: string;
@@ -26,17 +38,32 @@ export interface ClipItem {
   clipTitle?: string | undefined;
   clipReason?: string | undefined;
   clipTags?: string[] | undefined;
+  /** detalhamento do score viral */
+  clipMetrics?: ClipMetrics | undefined;
+  /** hashtags sugeridas pela IA */
+  clipHashtags?: string[] | undefined;
+  /** padrão da Biblioteca Viral que combinou com o corte */
+  clipPattern?: { label: string; hook: string; reason: string } | undefined;
   status: "pendente" | "na fila" | "processando" | "pronto" | "erro";
   progress: number;
   blob?: Blob | undefined;
   ext?: string | undefined;
 }
 
+
 export interface ClipSettings {
   minLen: number;
   maxLen: number;
   max: number;
   minScore: number;
+  /** corta em cima da transcrição (frases completas) */
+  useTranscript: boolean;
+  /** remove silêncios dentro do próprio corte */
+  trimSilence: boolean;
+  /** zoom dinâmico ritmado pela fala */
+  dynamicZoom: boolean;
+  /** nicho da Biblioteca Viral que dá contexto ao score */
+  nicheId: string | null;
 }
 
 interface Props {
@@ -45,6 +72,8 @@ interface Props {
   settings: ClipSettings;
   onSettings: (patch: Partial<ClipSettings>) => void;
   clipBusy: boolean;
+  /** etapa atual da geração (transcrição, análise…) */
+  clipStage?: string | null | undefined;
   onGenerate: (item: ClipItem) => void;
   running: boolean;
   paused: boolean;
@@ -62,6 +91,8 @@ interface Props {
   onDownload: (item: ClipItem) => void;
   onZip: () => void;
   onSaveFolder: () => void;
+  /** nicho descoberto pela IA na última geração */
+  detectedNiche?: string | null | undefined;
 }
 
 const LENGTH_PRESETS = [
@@ -92,6 +123,129 @@ function ScoreBadge({ score }: { score: number }) {
   );
 }
 
+/**
+ * Cria a URL apenas dentro do efeito. Isso é importante no modo estrito do
+ * React: uma URL criada durante o render pode ser revogada pelo ciclo de
+ * verificação e continuar presa ao elemento de vídeo.
+ */
+function useMediaObjectUrl(file: File) {
+  const [url, setUrl] = useState("");
+
+  useEffect(() => {
+    const nextUrl = URL.createObjectURL(file);
+    setUrl(nextUrl);
+    return () => URL.revokeObjectURL(nextUrl);
+  }, [file]);
+
+  return url;
+}
+
+/* ---------- áudio compartilhado entre todos os players do CorteIA ---------- */
+
+const audioStore = {
+  volume: 1,
+  muted: false,
+  listeners: new Set<() => void>(),
+  snapshot: { volume: 1, muted: false },
+  emit() {
+    audioStore.snapshot = { volume: audioStore.volume, muted: audioStore.muted };
+    audioStore.listeners.forEach((l) => l());
+  },
+  set(volume: number, muted: boolean) {
+    audioStore.volume = Math.max(0, Math.min(1, volume));
+    audioStore.muted = muted;
+    audioStore.emit();
+  },
+  subscribe(l: () => void) {
+    audioStore.listeners.add(l);
+    return () => audioStore.listeners.delete(l);
+  },
+};
+
+/** Volume/mudo globais do estúdio — o áudio nasce ligado. */
+function useClipAudio() {
+  const state = useSyncExternalStore(
+    audioStore.subscribe,
+    () => audioStore.snapshot,
+    () => audioStore.snapshot,
+  );
+  return {
+    ...state,
+    setVolume: (v: number) => audioStore.set(v, v === 0 ? true : false),
+    toggleMuted: () => audioStore.set(audioStore.volume || 1, !audioStore.muted),
+  };
+}
+
+/** Só um vídeo toca por vez: evita sobreposição de áudio entre cortes. */
+let activeVideo: HTMLVideoElement | null = null;
+function claimPlayback(el: HTMLVideoElement) {
+  if (activeVideo && activeVideo !== el) activeVideo.pause();
+  activeVideo = el;
+}
+
+/** Navegadores bloqueiam autoplay com som: cai para mudo em vez de falhar. */
+async function playWithAudio(el: HTMLVideoElement) {
+  claimPlayback(el);
+  try {
+    await el.play();
+  } catch {
+    el.muted = true;
+    try {
+      await el.play();
+      toast.info("O navegador bloqueou o som — ele volta assim que você clicar na página.");
+      // religa o som sozinho no primeiro gesto do usuário
+      unlockAudioOnGesture(() => {
+        if (audioStore.muted) return;
+        el.muted = false;
+        el.volume = audioStore.volume;
+      });
+    } catch {
+      /* ignora */
+    }
+  }
+}
+
+
+
+function waitForMediaEvent(video: HTMLVideoElement, event: "loadedmetadata" | "loadeddata" | "seeked") {
+  return new Promise<void>((resolve, reject) => {
+    const done = () => {
+      cleanup();
+      resolve();
+    };
+    const failed = () => {
+      cleanup();
+      reject(video.error ?? new Error("Falha ao carregar a mídia"));
+    };
+    const cleanup = () => {
+      video.removeEventListener(event, done);
+      video.removeEventListener("error", failed);
+      window.clearTimeout(timer);
+    };
+    const timer = window.setTimeout(failed, 15000);
+    video.addEventListener(event, done, { once: true });
+    video.addEventListener("error", failed, { once: true });
+  });
+}
+
+async function prepareClipPlayback(video: HTMLVideoElement, start: number, end: number) {
+  if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
+    if (video.networkState === HTMLMediaElement.NETWORK_EMPTY) video.load();
+    await waitForMediaEvent(video, "loadedmetadata");
+  }
+
+  const mediaEnd = Number.isFinite(video.duration) ? video.duration : end;
+  const from = Math.max(0, Math.min(start, Math.max(0, mediaEnd - 0.05)));
+  if (!Number.isFinite(video.currentTime) || Math.abs(video.currentTime - from) > 0.15) {
+    video.currentTime = from;
+    await waitForMediaEvent(video, "seeked");
+  }
+
+  if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+    await waitForMediaEvent(video, "loadeddata");
+  }
+}
+
 function ClipCard({
   item,
   index,
@@ -115,13 +269,38 @@ function ClipCard({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
-  const url = useMemo(() => URL.createObjectURL(item.file), [item.file]);
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  const [showReport, setShowReport] = useState(false);
+  const [rate, setRate] = useState(1);
+  const [health, setHealth] = useState<AudioHealth | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const url = useMediaObjectUrl(item.file);
+  const audio = useClipAudio();
+
+  const checkAudio = useCallback(async () => {
+    if (analyzing) return;
+    setAnalyzing(true);
+    try {
+      const s = item.clip?.start ?? 0;
+      const e = item.clip?.end ?? item.duration;
+      setHealth(await analyzeAudio(item.file, { start: s, end: e }));
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [analyzing, item.clip, item.duration, item.file]);
 
   const start = item.clip?.start ?? 0;
   const end = item.clip?.end ?? item.duration;
 
-  const play = () => {
+  // mantém volume/mudo sincronizados com o controle global do estúdio
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.volume = audio.volume;
+    v.muted = audio.muted;
+    v.playbackRate = rate;
+  }, [audio.volume, audio.muted, url, rate]);
+
+  const play = async () => {
     const v = videoRef.current;
     if (!v) return;
     if (playing) {
@@ -129,29 +308,58 @@ function ClipCard({
       setPlaying(false);
       return;
     }
-    v.currentTime = start;
-    void v.play();
-    setPlaying(true);
+
+    try {
+      await prepareClipPlayback(v, start, end);
+      v.volume = audio.volume;
+      v.muted = audio.muted;
+      await playWithAudio(v);
+      setPlaying(true);
+    } catch (e) {
+      const err = e as Error;
+      if (err?.name === "AbortError") return;
+      console.error("Erro ao dar play no clipe:", err);
+      toast.error("Não foi possível reproduzir o vídeo.");
+      setPlaying(false);
+    }
   };
+
 
   const [pos, setPos] = useState(0);
   const len = Math.max(0.1, end - start);
 
+  /** clique/arraste na barra move o cabeçote dentro do corte */
+  const scrub = useCallback(
+    (clientX: number, el: HTMLElement) => {
+      const v = videoRef.current;
+      if (!v) return;
+      const r = el.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (clientX - r.left) / Math.max(1, r.width)));
+      v.currentTime = start + ratio * len;
+      setPos(ratio * len);
+    },
+    [start, len],
+  );
+
   return (
     <div
       onClick={onSelect}
-      className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-surface-2 transition ${
-        active ? "border-primary" : "border-border hover:border-primary/40"
+      className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-surface-2 transition-all duration-300 ${
+        active 
+          ? "border-primary shadow-[0_0_20px_-5px_rgba(34,197,94,0.3)] ring-1 ring-primary/50" 
+          : "border-border hover:border-primary/40 hover:shadow-lg"
       }`}
     >
       <div className="relative aspect-[9/16] bg-black">
         <video
           ref={videoRef}
-          src={url}
-          muted
+          src={url || undefined}
+          preload="metadata"
           playsInline
           poster={item.poster ?? undefined}
           className="size-full object-cover"
+          onPlay={(e) => claimPlayback(e.currentTarget)}
+          onPause={() => setPlaying(false)}
           onTimeUpdate={(e) => {
             const v = e.currentTarget;
             setPos(Math.max(0, Math.min(len, v.currentTime - start)));
@@ -163,6 +371,7 @@ function ClipCard({
             }
           }}
         />
+
 
         {/* faixa de título estilo capa de corte */}
         {item.clipTitle && (
@@ -201,40 +410,104 @@ function ClipCard({
 
         {/* score grande no canto, como no OpusClip */}
         {typeof item.score === "number" && (
-          <div className="absolute bottom-12 right-2 rounded-lg bg-primary px-2.5 py-1 text-lg font-extrabold leading-none text-primary-foreground shadow-lg">
-            {(item.score / 10).toFixed(1)}
+          <div className="absolute bottom-12 right-2 flex flex-col items-end gap-1 scale-90 sm:scale-100 origin-bottom-right">
+            <div className="flex items-baseline gap-0.5 rounded-lg bg-primary px-2.5 py-1 text-2xl font-black leading-none text-primary-foreground shadow-[0_4px_12px_rgba(34,197,94,0.4)] ring-1 ring-white/20">
+              {item.score}
+              <span className="text-[10px] opacity-80">/99</span>
+            </div>
+            <div className="rounded bg-black/70 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white/90 backdrop-blur-md border border-white/10">
+              Viral Score
+            </div>
           </div>
         )}
 
         <div className="absolute inset-x-0 bottom-0 space-y-1.5 bg-gradient-to-t from-black/90 to-transparent px-2 pb-2 pt-6">
-          <div className="h-1 overflow-hidden rounded-full bg-white/25">
-            <div
-              className="h-full bg-white"
-              style={{
-                width: `${(item.status === "processando" ? item.progress : pos / len) * 100}%`,
-              }}
-            />
+          <div
+            role="slider"
+            aria-label="linha do tempo do corte"
+            aria-valuemin={0}
+            aria-valuemax={Math.round(len)}
+            aria-valuenow={Math.round(pos)}
+            tabIndex={0}
+            onClick={(e) => {
+              e.stopPropagation();
+              scrub(e.clientX, e.currentTarget);
+            }}
+            onPointerMove={(e) => {
+              if (e.buttons === 1) scrub(e.clientX, e.currentTarget);
+            }}
+            className="group/bar -my-1 cursor-pointer py-1"
+          >
+            <div className="h-1 overflow-hidden rounded-full bg-white/25 transition-all group-hover/bar:h-1.5">
+              <div
+                className="h-full bg-white"
+                style={{
+                  width: `${(item.status === "processando" ? item.progress : pos / len) * 100}%`,
+                }}
+              />
+            </div>
           </div>
           <div className="flex items-center justify-between gap-2">
             <p className="font-mono text-[10px] text-white/85">
               {formatTime(pos)} / {formatTime(len)}
             </p>
-            <p
-              className={`font-mono text-[10px] ${
-                item.status === "pronto"
-                  ? "text-primary"
-                  : item.status === "erro"
-                    ? "text-destructive"
-                    : item.status === "processando"
-                      ? "text-warn"
-                      : "text-white/60"
-              }`}
-            >
-              ● {item.status}
-              {item.status === "processando" ? ` ${Math.round(item.progress * 100)}%` : ""}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  audio.toggleMuted();
+                }}
+                title={audio.muted ? "ativar som" : "silenciar"}
+                aria-label={audio.muted ? "ativar som" : "silenciar"}
+                className="text-white/80 hover:text-white"
+              >
+                {audio.muted ? <VolumeX className="size-3.5" /> : <Volume2 className="size-3.5" />}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={audio.muted ? 0 : audio.volume}
+                aria-label="volume"
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => audio.setVolume(Number(e.target.value))}
+                className="h-1 w-12 accent-primary"
+              />
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const steps = [1, 1.25, 1.5, 2, 0.5];
+                  const next = steps[(steps.indexOf(rate) + 1) % steps.length] ?? 1;
+                  setRate(next);
+                  const v = videoRef.current;
+                  if (v) v.playbackRate = next;
+                }}
+                title="velocidade de reprodução"
+                aria-label="velocidade de reprodução"
+                className="flex items-center gap-0.5 font-mono text-[10px] text-white/80 hover:text-white"
+              >
+                <Gauge className="size-3" />
+                {rate}x
+              </button>
+              <p
+                className={`font-mono text-[10px] ${
+                  item.status === "pronto"
+                    ? "text-primary"
+                    : item.status === "erro"
+                      ? "text-destructive"
+                      : item.status === "processando"
+                        ? "text-warn"
+                        : "text-white/60"
+                }`}
+              >
+                ● {item.status}
+                {item.status === "processando" ? ` ${Math.round(item.progress * 100)}%` : ""}
+              </p>
+            </div>
           </div>
         </div>
+
       </div>
 
       {/* barra de ações */}
@@ -275,20 +548,22 @@ function ClipCard({
       </div>
 
       {/* título + descrição + baixar, no modelo da referência */}
-      <div className="flex flex-1 flex-col gap-2 p-3">
+      <div className="flex flex-1 flex-col gap-2 p-4">
         <div className="flex items-start justify-between gap-2">
-          <p className="line-clamp-2 text-sm font-semibold leading-snug">
+          <p className="line-clamp-2 text-sm font-bold leading-tight tracking-tight text-foreground">
             {item.clipTitle?.replace(/ · #\d+$/, "") ?? item.file.name}
           </p>
           {typeof item.score === "number" && <ScoreBadge score={item.score} />}
         </div>
         {item.clipReason && (
-          <p
-            className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground"
-            title={item.clipReason}
-          >
-            {item.clipReason}
-          </p>
+          <div className="relative rounded-lg bg-surface-3/50 p-2 border border-border/40">
+            <p
+              className="line-clamp-3 text-[11px] leading-relaxed text-muted-foreground italic"
+              title={item.clipReason}
+            >
+              "{item.clipReason}"
+            </p>
+          </div>
         )}
         {item.clipTags && item.clipTags.length > 0 && (
           <div className="flex flex-wrap gap-1">
@@ -302,6 +577,115 @@ function ClipCard({
             ))}
           </div>
         )}
+
+        {item.clipPattern && (
+          <p className="rounded-lg border border-primary/30 bg-primary/5 p-2 font-mono text-[10px] leading-snug text-muted-foreground">
+            <Sparkles className="mr-1 inline size-3 text-primary" />
+            biblioteca viral · {item.clipPattern.reason}
+            <span className="mt-1 block text-foreground/80">gancho: {item.clipPattern.hook}</span>
+          </p>
+        )}
+
+        {(item.clipMetrics || item.clipHashtags?.length) && (
+          <div className="rounded-lg border border-border/40 bg-surface-3/40">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowReport((s) => !s);
+              }}
+              className="flex w-full items-center gap-1.5 px-2 py-1.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              <BarChart3 className="size-3" />
+              {showReport ? "ocultar relatório viral" : "relatório do viral score"}
+            </button>
+            {showReport && (
+              <div className="space-y-1.5 border-t border-border/40 p-2">
+                <div className="flex items-center gap-2 pb-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void checkAudio();
+                    }}
+                    className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground hover:border-primary hover:text-foreground"
+                  >
+                    <AudioLines className="size-3" />
+                    {analyzing ? "analisando áudio…" : "analisar áudio"}
+                  </button>
+                  {health && (
+                    <span
+                      className={`font-mono text-[9px] ${
+                        health.hasAudio ? "text-primary" : "text-destructive"
+                      }`}
+                    >
+                      {health.hasAudio
+                        ? `${health.dbfs.toFixed(1)} dBFS · silêncio ${Math.round(health.silenceRatio * 100)}% · nota ${Math.round(health.score * 100)}`
+                        : "sem áudio"}
+                    </span>
+                  )}
+                </div>
+                {health?.issues.length ? (
+                  <ul className="space-y-0.5 pb-1">
+                    {health.issues.map((i) => (
+                      <li key={i} className="font-mono text-[9px] text-warn">
+                        • {i}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {item.clipMetrics &&
+                  (
+                    [
+                      ["Gancho", item.clipMetrics.hook],
+                      ["Densidade de fala", item.clipMetrics.density],
+                      ["Ritmo", item.clipMetrics.cadence],
+                      ["Clareza do áudio", item.clipMetrics.clarity],
+                      ["Movimento", item.clipMetrics.motion],
+                      ["Corte limpo", item.clipMetrics.edgeQuality],
+                      ["Retenção estimada", item.clipMetrics.retention],
+                    ] as const
+                  ).map(([label, value]) => (
+                    <div key={label} className="flex items-center gap-2">
+                      <span className="w-28 shrink-0 font-mono text-[9px] text-muted-foreground">
+                        {label}
+                      </span>
+                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-surface-2">
+                        <div
+                          className="h-full bg-primary"
+                          style={{ width: `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="w-7 text-right font-mono text-[9px] text-muted-foreground">
+                        {Math.round(Math.max(0, Math.min(1, value)) * 100)}
+                      </span>
+                    </div>
+                  ))}
+                {item.clipHashtags && item.clipHashtags.length > 0 && (
+                  <div className="flex items-center gap-1.5 pt-1">
+                    <p className="flex-1 font-mono text-[10px] text-primary">
+                      {item.clipHashtags.join(" ")}
+                    </p>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void navigator.clipboard
+                          .writeText(
+                            `${item.clipTitle?.replace(/ · #\d+$/, "") ?? ""}\n${item.clipHashtags?.join(" ") ?? ""}`.trim(),
+                          )
+                          .then(() => toast.success("Título e hashtags copiados"))
+                          .catch(() => toast.error("Não foi possível copiar"));
+                      }}
+                      className="rounded p-1 text-muted-foreground hover:text-foreground"
+                      title="copiar título e hashtags"
+                    >
+                      <Copy className="size-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="mt-auto space-y-1 pt-1">
           <Button
             className="w-full"
@@ -355,13 +739,21 @@ function SelectedClip({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
-  const url = useMemo(() => URL.createObjectURL(item.file), [item.file]);
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  const url = useMediaObjectUrl(item.file);
+  const audio = useClipAudio();
 
   const start = item.clip?.start ?? 0;
   const end = item.clip?.end ?? item.duration;
 
-  const toggle = () => {
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.volume = audio.volume;
+    v.muted = audio.muted;
+  }, [audio.volume, audio.muted, url]);
+
+
+  const toggle = async () => {
     const v = videoRef.current;
     if (!v) return;
     if (playing) {
@@ -369,9 +761,17 @@ function SelectedClip({
       setPlaying(false);
       return;
     }
-    if (v.currentTime < start || v.currentTime >= end) v.currentTime = start;
-    void v.play();
-    setPlaying(true);
+    try {
+      await prepareClipPlayback(v, start, end);
+      await playWithAudio(v);
+
+      setPlaying(true);
+    } catch (error) {
+      if ((error as Error)?.name === "AbortError") return;
+      console.error("Erro ao reproduzir clipe selecionado:", error);
+      toast.error("Não foi possível reproduzir o vídeo.");
+      setPlaying(false);
+    }
   };
 
   return (
@@ -382,10 +782,10 @@ function SelectedClip({
       onDrop={onDrop}
       onDragEnd={onDragEnd}
       onClick={onSelect}
-      className={`group relative w-36 shrink-0 cursor-move overflow-hidden rounded-lg border bg-surface-2 transition ${
-        active ? "border-primary" : "border-border hover:border-primary/40"
-      } ${dragging ? "opacity-40" : "opacity-100"} ${
-        dragOver ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""
+      className={`group relative w-40 shrink-0 cursor-move overflow-hidden rounded-xl border bg-surface-2 transition-all duration-300 ${
+        active ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-primary/40"
+      } ${dragging ? "opacity-30 scale-95" : "opacity-100"} ${
+        dragOver ? "ring-2 ring-primary ring-offset-4 ring-offset-background translate-x-1" : ""
       }`}
     >
       <div className="absolute left-0 top-0 z-10 rounded-br-md bg-background/80 p-1 backdrop-blur">
@@ -394,11 +794,14 @@ function SelectedClip({
       <div className="relative aspect-[9/16] bg-black">
         <video
           ref={videoRef}
-          src={url}
-          muted
+          src={url || undefined}
+          preload="metadata"
           playsInline
           poster={item.poster ?? undefined}
           className="size-full object-cover"
+          onPlay={(e) => claimPlayback(e.currentTarget)}
+          onPause={() => setPlaying(false)}
+
           onTimeUpdate={(e) => {
             const v = e.currentTarget;
             if (v.currentTime >= end) {
@@ -459,6 +862,7 @@ export function ClipStudio(props: Props) {
     clips,
     settings,
     onSettings,
+    clipStage,
     clipBusy,
     onGenerate,
     running,
@@ -477,6 +881,7 @@ export function ClipStudio(props: Props) {
     onDownload,
     onZip,
     onSaveFolder,
+    detectedNiche,
   } = props;
 
   const [advanced, setAdvanced] = useState(false);
@@ -532,6 +937,11 @@ export function ClipStudio(props: Props) {
           </div>
         </div>
 
+        {clipBusy && clipStage && (
+          <p className="mt-2 font-mono text-[11px] text-primary">{clipStage}</p>
+        )}
+
+
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <span className="mono-label mr-1">duração do clipe</span>
           {LENGTH_PRESETS.map((p) => (
@@ -550,7 +960,9 @@ export function ClipStudio(props: Props) {
         </div>
 
         {advanced && (
-          <div className="mt-4 grid gap-3 rounded-xl border border-border bg-surface-2 p-4 sm:grid-cols-2">
+          <div className="mt-4 space-y-3">
+          <div className="grid gap-3 rounded-xl border border-border bg-surface-2 p-4 sm:grid-cols-2">
+
             <label className="font-mono text-[11px] text-muted-foreground">
               duração mínima · {settings.minLen}s
               <input
@@ -612,8 +1024,72 @@ export function ClipStudio(props: Props) {
               </span>
             </label>
           </div>
+
+          <div className="grid gap-2 sm:grid-cols-3">
+            {(
+              [
+                {
+                  key: "useTranscript" as const,
+                  label: "Cortar pela fala (IA)",
+                  hint: "usa a transcrição para começar e terminar em frases completas",
+                },
+                {
+                  key: "trimSilence" as const,
+                  label: "Remover silêncios",
+                  hint: "acelera o ritmo tirando as pausas dentro do corte",
+                },
+                {
+                  key: "dynamicZoom" as const,
+                  label: "Zoom dinâmico",
+                  hint: "punch-in a cada nova frase, estilo OpusClip",
+                },
+              ]
+            ).map((t) => {
+              const on = settings[t.key];
+              const disabled = t.key !== "useTranscript" && !settings.useTranscript;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onSettings({ [t.key]: !on } as Partial<ClipSettings>)}
+                  className={`rounded-lg border p-3 text-left transition disabled:opacity-40 ${
+                    on && !disabled
+                      ? "border-primary/60 bg-primary/10"
+                      : "border-border/60 hover:border-border"
+                  }`}
+                >
+                  <span className="flex items-center gap-2 text-xs font-semibold">
+                    <span
+                      className={`h-2 w-2 rounded-full ${on && !disabled ? "bg-primary" : "bg-muted-foreground/40"}`}
+                    />
+                    {t.label}
+                  </span>
+                  <span className="mt-1 block font-mono text-[10px] leading-snug opacity-70">
+                    {t.hint}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          </div>
         )}
+
       </section>
+
+      <ViralLibrary
+        nicheId={settings.nicheId}
+        detectedId={detectedNiche}
+        onNiche={(id) => onSettings({ nicheId: id })}
+        onUsePattern={(p) => {
+          const min = Math.max(5, Math.round(p.seconds * 0.7));
+          const max = Math.max(min + 5, Math.round(p.seconds * 1.25));
+          onSettings({ minLen: min, maxLen: max });
+          toast.success(`Padrão aplicado · ${p.nicheLabel} (~${p.seconds}s)`);
+        }}
+      />
+
+
 
       {clips.length > 0 && (
         <section className="panel space-y-4 p-5">
@@ -664,14 +1140,17 @@ export function ClipStudio(props: Props) {
           </div>
 
           {validPicked.length > 0 && (
-            <div className="rounded-xl border border-border bg-surface-2 p-3">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="mono-label">selecionados para exportar · {validPicked.length}</p>
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 shadow-inner">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="size-2 rounded-full bg-primary animate-pulse" />
+                  <p className="mono-label text-primary font-bold">Fila de Sequenciamento · {validPicked.length} clipes</p>
+                </div>
                 <button
-                  className="font-mono text-[11px] text-muted-foreground hover:text-foreground"
+                  className="rounded-full bg-surface-3 px-3 py-1 font-mono text-[10px] text-muted-foreground hover:bg-destructive hover:text-white transition-colors"
                   onClick={() => setPicked([])}
                 >
-                  limpar
+                  limpar fila
                 </button>
               </div>
               <div className="flex gap-2 overflow-x-auto pb-1">

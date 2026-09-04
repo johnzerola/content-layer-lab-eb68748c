@@ -18,6 +18,7 @@ import { CloudPanel } from "@/components/CloudPanel";
 import { listJobs } from "@/lib/jobs";
 
 export const Route = createFileRoute("/armazenamento")({
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Armazenamento e versões de templates — VaiViral" },
@@ -45,7 +46,7 @@ const fmt = (ts?: number) =>
 const LIMIT = 5 * 1024 * 1024; // quota típica do localStorage
 
 function StoragePage() {
-  const [mode, setMode] = useState<AppMode>("lote");
+  const [mode, setMode] = useState<AppMode>("external");
   const [libOpen, setLibOpen] = useState(false);
   const [cloudOpen, setCloudOpen] = useState(false);
   const jobs = listJobs();
@@ -115,7 +116,8 @@ function StoragePage() {
 
   return (
     <AppShell
-      mode={mode}
+      mode="lote"
+
       onMode={setMode}
       count={jobs.length}
       onLibrary={() => setLibOpen(true)}
@@ -131,7 +133,7 @@ function StoragePage() {
               Selecione e apague versões antigas para não estourar o limite do navegador.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={refresh}>
               <RotateCcw className="size-4" /> Atualizar
             </Button>
@@ -165,7 +167,7 @@ function StoragePage() {
               style={{ width: `${pct}%` }}
             />
           </div>
-          <div className="mt-3 grid gap-2 font-mono text-[11px] text-muted-foreground sm:grid-cols-4">
+          <div className="mt-3 grid gap-2 text-[12px] text-muted-foreground sm:grid-cols-4">
             <span>
               total: {kb(usage.total)} ({pct}%)
             </span>
@@ -188,17 +190,17 @@ function StoragePage() {
                     <p className="truncate text-sm font-semibold">
                       {g.name}
                       {g.orphan && (
-                        <span className="ml-2 font-mono text-[10px] text-muted-foreground">
+                        <span className="ml-2 text-[11px] text-muted-foreground">
                           órfão
                         </span>
                       )}
                     </p>
-                    <p className="font-mono text-[11px] text-muted-foreground">
+                    <p className="text-[12px] text-muted-foreground">
                       {g.versions.length} versões · {kb(g.bytes)}
                     </p>
                   </div>
                   <button
-                    className="rounded-md border border-border px-2 py-1 font-mono text-[11px] hover:border-primary"
+                    className="rounded-md border border-border px-2 py-1 text-[12px] hover:border-primary"
                     onClick={() => toggleGroup(g.id, g.versions)}
                   >
                     selecionar tudo
@@ -218,11 +220,11 @@ function StoragePage() {
                         onChange={() => toggle(g.id, v.version)}
                         aria-label={`Selecionar versão ${v.version}`}
                       />
-                      <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
+                      <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
                         v{v.version} · {fmt(v.savedAt)}
                         {v.note ? ` · ${v.note}` : ""}
                       </span>
-                      <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                      <span className="shrink-0 text-[11px] text-muted-foreground">
                         {kb(JSON.stringify(v).length * 2)}
                       </span>
                       <button

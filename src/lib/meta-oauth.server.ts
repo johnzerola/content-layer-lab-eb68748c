@@ -1,0 +1,314 @@
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { metaGraphBase } from "@/lib/meta.server";
+import { MetaLinkError, normalizeInstagramHandle } from "@/lib/social-linking.server";
+
+const OAUTH_TTL_MS = 10 * 60 * 1000;
+const INSTAGRAM_AUTH_URL = "https://api.instagram.com/oauth/authorize";
+const INSTAGRAM_TOKEN_URL = "https://api.instagram.com/oauth/access_token";
+const INSTAGRAM_LONG_TOKEN_URL = "https://graph.instagram.com/access_token";
+const INSTAGRAM_REFRESH_TOKEN_URL = "https://graph.instagram.com/refresh_access_token";
+export const INSTAGRAM_SCOPES = [
+  "instagram_business_basic",
+  "instagram_business_content_publish",
+];
+
+type OAuthConfiguration = {
+  appId: string;
+  appSecret: string;
+  redirectUri: string;
+};
+
+type OAuthState = {
+  userId: string;
+  expiresAt: number;
+  nonce: string;
+};
+
+function base64Url(value: string | Buffer): string {
+  return Buffer.from(value).toString("base64url");
+}
+
+function callbackFromEnvironment(environment: NodeJS.ProcessEnv): string {
+  const explicitRedirect =
+    environment["INSTAGRAM_REDIRECT_URI"]?.trim() ||
+    environment["META_INSTAGRAM_REDIRECT_URI"]?.trim() ||
+    environment["META_REDIRECT_URI"]?.trim().replace(
+      "/integracoes/facebook/callback",
+      "/integracoes/instagram/callback",
+    );
+  const siteUrl = environment["PUBLIC_SITE_URL"]?.trim().replace(/\/$/, "");
+  return explicitRedirect || (siteUrl ? `${siteUrl}/integracoes/instagram/callback` : "");
+}
+
+function oauthConfiguration(environment: NodeJS.ProcessEnv = process.env): OAuthConfiguration {
+  const appId = environment["INSTAGRAM_APP_ID"]?.trim();
+  const appSecret = environment["INSTAGRAM_APP_SECRET"]?.trim();
+  const redirectUri = callbackFromEnvironment(environment);
+
+  if (!appId || !appSecret || !redirectUri) {
+    throw new MetaLinkError(
+      "SERVER_CONFIG_MISSING",
+      "O login do Instagram ainda não está configurado. Defina INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET e INSTAGRAM_REDIRECT_URI no servidor.",
+    );
+  }
+  return { appId, appSecret, redirectUri };
+}
+
+export type InstagramConfigCheck = {
+  appId: string | null;
+  authEndpoint: string;
+  redirectUri: string | null;
+  siteUrl: string | null;
+  requiredScopes: string[];
+  authorizationUrl: string | null;
+  issues: string[];
+};
+
+export function instagramConfigChecklist(
+  environment: NodeJS.ProcessEnv = process.env,
+): InstagramConfigCheck {
+  const issues: string[] = [];
+  const appId = environment["INSTAGRAM_APP_ID"]?.trim() ?? null;
+  const appSecret = environment["INSTAGRAM_APP_SECRET"]?.trim() ?? null;
+  const redirectUri = callbackFromEnvironment(environment) || null;
+  const siteUrl = environment["PUBLIC_SITE_URL"]?.trim().replace(/\/$/, "") ?? null;
+
+  if (!appId) issues.push("INSTAGRAM_APP_ID não está definido no Lovable.");
+  else if (!/^\d+$/.test(appId)) issues.push("INSTAGRAM_APP_ID deve conter apenas números.");
+  if (!appSecret) issues.push("INSTAGRAM_APP_SECRET não está definido no Lovable.");
+  if (!redirectUri) {
+    issues.push("Defina INSTAGRAM_REDIRECT_URI ou PUBLIC_SITE_URL no Lovable.");
+  } else {
+    try {
+      const callback = new URL(redirectUri);
+      if (callback.protocol !== "https:") issues.push("INSTAGRAM_REDIRECT_URI precisa usar HTTPS.");
+      if (callback.pathname !== "/integracoes/instagram/callback") {
+        issues.push("INSTAGRAM_REDIRECT_URI precisa terminar em /integracoes/instagram/callback.");
+      }
+      if (callback.search || callback.hash) {
+        issues.push("INSTAGRAM_REDIRECT_URI não pode ter query string nem hash.");
+      }
+      if (siteUrl && callback.origin !== siteUrl) {
+        issues.push(
+          `INSTAGRAM_REDIRECT_URI (${callback.origin}) não bate com PUBLIC_SITE_URL (${siteUrl}).`,
+        );
+      }
+    } catch {
+      issues.push("INSTAGRAM_REDIRECT_URI é inválida.");
+    }
+  }
+
+  let authorizationUrl: string | null = null;
+  if (issues.length === 0) {
+    try {
+      const preview = new URL(instagramAuthorizationUrl("diagnostico", environment));
+      preview.searchParams.set("state", "<gerado por usuário>");
+      authorizationUrl = preview.toString();
+    } catch {
+      authorizationUrl = null;
+    }
+  }
+
+  return {
+    appId,
+    authEndpoint: INSTAGRAM_AUTH_URL,
+    redirectUri,
+    siteUrl,
+    requiredScopes: [...INSTAGRAM_SCOPES],
+    authorizationUrl,
+    issues,
+  };
+}
+
+function signState(payload: string, secret: string): string {
+  return createHmac("sha256", secret).update(payload).digest("base64url");
+}
+
+export function createInstagramOAuthState(
+  userId: string,
+  environment: NodeJS.ProcessEnv = process.env,
+  now = Date.now(),
+): string {
+  const { appSecret } = oauthConfiguration(environment);
+  const payload = base64Url(
+    JSON.stringify({
+      userId,
+      expiresAt: now + OAUTH_TTL_MS,
+      nonce: randomBytes(24).toString("base64url"),
+    } satisfies OAuthState),
+  );
+  return `${payload}.${signState(payload, appSecret)}`;
+}
+
+export function verifyInstagramOAuthState(
+  state: string,
+  userId: string,
+  environment: NodeJS.ProcessEnv = process.env,
+  now = Date.now(),
+): void {
+  const { appSecret } = oauthConfiguration(environment);
+  const [payload, receivedSignature, extra] = state.split(".");
+  if (!payload || !receivedSignature || extra) {
+    throw new MetaLinkError("META_AUTH_INVALID", "A autorização do Instagram é inválida.");
+  }
+
+  const expectedSignature = signState(payload, appSecret);
+  const received = Buffer.from(receivedSignature);
+  const expected = Buffer.from(expectedSignature);
+  if (received.length !== expected.length || !timingSafeEqual(received, expected)) {
+    throw new MetaLinkError("META_AUTH_INVALID", "A autorização do Instagram é inválida.");
+  }
+
+  let decoded: OAuthState;
+  try {
+    decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as OAuthState;
+  } catch {
+    throw new MetaLinkError("META_AUTH_INVALID", "A autorização do Instagram é inválida.");
+  }
+  if (decoded.userId !== userId || decoded.expiresAt < now || !decoded.nonce) {
+    throw new MetaLinkError("META_AUTH_INVALID", "A autorização do Instagram expirou.");
+  }
+}
+
+export function instagramAuthorizationUrl(
+  userId: string,
+  environment: NodeJS.ProcessEnv = process.env,
+): string {
+  const configuration = oauthConfiguration(environment);
+  const url = new URL(INSTAGRAM_AUTH_URL);
+  url.searchParams.set("enable_fb_login", "0");
+  url.searchParams.set("force_authentication", "1");
+  url.searchParams.set("client_id", configuration.appId);
+  url.searchParams.set("redirect_uri", configuration.redirectUri);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("scope", INSTAGRAM_SCOPES.join(","));
+  url.searchParams.set("state", createInstagramOAuthState(userId, environment));
+  return url.toString();
+}
+
+export async function exchangeInstagramAuthorizationCode(input: {
+  code: string;
+  environment?: NodeJS.ProcessEnv;
+  fetch?: typeof fetch;
+}): Promise<{ accessToken: string; userId: string }> {
+  const environment = input.environment ?? process.env;
+  const configuration = oauthConfiguration(environment);
+  const request = input.fetch ?? fetch;
+  const body = new URLSearchParams({
+    client_id: configuration.appId,
+    client_secret: configuration.appSecret,
+    grant_type: "authorization_code",
+    redirect_uri: configuration.redirectUri,
+    code: input.code.replace(/#_$/, ""),
+  });
+  const response = await request(INSTAGRAM_TOKEN_URL, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body,
+  }).catch(() => null);
+
+  if (!response || response.status >= 500 || response.status === 429) {
+    throw new MetaLinkError(
+      "META_TEMPORARY_ERROR",
+      "A Meta está temporariamente indisponível. Tente novamente.",
+    );
+  }
+  if (!response.ok) {
+    throw new MetaLinkError("META_AUTH_INVALID", "O login do Instagram não pôde ser concluído.");
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  const object = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : null;
+  const accessToken =
+    object && "access_token" in object && typeof object.access_token === "string"
+      ? object.access_token
+      : null;
+  const userId =
+    object && "user_id" in object && (typeof object.user_id === "string" || typeof object.user_id === "number")
+      ? String(object.user_id)
+      : null;
+  if (!accessToken || !userId) {
+    throw new MetaLinkError("META_RESPONSE_INVALID", "A Meta retornou uma resposta inválida.");
+  }
+  return { accessToken, userId };
+}
+
+export async function fetchOAuthInstagramIdentity(input: {
+  accessToken: string;
+  environment?: NodeJS.ProcessEnv;
+  fetch?: typeof fetch;
+}): Promise<{ id: string; username: string }> {
+  const request = input.fetch ?? fetch;
+  const response = await request(
+    `${metaGraphBase(input.environment)}/me?fields=id,username`,
+    { headers: { authorization: `Bearer ${input.accessToken}` } },
+  ).catch(() => null);
+  if (!response || response.status >= 500 || response.status === 429) {
+    throw new MetaLinkError("META_TEMPORARY_ERROR", "A Meta está temporariamente indisponível.");
+  }
+  if (!response.ok) {
+    throw new MetaLinkError("META_AUTH_INVALID", "A autorização do Instagram é inválida.");
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  const object = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : null;
+  const id = object && "id" in object && typeof object.id === "string" ? object.id : null;
+  const username = object && "username" in object && typeof object.username === "string"
+    ? object.username
+    : null;
+  if (!id || !username) {
+    throw new MetaLinkError("META_RESPONSE_INVALID", "A Meta retornou uma resposta inválida.");
+  }
+  return { id, username: normalizeInstagramHandle(username) };
+}
+
+type InstagramLongLivedToken = { accessToken: string; expiresAt: Date };
+
+async function readLongLivedTokenResponse(
+  response: Response | null,
+  now: number,
+): Promise<InstagramLongLivedToken> {
+  if (!response || response.status >= 500 || response.status === 429) {
+    throw new MetaLinkError("META_TEMPORARY_ERROR", "A Meta está temporariamente indisponível.");
+  }
+  if (!response.ok) {
+    throw new MetaLinkError("META_AUTH_INVALID", "A autorização do Instagram é inválida.");
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  const object = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : null;
+  const accessToken = object && "access_token" in object && typeof object.access_token === "string"
+    ? object.access_token
+    : null;
+  const expiresIn = object && "expires_in" in object && typeof object.expires_in === "number"
+    ? object.expires_in
+    : null;
+  if (!accessToken || !expiresIn || expiresIn <= 0) {
+    throw new MetaLinkError("META_RESPONSE_INVALID", "A Meta retornou uma resposta inválida.");
+  }
+  return { accessToken, expiresAt: new Date(now + expiresIn * 1000) };
+}
+
+export async function exchangeLongLivedInstagramToken(input: {
+  accessToken: string;
+  environment?: NodeJS.ProcessEnv;
+  fetch?: typeof fetch;
+  now?: number;
+}): Promise<InstagramLongLivedToken> {
+  const configuration = oauthConfiguration(input.environment ?? process.env);
+  const url = new URL(INSTAGRAM_LONG_TOKEN_URL);
+  url.searchParams.set("grant_type", "ig_exchange_token");
+  url.searchParams.set("client_secret", configuration.appSecret);
+  url.searchParams.set("access_token", input.accessToken);
+  const response = await (input.fetch ?? fetch)(url, { method: "GET" }).catch(() => null);
+  return readLongLivedTokenResponse(response, input.now ?? Date.now());
+}
+
+export async function refreshLongLivedInstagramToken(input: {
+  accessToken: string;
+  fetch?: typeof fetch;
+  now?: number;
+}): Promise<InstagramLongLivedToken> {
+  const url = new URL(INSTAGRAM_REFRESH_TOKEN_URL);
+  url.searchParams.set("grant_type", "ig_refresh_token");
+  url.searchParams.set("access_token", input.accessToken);
+  const response = await (input.fetch ?? fetch)(url, { method: "GET" }).catch(() => null);
+  return readLongLivedTokenResponse(response, input.now ?? Date.now());
+}

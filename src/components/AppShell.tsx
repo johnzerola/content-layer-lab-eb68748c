@@ -1,7 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Layers,
+  Palette,
+  KeyRound,
+  FolderKanban,
   Scissors,
   Eraser,
   Library,
@@ -16,9 +19,23 @@ import {
   HardDrive,
   Radio,
   Settings2,
+  BarChart3,
+  Shield,
+  Images,
+  Users,
+  Menu,
+  X,
 } from "lucide-react";
 
-export type AppMode = "lote" | "clip" | "limpar" | "limpar-ia";
+import { TooltipProvider } from "@/components/ui/base";
+import { PlanGate } from "@/components/PlanGate";
+import { GlobalActionBar } from "@/components/GlobalActionBar";
+import { ProcessSteps } from "@/components/ProcessSteps";
+import { useAccess } from "@/lib/subscription";
+import { planFromId } from "@/lib/plan";
+import { markPendingShellMode, type ShellMode } from "@/lib/handoff";
+
+export type AppMode = "lote" | "clip" | "limpar" | "limpar-ia" | "external";
 
 type ModeDef = {
   id: AppMode;
@@ -30,6 +47,8 @@ type ModeDef = {
   mark: string;
   tagline: string;
   headline: string;
+  /** palavra de destaque em serifa itálica, ao fim do título */
+  accent: string;
   description: string;
   chips: string[];
   icon: typeof Layers;
@@ -44,7 +63,8 @@ const MODES: ModeDef[] = [
     brand: "ViralBatch",
     mark: "VB",
     tagline: "branding em massa",
-    headline: "Um template, centenas de vídeos prontos",
+    headline: "Um template, centenas de vídeos",
+    accent: "prontos",
     description:
       "Monte o layout uma vez — avatar, nome, headline, CTA e marca d'água — e aplique em todo o lote com variações antiduplicidade.",
     chips: ["editor de template", "variações 3–5x", "branding automático", "ZIP por plataforma"],
@@ -58,7 +78,8 @@ const MODES: ModeDef[] = [
     brand: "CorteIA",
     mark: "CI",
     tagline: "clipagem inteligente",
-    headline: "Ache os melhores momentos sozinho",
+    headline: "Ache os melhores momentos",
+    accent: "sozinho",
     description:
       "A IA lê energia de fala e movimento, pontua cada trecho e devolve os cortes prontos — sem template, sem branding, só o vídeo limpo no formato vertical.",
     chips: ["score viral", "duração min/máx", "reordenar cortes", "export direto"],
@@ -72,7 +93,8 @@ const MODES: ModeDef[] = [
     brand: "LimpaVídeo",
     mark: "LV",
     tagline: "restauração de quadro",
-    headline: "Apague textos e marcas d'água",
+    headline: "Apague textos e",
+    accent: "marcas d'água",
     description:
       "Detecção automática das áreas fixas + reconstrução por inpainting (Telea) para tirar texto e logo sem borrão, mantendo o enquadramento original.",
     chips: ["detecção automática", "inpainting HQ", "antes / depois", "sem zoom"],
@@ -86,14 +108,56 @@ const MODES: ModeDef[] = [
     brand: "CleanerIA",
     mark: "CI",
     tagline: "inpainting profissional",
-    headline: "Remoção Profissional com ProPainter",
+    headline: "Remoção profissional com",
+    accent: "ProPainter",
     description:
       "Módulo de alta fidelidade para reconstrução temporal profunda. Ideal para vídeos complexos onde a restauração local não é suficiente.",
     chips: ["ProPainter engine", "processamento configurável", "temporal tracking", "4K support"],
     icon: Sparkle,
     badge: Wand2,
   },
+  {
+    id: "external",
+    label: "VaiViral",
+    hint: "dashboard",
+    brand: "VaiViral",
+    mark: "VV",
+    tagline: "clipagem em tempo real",
+    headline: "Cortes automáticos de",
+    accent: "lives",
+    description:
+      "Monitore transmissões do X, Kick e TikTok e gere cortes automáticos baseados em IA sem precisar de templates.",
+    chips: ["monitoramento HLS", "score viral IA", "exportação rápida"],
+    icon: Sparkle,
+    badge: Sparkle,
+  },
 ];
+
+/** rotas fixas fora do estúdio — quando ativas, as ferramentas não ficam destacadas */
+const ROUTE_PATHS = [
+  "/templates",
+  "/estilos",
+  "/comparar",
+  "/editor",
+  "/projects",
+  "/projetos",
+  "/estudio",
+  "/cortes",
+  "/live",
+  "/biblioteca",
+  "/agenda",
+  "/perfis",
+  "/contas",
+  "/conta",
+  "/integracoes",
+  "/armazenamento",
+  "/metricas",
+  "/admin",
+  "/fotos",
+  "/limpar-ia",
+  "/remover",
+
+] as const;
 
 interface Props {
   mode: AppMode;
@@ -106,10 +170,106 @@ interface Props {
   children: ReactNode;
 }
 
+function NavItem({
+  open,
+  active,
+  label,
+  hint,
+  icon: Icon,
+  badge,
+  routeTo,
+  ...rest
+}: {
+  open: boolean;
+  active?: boolean | undefined;
+  label: string;
+  hint?: string | undefined;
+  icon: typeof Layers;
+  badge?: ReactNode | undefined;
+  routeTo?: "/" | undefined;
+} & React.ComponentProps<"button">) {
+  const className = `group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-150 ${
+        active
+          ? "bg-surface-2 text-foreground"
+          : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+      } ${open ? "" : "justify-center px-0"}`;
+  const content = (
+    <>
+      <span className="relative flex shrink-0 items-center">
+        <span
+          aria-hidden
+          className={`aurora-rail aurora-slider absolute -left-2.5 w-[2px] rounded-full ${
+            active ? "h-4 opacity-100" : "h-1 opacity-0"
+          }`}
+          style={{ display: open ? "block" : "none" }}
+        />
+        <Icon className={`size-[17px] ${active ? "text-primary" : ""}`} />
+      </span>
+      {open && (
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-medium leading-tight">{label}</span>
+          {hint && (
+            <span className="block truncate text-[11px] leading-tight text-[var(--muted-2)]">
+              {hint}
+            </span>
+          )}
+        </span>
+      )}
+      {open && badge}
+    </>
+  );
+
+  if (routeTo) {
+    return (
+      <Link
+        to={routeTo}
+        title={label}
+        aria-current={active ? "page" : undefined}
+        className={className}
+        preload="intent"
+        onClick={(event) => rest.onClick?.(event as unknown as React.MouseEvent<HTMLButtonElement>)}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-current={active ? "page" : undefined}
+      className={className}
+      {...rest}
+    >
+      {content}
+    </button>
+  );
+}
+
 export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, children }: Props) {
   const [open, setOpen] = useState(true);
+  const [mobileNav, setMobileNav] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const { signedIn, sub, isAdmin } = useAccess();
+  const plan = planFromId(sub?.plan);
+  const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const navigatingPending = useRouterState({ select: (r) => r.status === "pending" });
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  // Barra de progresso só após a hidratação, para não divergir do HTML do SSR.
+  const navigating = mounted && navigatingPending;
+  const navigate = useNavigate();
+  const onFixedRoute = ROUTE_PATHS.some((p) => pathname.startsWith(p));
+
+  useEffect(() => {
+    import("@/lib/cloud").then(({ currentUser, onAuth }) => {
+      void currentUser().then(setUser);
+      return onAuth(setUser);
+    });
+  }, []);
+
   const current = MODES.find((m) => m.id === mode)!;
-  const Badge = current.badge;
 
   // mantém portais (modais, toasts) na mesma identidade de cor
   useEffect(() => {
@@ -118,211 +278,383 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
     root.classList.add(`theme-${mode}`);
   }, [mode]);
 
-  return (
-    <div className={`theme-${mode} flex min-h-dvh w-full bg-background`}>
-      <aside
-        className={`sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-border/70 bg-surface/60 backdrop-blur transition-[width] duration-300 md:flex ${
-          open ? "w-[16.5rem]" : "w-[4.5rem]"
+  useEffect(() => {
+    if (!mobileNav) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileNav(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [mobileNav]);
+
+  const openTool = (nextMode: AppMode) => {
+    if (nextMode === "external") return;
+    if (onFixedRoute) {
+      markPendingShellMode(nextMode);
+      void navigate({ to: "/" });
+      return;
+    }
+    onMode(nextMode);
+  };
+
+  const routeLink = (
+    to: string,
+    label: string,
+    Icon: typeof Layers,
+    expanded = open,
+    close?: () => void,
+  ) => (
+    <Link
+      key={to}
+      to={to as any}
+      title={label}
+      onClick={close}
+      preload="intent"
+      aria-current={pathname.startsWith(to) ? "page" : undefined}
+      className={`flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors duration-150 ${
+        pathname.startsWith(to)
+          ? "bg-surface-2 text-foreground"
+          : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+      } ${expanded ? "" : "justify-center px-0"}`}
+    >
+      <Icon
+        className={`size-[17px] shrink-0 ${pathname.startsWith(to) ? "text-primary" : ""}`}
+      />
+      {expanded && <span className="truncate">{label}</span>}
+    </Link>
+  );
+
+  /** Navegação agrupada por fluxo — reaproveitada na sidebar e no menu mobile. */
+  const navSections = (expanded: boolean, close?: () => void) => (
+    <>
+      <nav className="flex flex-col gap-0.5 px-3" aria-label="Criar">
+        {expanded && <p className="mono-label px-2.5 pb-1.5 pt-2">1 · Criar</p>}
+        {/* "clip" saiu daqui: Corte IA e Cortes viraram uma única área em /cortes */}
+        {MODES.filter((m) => m.id !== "external" && m.id !== "clip").map((m) => (
+          <NavItem
+            key={m.id}
+            open={expanded}
+            active={m.id === mode && !onFixedRoute}
+            label={m.brand}
+            hint={expanded ? m.hint : undefined}
+            icon={m.icon}
+            routeTo={onFixedRoute ? "/" : undefined}
+            onClick={() => {
+              if (onFixedRoute) markPendingShellMode(m.id as ShellMode);
+              else openTool(m.id);
+              close?.();
+            }}
+            badge={
+              (counts?.[m.id] ?? 0) > 0 ? (
+                <span className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                  {counts?.[m.id]}
+                </span>
+              ) : undefined
+            }
+          />
+        ))}
+        {routeLink("/remover", "Remover legenda/marca", Eraser, expanded, close)}
+        {routeLink("/cortes", "Corte IA & Cortes", Scissors, expanded, close)}
+
+        {routeLink("/estudio", "Estúdio de gravação", Radio, expanded, close)}
+        {routeLink("/fotos", "FotoViral", Images, expanded, close)}
+      </nav>
+
+      <div className="mt-4 flex flex-col gap-0.5 px-3">
+        {expanded && <p className="mono-label px-2.5 pb-1.5">2 · Produção</p>}
+        <NavItem
+          open={expanded}
+          label="Templates"
+          icon={Library}
+          onClick={() => {
+            onLibrary();
+            close?.();
+          }}
+        />
+        {routeLink("/templates", "Templates de vídeo", Layers, expanded, close)}
+        {routeLink("/estilos", "Estilos reutilizáveis", Palette, expanded, close)}
+        {routeLink("/comparar", "Comparar layouts", Layers, expanded, close)}
+
+        {routeLink("/editor", "Editor profissional", Wand2, expanded, close)}
+        {routeLink("/projetos", "Projetos", FolderKanban, expanded, close)}
+        {routeLink("/biblioteca", "Resultados", History, expanded, close)}
+        {routeLink("/armazenamento", "Armazenamento", HardDrive, expanded, close)}
+        <NavItem
+          open={expanded}
+          label="Nuvem"
+          icon={Cloud}
+          onClick={() => {
+            onCloud();
+            close?.();
+          }}
+        />
+      </div>
+
+      <div className="mt-4 flex flex-col gap-0.5 px-3">
+        {expanded && <p className="mono-label px-2.5 pb-1.5">3 · Distribuição</p>}
+        {routeLink("/agenda", "Agenda", CalendarClock, expanded, close)}
+        {routeLink("/contas", "Contas e credenciais", KeyRound, expanded, close)}
+        {routeLink("/perfis", "Perfis", Users, expanded, close)}
+        {routeLink("/live", "Monitora Live", Radio, expanded, close)}
+        {routeLink("/metricas", "Métricas", BarChart3, expanded, close)}
+      </div>
+
+      <div className="mt-4 flex flex-col gap-0.5 px-3">
+        {expanded && <p className="mono-label px-2.5 pb-1.5">Workspace</p>}
+        {routeLink("/integracoes", "Integrações", Settings2, expanded, close)}
+        {isAdmin && routeLink("/admin", "Admin", Shield, expanded, close)}
+      </div>
+    </>
+  );
+
+  const brandBlock = (expanded: boolean) => (
+    <div className={expanded ? "px-3 pb-1 pt-3" : "px-0 py-3"}>
+      <div
+        className={`flex items-center gap-2.5 rounded-xl transition-colors ${
+          expanded
+            ? "border border-border bg-surface px-3 py-2.5"
+            : "justify-center px-0 py-0"
         }`}
       >
-        <div className="flex items-center gap-3 px-4 py-5">
-          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary font-display text-sm font-bold text-primary-foreground shadow-[var(--shadow-glow)]">
-            {current.mark}
+        <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary font-display text-[13px] font-semibold text-primary-foreground">
+          {current.mark}
+        </div>
+        {expanded && (
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-display text-[14px] font-semibold tracking-tight text-foreground">
+              {current.brand}
+            </p>
+            <p className="truncate font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--muted-2)]">
+              {current.tagline}
+            </p>
           </div>
-          {open && (
-            <div className="min-w-0">
-              <p className="truncate font-display text-base font-bold tracking-tight text-foreground">
-                {current.brand}
-              </p>
-              <p className="truncate font-mono text-[10px] text-muted-foreground">{current.tagline}</p>
-            </div>
-          )}
-        </div>
+        )}
+      </div>
+    </div>
+  );
 
-        <nav className="flex flex-col gap-1 px-3">
-          {open && <p className="mono-label px-2 pb-2 pt-3">Ferramentas</p>}
-          {MODES.map((m) => {
-            const active = m.id === mode;
-            return (
-              <button
-                key={m.id}
-                onClick={() => onMode(m.id)}
-                title={m.brand}
-                aria-current={active ? "page" : undefined}
-                className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
-                  active
-                    ? "bg-accent text-accent-foreground ring-1 ring-primary/30"
-                    : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-                }`}
-              >
-                <span
-                  className={`grid size-7 shrink-0 place-items-center rounded-lg border transition ${
-                    active
-                      ? "border-primary/40 bg-primary/15 text-primary"
-                      : "border-border bg-surface-2 text-muted-foreground group-hover:text-foreground"
-                  }`}
-                >
-                  <m.icon className="size-[15px]" />
-                </span>
-                {open && (
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{m.brand}</span>
-                    <span className="block truncate font-mono text-[10px] opacity-70">{m.hint}</span>
-                  </span>
-                )}
-                {open && (counts?.[m.id] ?? 0) > 0 && (
-                  <span className="shrink-0 rounded-full border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
-                    {counts?.[m.id]}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
+  /** cartão da conta no rodapé da sidebar */
+  const userCard = (expanded: boolean) => {
+    const email = (user?.email as string | undefined) ?? "";
+    const initial = (email.charAt(0) || "?").toUpperCase();
+    if (!signedIn) return null;
+    return (
+      <Link
+        to="/conta"
+        title={email || "Conta"}
+        className={`flex items-center gap-2.5 rounded-xl border border-border bg-surface transition-colors hover:border-[var(--border-hover)] ${
+          expanded ? "px-2.5 py-2" : "justify-center px-0 py-2"
+        }`}
+      >
+        <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-surface-3 font-mono text-[11px] text-foreground">
+          {initial}
+        </span>
+        {expanded && (
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[12px] font-medium text-foreground">
+              {email || "Minha conta"}
+            </span>
+            <span className="block truncate font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--muted-2)]">
+              {plan.credits === null ? "ilimitado" : `${sub?.credits ?? 0} créditos`}
+            </span>
+          </span>
+        )}
+      </Link>
+    );
+  };
 
-        <div className="mt-6 flex flex-col gap-1 px-3">
-          {open && <p className="mono-label px-2 pb-2">Biblioteca</p>}
-          <button
-            onClick={onLibrary}
-            title="Biblioteca de templates"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <Library className="size-[18px] shrink-0" />
-            {open && "Templates"}
-          </button>
-          <Link
-            to="/live"
-            title="Monitora Live"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <Radio className="size-[18px] shrink-0" />
-            {open && "Monitora Live"}
-          </Link>
-          <Link
-            to="/biblioteca"
-            title="Biblioteca de Resultados"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <History className="size-[18px] shrink-0" />
-            {open && "Resultados"}
-          </Link>
-          <Link
-            to="/agenda"
-            title="Agenda de postagens"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <CalendarClock className="size-[18px] shrink-0" />
-            {open && "Agenda"}
-          </Link>
-          <Link
-            to="/integracoes"
-            title="Configurações e integrações"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <Settings2 className="size-[18px] shrink-0" />
-            {open && "Integrações"}
-          </Link>
-          <Link
-            to="/armazenamento"
-            title="Armazenamento e versões"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <HardDrive className="size-[18px] shrink-0" />
-            {open && "Armazenamento"}
-          </Link>
-          <button
-            onClick={onCloud}
-            title="Nuvem"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <Cloud className="size-[18px] shrink-0" />
-            {open && "Nuvem"}
-          </button>
-        </div>
+  return (
+    <TooltipProvider delayDuration={350}>
+    <div className={`theme-${mode} flex min-h-dvh w-full aurora-bg`}>
+      <aside
+        className={`sticky top-0 hidden h-dvh shrink-0 flex-col overflow-y-auto border-r border-border bg-[var(--background-2)] transition-[width] duration-[220ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] md:flex ${
+          open ? "w-[244px]" : "w-[68px]"
+        }`}
+      >
+        {brandBlock(open)}
+        {navSections(open)}
 
-        <div className="mt-auto p-3">
+        <div className="mt-auto flex flex-col gap-2 p-3">
+          {userCard(open)}
           <button
             onClick={() => setOpen((v) => !v)}
             aria-label={open ? "Recolher menu" : "Expandir menu"}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+            aria-expanded={open}
+            className={`flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground ${
+              open ? "" : "justify-center px-0"
+            }`}
           >
-            {open ? <PanelLeftClose className="size-[18px]" /> : <PanelLeftOpen className="size-[18px]" />}
+            {open ? (
+              <PanelLeftClose className="size-[17px]" />
+            ) : (
+              <PanelLeftOpen className="size-[17px]" />
+            )}
             {open && "Recolher"}
           </button>
         </div>
       </aside>
 
+      {/* menu mobile / tablet */}
+      {mobileNav && (
+        <div
+          className="fixed inset-0 z-[60] md:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu"
+        >
+          <button
+            aria-label="Fechar menu"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setMobileNav(false)}
+          />
+          <div className="drawer-in absolute inset-y-0 left-0 flex w-[86vw] max-w-[300px] flex-col overflow-y-auto border-r border-border bg-[var(--background-2)] pb-6">
+            <div className="flex items-center justify-between pr-3">
+              {brandBlock(true)}
+              <button
+                type="button"
+                aria-label="Fechar menu"
+                onClick={() => setMobileNav(false)}
+                className="grid size-11 place-items-center rounded-lg text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            {navSections(true, () => setMobileNav(false))}
+            <div className="mt-auto px-3 pt-4">{userCard(true)}</div>
+          </div>
+        </div>
+      )}
+
+
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-3 sm:px-6">
+        <header className="sticky top-0 z-[20] border-b border-border bg-[color-mix(in_srgb,var(--background)_88%,transparent)] backdrop-blur-md">
+          {navigating && (
+            <div
+              className="absolute inset-x-0 top-0 h-0.5 overflow-hidden bg-primary/15"
+              role="progressbar"
+              aria-label="Carregando página"
+            >
+              <span className="block h-full w-1/3 animate-pulse bg-primary" />
+            </div>
+          )}
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 sm:px-6">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-primary/35 bg-primary/12 text-primary md:hidden">
-                <current.icon className="size-4" />
-              </span>
-              <div className="min-w-0">
-                <h1 className="truncate font-display text-lg font-bold tracking-tight">{current.brand}</h1>
-                <p className="truncate font-mono text-[11px] text-muted-foreground">{current.hint}</p>
-              </div>
+              <button
+                type="button"
+                aria-label="Abrir menu"
+                onClick={() => setMobileNav(true)}
+                className="grid size-11 shrink-0 place-items-center rounded-lg bg-surface-2 text-primary transition hover:bg-surface-3 md:hidden"
+              >
+                <Menu className="size-5" />
+              </button>
+
+              <nav
+                aria-label="Trilha"
+                className="hidden min-w-0 shrink items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--muted-2)] lg:flex"
+              >
+                <span className="text-foreground">VaiViral</span>
+                <span className="text-border">/</span>
+                <span className="truncate">
+                  {onFixedRoute
+                    ? (pathname.split("/")[1] ?? "").replace(/-/g, " ") || "estúdio"
+                    : current.brand}
+                </span>
+              </nav>
+
+              <GlobalActionBar className="max-w-md" />
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <div className="flex rounded-xl border border-border bg-surface-2 p-0.5 md:hidden">
-                {MODES.map((m) => (
+              <div className="hidden rounded-lg border border-border bg-surface p-0.5 sm:flex md:hidden">
+                {/* "clip" saiu daqui: Corte IA e Cortes viraram uma única área em /cortes */}
+        {MODES.filter((m) => m.id !== "external" && m.id !== "clip").map((m) => (
                   <button
                     key={m.id}
-                    onClick={() => onMode(m.id)}
+                    onClick={() => openTool(m.id)}
                     aria-label={m.brand}
-                    className={`grid size-9 place-items-center rounded-lg transition ${
-                      m.id === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                    className={`grid size-9 place-items-center rounded-md transition ${
+                      m.id === mode ? "bg-surface-3 text-primary" : "text-muted-foreground"
                     }`}
                   >
                     <m.icon className="size-4" />
                   </button>
                 ))}
               </div>
-              <span className="rounded-full border border-primary/35 bg-accent px-3 py-1.5 font-mono text-[11px] text-accent-foreground">
-                ● {count} vídeo{count === 1 ? "" : "s"}
+              {signedIn && sub && (
+                <Link
+                  to="/checkout"
+                  search={{ plano: plan.id }}
+                  title="Plano e créditos"
+                  className="hidden items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[12px] text-muted-foreground transition hover:border-[var(--border-hover)] hover:text-foreground sm:inline-flex"
+                >
+                  <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-foreground">
+                    {plan.name}
+                  </span>
+                  <span className="text-border">/</span>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.1em]">
+                    {plan.credits === null ? "ilimitado" : `${sub.credits} créditos`}
+                  </span>
+                </Link>
+              )}
+              <span className="hidden items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[12px] text-muted-foreground sm:inline-flex">
+                <span className="size-1.5 rounded-full bg-success" aria-hidden />
+                <span className="font-mono text-[10px] uppercase tracking-[0.1em]">
+                  {count} vídeo{count === 1 ? "" : "s"}
+                </span>
               </span>
             </div>
           </div>
         </header>
 
-        <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
-          <section
-            key={current.id}
-            className="mb-6 overflow-hidden rounded-2xl border border-border/70 bg-[var(--gradient-surface)] p-5 shadow-[var(--shadow-panel)] sm:p-6"
-          >
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="app-main mx-auto w-full max-w-[1440px] flex-1 px-4 py-5 sm:px-6">
+          {mode === "external" || onFixedRoute ? null : (
+            <section
+              key={current.id}
+              className="rise-in mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-border pb-5"
+            >
               <div className="min-w-0">
-                <p className="mono-label flex items-center gap-2 text-primary">
-                  <Badge className="size-3.5" />
-                  ferramenta independente
+                <p className="eyebrow">
+                  <span className="size-1.5 rounded-full bg-primary" aria-hidden />
+                  {current.brand}
+                  <span className="text-border">/</span>
+                  {current.tagline}
                 </p>
-                <h2 className="mt-2 font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                  {current.headline}
+                <h2 className="title-editorial mt-2">
+                  {current.headline} <span className="title-em">{current.accent}</span>
                 </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
                   {current.description}
                 </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {current.chips.map((c) => (
-                    <span
-                      key={c}
-                      className="rounded-full border border-border bg-surface-2 px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground"
-                    >
-                      {c}
-                    </span>
-                  ))}
-                </div>
               </div>
-              <div className="grid size-16 shrink-0 place-items-center rounded-2xl border border-primary/30 bg-primary/12 text-primary shadow-[var(--shadow-glow)]">
-                <current.icon className="size-7" />
+              <div className="flex flex-wrap gap-1.5">
+                {current.chips.slice(0, 3).map((c) => (
+                  <span
+                    key={c}
+                    className="rounded-full border border-border bg-surface px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--muted-2)]"
+                  >
+                    {c}
+                  </span>
+                ))}
               </div>
-            </div>
-          </section>
+            </section>
+          )}
 
-          {children}
+          {mode === "external" || onFixedRoute ? null : (
+            <ProcessSteps current={count > 0 ? 1 : 0} className="rise-in mb-5" />
+          )}
+
+
+          {/* 23 · só o conteúdo principal transita; o shell fica imóvel */}
+          <div key={pathname} className="page-in">
+            {isAdmin ? children : <PlanGate>{children}</PlanGate>}
+          </div>
         </div>
       </div>
     </div>
+    </TooltipProvider>
   );
 }

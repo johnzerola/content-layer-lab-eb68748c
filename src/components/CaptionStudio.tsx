@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Play, Type, Upload } from "lucide-react";
+import { useInView } from "@/hooks/use-in-view";
 import { drawCaptions } from "@/lib/draw";
+
 import { BUILTIN_FONTS, fileToFont } from "@/lib/fonts";
 import { CAPTION_PRESETS, type CaptionStyle, type CustomFont } from "@/lib/template";
 import type { CaptionCue } from "@/lib/captions";
+import { CaptionTemplateGallery } from "./CaptionTemplateGallery";
 
 interface Props {
   style: CaptionStyle;
   onChange: (patch: Partial<CaptionStyle>) => void;
   cues?: CaptionCue[] | undefined;
   fonts?: CustomFont[] | undefined;
-  onAddFont?: (f: CustomFont) => void;
+  onAddFont?: ((f: CustomFont) => void) | undefined;
+  /** esconde a mini-prévia (usada quando já existe prévia grande ao lado) */
+  hidePreview?: boolean;
 }
 
 const DEMO_TEXT = "isso aqui muda o seu jogo agora mesmo";
@@ -78,11 +83,13 @@ function Range({
   );
 }
 
-export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props) {
+export function CaptionStudio({ style, onChange, cues, fonts, onAddFont, hidePreview }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const visible = useInView(canvasRef);
   const [playing, setPlaying] = useState(true);
   const demo = useMemo(() => demoCues(), []);
   const useCues = cues?.length ? cues : demo;
+
   const start = useCues[0]?.start ?? 0;
   const end = useCues[0]?.end ?? 3;
 
@@ -99,7 +106,7 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
 
   useEffect(() => {
     const cv = canvasRef.current;
-    if (!cv) return;
+    if (!cv || !visible) return;
     const ctx = cv.getContext("2d");
     if (!ctx) return;
     let raf = 0;
@@ -120,11 +127,12 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [style, useCues, playing, start, end]);
+  }, [style, useCues, playing, start, end, visible]);
+
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
-      <div className="space-y-2">
+    <div className={hidePreview ? "grid gap-4" : "grid gap-4 lg:grid-cols-[240px_1fr]"}>
+      <div className={hidePreview ? "hidden" : "space-y-2"}>
         <div className="relative overflow-hidden rounded-xl border border-border bg-black">
           <canvas ref={canvasRef} width={324} height={576} className="w-full" />
           <button
@@ -141,6 +149,8 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
       </div>
 
       <div className="space-y-3">
+        <CaptionTemplateGallery style={style} onChange={onChange} cues={cues} />
+
         <div>
           <p className="mono-label mb-1.5">Presets</p>
           <div className="flex flex-wrap gap-1.5">
@@ -228,7 +238,7 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
           </Field>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
           {(
             [
               ["Cor do texto", "color"],
@@ -236,6 +246,7 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
               ["Contorno", "strokeColor"],
               ["Caixa/realce", "highlightColor"],
               ["Fundo (caixa)", "boxColor"],
+              ["Cor da sombra", "shadowColor"],
             ] as const
           ).map(([label, key]) => (
             <Field key={key} label={label}>
@@ -266,6 +277,14 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
             min={1}
             max={4}
             onChange={(v) => onChange({ maxLines: v })}
+          />
+          <Range
+            label="Sincronia (s)"
+            value={style.offset ?? 0}
+            min={-1}
+            max={1}
+            step={0.05}
+            onChange={(v) => onChange({ offset: v })}
           />
           <Range
             label="Altura da linha"
@@ -307,8 +326,68 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
             suffix="%"
             onChange={(v) => onChange({ opacity: v / 100 })}
           />
+          <Range
+            label="Espaço entre letras"
+            value={style.letterSpacing ?? 0}
+            min={-6}
+            max={24}
+            suffix="px"
+            onChange={(v) => onChange({ letterSpacing: v })}
+          />
+          {style.bg === "shadow" && (
+            <>
+              <Range
+                label="Desfoque da sombra"
+                value={Math.round((style.shadowBlur ?? 0.25) * 100)}
+                min={0}
+                max={150}
+                suffix="%"
+                onChange={(v) => onChange({ shadowBlur: v / 100 })}
+              />
+              <Range
+                label="Sombra · vertical"
+                value={Math.round((style.shadowY ?? 0.06) * 100)}
+                min={-50}
+                max={50}
+                suffix="%"
+                onChange={(v) => onChange({ shadowY: v / 100 })}
+              />
+              <Range
+                label="Sombra · horizontal"
+                value={Math.round((style.shadowX ?? 0) * 100)}
+                min={-50}
+                max={50}
+                suffix="%"
+                onChange={(v) => onChange({ shadowX: v / 100 })}
+              />
+              <Range
+                label="Opacidade da sombra"
+                value={Math.round((style.shadowOpacity ?? 0.65) * 100)}
+                min={0}
+                max={100}
+                suffix="%"
+                onChange={(v) => onChange({ shadowOpacity: v / 100 })}
+              />
+            </>
+          )}
           {style.bg === "box" && (
             <>
+              <Range
+                label="Borda da caixa"
+                value={style.boxBorderWidth ?? 0}
+                min={0}
+                max={20}
+                suffix="px"
+                onChange={(v) => onChange({ boxBorderWidth: v })}
+              />
+              <Field label="Cor da borda">
+                <input
+                  type="color"
+                  className="h-8 w-full rounded-lg border border-border bg-transparent"
+                  value={style.boxBorderColor ?? "#ffffff"}
+                  onChange={(e) => onChange({ boxBorderColor: e.target.value })}
+                />
+              </Field>
               <Range
                 label="Respiro da caixa"
                 value={Math.round((style.boxPad ?? 0.28) * 100)}

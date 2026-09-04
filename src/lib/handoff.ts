@@ -82,3 +82,26 @@ export function takePendingTool(): HandoffTool | null {
     return null;
   }
 }
+
+/** Ferramenta escolhida no menu enquanto o usuário estava em outra rota. */
+const SHELL_MODE_KEY = "vv.shell-mode";
+
+export type ShellMode = HandoffTool | "limpar-ia";
+
+export function markPendingShellMode(mode: ShellMode) {
+  try {
+    sessionStorage.setItem(SHELL_MODE_KEY, mode);
+  } catch {
+    /* sem sessionStorage */
+  }
+}
+
+export function takePendingShellMode(): ShellMode | null {
+  try {
+    const value = sessionStorage.getItem(SHELL_MODE_KEY) as ShellMode | null;
+    if (value) sessionStorage.removeItem(SHELL_MODE_KEY);
+    return value;
+  } catch {
+    return null;
+  }
+}

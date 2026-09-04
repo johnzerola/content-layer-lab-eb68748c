@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { safeRemoteUrl } from "@/lib/remote-url";
+import { assertSafeRemoteUrl } from "@/lib/remote-url.server";
 import { mediaProxyTicket, verifyMediaProxyTicket } from "@/lib/cleaner.server";
 
 const UA =
@@ -46,7 +47,7 @@ export const Route = createFileRoute("/api/public/hls-proxy")({
       GET: async ({ request }) => {
         const ticket = verifyMediaProxyTicket(new URL(request.url).searchParams.get("t"));
         if (!ticket) return new Response("invalid or expired ticket", { status: 401, headers: CORS });
-        const target = safeRemoteUrl(ticket.url);
+        const target = await assertSafeRemoteUrl(ticket.url);
         if (!target) return new Response("url not allowed", { status: 400, headers: CORS });
 
         const range = request.headers.get("range");
@@ -63,7 +64,7 @@ export const Route = createFileRoute("/api/public/hls-proxy")({
 
         if (upstream && upstream.status >= 300 && upstream.status < 400) {
           const location = upstream.headers.get("location");
-          const next = location ? safeRemoteUrl(new URL(location, target).toString()) : null;
+          const next = location ? await assertSafeRemoteUrl(new URL(location, target).toString()) : null;
           return next
             ? new Response("redirect requires fresh ticket", { status: 409, headers: CORS })
             : new Response("redirect not allowed", { status: 400, headers: CORS });

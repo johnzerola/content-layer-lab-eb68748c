@@ -32,8 +32,11 @@ chamada manual com esse header. A resposta contém apenas contadores.
 ## Scheduler
 
 O Supabase hospedado suporta Cron (`pg_cron`), chamadas HTTP por `pg_net` e
-segredos criptografados no Vault. A ativação não está em migration porque URL e
-segredo variam por ambiente e nunca devem entrar no Git.
+segredos criptografados no Vault. A migration
+`20260831193000_schedule_publish_due_cron.sql` agenda a fila automaticamente a
+cada minuto quando os segredos `publish_dispatch_url` e `publish_cron_secret`
+existem no Vault. Ela não grava valores sensíveis no Git; o comando do Cron lê
+o Vault em cada execução.
 
 ### Ativação recomendada no Supabase
 
@@ -43,9 +46,9 @@ segredo variam por ambiente e nunca devem entrar no Git.
    - `publish_dispatch_url`: URL completa HTTPS terminando em
      `/api/public/hooks/publish-due`;
    - `publish_cron_secret`: exatamente o mesmo valor configurado na aplicação.
-3. Abra **Integrations → Cron → Create job**.
-4. Use o nome `publish-due-every-minute` e a expressão `* * * * *`.
-5. Escolha SQL snippet e salve exatamente:
+3. Aplique as migrations do projeto. O job `publish-due-every-minute` será
+   criado ou atualizado automaticamente.
+4. Para validar ou recriar manualmente, o SQL do job executado é:
 
 ```sql
 select net.http_post(
@@ -67,9 +70,10 @@ select net.http_post(
 ) as request_id;
 ```
 
-O intervalo recomendado é um minuto: mantém precisão suficiente para posts e
+O intervalo configurado é um minuto: mantém precisão suficiente para posts e
 permite que `next_attempt_at` seja reavaliado automaticamente sem chamadas
-excessivas.
+excessivas. O dispatcher publica Facebook Pages e YouTube usando as conexões
+OAuth salvas de cada canal.
 
 ### Validação
 
@@ -85,7 +89,7 @@ curl --request POST \
 Resposta saudável, mesmo sem posts:
 
 ```json
-{"ok":true,"processed":0,"published":0,"retrying":0,"failed":0}
+{ "ok": true, "processed": 0, "published": 0, "retrying": 0, "failed": 0 }
 ```
 
 Depois confira o job e as últimas execuções no SQL Editor:
@@ -136,8 +140,71 @@ o fallback global, que existe apenas para registros legados `pending`.
 Uma conexão por conta pode selecionar `meta` ou `ayrshare`, mas credenciais por
 usuário só devem ser ativadas depois que o secret store estiver disponível.
 
-Facebook, TikTok e YouTube aparecem como “Em preparação”; não existem adapters
-de publicação para essas plataformas.
+Facebook, Instagram e YouTube usam OAuth oficial e adapters próprios de
+publicação. TikTok continua em preparação.
+
+## OAuth Meta (Facebook e Instagram)
+
+O conector combinado usa Facebook Login, troca o código por token de longa
+duração e chama `GET /me/accounts` para obter os tokens das Páginas e a conta
+Instagram profissional vinculada. A listagem percorre todas as páginas da
+resposta da Graph API. Como a Meta pode omitir da lista agregada um ativo que o
+usuário acabou de selecionar, o callback também lê os `target_ids` granulares
+de `/debug_token` e consulta diretamente cada ID ausente. Os resultados são
+mesclados por Page ID antes da persistência. Os scopes mínimos são fixos no
+código:
+
+```text
+pages_show_list
+pages_read_engagement
+pages_manage_posts
+instagram_basic
+instagram_content_publish
+```
+
+`pages_read_engagement` não é opcional neste fluxo: ela é necessária para ler
+as Páginas e o vínculo `instagram_business_account`. Definir um secret não
+adiciona uma permissão ao App Dashboard da Meta.
+
+No painel Meta for Developers, abra os casos de uso **Gerenciar Páginas** e
+**API do Instagram com login do Facebook**, depois entre em **Permissões e
+recursos**. Cada permissão acima deve estar adicionada ao app. Se
+`pages_read_engagement` mostrar o botão **Adicionar** ou apenas **Encontrado em
+casos de uso**, clique em **Adicionar** (ou em **Add required content
+permissions** no assistente do Instagram) antes de testar o login.
+
+Secrets de produção:
+
+```text
+META_APP_ID=<app id numérico>
+META_APP_SECRET=<segredo do app>
+META_GRAPH_VERSION=v26.0
+META_LOGIN_MODE=classic
+FACEBOOK_REDIRECT_URI=https://content-layer-lab.lovable.app/integracoes/facebook/callback
+PUBLIC_SITE_URL=https://content-layer-lab.lovable.app
+```
+
+O modo clássico é o padrão e sempre envia os scopes acima. Um
+`META_LOGIN_CONFIG_ID` antigo é ignorado. Para usar Login para Empresas, altere
+explicitamente para `META_LOGIN_MODE=business`, defina
+`META_LOGIN_CONFIG_ID` e publique na Meta uma configuração que contenha todos
+os scopes obrigatórios.
+
+Após o callback, o servidor consulta `/debug_token` e interrompe a conexão se o
+token pertencer a outro app ou se faltar qualquer permissão. O painel
+administrativo em `/integracoes` mostra modo, scopes e URL OAuth sem expor
+segredos ou tokens.
+
+Ao atualizar a seleção, escolha as Páginas e depois as contas profissionais do
+Instagram vinculadas. O retorno mostra separadamente quantas Páginas e quantos
+Instagrams foram sincronizados. Se um ID selecionado não liberar Page Access
+Token, o callback preserva as demais contas e informa quantas exigem revisão de
+controle total no Business Portfolio.
+
+Referências de implementação: coleção oficial da Meta para Instagram API e o
+projeto MIT `Binary-Black-Holes/instagram-api`. O projeto AGPL BrightBean Studio
+foi usado apenas para comparação de comportamento; nenhum código AGPL foi
+copiado.
 
 ## Diagnóstico
 
