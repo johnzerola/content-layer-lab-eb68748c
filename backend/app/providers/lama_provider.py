@@ -24,9 +24,12 @@ from . import register
 _REPO = "Carve/LaMa-ONNX"
 _FILE = "lama_fp32.onnx"
 _DEFAULT_SIDE = 512
-_CONTEXT = 1.6  # quanto de fundo limpo entra junto na janela
+_CONTEXT = 2.2   # quanto de fundo limpo entra junto na janela
+_STRIP_CONTEXT = 5.0  # altura mínima do tile em relação à faixa de legenda
+_MAX_FILL = 0.30  # fração máxima do tile que pode ser máscara
 _MAX_WINDOWS = 4  # regiões distintas por frame
 _MAX_TILES = 12    # inferências por frame; acima disso o custo em CPU explode
+
 
 
 def models_dir() -> str:
