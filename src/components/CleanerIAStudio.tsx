@@ -69,6 +69,13 @@ type Tool = "select" | "rect" | "poly" | "brush" | "protect" | "erase";
 const MODES: CleanerMode[] = ["smart", "text", "watermark", "object", "passerby"];
 const PRESETS: CleanerPreset[] = ["fast", "quality", "max"];
 
+/** Filtros de VISUALIZAÇÃO da lista de áreas — nunca alteram `masks`. */
+const MASK_FILTERS: Record<string, (m: CleanerRegion) => boolean> = {
+  "Só legendas": (m) => /texto|legenda|caption/i.test(m.label || m.role || ""),
+  "Só marca d'água": (m) => /marca|watermark|logo/i.test(m.label || m.role || ""),
+  "Só as minhas": (m) => /manual|polígono|pincel|protegida/i.test(m.label || ""),
+};
+
 /** Caixa normalizada (0..1) de uma área, seja retângulo, polígono ou pincel. */
 function regionBox(m: CleanerRegion): { x: number; y: number; w: number; h: number } | null {
   if (m.points && m.points.length) {
