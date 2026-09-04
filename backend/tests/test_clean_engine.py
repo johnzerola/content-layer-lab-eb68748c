@@ -37,7 +37,7 @@ def test_score_penaliza_texto_residual() -> None:
 
 
 def test_roi_crop_e_paste_preservam_fora_da_area() -> None:
-    roi = Roi(0.1, 0.6, 0.8, 0.2)
+    roi = Roi(26, 154, 204, 51)
     frame = _frame()
     crop = roi.crop(frame)
     assert crop.shape[0] > 0 and crop.shape[1] > 0
