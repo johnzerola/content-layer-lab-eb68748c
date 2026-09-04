@@ -1350,16 +1350,29 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                   <button
                     key={label}
                     type="button"
-                    onClick={() => setMasks((prev) => (prev.some(keep) ? prev.filter(keep) : prev))}
-                    className="rounded-full border border-border/60 px-2 py-1 text-[10px] font-semibold text-muted-foreground hover:border-primary hover:text-primary"
+                    onClick={() => setMaskFilter((f) => (f === label ? null : label))}
+                    className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${
+                      maskFilter === label
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border/60 text-muted-foreground hover:border-primary hover:text-primary"
+                    }`}
                   >
                     {label}
                   </button>
                 ))}
+                {maskFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setMaskFilter(null)}
+                    className="rounded-full border border-border/60 px-2 py-1 text-[10px] font-semibold text-muted-foreground hover:border-primary hover:text-primary"
+                  >
+                    Todas
+                  </button>
+                )}
               </div>
 
             <div className="max-h-[220px] space-y-2 overflow-y-auto pr-1">
-              {masks.map((m) => (
+              {visibleMasks.map((m) => (
                 <div
                   key={m.id}
                   onClick={() => setSelected(m.id)}
