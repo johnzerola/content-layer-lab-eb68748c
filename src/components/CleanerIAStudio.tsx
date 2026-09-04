@@ -654,7 +654,13 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       setJob((prev) => (prev ? { ...prev, status: "detecting", stage: "detectando áreas" } : prev));
       const headers = await cloudAuthHeaders();
       const res = (await detectJob({ data: { id: target.id, mode }, headers })) as CleanerJob;
-      const found = (res.detections || []) as CleanerRegion[];
+      // O motor devolve as áreas sem o papel definido; sem isso elas não contariam
+      // como área de remoção e o vídeo acabaria só reenquadrado em vez de limpo.
+      const found = ((res.detections || []) as CleanerRegion[]).map((region) => ({
+        ...region,
+        role: region.role === "protect" ? ("protect" as const) : ("remove" as const),
+        enabled: region.enabled !== false,
+      }));
       setMasks((prev) => [...prev, ...found]);
       setJob({ ...res, status: "queued" });
       toast[found.length ? "success" : "warning"](
