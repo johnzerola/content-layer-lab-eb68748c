@@ -75,7 +75,7 @@ class CleanOptions:
     # AUTO-LaMa: liga o inpainting por modelo mesmo em presets sem LaMa,
     # quando a máscara é pequena (barato) e o TBE não fechou o chunk.
     auto_lama: bool = True
-    auto_lama_max_mask: float = 0.12  # fração máxima da ROI coberta pela máscara
+    auto_lama_max_mask: float = 0.18  # fração máxima da ROI coberta pela máscara
     auto_lama_min_mask: float = 0.0008
 
 
