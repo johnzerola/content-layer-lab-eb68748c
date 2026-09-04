@@ -134,12 +134,12 @@ def interpolate_keyframes(
     first, last = key_set[0], key_set[-1]
     cur = out[first].copy()
     for i in range(first - 1, -1, -1):
-        flow = cv2.calcOpticalFlowFarneback(grays[i], grays[i + 1], None, 0.5, 3, 21, 3, 5, 1.2, 0)
+        flow = _flow(grays[i], grays[i + 1])
         cur = _warp(cur, flow)
         out[i] = np.maximum(out[i], cur)
     cur = out[last].copy()
     for i in range(last + 1, n):
-        flow = cv2.calcOpticalFlowFarneback(grays[i], grays[i - 1], None, 0.5, 3, 21, 3, 5, 1.2, 0)
+        flow = _flow(grays[i], grays[i - 1])
         cur = _warp(cur, flow)
         out[i] = np.maximum(out[i], cur)
     return out
