@@ -15,7 +15,7 @@ import {
   cancelChunk,
   chunkStatus,
   gpuConfigured,
-  jobSourceUrl,
+  jobChunkSourceUrl,
   submitChunk,
 } from "@/lib/cleaner-gpu.server";
 
@@ -225,7 +225,6 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
     const limit = concurrencyFor(String(row["preset"] ?? "quality"));
     const running = chunks.filter((c) => c.status === "running").length;
     const pending = chunks.filter((c) => c.status === "pending");
-    const source = jobSourceUrl(jobId);
     for (const chunk of pending.slice(0, Math.max(0, limit - running))) {
       const attempt = chunk.attempts + 1;
       const path = chunkPath(jobId, chunk.idx, attempt);
@@ -235,7 +234,8 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
       if (signError || !signed) throw new Error(signError?.message ?? "falha ao assinar upload");
       const providerId = await submitChunk({
         chunkIndex: chunk.idx,
-        sourceUrl: source,
+        sourceUrl: jobChunkSourceUrl(jobId, chunk.idx),
+        sourceIsChunk: true,
         uploadUrl: signed.signedUrl,
         start: Number(chunk.start_seconds),
         end: Number(chunk.end_seconds),

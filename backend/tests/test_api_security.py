@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 from pathlib import Path
 import shutil
 import tempfile
@@ -70,6 +71,46 @@ class ApiSecurityTests(unittest.TestCase):
             files={"file": ("video.mp4", b"test", "video/mp4")},
         )
         self.assertEqual(response.status_code, 401)
+
+    @patch("app.main.slice_video")
+    def test_chunk_source_caches_only_the_planned_window(self, slice_video):
+        directory = Path(TEMPORARY.name) / JOB_ID
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "input.mp4").write_bytes(b"master")
+        (directory / "gpu-plan.json").write_text(
+            json.dumps({
+                "chunks": [{
+                    "index": 2,
+                    "read_start": 29.4,
+                    "read_duration": 16.2,
+                }],
+            }),
+            encoding="utf-8",
+        )
+
+        def create_chunk(_source, destination, _start, _duration):
+            Path(destination).write_bytes(b"x" * 2048)
+            return destination
+
+        slice_video.side_effect = create_chunk
+        url = f"/v1/jobs/{JOB_ID}/chunks/2/source?token={self.token('result')}"
+        first = self.client.get(url)
+        second = self.client.get(url)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(slice_video.call_count, 1)
+        self.assertEqual(slice_video.call_args.args[2:], (29.4, 16.2))
+
+    def test_chunk_source_rejects_index_outside_saved_plan(self):
+        directory = Path(TEMPORARY.name) / JOB_ID
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "input.mp4").write_bytes(b"master")
+        (directory / "gpu-plan.json").write_text('{"chunks":[]}', encoding="utf-8")
+        response = self.client.get(
+            f"/v1/jobs/{JOB_ID}/chunks/9/source?token={self.token('result')}"
+        )
+        self.assertEqual(response.status_code, 404)
 
     def test_upload_rejects_claim_above_limit_before_writing(self):
         response = self.client.post(

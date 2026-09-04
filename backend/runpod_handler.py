@@ -31,7 +31,7 @@ import uuid
 
 import requests
 
-from app.services.chunking import slice_video, trim_edges
+from app.services.chunking import localize_masks, slice_video, trim_edges
 from app.storage import job_dir as safe_job_dir
 from app.utils.video import probe
 from app.workers.tasks import run_pipeline
@@ -68,6 +68,7 @@ def handler(event: dict) -> dict:
     started = time.monotonic()
     index = int(payload.get("chunk_index", 0))
     source_url = str(payload.get("source_url") or "")
+    source_is_chunk = payload.get("source_is_chunk") is True
     if not source_url:
         return {"ok": False, "chunk_index": index, "error": "source_url ausente"}
 
@@ -86,14 +87,20 @@ def handler(event: dict) -> dict:
     try:
         full = _download(source_url, scratch / "source.mp4")
         # Só o trecho necessário (miolo + contexto) entra na pipeline.
-        chunk_input = slice_video(str(full), str(job_path / "input.mp4"), read_start, read_duration)
+        if source_is_chunk:
+            chunk_input = str(job_path / "input.mp4")
+            shutil.move(str(full), chunk_input)
+        else:
+            # Compatibilidade com jobs enfileirados antes desta versao.
+            chunk_input = slice_video(str(full), str(job_path / "input.mp4"), read_start, read_duration)
         info = probe(chunk_input)
+        masks = localize_masks(list(payload.get("masks") or []), read_start, read_duration)
 
         result = run_pipeline(
             job_id,
             str(payload.get("mode", "subtitle")),
             str(payload.get("preset", "quality")),
-            list(payload.get("masks") or []),
+            masks,
             None,
             None,
             dict(payload.get("options") or {}),

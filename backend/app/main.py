@@ -4,6 +4,7 @@ import asyncio
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 import hashlib
+import json
 import os
 from pathlib import Path
 import shutil
@@ -24,7 +25,7 @@ from .engines.inpainting import cuda_available, device_name
 from .engines.propainter_official import propainter_status
 from .engines.tbe import tbe_status
 from .security import TokenError, validate_callback_url, validate_job_token, validate_service_token
-from .services.chunking import concat_videos, plan_chunks
+from .services.chunking import concat_videos, plan_chunks, slice_video
 from .services.media_resolver import MediaResolveError, resolve_public_media
 from .services.text_detect import detector_status
 from .storage import cleanup_expired, directory_size, job_dir, read_state, write_state
@@ -544,6 +545,45 @@ async def get_source(job_id: str, token: Optional[str] = Query(None)):
     return FileResponse(path, media_type="video/mp4")
 
 
+@app.get("/v1/jobs/{job_id}/chunks/{chunk_index}/source")
+async def get_chunk_source(
+    job_id: str,
+    chunk_index: int,
+    token: Optional[str] = Query(None),
+):
+    """Serve somente a janela planejada e reutiliza o recorte em retries."""
+    verify_token(job_id, token, "result")
+    if chunk_index < 0 or chunk_index > 4096:
+        raise HTTPException(404, "chunk invalido")
+    directory = job_dir(SETTINGS.storage_dir, job_id)
+    input_path = directory / "input.mp4"
+    plan_path = directory / "gpu-plan.json"
+    if not input_path.is_file() or not plan_path.is_file():
+        raise HTTPException(404, "plano ou video de entrada indisponivel")
+    try:
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        chunk = next(item for item in plan["chunks"] if int(item["index"]) == chunk_index)
+        start = float(chunk["read_start"])
+        duration = float(chunk["read_duration"])
+    except (KeyError, TypeError, ValueError, StopIteration, json.JSONDecodeError):
+        raise HTTPException(404, "chunk nao pertence ao plano") from None
+
+    cache_dir = directory / "gpu-sources"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cached = cache_dir / f"chunk-{chunk_index:04d}.mp4"
+    if not cached.is_file() or cached.stat().st_size < 1024:
+        temporary = cache_dir / f".{cached.name}.{os.getpid()}.{threading.get_ident()}.tmp"
+        try:
+            await asyncio.to_thread(slice_video, str(input_path), str(temporary), start, duration)
+            if temporary.stat().st_size < 1024:
+                raise RuntimeError("recorte vazio")
+            os.replace(temporary, cached)
+        except Exception as exc:
+            temporary.unlink(missing_ok=True)
+            raise HTTPException(422, f"falha ao preparar chunk: {str(exc)[:200]}") from None
+    return FileResponse(cached, media_type="video/mp4", filename=f"chunk-{chunk_index:04d}.mp4")
+
+
 @app.post("/v1/jobs/{job_id}/plan")
 async def plan_job_chunks(job_id: str, req: PlanRequest, x_job_token: Optional[str] = Header(None)):
     """Divide o vídeo em janelas com sobreposição, respeitando cortes de cena."""
@@ -563,7 +603,7 @@ async def plan_job_chunks(job_id: str, req: PlanRequest, x_job_token: Optional[s
         except Exception:
             cuts = []
     chunks = plan_chunks(info.duration, req.target_seconds, req.overlap, cuts)
-    return {
+    response = {
         "duration": round(info.duration, 3),
         "fps": round(info.fps, 3),
         "chunks": [
@@ -572,10 +612,17 @@ async def plan_job_chunks(job_id: str, req: PlanRequest, x_job_token: Optional[s
                 "start": round(chunk.start, 3),
                 "end": round(chunk.end, 3),
                 "overlap": round(chunk.overlap, 3),
+                "read_start": round(chunk.read_start, 3),
+                "read_duration": round(min(chunk.read_duration, info.duration - chunk.read_start), 3),
             }
             for chunk in chunks
         ],
     }
+    temporary_plan = directory / f".gpu-plan.{os.getpid()}.tmp"
+    temporary_plan.write_text(json.dumps(response, separators=(",", ":")), encoding="utf-8")
+    os.replace(temporary_plan, directory / "gpu-plan.json")
+    shutil.rmtree(directory / "gpu-sources", ignore_errors=True)
+    return response
 
 
 @app.post("/v1/jobs/{job_id}/assemble")

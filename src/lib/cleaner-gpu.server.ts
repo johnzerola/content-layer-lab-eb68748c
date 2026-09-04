@@ -84,6 +84,7 @@ async function runpod<T>(path: string, init: RequestInit = {}): Promise<T> {
 export type ChunkPayload = {
   chunkIndex: number;
   sourceUrl: string;
+  sourceIsChunk?: boolean;
   uploadUrl?: string | null;
   outputUrl?: string | null;
   start: number;
@@ -100,6 +101,7 @@ export async function submitChunk(payload: ChunkPayload): Promise<string> {
     input: {
       chunk_index: payload.chunkIndex,
       source_url: payload.sourceUrl,
+      source_is_chunk: payload.sourceIsChunk ?? false,
       upload_url: payload.uploadUrl ?? null,
       output_url: payload.outputUrl ?? null,
       start: payload.start,
@@ -165,8 +167,8 @@ export async function cancelChunk(providerJobId: string): Promise<void> {
 }
 
 /** URL assinada (HMAC do worker) do vídeo original — consumida pela GPU. */
-export function jobSourceUrl(jobId: string, ttlSeconds = 60 * 60 * 3): string {
+export function jobChunkSourceUrl(jobId: string, chunkIndex: number, ttlSeconds = 60 * 60 * 3): string {
   const base = workerPublicBase();
   if (!base) throw new Error("worker-offline");
-  return `${base}/v1/jobs/${jobId}/source?token=${encodeURIComponent(jobToken(jobId, "result", ttlSeconds))}`;
+  return `${base}/v1/jobs/${jobId}/chunks/${chunkIndex}/source?token=${encodeURIComponent(jobToken(jobId, "result", ttlSeconds))}`;
 }

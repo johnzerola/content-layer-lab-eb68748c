@@ -14,6 +14,29 @@ import subprocess
 from typing import List, Sequence
 
 
+def localize_masks(masks: Sequence[dict], offset: float, duration: float) -> List[dict]:
+    """Converte intervalos absolutos do master para o relogio do recorte."""
+    localized: List[dict] = []
+    for original in masks:
+        if not isinstance(original, dict):
+            continue
+        region = dict(original)
+        start_value = region.get("from", region.get("from_time"))
+        end_value = region.get("to", region.get("to_time"))
+        if end_value is not None and float(end_value) <= offset:
+            continue
+        if start_value is not None and float(start_value) >= offset + duration:
+            continue
+        if start_value is not None:
+            region["from"] = max(0.0, float(start_value) - offset)
+            region.pop("from_time", None)
+        if end_value is not None:
+            region["to"] = min(duration, max(0.0, float(end_value) - offset))
+            region.pop("to_time", None)
+        localized.append(region)
+    return localized
+
+
 @dataclass(frozen=True)
 class Chunk:
     index: int
