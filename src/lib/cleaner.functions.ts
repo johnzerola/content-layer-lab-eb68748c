@@ -51,8 +51,8 @@ export const createCleanerJob = createServerFn({ method: "POST" })
         filename: z.string().min(1),
         size: z.number().positive().max(maxUploadBytes, "Video excede o limite permitido"),
         mode: z
-          .enum(["smart", "text", "watermark", "logo", "object", "passerby"])
-          .default("smart"),
+          .enum(["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"])
+          .default("subtitle"),
         preset: z.enum(["fast", "quality", "max"]).default("quality"),
       })
       .parse(d),
@@ -100,7 +100,8 @@ export const confirmCleanerUpload = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireOwnedJob(context.supabase, context.userId, data.id);
     const input = await workerInputStatus(data.id);
-    if (!input.exists || input.size < 1) throw new Error("video nao chegou ao motor; reenvie o arquivo");
+    if (!input.exists || input.size < 1)
+      throw new Error("video nao chegou ao motor; reenvie o arquivo");
     const { data: row, error } = await context.supabase
       .from("cleaner_jobs")
       .update({
@@ -168,7 +169,7 @@ export const detectCleanerJob = createServerFn({ method: "POST" })
     z
       .object({
         id: z.string().uuid(),
-        mode: z.enum(["smart", "text", "watermark", "logo", "object", "passerby"]),
+        mode: z.enum(["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"]),
         roi: cleanerRegionSchema.nullable().optional(),
       })
       .parse(d),
@@ -222,7 +223,7 @@ export const processCleanerJob = createServerFn({ method: "POST" })
     z
       .object({
         id: z.string().uuid(),
-        mode: z.enum(["smart", "text", "watermark", "logo", "object", "passerby"]),
+        mode: z.enum(["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"]),
         preset: z.enum(["fast", "quality", "max"]),
         masks: z.array(cleanerRegionSchema),
         options: z.record(z.string(), z.any()).default({}),

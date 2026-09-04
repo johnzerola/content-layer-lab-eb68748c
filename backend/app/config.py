@@ -36,6 +36,12 @@ class Settings:
     retention_seconds: int
     max_concurrent_jobs: int
     rate_limit_per_minute: int
+    redis_url: str
+    minio_endpoint: str
+    minio_access_key: str
+    minio_secret_key: str
+    minio_bucket: str
+    minio_secure: bool
 
     @property
     def production(self) -> bool:
@@ -69,6 +75,12 @@ def get_settings() -> Settings:
         retention_seconds=int(_number("CLEANER_RETENTION_HOURS", 72, 1) * 3600),
         max_concurrent_jobs=int(_number("CLEANER_MAX_CONCURRENT_JOBS", 1, 1)),
         rate_limit_per_minute=int(_number("CLEANER_RATE_LIMIT_PER_MINUTE", 120, 10)),
+        redis_url=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+        minio_endpoint=os.getenv("MINIO_ENDPOINT", "localhost:9000"),
+        minio_access_key=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
+        minio_secret_key=os.getenv("MINIO_SECRET_KEY", "minioadmin"),
+        minio_bucket=os.getenv("MINIO_BUCKET", "cleaner-jobs"),
+        minio_secure=os.getenv("MINIO_SECURE", "0") == "1",
     )
     settings.validate()
     return settings

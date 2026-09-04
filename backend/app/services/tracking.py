@@ -19,6 +19,28 @@ def _warp(mask: np.ndarray, flow: np.ndarray) -> np.ndarray:
     return cv2.remap(mask, map_x, map_y, cv2.INTER_NEAREST, borderMode=cv2.BORDER_CONSTANT)
 
 
+def _flow(current: np.ndarray, neighbor: np.ndarray, max_side: int = 320) -> np.ndarray:
+    """Calculate dense flow at a bounded resolution and restore pixel units."""
+    height, width = current.shape
+    largest = max(height, width)
+    if largest <= max_side:
+        return cv2.calcOpticalFlowFarneback(
+            current, neighbor, None, 0.5, 2, 15, 2, 5, 1.1, 0
+        )
+    ratio = max_side / largest
+    small_width = max(32, int(round(width * ratio)))
+    small_height = max(32, int(round(height * ratio)))
+    current_small = cv2.resize(current, (small_width, small_height), interpolation=cv2.INTER_AREA)
+    neighbor_small = cv2.resize(neighbor, (small_width, small_height), interpolation=cv2.INTER_AREA)
+    flow = cv2.calcOpticalFlowFarneback(
+        current_small, neighbor_small, None, 0.5, 2, 15, 2, 5, 1.1, 0
+    )
+    flow = cv2.resize(flow, (width, height), interpolation=cv2.INTER_LINEAR)
+    flow[..., 0] *= width / small_width
+    flow[..., 1] *= height / small_height
+    return flow
+
+
 def propagate(
     frames: Sequence[np.ndarray],
     seed_mask: np.ndarray,
@@ -93,6 +115,35 @@ def interpolate_keyframes(
     n = len(frames)
     if not keys:
         return [np.zeros(frames[0].shape[:2], np.uint8) for _ in range(n)]
+
+    active = np.zeros(frames[0].shape[:2], dtype=np.uint8)
+    for mask in key_masks:
+        active = np.maximum(active, mask)
+    if active.max() == 0:
+        return [np.zeros_like(active) for _ in range(n)]
+    ys, xs = np.where(active > 0)
+    margin = 24
+    height, width = active.shape
+    y0 = max(0, int(ys.min()) - margin)
+    y1 = min(height, int(ys.max()) + margin + 1)
+    x0 = max(0, int(xs.min()) - margin)
+    x1 = min(width, int(xs.max()) + margin + 1)
+
+    local_frames = [frame[y0:y1, x0:x1] for frame in frames]
+    local_masks = [mask[y0:y1, x0:x1] for mask in key_masks]
+    local = _interpolate_local(local_frames, keys, local_masks)
+    out = [np.zeros_like(active) for _ in range(n)]
+    for index, mask in enumerate(local):
+        out[index][y0:y1, x0:x1] = mask
+    return out
+
+
+def _interpolate_local(
+    frames: Sequence[np.ndarray],
+    keys: Sequence[int],
+    key_masks: Sequence[np.ndarray],
+) -> List[np.ndarray]:
+    n = len(frames)
     grays = [cv2.cvtColor(f, cv2.COLOR_BGR2GRAY) for f in frames]
     out: List[np.ndarray] = [np.zeros(frames[0].shape[:2], np.uint8) for _ in range(n)]
     for k, m in zip(keys, key_masks):
@@ -105,26 +156,24 @@ def interpolate_keyframes(
             continue
         fwd = out[a].copy()
         for i in range(a + 1, b):
-            flow = cv2.calcOpticalFlowFarneback(grays[i], grays[i - 1], None,
-                                                0.5, 3, 21, 3, 5, 1.2, 0)
+            flow = _flow(grays[i], grays[i - 1])
             fwd = _warp(fwd, flow)
             out[i] = np.maximum(out[i], fwd)
         bwd = out[b].copy()
         for i in range(b - 1, a, -1):
-            flow = cv2.calcOpticalFlowFarneback(grays[i], grays[i + 1], None,
-                                                0.5, 3, 21, 3, 5, 1.2, 0)
+            flow = _flow(grays[i], grays[i + 1])
             bwd = _warp(bwd, flow)
             out[i] = np.maximum(out[i], bwd)
 
     first, last = key_set[0], key_set[-1]
     cur = out[first].copy()
     for i in range(first - 1, -1, -1):
-        flow = cv2.calcOpticalFlowFarneback(grays[i], grays[i + 1], None, 0.5, 3, 21, 3, 5, 1.2, 0)
+        flow = _flow(grays[i], grays[i + 1])
         cur = _warp(cur, flow)
         out[i] = np.maximum(out[i], cur)
     cur = out[last].copy()
     for i in range(last + 1, n):
-        flow = cv2.calcOpticalFlowFarneback(grays[i], grays[i - 1], None, 0.5, 3, 21, 3, 5, 1.2, 0)
+        flow = _flow(grays[i], grays[i - 1])
         cur = _warp(cur, flow)
         out[i] = np.maximum(out[i], cur)
     return out

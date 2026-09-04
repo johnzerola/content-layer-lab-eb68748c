@@ -15,7 +15,7 @@ from urllib.parse import unquote
 from fastapi import BackgroundTasks, FastAPI, File, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from .config import get_settings
@@ -176,6 +176,14 @@ class ProcessRequest(BaseModel):
 
 class MediaResolveRequest(BaseModel):
     url: str = Field(min_length=10, max_length=2048)
+
+
+@app.get("/ping", include_in_schema=False)
+async def runpod_ping():
+    """RunPod Load Balancer readiness probe."""
+    if not cuda_available() or not propainter_status().ready:
+        return Response(status_code=204)
+    return {"status": "healthy"}
 
 
 @app.get("/v1/health")
@@ -355,6 +363,9 @@ async def start_process(
         raise HTTPException(400, str(exc)) from None
     if not (job_dir(SETTINGS.storage_dir, job_id) / "input.mp4").is_file():
         raise HTTPException(409, "video ainda nao foi enviado")
+    current_state = read_state(job_dir(SETTINGS.storage_dir, job_id))
+    if current_state.get("status") in {"queued", "processing", "inpainting", "analyzing", "detecting"}:
+        raise HTTPException(409, "job ja esta em processamento")
     with ACTIVE_LOCK:
         if job_id in ACTIVE_JOBS:
             raise HTTPException(409, "job ja esta em processamento")

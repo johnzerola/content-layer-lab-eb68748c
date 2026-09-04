@@ -1,0 +1,75 @@
+# CleanerIA GPU worker
+#
+# Builds the production FastAPI worker with the pinned official ProPainter and
+# DiffuEraser code. Runtime model files stay outside the image in mounted
+# volumes so they can be updated/reused without rebuilding the container.
+#
+# Build from backend/:
+#   docker build -f Dockerfile.gpu -t content-layer-lab-cleaner-worker-gpu .
+
+FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    TORCH_CUDA_ARCH_LIST="7.0 7.5 8.0 8.6 8.9 9.0" \
+    CLEANER_ENV=production \
+    CLEANER_STORAGE=/app/storage \
+    CLEANER_DEVICE=cuda \
+    PROPAINTER_ROOT=/opt/ProPainter \
+    PROPAINTER_WEIGHTS_DIR=/app/models \
+    PROPAINTER_FP16=1 \
+    DIFFUERASER_ROOT=/opt/DiffuEraser \
+    DIFFUERASER_MODELS_ROOT=/app/max-models \
+    HF_HOME=/tmp/huggingface \
+    HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1 \
+    HF_HUB_DISABLE_TELEMETRY=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    ffmpeg \
+    git \
+    libgl1 \
+    libglib2.0-0 \
+    libgomp1 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    python3.10 \
+    python3.10-venv \
+    python3-pip \
+    tini \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt ./
+RUN python3.10 -m pip install --upgrade pip setuptools wheel && \
+    python3.10 -m pip install -r requirements.txt
+
+COPY scripts/ ./scripts/
+
+# Install only immutable upstream source during image build. The heavy model
+# files are installed by scripts/setup_gpu_stack.sh into mounted volumes.
+RUN python3.10 scripts/install_propainter.py --code-only --root /opt/ProPainter && \
+    python3.10 scripts/install_diffueraser.py --code-only --root /opt/DiffuEraser
+
+COPY app/ ./app/
+
+RUN mkdir -p /app/storage /app/models /app/max-models /tmp/huggingface && \
+    useradd -m -u 10001 cleaner && \
+    chown -R cleaner:cleaner /app /opt/ProPainter /opt/DiffuEraser /tmp/huggingface
+
+USER cleaner
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
+    CMD curl -fsS http://localhost:8000/v1/health >/dev/null || exit 1
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["sh", "-c", "exec python3.10 -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --proxy-headers --forwarded-allow-ips '*'" ]

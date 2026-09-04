@@ -9,6 +9,7 @@ PUBLIC_HOST=${CLEANER_PUBLIC_HOST:?defina CLEANER_PUBLIC_HOST}
 BIND_PORT=${CLEANER_BIND_PORT:-18096}
 MIN_VRAM_MB=${DIFFUERASER_MIN_VRAM_MB:-20000}
 CADDY_SITE_FILE=${CADDY_SITE_FILE:-content-layer-lab-cleaner.caddy}
+REMOTE_HF_TOKEN=$(printf '%q' "${HF_TOKEN:-}")
 
 [[ "$APP_ORIGIN" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]] || { echo "APP_ORIGIN invalida"; exit 2; }
 [[ "$PUBLIC_HOST" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "CLEANER_PUBLIC_HOST invalido"; exit 2; }
@@ -19,11 +20,11 @@ echo "==> Enviando release GPU para $USER@$HOST:$REMOTE_DIR"
 ssh "$USER@$HOST" "mkdir -p '$REMOTE_DIR'"
 rsync -az --delete \
   --exclude data --exclude .env --exclude __pycache__ --exclude '*.pyc' \
-  ./app ./scripts ./requirements.txt ./Dockerfile ./docker-compose.gpu.yml \
+  ./app ./scripts ./requirements.txt ./Dockerfile.gpu ./docker-compose.gpu.yml \
   ./Caddyfile.cleaner "$USER@$HOST:$REMOTE_DIR/"
 
 ssh "$USER@$HOST" \
-  "REMOTE_DIR='$REMOTE_DIR' APP_ORIGIN='$APP_ORIGIN' PUBLIC_HOST='$PUBLIC_HOST' BIND_PORT='$BIND_PORT' MIN_VRAM_MB='$MIN_VRAM_MB' CADDY_SITE_FILE='$CADDY_SITE_FILE' bash -s" <<'REMOTE'
+  "REMOTE_DIR='$REMOTE_DIR' APP_ORIGIN='$APP_ORIGIN' PUBLIC_HOST='$PUBLIC_HOST' BIND_PORT='$BIND_PORT' MIN_VRAM_MB='$MIN_VRAM_MB' CADDY_SITE_FILE='$CADDY_SITE_FILE' HF_TOKEN=$REMOTE_HF_TOKEN bash -s" <<'REMOTE'
 set -euo pipefail
 cd "$REMOTE_DIR"
 
@@ -93,9 +94,10 @@ docker compose -f docker-compose.gpu.yml build
 
 echo "==> Instalando snapshots imutaveis e pesos verificados"
 docker compose -f docker-compose.gpu.yml run --rm --no-deps \
+  -e HF_TOKEN="${HF_TOKEN:-}" \
   worker python3.10 scripts/install_propainter.py --weights-only --weights-dir /app/models
 docker compose -f docker-compose.gpu.yml run --rm --no-deps \
-  -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 \
+  -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -e HF_TOKEN="${HF_TOKEN:-}" \
   worker python3.10 scripts/install_diffueraser.py --models-only --models-root /app/max-models
 
 docker compose -f docker-compose.gpu.yml up -d

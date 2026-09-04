@@ -100,6 +100,55 @@ CLEANER_PUBLIC_HOST=cleaner-104-234-186-50.nip.io \
 bash scripts/deploy_gpu_vps.sh
 ```
 
+Se voce ja esta dentro da maquina GPU com o diretorio `backend/` copiado, rode
+o setup local. Ele gera/preserva o `.env`, baixa os pesos oficiais em
+`data/models` e `data/max-models`, sobe o compose GPU e espera o health check:
+
+```bash
+APP_ORIGIN=https://content-layer-lab.lovable.app \
+CLEANER_PUBLIC_HOST=content-layer-lab-cleaner-104-234-186-50.nip.io \
+CLEANER_BIND_PORT=18096 \
+bash scripts/setup_gpu_stack.sh
+```
+
+Use `REQUIRE_MAX_READY=0` apenas quando quiser subir ProPainter sem exigir que
+o DiffuEraser esteja pronto.
+
+## Pipeline final com filas
+
+Para a arquitetura com `detect`, `gpu-quality` e `gpu-max`, use o compose novo.
+Na VPS CPU:
+
+```bash
+cd backend
+APP_ORIGIN=https://content-layer-lab.lovable.app \
+CLEANER_PUBLIC_HOST=content-layer-lab-cleaner-104-234-186-50.nip.io \
+CLEANER_BIND_PORT=18095 \
+bash scripts/setup_pipeline_stack.sh
+```
+
+Se a GPU estiver na mesma maquina:
+
+```bash
+WITH_GPU=1 bash scripts/setup_pipeline_stack.sh
+```
+
+Se a GPU estiver em outra maquina, suba a VPS CPU primeiro e conecte a GPU a um
+Redis/MinIO privados, via rede privada, VPN ou S3 compativel. Na maquina GPU:
+
+```bash
+cd backend
+CLEANER_WORKER_SECRET=mesmo_segredo_da_vps \
+REDIS_URL=redis://host-privado:6379/0 \
+MINIO_ENDPOINT=https://storage-privado.example.com \
+MINIO_ACCESS_KEY=cleaneradmin \
+MINIO_SECRET_KEY=segredo_minio \
+bash scripts/setup_gpu_worker.sh
+```
+
+Nao exponha Redis ou MinIO em HTTP publico. Para GPU remota, prefira WireGuard,
+rede privada do provedor ou storage S3 com credenciais restritas.
+
 Para uma instalacao manual:
 
 ```bash

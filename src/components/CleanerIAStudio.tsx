@@ -29,6 +29,11 @@ import {
   saveCleanerMasks,
 } from "@/lib/cleaner.functions";
 import {
+  CLEANER_DEFAULT_CROP,
+  CLEANER_DEFAULT_ENHANCE,
+  CLEANER_DEFAULT_MODE,
+  CLEANER_DEFAULT_PRESET,
+  CLEANER_DEFAULT_STRATEGY,
   MODE_HINT,
   MODE_LABEL,
   PRESET_HINT,
@@ -49,7 +54,7 @@ type Props = {
 
 type Tool = "select" | "rect" | "poly" | "brush" | "protect" | "erase";
 
-const MODES: CleanerMode[] = ["smart", "text", "watermark", "object", "passerby"];
+const MODES: CleanerMode[] = ["subtitle", "smart", "text", "watermark", "object", "passerby"];
 const PRESETS: CleanerPreset[] = ["fast", "quality", "max"];
 
 export function CleanerIAStudio({ item, onComplete }: Props) {
@@ -57,13 +62,13 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [inputReady, setInputReady] = useState(false);
-  const [mode, setMode] = useState<CleanerMode>("smart");
-  const [preset, setPreset] = useState<CleanerPreset>("quality");
+  const [mode, setMode] = useState<CleanerMode>(CLEANER_DEFAULT_MODE);
+  const [preset, setPreset] = useState<CleanerPreset>(CLEANER_DEFAULT_PRESET);
   const [dynamicMask, setDynamicMask] = useState(true);
   const [protectSubject, setProtectSubject] = useState(true);
   const [verifyPass, setVerifyPass] = useState(true);
-  const [cropClean, setCropClean] = useState(true);
-  const [enhanceOutput, setEnhanceOutput] = useState(true);
+  const [cropClean, setCropClean] = useState(CLEANER_DEFAULT_CROP);
+  const [enhanceOutput, setEnhanceOutput] = useState(CLEANER_DEFAULT_ENHANCE);
   const [masks, setMasks] = useState<CleanerRegion[]>([]);
   const [health, setHealth] = useState<{
     online: boolean;
@@ -492,7 +497,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       toast.error("O vídeo ainda não foi confirmado no motor. Reenvie o arquivo.");
       return;
     }
-    if (!masks.length && !cropClean) {
+    if (!masks.length && !cropClean && (mode === "object" || mode === "passerby")) {
       toast.error("Marque ao menos uma área ou use Detectar.");
       return;
     }
@@ -508,18 +513,20 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             dynamic: dynamicMask,
             protect_subject: protectSubject,
             verify: verifyPass,
-            strategy: cropClean ? "crop-clean" : "inpaint",
+            strategy: cropClean ? "crop-clean" : CLEANER_DEFAULT_STRATEGY,
             crop_clean: { y: 0.26, h: 0.435 },
             enhance: enhanceOutput ? { mode: "hq", scale: 1 } : { mode: "off" },
-            crf: enhanceOutput ? 14 : 16,
-            key_step: dynamicMask ? 3 : 8,
+            crf: enhanceOutput ? 12 : 16,
+            key_step: dynamicMask ? (mode === "subtitle" || mode === "text" ? 1 : 3) : 8,
           },
         },
         headers,
       });
       setPolling(true);
       setJob((prev) => (prev ? { ...prev, status: "inpainting", progress: 1 } : prev));
-      toast.success("Reconstrução iniciada no motor de IA.");
+      toast.success(
+        cropClean ? "Recorte iniciado." : "Remoção e reconstrução iniciadas no CleanerIA.",
+      );
     } catch (e) {
       toast.error(`Erro ao iniciar: ${e instanceof Error ? e.message : "desconhecido"}`);
     }
@@ -862,9 +869,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                   ? "IA pronta"
                   : health.online && health.cuda === false
                     ? "modo CPU"
-                  : health.online
-                    ? "modo básico"
-                    : "offline"}
+                    : health.online
+                      ? "modo básico"
+                      : "offline"}
             </button>
           </div>
 
@@ -926,8 +933,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 key: "crop",
                 on: cropClean,
                 set: setCropClean,
-                title: "Legenda por recorte limpo",
-                hint: "Remove legendas dinÃ¢micas reenquadrando como no teste aprovado",
+                title: "Recortar área da legenda",
+                hint: "Alternativa sem IA: recorta e reenquadra o vídeo; mantenha desligado para reconstruir o fundo",
               },
               {
                 key: "enh",

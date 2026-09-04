@@ -84,10 +84,30 @@ def diffueraser_status() -> DiffuEraserStatus:
         path = models / "propainter" / name
         if not path.is_file() or path.stat().st_size < 1024 * 1024:
             missing.append(f"models/propainter/{name}")
-    has_cuda = cuda_available()
+    has_cuda = _diffueraser_cuda_available()
     if not has_cuda:
         missing.append("cuda")
     return DiffuEraserStatus(not missing, str(root), str(models), has_cuda, tuple(missing))
+
+
+def _diffueraser_cuda_available() -> bool:
+    python = os.getenv("DIFFUERASER_PYTHON", sys.executable)
+    if Path(python).resolve() == Path(sys.executable).resolve():
+        return cuda_available()
+    try:
+        completed = subprocess.run(
+            [
+                python,
+                "-c",
+                "import torch; raise SystemExit(0 if torch.cuda.is_available() else 1)",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=15,
+        )
+        return completed.returncode == 0
+    except Exception:
+        return cuda_available()
 
 
 def build_diffueraser_command(

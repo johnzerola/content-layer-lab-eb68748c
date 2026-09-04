@@ -4,7 +4,7 @@ services:
   worker:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.gpu
     image: content-layer-lab-cleaner-worker-gpu:latest
     container_name: content-layer-lab-cleaner-gpu-worker
     restart: unless-stopped
@@ -40,8 +40,8 @@ services:
       - "127.0.0.1:${CLEANER_BIND_PORT:-8095}:8000"
     volumes:
       - ./data/storage:/app/storage
-      - ./data/models:/app/models:ro
-      - ./data/max-models:/app/max-models:ro
+      - ./data/models:/app/models
+      - ./data/max-models:/app/max-models
     deploy:
       resources:
         reservations:

@@ -30,78 +30,26 @@ def empty_cache() -> None:
 
 
 def patch_fill(image: np.ndarray, hole: np.ndarray, patch: int = 13, search: int = 96) -> np.ndarray:
-    """Exemplar fill for pixels with no usable temporal reference."""
+    """Fast spatial fallback for pixels with no usable temporal reference."""
     if hole.max() == 0:
         return image
-    height, width = hole.shape[:2]
     out = image.copy()
     remaining = (hole > 0).astype(np.uint8) * 255
-    seed = cv2.inpaint(out, remaining, 3, cv2.INPAINT_TELEA)
-    out[remaining > 0] = seed[remaining > 0]
-    step = max(4, patch // 2)
-    ys, xs = np.where(remaining > 0)
-    if ys.size == 0:
-        return out
-    y0, y1 = int(ys.min()), int(ys.max())
-    x0, x1 = int(xs.min()), int(xs.max())
-    half = patch // 2
-    for block_y in range(y0, y1 + 1, step):
-        for block_x in range(x0, x1 + 1, step):
-            if remaining[block_y:block_y + step, block_x:block_x + step].max() == 0:
-                continue
-            target_y0, target_x0 = max(0, block_y - half), max(0, block_x - half)
-            target_y1 = min(height, block_y + step + half)
-            target_x1 = min(width, block_x + step + half)
-            template = out[target_y0:target_y1, target_x0:target_x1]
-            template_mask = (
-                remaining[target_y0:target_y1, target_x0:target_x1] == 0
-            ).astype(np.uint8) * 255
-            if template.shape[0] < 5 or template.shape[1] < 5 or template_mask.max() == 0:
-                continue
-            source_y0, source_x0 = max(0, target_y0 - search), max(0, target_x0 - search)
-            source_y1, source_x1 = min(height, target_y1 + search), min(width, target_x1 + search)
-            source = out[source_y0:source_y1, source_x0:source_x1]
-            source_hole = remaining[source_y0:source_y1, source_x0:source_x1]
-            if source.shape[0] <= template.shape[0] or source.shape[1] <= template.shape[1]:
-                continue
-            try:
-                scores = cv2.matchTemplate(
-                    source, template, cv2.TM_CCORR_NORMED, mask=template_mask
-                )
-            except Exception:
-                continue
-            scores[~np.isfinite(scores)] = -1.0
-            occupied = cv2.boxFilter(
-                (source_hole > 0).astype(np.float32),
-                -1,
-                (template.shape[1], template.shape[0]),
-                normalize=True,
-            )
-            scores[occupied[:scores.shape[0], :scores.shape[1]] > 0.02] = -1.0
-            _, best_score, _, best = cv2.minMaxLoc(scores)
-            if best_score <= 0:
-                continue
-            candidate = source[
-                best[1]:best[1] + template.shape[0],
-                best[0]:best[0] + template.shape[1],
-            ]
-            if candidate.shape != template.shape:
-                continue
-            fill = remaining[target_y0:target_y1, target_x0:target_x1] > 0
-            target = out[target_y0:target_y1, target_x0:target_x1]
-            target[fill] = candidate[fill]
-            out[target_y0:target_y1, target_x0:target_x1] = target
-            remaining[block_y:block_y + step, block_x:block_x + step] = 0
-    if remaining.max() > 0:
-        rest = cv2.inpaint(out, remaining, 3, cv2.INPAINT_TELEA)
-        out[remaining > 0] = rest[remaining > 0]
+    restored = cv2.inpaint(out, remaining, 2, cv2.INPAINT_NS)
+    out[remaining > 0] = restored[remaining > 0]
     return out
 
 
 class InpaintingEngine:
     name = "base"
 
-    def process(self, frames: np.ndarray, masks: np.ndarray) -> np.ndarray:
+    def process(
+        self,
+        frames: np.ndarray,
+        masks: np.ndarray,
+        target_start: int = 0,
+        target_end: int | None = None,
+    ) -> np.ndarray:
         raise NotImplementedError
 
 
@@ -110,52 +58,129 @@ class TemporalFillEngine(InpaintingEngine):
 
     name = "temporal-fill"
 
-    def __init__(self, context_radius: int = 12):
+    def __init__(self, context_radius: int = 12, max_neighbors: int = 4):
         self.context_radius = context_radius
+        self.max_neighbors = max(1, max_neighbors)
 
-    def process(self, frames: np.ndarray, masks: np.ndarray) -> np.ndarray:
+    def process(
+        self,
+        frames: np.ndarray,
+        masks: np.ndarray,
+        target_start: int = 0,
+        target_end: int | None = None,
+    ) -> np.ndarray:
+        if len(frames) == 0 or not np.any(masks):
+            return frames.copy()
+
+        active = np.any(masks > 0, axis=0)
+        ys, xs = np.where(active)
+        margin = 32
+        height, width = active.shape
+        y0 = max(0, int(ys.min()) - margin)
+        y1 = min(height, int(ys.max()) + margin + 1)
+        x0 = max(0, int(xs.min()) - margin)
+        x1 = min(width, int(xs.max()) + margin + 1)
+
+        output = frames.copy()
+        restored = self._process_region(
+            frames[:, y0:y1, x0:x1],
+            masks[:, y0:y1, x0:x1],
+            target_start,
+            target_end,
+        )
+        output[:, y0:y1, x0:x1] = restored
+        return output
+
+    def _process_region(
+        self,
+        frames: np.ndarray,
+        masks: np.ndarray,
+        target_start: int = 0,
+        target_end: int | None = None,
+    ) -> np.ndarray:
         count = len(frames)
+        target_start = max(0, min(count, target_start))
+        target_end = count if target_end is None else max(target_start, min(count, target_end))
         grays = [cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) for frame in frames]
         output = [frame.copy() for frame in frames]
-        for index in range(count):
+        height, width = grays[0].shape
+        grid_x, grid_y = np.meshgrid(
+            np.arange(width, dtype=np.float32),
+            np.arange(height, dtype=np.float32),
+        )
+        for index in range(target_start, target_end):
             remaining = masks[index].copy()
             if remaining.max() == 0:
                 continue
             current = output[index]
-            for radius in range(1, self.context_radius + 1):
-                for neighbor in (index - radius, index + radius):
-                    if neighbor < 0 or neighbor >= count or remaining.max() == 0:
-                        continue
-                    flow = cv2.calcOpticalFlowFarneback(
-                        grays[index], grays[neighbor], None, 0.5, 3, 25, 3, 5, 1.2, 0
-                    )
-                    height, width = grays[index].shape
-                    grid_x, grid_y = np.meshgrid(
-                        np.arange(width, dtype=np.float32),
-                        np.arange(height, dtype=np.float32),
-                    )
-                    warped = cv2.remap(
-                        frames[neighbor],
-                        grid_x + flow[..., 0],
-                        grid_y + flow[..., 1],
-                        cv2.INTER_LINEAR,
-                        borderMode=cv2.BORDER_REPLICATE,
-                    )
-                    warped_mask = cv2.remap(
-                        masks[neighbor],
-                        grid_x + flow[..., 0],
-                        grid_y + flow[..., 1],
-                        cv2.INTER_NEAREST,
-                        borderMode=cv2.BORDER_CONSTANT,
-                    )
-                    usable = cv2.bitwise_and(remaining, cv2.bitwise_not(warped_mask))
-                    selected = usable > 0
-                    current[selected] = warped[selected]
-                    remaining[selected] = 0
+            neighbors = []
+            preferred = (1, 16, 32, 8, 24, 4)
+            radii = [radius for radius in preferred if radius <= self.context_radius]
+            radii.extend(
+                radius for radius in range(1, self.context_radius + 1) if radius not in radii
+            )
+            for radius in radii:
+                neighbors.extend((index - radius, index + radius))
+            used_neighbors = 0
+            for neighbor in neighbors:
+                if neighbor < 0 or neighbor >= count or remaining.max() == 0:
+                    continue
+                potential = cv2.bitwise_and(remaining, cv2.bitwise_not(masks[neighbor]))
+                if potential.max() == 0:
+                    continue
+                current_gray, neighbor_gray, scale_x, scale_y = self._flow_inputs(
+                    grays[index], grays[neighbor]
+                )
+                flow = cv2.calcOpticalFlowFarneback(
+                    current_gray, neighbor_gray, None, 0.5, 2, 15, 2, 5, 1.1, 0
+                )
+                if flow.shape[:2] != (height, width):
+                    flow = cv2.resize(flow, (width, height), interpolation=cv2.INTER_LINEAR)
+                    flow[..., 0] *= scale_x
+                    flow[..., 1] *= scale_y
+                warped = cv2.remap(
+                    frames[neighbor],
+                    grid_x + flow[..., 0],
+                    grid_y + flow[..., 1],
+                    cv2.INTER_LINEAR,
+                    borderMode=cv2.BORDER_REPLICATE,
+                )
+                warped_mask = cv2.remap(
+                    masks[neighbor],
+                    grid_x + flow[..., 0],
+                    grid_y + flow[..., 1],
+                    cv2.INTER_NEAREST,
+                    borderMode=cv2.BORDER_CONSTANT,
+                )
+                usable = cv2.bitwise_and(remaining, cv2.bitwise_not(warped_mask))
+                selected = usable > 0
+                current[selected] = warped[selected]
+                remaining[selected] = 0
+                used_neighbors += 1
+                if used_neighbors >= self.max_neighbors:
+                    break
             if remaining.max() > 0:
                 current = patch_fill(current, remaining)
             output[index] = current
         return np.asarray(output)
+
+    @staticmethod
+    def _flow_inputs(
+        current: np.ndarray, neighbor: np.ndarray, max_side: int = 320
+    ) -> tuple[np.ndarray, np.ndarray, float, float]:
+        height, width = current.shape
+        largest = max(height, width)
+        if largest <= max_side:
+            return current, neighbor, 1.0, 1.0
+        ratio = max_side / largest
+        small_width = max(32, int(round(width * ratio)))
+        small_height = max(32, int(round(height * ratio)))
+        return (
+            cv2.resize(current, (small_width, small_height), interpolation=cv2.INTER_AREA),
+            cv2.resize(neighbor, (small_width, small_height), interpolation=cv2.INTER_AREA),
+            width / small_width,
+            height / small_height,
+        )
 
 
 def process_windowed(

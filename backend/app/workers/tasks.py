@@ -11,13 +11,16 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import time
+from types import SimpleNamespace
 from typing import Dict, List, Optional
 
 import cv2
 import numpy as np
 import requests
 from celery import Celery
+from kombu import Queue
 
 from ..config import get_settings
 from ..engines.inpainting import (
@@ -40,6 +43,7 @@ from ..services import mask as mask_svc
 from ..services import protect as protect_svc
 from ..services import tracking
 from ..services import verify
+from ..services.private_storage import PrivateStorage
 from ..services.scene import detect_scenes
 from ..services.text_detect import detect_text_boxes, frame_text_mask
 from ..services.watermark import detect_watermarks, frame_watermark_mask
@@ -56,12 +60,30 @@ from ..utils.video import (
     read_frames,
 )
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-celery_app = Celery("cleaner_tasks", broker=REDIS_URL, backend=REDIS_URL)
-
 SETTINGS = get_settings()
 WORKER_SECRET = SETTINGS.worker_secret
 STORAGE_DIR = str(SETTINGS.storage_dir)
+REDIS_URL = SETTINGS.redis_url
+celery_app = Celery("cleaner_tasks", broker=REDIS_URL, backend=REDIS_URL)
+celery_app.conf.task_queues = (
+    Queue("detect", routing_key="detect"),
+    Queue("gpu-quality", routing_key="gpu-quality"),
+    Queue("gpu-max", routing_key="gpu-max"),
+)
+celery_app.conf.task_routes = {
+    "process_video_task": {"queue": "detect", "routing_key": "detect"},
+    "cleaner.gpu_quality": {"queue": "gpu-quality", "routing_key": "gpu-quality"},
+    "cleaner.gpu_max": {"queue": "gpu-max", "routing_key": "gpu-max"},
+    "cleaner.finalize": {"queue": "detect", "routing_key": "detect"},
+}
+celery_app.conf.update(
+    task_default_queue="detect",
+    task_default_routing_key="detect",
+    task_track_started=True,
+    worker_prefetch_multiplier=1,
+    task_acks_late=True,
+    result_expires=86400,
+)
 
 
 class JobCancelled(RuntimeError):
@@ -472,6 +494,117 @@ def _run_diffusion_pipeline(
     return segments, metrics, frames
 
 
+def _info_payload(info) -> Dict[str, object]:
+    return {
+        "width": int(info.width),
+        "height": int(info.height),
+        "fps": float(info.fps),
+        "frames": int(info.frames),
+        "duration": float(info.duration),
+        "has_audio": bool(info.has_audio),
+    }
+
+
+def _info_from_payload(payload: Dict[str, object]):
+    return SimpleNamespace(
+        width=int(payload["width"]),
+        height=int(payload["height"]),
+        fps=float(payload["fps"]),
+        frames=int(payload["frames"]),
+        duration=float(payload["duration"]),
+        has_audio=bool(payload.get("has_audio", False)),
+    )
+
+
+def _write_stage(job_id: str, patch: Dict[str, object]) -> Dict[str, object]:
+    job_path = safe_job_dir(SETTINGS.storage_dir, job_id)
+    state = {**read_state(job_path), **patch}
+    write_state(job_path, state)
+    return state
+
+
+def _make_emitter(job_id: str, callback_url: Optional[str], callback_seq: int = 0):
+    job_path = safe_job_dir(SETTINGS.storage_dir, job_id)
+
+    def emit(progress: float, stage: str, status: str = "processing", **extra) -> None:
+        nonlocal callback_seq
+        if (job_path / ".cancel").exists():
+            raise JobCancelled("job cancelado")
+        callback_seq += 1
+        payload = {
+            "job_id": job_id,
+            "status": status,
+            "stage": stage,
+            "progress": round(progress, 1),
+            "callback_seq": callback_seq,
+            **extra,
+        }
+        write_state(job_path, {**read_state(job_path), **payload})
+        _notify(callback_url, payload)
+
+    return emit
+
+
+def _mask_video_to_dir(mask_video: str, mask_dir: str) -> str:
+    target = Path(mask_dir)
+    if target.exists():
+        shutil.rmtree(target)
+    target.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-loglevel",
+            "error",
+            "-i",
+            mask_video,
+            "-vsync",
+            "0",
+            "-start_number",
+            "0",
+            str(target / "%06d.png"),
+        ],
+        check=True,
+    )
+    if not (target / "000000.png").is_file():
+        raise RuntimeError("mascara distribuida nao gerou frames")
+    return str(target)
+
+
+def _needs_diffueraser(metrics: Dict[str, float], options: Dict) -> bool:
+    if os.getenv("CLEANER_AUTO_DIFFUERASER", "1") != "1":
+        return False
+    if options.get("allow_diffusion_fallback") is False:
+        return False
+    residual_threshold = float(options.get("residual_threshold", 0.05))
+    sharpness_threshold = float(options.get("sharpness_threshold", 0.55))
+    temporal_threshold = float(options.get("temporal_threshold", 0.55))
+    return (
+        float(metrics.get("residual_text", 0.0)) > residual_threshold
+        or float(metrics.get("sharpness_ratio", 1.0)) < sharpness_threshold
+        or float(metrics.get("temporal_consistency", 1.0)) < temporal_threshold
+    )
+
+
+def _cleanup_intermediate_files(job_path: Path) -> None:
+    for name in (
+        "masks",
+        "masks.mp4",
+        "propainter-run",
+        "diffueraser-run",
+        "propainter-native.mp4",
+        "diffueraser-native.mp4",
+        "video_only.mp4",
+        "video_only.remote.mp4",
+        "output.post.mp4",
+    ):
+        target = job_path / name
+        if target.is_dir():
+            shutil.rmtree(target, ignore_errors=True)
+        else:
+            target.unlink(missing_ok=True)
+
+
 def _run_classic_pipeline(
     input_path: str,
     tmp_path: str,
@@ -485,10 +618,11 @@ def _run_classic_pipeline(
     auto_protect: bool,
     verify_on: bool,
     emit,
+    cancel_file: Optional[str] = None,
 ) -> tuple[List[Dict], dict, int, str]:
-    engine = TemporalFillEngine(14)
+    engine = TemporalFillEngine(context_radius=32, max_neighbors=6)
     core = 20
-    overlap = 5
+    overlap = 32
     total = max(1, info.frames)
     writer = RawWriter(tmp_path, info.width, info.height, info.fps)
     segments: List[Dict] = []
@@ -498,16 +632,17 @@ def _run_classic_pipeline(
     emit(20, f"reconstrucao temporal classica ({device_name()})", "inpainting")
     try:
         while start < total:
-            context_start = max(0, start - overlap)
-            read_len = min(total, start + core + overlap) - context_start
+            if cancel_file and Path(cancel_file).exists():
+                raise JobCancelled("job cancelado")
+            scene_start = max((cut for cut in cuts if cut <= start), default=0)
+            scene_end = min((cut for cut in cuts if cut > start), default=total)
+            end = min(total, start + core, scene_end)
+            context_start = max(scene_start, start - overlap)
+            context_end = min(scene_end, end + overlap)
+            read_len = context_end - context_start
             frames = read_chunk(input_path, context_start, read_len)
             if not frames:
                 break
-            end = min(total, start + core)
-            for cut in cuts:
-                if start < cut < end:
-                    end = cut
-                    break
             core_len = end - start
             masks = _window_masks(
                 frames,
@@ -519,12 +654,18 @@ def _run_classic_pipeline(
                 context_start,
                 auto_protect,
             )
-            masks = tracking.stabilize(masks) if len(masks) > 2 else masks
-            result = process_windowed(engine, list(frames), masks, len(frames), 0)
+            if len(masks) > 2 and mode not in ("subtitle", "text"):
+                masks = tracking.stabilize(masks)
+            offset = start - context_start
+            result = engine.process(
+                np.asarray(frames),
+                masks,
+                target_start=offset,
+                target_end=offset + core_len,
+            )
             metrics = {"residual_text": 0.0, "sharpness_ratio": 1.0, "temporal_consistency": 1.0}
             if verify_on:
                 _, metrics = verify.audit_window(result, masks)
-            offset = start - context_start
             for index in range(offset, offset + core_len):
                 if index < len(result):
                     writer.write(result[index])
@@ -712,6 +853,7 @@ def run_pipeline(
                 auto_protect,
                 verify_on,
                 emit,
+                str(cancel_path),
             )
             pass_count = 1
 
@@ -761,10 +903,337 @@ def run_pipeline(
         raise
 
 
-@celery_app.task(name="process_video_task", bind=True)
-def process_video_task(self, job_id: str, mode: str, preset: str,
-                       masks_data: list, callback_url: str, options: dict | None = None):
+@celery_app.task(name="process_video_task", bind=True, queue="detect")
+def process_video_task(
+    self,
+    job_id: str,
+    mode: str,
+    preset: str,
+    masks_data: list,
+    callback_url: str | None,
+    options: dict | None = None,
+):
+    """CPU detect phase.
+
+    Fast/crop jobs can finish on CPU. Quality/max jobs generate one combined
+    mask video and hand off original+mask to a GPU worker through MinIO.
+    """
+    opts = options or {}
+
     def progress_cb(progress: float, stage: str) -> None:
         self.update_state(state="PROGRESS", meta={"progress": progress, "stage": stage})
 
-    return run_pipeline(job_id, mode, preset, masks_data, callback_url, progress_cb, options)
+    if preset == "fast" or str(opts.get("strategy", "inpaint")) == "crop-clean":
+        return run_pipeline(job_id, mode, preset, masks_data, callback_url, progress_cb, opts)
+
+    job_path = safe_job_dir(SETTINGS.storage_dir, job_id)
+    cancel_path = job_path / ".cancel"
+    input_path = str(job_path / "input.mp4")
+    callback_seq = int(read_state(job_path).get("callback_seq", 0))
+    emit = _make_emitter(job_id, callback_url, callback_seq)
+
+    try:
+        if not Path(input_path).is_file():
+            raise FileNotFoundError(f"video de entrada ausente para {job_id}")
+
+        emit(4, "analisando video", "analyzing")
+        info = probe(input_path)
+        regions = list(masks_data or [])
+        if not regions:
+            emit(10, "detectando legendas e marcas", "detecting")
+            regions = auto_detect(job_id, mode)
+        if not regions:
+            raise ValueError("nenhuma area para remover foi detectada ou marcada")
+
+        dynamic = bool(opts.get("dynamic", True))
+        auto_protect = bool(opts.get("protect_subject", True))
+        key_step = int(opts.get("key_step", 4))
+        mask_dir = str(job_path / "masks")
+        mask_video = str(job_path / "masks.mp4")
+
+        emit(16, "unindo mascaras", "tracking")
+        written = _write_mask_sequence(
+            input_path,
+            mask_dir,
+            regions,
+            info,
+            mode,
+            dynamic,
+            key_step,
+            auto_protect,
+            lambda ratio: emit(16 + ratio * 18, "unindo mascaras", "tracking"),
+        )
+        masks_to_video(mask_dir, mask_video, info.fps)
+
+        emit(36, "enviando para storage privado", "queued")
+        storage = PrivateStorage()
+        original_object = storage.put_file(input_path, f"{job_id}/input.mp4", "video/mp4")
+        mask_object = storage.put_file(mask_video, f"{job_id}/mask.mp4", "video/mp4")
+        current_seq = int(read_state(job_path).get("callback_seq", callback_seq))
+        payload = {
+            "job_id": job_id,
+            "mode": mode,
+            "preset": preset,
+            "regions": regions,
+            "options": opts,
+            "callback_url": callback_url,
+            "callback_seq": current_seq,
+            "info": _info_payload(info),
+            "objects": {
+                "original": original_object,
+                "mask": mask_object,
+            },
+            "mask_frames": written,
+        }
+        _write_stage(
+            job_id,
+            {
+                "status": "queued",
+                "progress": 38,
+                "stage": "aguardando GPU",
+                "detections": regions,
+                "probe": _info_payload(info),
+                "pipeline": "distributed",
+                "queue": "gpu-quality",
+            },
+        )
+        gpu_quality_task.apply_async(args=[payload], queue="gpu-quality")
+        return {"status": "queued", "job_id": job_id, "queue": "gpu-quality"}
+    except Exception as exc:
+        empty_cache()
+        failure = {
+            "job_id": job_id,
+            "status": "failed",
+            "progress": 0,
+            "error": str(exc)[:1000],
+        }
+        write_state(job_path, {**read_state(job_path), **failure})
+        _notify(callback_url, failure)
+        raise
+    finally:
+        if cancel_path.exists():
+            cancel_path.unlink(missing_ok=True)
+
+
+@celery_app.task(name="cleaner.gpu_quality", bind=True, queue="gpu-quality")
+def gpu_quality_task(self, payload: dict):
+    """GPU quality phase: ProPainter plus localized validation."""
+    job_id = payload["job_id"]
+    callback_url = payload.get("callback_url")
+    opts = payload.get("options") or {}
+    info = _info_from_payload(payload["info"])
+    gpu_path = safe_job_dir(SETTINGS.storage_dir, job_id)
+    gpu_path.mkdir(parents=True, exist_ok=True)
+    emit = _make_emitter(job_id, callback_url, int(payload.get("callback_seq") or 0))
+
+    try:
+        emit(42, "baixando original e mascara na GPU", "processing")
+        storage = PrivateStorage()
+        input_path = storage.get_file(payload["objects"]["original"], gpu_path / "input.mp4")
+        mask_video = storage.get_file(payload["objects"]["mask"], gpu_path / "masks.mp4")
+        mask_dir = _mask_video_to_dir(str(mask_video), str(gpu_path / "masks"))
+
+        emit(50, "rodando ProPainter", "inpainting")
+        video_only = run_propainter(
+            str(input_path),
+            mask_dir,
+            str(gpu_path / "propainter-run"),
+            info.width,
+            info.height,
+            info.fps,
+            payload.get("preset", "quality"),
+            lambda stage: emit(52, stage, "inpainting"),
+            str(gpu_path / ".cancel"),
+        )
+        normalized = normalize_video(
+            video_only,
+            str(gpu_path / "propainter-native.mp4"),
+            info.width,
+            info.height,
+            info.fps,
+        )
+
+        emit(76, "validando area reconstruida", "refining")
+        if bool(opts.get("verify", True)):
+            segments, metrics = _audit_video(normalized, mask_dir, info.fps)
+        else:
+            segments = []
+            metrics = {"residual_text": 0.0, "sharpness_ratio": 1.0, "temporal_consistency": 1.0}
+
+        diffusion = diffueraser_status()
+        should_max = diffusion.ready and _needs_diffueraser(metrics, opts)
+        if should_max:
+            emit(82, "residuo detectado; enviando para DiffuEraser", "queued")
+            max_payload = {
+                **payload,
+                "quality": {"segments": segments, "metrics": metrics},
+                "objects": payload["objects"],
+                "callback_seq": int(read_state(gpu_path).get("callback_seq", payload.get("callback_seq") or 0)),
+            }
+            gpu_max_task.apply_async(args=[max_payload], queue="gpu-max")
+            return {"status": "queued", "queue": "gpu-max", "validation": metrics}
+
+        emit(86, "subindo resultado ProPainter", "queued")
+        video_object = storage.put_file(normalized, f"{job_id}/propainter-video.mp4", "video/mp4")
+        finalize_payload = {
+            **payload,
+            "objects": {**payload["objects"], "video": video_object},
+            "segments": segments,
+            "metrics": metrics,
+            "engine": "propainter-official",
+            "device": device_name(),
+            "passes": 1,
+            "callback_seq": int(read_state(gpu_path).get("callback_seq", payload.get("callback_seq") or 0)),
+        }
+        finalize_video_task.apply_async(args=[finalize_payload], queue="detect")
+        _cleanup_intermediate_files(gpu_path)
+        return {"status": "queued", "queue": "detect", "engine": "propainter-official"}
+    except Exception as exc:
+        empty_cache()
+        failure = {
+            "job_id": job_id,
+            "status": "failed",
+            "progress": 0,
+            "error": str(exc)[:1000],
+        }
+        write_state(gpu_path, {**read_state(gpu_path), **failure})
+        _notify(callback_url, failure)
+        raise
+
+
+@celery_app.task(name="cleaner.gpu_max", bind=True, queue="gpu-max")
+def gpu_max_task(self, payload: dict):
+    """GPU max phase: DiffuEraser fallback when quality validation fails."""
+    job_id = payload["job_id"]
+    callback_url = payload.get("callback_url")
+    info = _info_from_payload(payload["info"])
+    gpu_path = safe_job_dir(SETTINGS.storage_dir, job_id)
+    gpu_path.mkdir(parents=True, exist_ok=True)
+    emit = _make_emitter(job_id, callback_url, int(payload.get("callback_seq") or 0))
+
+    try:
+        emit(84, "baixando arquivos para DiffuEraser", "processing")
+        storage = PrivateStorage()
+        input_path = storage.get_file(payload["objects"]["original"], gpu_path / "input.mp4")
+        mask_video = storage.get_file(payload["objects"]["mask"], gpu_path / "masks.mp4")
+        mask_dir = _mask_video_to_dir(str(mask_video), str(gpu_path / "masks"))
+
+        emit(88, "rodando DiffuEraser", "inpainting")
+        video_only = run_diffueraser(
+            str(input_path),
+            str(mask_video),
+            str(gpu_path / "diffueraser-run"),
+            info.duration,
+            lambda stage: emit(90, stage, "inpainting"),
+            str(gpu_path / ".cancel"),
+        )
+        normalized = normalize_video(
+            video_only,
+            str(gpu_path / "diffueraser-native.mp4"),
+            info.width,
+            info.height,
+            info.fps,
+        )
+        if bool((payload.get("options") or {}).get("verify", True)):
+            segments, metrics = _audit_video(normalized, mask_dir, info.fps)
+        else:
+            segments = []
+            metrics = {"residual_text": 0.0, "sharpness_ratio": 1.0, "temporal_consistency": 1.0}
+
+        emit(94, "subindo resultado DiffuEraser", "queued")
+        video_object = storage.put_file(normalized, f"{job_id}/diffueraser-video.mp4", "video/mp4")
+        finalize_payload = {
+            **payload,
+            "objects": {**payload["objects"], "video": video_object},
+            "segments": segments,
+            "metrics": metrics,
+            "engine": "diffueraser-official",
+            "device": device_name(),
+            "passes": 2,
+            "callback_seq": int(read_state(gpu_path).get("callback_seq", payload.get("callback_seq") or 0)),
+        }
+        finalize_video_task.apply_async(args=[finalize_payload], queue="detect")
+        _cleanup_intermediate_files(gpu_path)
+        return {"status": "queued", "queue": "detect", "engine": "diffueraser-official"}
+    except Exception as exc:
+        empty_cache()
+        failure = {
+            "job_id": job_id,
+            "status": "failed",
+            "progress": 0,
+            "error": str(exc)[:1000],
+        }
+        write_state(gpu_path, {**read_state(gpu_path), **failure})
+        _notify(callback_url, failure)
+        raise
+
+
+@celery_app.task(name="cleaner.finalize", bind=True, queue="detect")
+def finalize_video_task(self, payload: dict):
+    """CPU final phase: mux original audio, write final state and clean storage."""
+    job_id = payload["job_id"]
+    callback_url = payload.get("callback_url")
+    opts = payload.get("options") or {}
+    info = _info_from_payload(payload["info"])
+    job_path = safe_job_dir(SETTINGS.storage_dir, job_id)
+    job_path.mkdir(parents=True, exist_ok=True)
+    emit = _make_emitter(
+        job_id,
+        callback_url,
+        int(payload.get("callback_seq") or read_state(job_path).get("callback_seq", 0)),
+    )
+    storage = PrivateStorage()
+
+    try:
+        emit(96, "baixando resultado da GPU", "encoding")
+        original = job_path / "input.mp4"
+        if not original.is_file():
+            storage.get_file(payload["objects"]["original"], original)
+        video_only = storage.get_file(payload["objects"]["video"], job_path / "video_only.remote.mp4")
+        output_path = str(job_path / "output.mp4")
+        mux_audio(str(video_only), str(original), output_path, info.has_audio)
+        _apply_postprocess(str(original), output_path, info, opts, emit)
+
+        result_payload = {
+            "job_id": job_id,
+            "callback_seq": int(read_state(job_path).get("callback_seq", 0)) + 1,
+            "status": "completed",
+            "progress": 100,
+            "stage": "concluido",
+            "result_url": f"/v1/jobs/{job_id}/result",
+            "detections": payload.get("regions", []),
+            "segments": payload.get("segments", []),
+            "metrics": {
+                **(payload.get("metrics") or {}),
+                "device": payload.get("device", device_name()),
+                "frames": int(payload.get("mask_frames") or info.frames),
+                "engine": payload.get("engine", "distributed"),
+                "passes": int(payload.get("passes", 1)),
+                "strategy": str(opts.get("strategy", "inpaint")),
+                "enhance": opts.get("enhance", {"mode": "hq"}),
+                "dynamic_masks": bool(opts.get("dynamic", True)),
+                "subject_protection": bool(opts.get("protect_subject", True)),
+            },
+            "probe": _info_payload(info),
+            "pipeline": "distributed",
+        }
+        write_state(job_path, {**read_state(job_path), **result_payload})
+        _notify(callback_url, result_payload)
+        _cleanup_intermediate_files(job_path)
+        try:
+            original.unlink(missing_ok=True)
+            storage.delete_prefix(f"{job_id}/")
+        except Exception as cleanup_exc:  # pragma: no cover
+            print(f"[cleanup] distributed cleanup failed: {cleanup_exc}")
+        return result_payload
+    except Exception as exc:
+        empty_cache()
+        failure = {
+            "job_id": job_id,
+            "status": "failed",
+            "progress": 0,
+            "error": str(exc)[:1000],
+        }
+        write_state(job_path, {**read_state(job_path), **failure})
+        _notify(callback_url, failure)
+        raise

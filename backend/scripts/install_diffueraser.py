@@ -8,8 +8,6 @@ from pathlib import Path
 import subprocess
 import sys
 
-from huggingface_hub import snapshot_download
-
 from install_propainter import install_weights
 
 
@@ -35,6 +33,8 @@ def install_code(root: Path) -> None:
 
 
 def hf_download(repo: str, destination: Path, allow_patterns=None) -> None:
+    from huggingface_hub import snapshot_download
+
     destination.mkdir(parents=True, exist_ok=True)
     print(f"[download] {repo} -> {destination}")
     snapshot_download(
@@ -42,6 +42,7 @@ def hf_download(repo: str, destination: Path, allow_patterns=None) -> None:
         revision=MODEL_REVISIONS[repo],
         local_dir=destination,
         allow_patterns=allow_patterns,
+        max_workers=1,
         token=os.getenv("HF_TOKEN") or None,
     )
 

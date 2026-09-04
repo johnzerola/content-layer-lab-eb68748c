@@ -21,13 +21,17 @@ def _get_detector():
     if _detector_tried:
         return _detector
     _detector_tried = True
+    requested_detector = os.getenv("CLEANER_TEXT_DETECTOR", "morphology").strip()
+    if requested_detector.lower() == "morphology":
+        _detector_kind = "morphology"
+        return None
     try:
         # PaddleOCR 3.x direct detector. Recognition is intentionally omitted:
         # masks need geometry, not the transcription.
         from paddleocr import TextDetection  # type: ignore
 
         _detector = TextDetection(
-            model_name=os.getenv("CLEANER_TEXT_DETECTOR", "PP-OCRv5_server_det"),
+            model_name=requested_detector,
             device=os.getenv("CLEANER_OCR_DEVICE", "cpu"),
         )
         _detector_kind = "pp-ocrv5"
@@ -50,9 +54,13 @@ def detector_status(load: bool = False) -> dict:
     if load:
         _get_detector()
     return {
-        "ready": _detector is not None or importlib.util.find_spec("paddleocr") is not None,
+        "ready": (
+            _detector_kind == "morphology"
+            or _detector is not None
+            or importlib.util.find_spec("paddleocr") is not None
+        ),
         "engine": _detector_kind if _detector_tried else "not-loaded",
-        "model": os.getenv("CLEANER_TEXT_DETECTOR", "PP-OCRv5_server_det"),
+        "model": os.getenv("CLEANER_TEXT_DETECTOR", "morphology"),
     }
 
 
@@ -87,6 +95,7 @@ def _modern_polygons(result: Iterable[Any]) -> List[np.ndarray]:
 
 
 def _boxes_paddle(frame: np.ndarray) -> List[Box]:
+    global _detector, _detector_kind
     detector = _get_detector()
     if detector is None:
         return []
@@ -96,7 +105,9 @@ def _boxes_paddle(frame: np.ndarray) -> List[Box]:
             return [cv2.boundingRect(poly.astype(np.int32)) for poly in _modern_polygons(result)]
         result = detector.ocr(frame, cls=False)
     except Exception as exc:
-        print(f"[text_detect] inference failed ({exc}); using morphology for this frame")
+        print(f"[text_detect] inference failed ({exc}); disabling PaddleOCR")
+        _detector = None
+        _detector_kind = "morphology"
         return []
     boxes: List[Box] = []
     for page in result or []:
@@ -157,6 +168,45 @@ def text_pixel_mask(frame: np.ndarray, box: Box, dilate_ratio: float = 0.18) -> 
     return mask
 
 
+def _bright_subtitle_mask(frame: np.ndarray, roi: np.ndarray) -> np.ndarray:
+    """Recover short white words that morphology may reject as narrow boxes."""
+    h_img, w_img = frame.shape[:2]
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    bright = (
+        (hsv[..., 2] >= 185)
+        & (hsv[..., 1] <= 120)
+        & (roi > 0)
+    ).astype(np.uint8) * 255
+    count, labels, stats, centroids = cv2.connectedComponentsWithStats(bright, 8)
+    candidates = []
+    for label in range(1, count):
+        x, y, w, h, area = stats[label]
+        if area < 20 or w < 2 or h < 8:
+            continue
+        if w > w_img * 0.16 or h > max(32, h_img * 0.08):
+            continue
+        candidates.append((label, x, y, w, h, centroids[label][1]))
+
+    keep = np.zeros((h_img, w_img), dtype=np.uint8)
+    kept_heights = []
+    for label, _x, _y, _w, height, center_y in candidates:
+        peers = sum(
+            1
+            for _other, _ox, _oy, _ow, other_h, other_y in candidates
+            if abs(center_y - other_y) <= max(8, 0.45 * max(height, other_h))
+        )
+        if peers >= 3:
+            keep[labels == label] = 255
+            kept_heights.append(height)
+    if not kept_heights:
+        return keep
+    radius = max(3, int(round(float(np.median(kept_heights)) * 0.18)) | 1)
+    return cv2.dilate(
+        keep,
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (radius, radius)),
+    )
+
+
 def frame_text_mask(
     frame: np.ndarray,
     roi: np.ndarray | None = None,
@@ -164,7 +214,27 @@ def frame_text_mask(
 ) -> np.ndarray:
     h_img, w_img = frame.shape[:2]
     out = np.zeros((h_img, w_img), np.uint8)
-    for box in detect_text_boxes(frame):
+    offset_x = 0
+    offset_y = 0
+    detector_frame = frame
+    if roi is not None and roi.max() > 0:
+        ys, xs = np.where(roi > 0)
+        margin = 16
+        offset_x = max(0, int(xs.min()) - margin)
+        offset_y = max(0, int(ys.min()) - margin)
+        x1 = min(w_img, int(xs.max()) + margin + 1)
+        y1 = min(h_img, int(ys.max()) + margin + 1)
+        detector_frame = frame[offset_y:y1, offset_x:x1]
+
+    for detected_box in detect_text_boxes(detector_frame):
+        x, y, w, h = detected_box
+        pad = max(3, int(round(h * 0.18)))
+        box = (
+            max(0, x + offset_x - pad),
+            max(0, y + offset_y - pad),
+            min(w_img, x + offset_x + w + pad) - max(0, x + offset_x - pad),
+            min(h_img, y + offset_y + h + pad) - max(0, y + offset_y - pad),
+        )
         x, y, w, h = box
         if subtitle_only and (y + h / 2) < h_img * 0.42:
             continue
@@ -173,6 +243,12 @@ def frame_text_mask(
             if sub.size == 0 or (sub > 0).mean() < 0.15:
                 continue
         out = np.maximum(out, text_pixel_mask(frame, box))
+    if subtitle_only and roi is not None:
+        out = np.maximum(out, _bright_subtitle_mask(frame, roi))
+        out = cv2.dilate(
+            out,
+            cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)),
+        )
     if roi is not None:
         out = cv2.bitwise_and(out, roi)
     return out

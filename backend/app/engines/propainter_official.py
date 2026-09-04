@@ -22,7 +22,9 @@ REQUIRED_CODE = (
     "inference_propainter.py",
     "model/propainter.py",
     "model/recurrent_flow_completion.py",
-    "RAFT/core/raft.py",
+)
+REQUIRED_CODE_ANY = (
+    ("RAFT/core/raft.py", "RAFT/raft.py"),
 )
 REQUIRED_WEIGHTS = (
     "ProPainter.pth",
@@ -62,14 +64,37 @@ def propainter_status(require_cuda: bool = True) -> ProPainterStatus:
     for rel in REQUIRED_CODE:
         if not (root / rel).is_file():
             missing.append(rel)
+    for alternatives in REQUIRED_CODE_ANY:
+        if not any((root / rel).is_file() for rel in alternatives):
+            missing.append("|".join(alternatives))
     for name in REQUIRED_WEIGHTS:
         path = weights_dir / name
         if not path.is_file() or path.stat().st_size < 1024 * 1024:
             missing.append(f"weights/{name}")
-    has_cuda = cuda_available()
+    has_cuda = _propainter_cuda_available()
     if require_cuda and not has_cuda:
         missing.append("cuda")
     return ProPainterStatus(not missing, str(root), has_cuda, tuple(missing))
+
+
+def _propainter_cuda_available() -> bool:
+    python = os.getenv("PROPAINTER_PYTHON", sys.executable)
+    if Path(python).resolve() == Path(sys.executable).resolve():
+        return cuda_available()
+    try:
+        completed = subprocess.run(
+            [
+                python,
+                "-c",
+                "import torch; raise SystemExit(0 if torch.cuda.is_available() else 1)",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=15,
+        )
+        return completed.returncode == 0
+    except Exception:
+        return cuda_available()
 
 
 def _processing_size(width: int, height: int, preset: str) -> Tuple[int, int]:
@@ -106,7 +131,7 @@ def build_propainter_command(
         "--ref_stride", "5" if preset == "max" else "10",
         "--mask_dilation", "2" if preset == "max" else "1",
     ]
-    if cuda_available() and os.getenv("PROPAINTER_FP16", "1") == "1":
+    if _propainter_cuda_available() and os.getenv("PROPAINTER_FP16", "1") == "1":
         command.append("--fp16")
     return command
 

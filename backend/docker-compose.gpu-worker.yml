@@ -1,0 +1,55 @@
+name: content-layer-lab-cleaner-gpu-worker
+
+services:
+  worker-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    image: content-layer-lab-cleaner-worker-gpu:latest
+    container_name: cleaner-worker-gpu
+    restart: unless-stopped
+    command: celery -A app.workers.tasks:celery_app worker -Q gpu-quality,gpu-max -c 1 --loglevel=info
+    environment:
+      CLEANER_ENV: production
+      CLEANER_WORKER_SECRET: ${CLEANER_WORKER_SECRET:?defina no .env}
+      CLEANER_STORAGE: /app/storage
+      CLEANER_DEVICE: cuda
+      USE_CELERY: "1"
+      REDIS_URL: ${REDIS_URL:?defina no .env}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:?defina no .env}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?defina no .env}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?defina no .env}
+      MINIO_BUCKET: ${MINIO_BUCKET:-cleaner-jobs}
+      MINIO_SECURE: ${MINIO_SECURE:-0}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://localhost}
+      CLEANER_CALLBACK_ORIGINS: ${CLEANER_CALLBACK_ORIGINS:-https://localhost}
+      CLEANER_ALLOWED_HOSTS: ${CLEANER_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      PROPAINTER_ROOT: /opt/ProPainter
+      PROPAINTER_WEIGHTS_DIR: /app/models
+      PROPAINTER_MAX_SIDE: ${PROPAINTER_MAX_SIDE:-1280}
+      PROPAINTER_FP16: "1"
+      DIFFUERASER_ROOT: /opt/DiffuEraser
+      DIFFUERASER_MODELS_ROOT: /app/max-models
+      DIFFUERASER_MAX_SIDE: ${DIFFUERASER_MAX_SIDE:-960}
+      CLEANER_AUTO_DIFFUERASER: ${CLEANER_AUTO_DIFFUERASER:-1}
+    volumes:
+      - ./data/gpu-storage:/app/storage
+      - ./data/models:/app/models
+      - ./data/max-models:/app/max-models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    shm_size: "8gb"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"

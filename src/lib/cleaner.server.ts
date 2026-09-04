@@ -37,7 +37,10 @@ function compactWorkerError(body: string, status?: number): string {
 
 export function workerBase(): string | null {
   const url = process.env["CLEANER_WORKER_URL"];
-  return url ? normalizeBase(url) : null;
+  if (url) return normalizeBase(url);
+  const endpointId = process.env["RUNPOD_ENDPOINT_ID"]?.trim();
+  if (!endpointId || !/^[a-zA-Z0-9_-]+$/.test(endpointId)) return null;
+  return `https://${endpointId}.api.runpod.ai`;
 }
 
 export function workerPublicBase(): string | null {
@@ -51,6 +54,11 @@ function secret(): string {
     throw new Error("CLEANER_WORKER_SECRET ausente ou fraco");
   }
   return value;
+}
+
+function applyRunpodAuth(headers: Headers): void {
+  const apiKey = process.env["RUNPOD_API_KEY"]?.trim();
+  if (apiKey) headers.set("authorization", `Bearer ${apiKey}`);
 }
 
 let legacyTokenCache: boolean | null = null;
@@ -67,7 +75,9 @@ async function usesLegacyWorkerToken(): Promise<boolean> {
   const base = workerBase();
   if (!base) return false;
   try {
-    const response = await fetch(`${base}/v1/health`);
+    const headers = new Headers();
+    applyRunpodAuth(headers);
+    const response = await fetch(`${base}/v1/health`, { headers });
     const body = (await response.json()) as { version?: unknown };
     legacyTokenCache = body.version === "1.0.0";
   } catch {
@@ -194,6 +204,7 @@ async function call<T>(path: string, init: RequestInit & { jobId?: string } = {}
   if (!base) throw new Error("worker-offline");
   const headers = new Headers(init.headers);
   headers.set("content-type", "application/json");
+  applyRunpodAuth(headers);
   if (init.jobId) {
     headers.set(
       "x-job-token",
@@ -217,7 +228,9 @@ export async function workerHealth() {
   const base = workerBase();
   if (!base) return { online: false as const, reason: "CLEANER_WORKER_URL nao configurada" };
   try {
-    const response = await fetch(`${base}/v1/health`);
+    const headers = new Headers();
+    applyRunpodAuth(headers);
+    const response = await fetch(`${base}/v1/health`, { headers });
     const responseBody = await response.text();
     if (!response.ok) {
       return {
@@ -243,12 +256,14 @@ export async function workerHealth() {
 export async function workerResolveMedia(url: string) {
   const base = workerBase();
   if (!base) throw new Error("worker-offline");
+  const headers = new Headers({
+    "content-type": "application/json",
+    "x-service-token": serviceToken("media"),
+  });
+  applyRunpodAuth(headers);
   const response = await fetch(`${base}/v1/media/resolve`, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-service-token": serviceToken("media"),
-    },
+    headers,
     body: JSON.stringify({ url }),
   });
   const body = await response.text();

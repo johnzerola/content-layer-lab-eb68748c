@@ -8,8 +8,16 @@
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [k: string]: JsonValue };
 
-export type CleanerMode = "smart" | "text" | "watermark" | "logo" | "object" | "passerby";
+export type CleanerMode =
+  "smart" | "subtitle" | "text" | "watermark" | "logo" | "object" | "passerby";
 export type CleanerPreset = "fast" | "quality" | "max";
+export type CleanerStrategy = "inpaint" | "crop-clean";
+
+export const CLEANER_DEFAULT_MODE: CleanerMode = "subtitle";
+export const CLEANER_DEFAULT_PRESET: CleanerPreset = "quality";
+export const CLEANER_DEFAULT_STRATEGY: CleanerStrategy = "inpaint";
+export const CLEANER_DEFAULT_CROP = false;
+export const CLEANER_DEFAULT_ENHANCE = true;
 
 export type CleanerStatus =
   | "queued"
@@ -55,6 +63,7 @@ export const STAGE_LABEL: Record<CleanerStatus, string> = {
 
 export const MODE_LABEL: Record<CleanerMode, string> = {
   smart: "Smart",
+  subtitle: "Legenda",
   text: "Texto",
   watermark: "Marca d'água",
   logo: "Logo",
@@ -64,6 +73,7 @@ export const MODE_LABEL: Record<CleanerMode, string> = {
 
 export const MODE_HINT: Record<CleanerMode, string> = {
   smart: "detecta texto, marca d'água e objetos de uma vez",
+  subtitle: "detecta legendas queimadas e acompanha o texto durante o vídeo",
   text: "qualquer texto sobreposto, em qualquer posição da tela",
   watermark: "detecta também alpha blending de marca semitransparente",
   logo: "blob de cor/forma persistente, inclusive logo animado",
