@@ -806,9 +806,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     const detectDone = (job?.detections?.length ?? 0) > 0 || masks.length > 0;
     const maskDone = masks.length > 0 || (uploadDone && cropClean && stageAt >= 5);
     const inpaintActive =
-      !!status && ["analyzing", "detecting", "tracking", "processing", "inpainting", "refining"].includes(status);
+      !!status &&
+      ["chunking", "analyzing", "detecting", "tracking", "processing", "inpainting", "refining"].includes(status);
     const inpaintDone = !!status && stageAt >= stageIndex("encoding");
-    const remuxActive = status === "encoding";
+    const remuxActive = status === "encoding" || status === "assembling" || status === "cleaning";
     const remuxDone = status === "completed" && !!(job?.result_url || job?.preview_url);
 
     return [
