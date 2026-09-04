@@ -699,16 +699,30 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     override?: { job?: CleanerJob | null; masks?: CleanerRegion[] },
   ) => {
     const target = override?.job ?? job;
-    const activeMasks = override?.masks ?? masks;
+    let activeMasks = override?.masks ?? masks;
     if (!target?.id) return;
     if (!inputReady && !override?.job) {
       toast.error("O vídeo ainda não foi confirmado no motor. Reenvie o arquivo.");
       return;
     }
-    if (!activeMasks.length && !cropClean) {
-      toast.error("Marque ao menos uma área ou use Detectar.");
-      return;
+    // Sem nenhuma área marcada o motor não tem o que reconstruir. Antes de qualquer
+    // coisa tentamos detectar sozinho — reenquadrar (recorte) nunca é automático,
+    // porque só corta o vídeo em vez de apagar a legenda.
+    const hasRemove = activeMasks.some((m) => m.role !== "protect" && m.enabled !== false);
+    if (!hasRemove) {
+      const found = await handleDetect(target);
+      if (found?.length) {
+        activeMasks = [...activeMasks, ...found];
+      } else if (cropClean) {
+        toast.warning(
+          "Nenhuma área encontrada: o vídeo será apenas reenquadrado, sem reconstruir o fundo.",
+        );
+      } else {
+        toast.error("Nenhuma área encontrada. Marque a legenda ou a marca d'água à mão.");
+        return;
+      }
     }
+
     if (!preview && !creditsAvailable) {
       toast.error(
         `Créditos insuficientes: este vídeo custa ${creditsNeeded} crédito(s). Faça upgrade do plano.`,
