@@ -434,6 +434,7 @@ def clean_video(
                 # LaMa em poucos keyframes + propagação alinhada: reconstrói
                 # estrutura (linhas, bordas) sem pagar uma inferência por frame.
                 budget = int(preset.get("lama_keys", 2) or 2)
+                before = list(cleaned)
                 cleaned, plate_stats = reconstruct_with_plates(
                     crops, list(masks), list(cleaned), lama,
                     budget=budget, feather=max(3, opts.mask_feather_px),
@@ -451,6 +452,7 @@ def clean_video(
                     report = lama_report
                     engine_used = "tbe+lama"
                 else:
+                    cleaned = before
                     plate_totals["lama_rejected"] = plate_totals.get("lama_rejected", 0) + 1
 
 
