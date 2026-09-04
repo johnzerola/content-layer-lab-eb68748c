@@ -32,6 +32,7 @@ import numpy as np
 
 from ..providers.lama_provider import LaMaProvider
 from ..providers.sam2_provider import Sam2Provider
+from ..video.harmonize import harmonize_sequence
 from ..video.protect import ProtectMap
 from .object_pipeline import ObjectMaskStats, Selection, build_object_masks, stats_to_metrics
 from .plate import reconstruct_with_plates
@@ -88,6 +89,9 @@ class CleanOptions:
     # Correção residual por fluxo óptico no TBE (opt-in: só compensa quando o
     # fundo tem parallax forte; em cena plana só custa tempo).
     flow_refine: bool = False
+    # Pós-passe de harmonização (grão/nitidez/cor) da área reconstruída.
+    harmonize: bool = True
+    harmonize_grain: bool = True
 
     auto_lama_max_mask: float = 0.18  # fração máxima da ROI coberta pela máscara
     auto_lama_min_mask: float = 0.0008
