@@ -782,6 +782,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       toast.error(`Fluxo interrompido: ${e instanceof Error ? e.message : "erro"}`);
     } finally {
       setPipelineBusy(false);
+      setPipelineStep(null);
     }
   };
 
