@@ -542,7 +542,7 @@ def clean_video(
         telemetry=timer.as_dict(),
         roi=roi.to_percent(info.width, info.height),
         zone=zone_payload.get("zone") if isinstance(zone_payload, dict) else None,
-        engine="tbe" if not (lama and lama.available()) else "tbe+lama",
+        engine="tbe+lama" if plate_totals.get("lama_inferences") else "tbe",
         chunks=chunk_reports,
         gpu_recommended=gpu_recommended,
     )
