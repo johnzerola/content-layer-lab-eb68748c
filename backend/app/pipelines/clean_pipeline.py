@@ -38,6 +38,7 @@ from .object_pipeline import ObjectMaskStats, Selection, build_object_masks, sta
 from .plate import reconstruct_with_plates
 from ..providers.rapidocr_provider import GlyphMaskGenerator, RapidOcrTextDetector
 from ..providers.temporal_provider import TemporalProvider
+from ..providers.sttn_provider import SttnProvider
 from ..quality.scoring import QualityReport, quality_score
 from ..services import mask_modes, tracking
 from ..services.scene import detect_scenes
@@ -402,6 +403,8 @@ def clean_video(
         "tried": bool(preset["lama"]) or bool(opts.gpu),
         "auto_activations": 0,
     }
+
+    _sttn_state: Dict[str, object] = {"provider": None, "tried": False}
 
     def _lama_for(mask_ratio: float) -> Optional[LaMaProvider]:
         """Resolve o provider de inpainting para este chunk.
