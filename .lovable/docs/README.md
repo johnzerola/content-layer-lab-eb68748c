@@ -39,3 +39,7 @@ Integração com a API Graph da Meta para publicação direta em contas conectad
 - [Arquitetura de Banco de Dados](architecture/database.md)
 - [Integração Meta API](architecture/meta-integration.md)
 - [Sistema de Cleaner IA](architecture/cleaner-ia.md)
+- [API Reference](architecture/api-reference.md)
+
+## Operações e Manutenção
+- [Mover projeto para outra conta/workspace](migration/move-project-workspace.md)
