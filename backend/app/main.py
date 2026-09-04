@@ -517,6 +517,99 @@ async def job_status(job_id: str, x_job_token: Optional[str] = Header(None)):
     return state or {"status": "unknown", "progress": 0}
 
 
+@app.get("/v1/jobs/{job_id}/source")
+async def get_source(job_id: str, token: Optional[str] = Query(None)):
+    """Entrada original — consumida pelos workers GPU que processam um chunk."""
+    verify_token(job_id, token, "result")
+    path = job_dir(SETTINGS.storage_dir, job_id) / "input.mp4"
+    if not path.is_file():
+        raise HTTPException(404, "video de entrada indisponivel")
+    return FileResponse(path, media_type="video/mp4")
+
+
+@app.post("/v1/jobs/{job_id}/plan")
+async def plan_job_chunks(job_id: str, req: PlanRequest, x_job_token: Optional[str] = Header(None)):
+    """Divide o vídeo em janelas com sobreposição, respeitando cortes de cena."""
+    verify_token(job_id, x_job_token, "control")
+    directory = job_dir(SETTINGS.storage_dir, job_id)
+    input_path = directory / "input.mp4"
+    if not input_path.is_file():
+        raise HTTPException(409, "video ainda nao foi enviado")
+    info = await asyncio.to_thread(probe, str(input_path))
+    cuts: List[float] = []
+    if req.use_scenes:
+        from .services.scene import detect_scenes
+
+        try:
+            scenes = await asyncio.to_thread(detect_scenes, str(input_path))
+            cuts = [float(start) / max(info.fps, 1e-6) for start, _ in scenes]
+        except Exception:
+            cuts = []
+    chunks = plan_chunks(info.duration, req.target_seconds, req.overlap, cuts)
+    return {
+        "duration": round(info.duration, 3),
+        "fps": round(info.fps, 3),
+        "chunks": [
+            {
+                "index": chunk.index,
+                "start": round(chunk.start, 3),
+                "end": round(chunk.end, 3),
+                "overlap": round(chunk.overlap, 3),
+            }
+            for chunk in chunks
+        ],
+    }
+
+
+@app.post("/v1/jobs/{job_id}/assemble")
+async def assemble_job(job_id: str, req: AssembleRequest, x_job_token: Optional[str] = Header(None)):
+    """Baixa os chunks prontos, concatena na ordem e remonta o áudio original."""
+    verify_token(job_id, x_job_token, "control")
+    directory = job_dir(SETTINGS.storage_dir, job_id)
+    input_path = directory / "input.mp4"
+    if not input_path.is_file():
+        raise HTTPException(409, "video de entrada ausente")
+    work_dir = directory / "chunks"
+    work_dir.mkdir(parents=True, exist_ok=True)
+
+    def build() -> dict:
+        import requests as _requests
+
+        parts: List[str] = []
+        for order, part in enumerate(sorted(req.parts, key=lambda item: item.index)):
+            destination = work_dir / f"part-{order:04d}.mp4"
+            with _requests.get(part.url, stream=True, timeout=(30, 1800)) as response:
+                response.raise_for_status()
+                with destination.open("wb") as handle:
+                    for block in response.iter_content(chunk_size=1024 * 1024):
+                        if block:
+                            handle.write(block)
+            if destination.stat().st_size < 1024:
+                raise RuntimeError(f"chunk {part.index} veio vazio")
+            parts.append(str(destination))
+        merged = concat_videos(parts, str(work_dir / "merged.mp4"), str(work_dir))
+        info = probe(str(input_path))
+        mux_audio(merged, str(input_path), str(directory / "output.mp4"), info.has_audio)
+        return {"frames": info.frames, "duration": round(info.duration, 3)}
+
+    try:
+        summary = await asyncio.to_thread(build)
+    except Exception as exc:
+        _set_state(job_id, {"status": "failed", "error": f"falha ao remontar: {str(exc)[:300]}"})
+        raise HTTPException(422, f"falha ao remontar: {str(exc)[:300]}") from None
+    shutil.rmtree(work_dir, ignore_errors=True)
+    state = {
+        "status": "completed",
+        "progress": 100,
+        "stage": "concluido",
+        "result_url": f"/v1/jobs/{job_id}/result",
+        "metrics": {**(req.metrics or {}), **summary, "engine": "gpu-chunked"},
+    }
+    _set_state(job_id, state)
+    return {"ok": True, **state}
+
+
+
 @app.post("/v1/jobs/{job_id}/cancel")
 async def cancel(job_id: str, x_job_token: Optional[str] = Header(None)):
     verify_token(job_id, x_job_token, "control")
