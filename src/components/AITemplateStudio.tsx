@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Wand2, Loader2, Scissors, Layers, Eraser, Palette } from "lucide-react";
+import { Wand2, Loader2, Scissors, Layers, Palette } from "lucide-react";
 import { toast } from "sonner";
 import { aiTemplatePlan, type AiTemplatePlan } from "@/lib/ai-template.functions";
 import { LOOKS, LOOK_BY_ID } from "@/lib/looks";
-import { CAPTION_PRESETS, CLEANUP_PRESETS } from "@/lib/template";
+import { CAPTION_PRESETS } from "@/lib/template";
 import type { CaptionCue } from "@/lib/captions";
 
 export type AiPlanCut = AiTemplatePlan["cuts"][number];
@@ -20,8 +20,6 @@ interface Props {
   onCuts: (cuts: AiPlanCut[]) => void;
   /** distribui as variações de estilo entre os vídeos do lote */
   onVariations: (variations: AiPlanVariation[]) => void;
-  /** liga as áreas de limpeza sugeridas (CleanerIA) */
-  onCleanup: (regionIds: string[]) => void;
 }
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -33,7 +31,6 @@ export function AITemplateStudio({
   onBrand,
   onCuts,
   onVariations,
-  onCleanup,
 }: Props) {
   const run = useServerFn(aiTemplatePlan);
   const [loading, setLoading] = useState(false);
@@ -58,7 +55,6 @@ export function AITemplateStudio({
           ...(platform ? { platform } : {}),
           looks: LOOKS.map((l) => l.id),
           captionPresets: CAPTION_PRESETS.map((p) => p.id),
-          cleanupPresets: CLEANUP_PRESETS.map((p) => p.id),
         },
       })) as AiTemplatePlan;
       setPlan(out);
@@ -199,34 +195,6 @@ export function AITemplateStudio({
             )}
           </section>
 
-          <section className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
-            <p className="mono-label flex items-center gap-1.5">
-              <Eraser className="size-3.5" /> CleanerIA
-            </p>
-            <p className="text-[12px] text-muted-foreground">
-              {plan.cleaner.recommended
-                ? plan.cleaner.reason || "áreas de legenda/marca d'água detectadas"
-                : "nenhuma limpeza necessária neste vídeo"}
-            </p>
-            {plan.cleaner.regions.length > 0 && (
-              <>
-                <p className="text-[11px] text-muted-foreground">
-                  {plan.cleaner.regions
-                    .map((r) => CLEANUP_PRESETS.find((p) => p.id === r)?.label ?? r)
-                    .join(" · ")}
-                </p>
-                <button
-                  className="btn-ghost interactive h-8 w-full text-xs"
-                  onClick={() => {
-                    onCleanup(plan.cleaner.regions);
-                    toast.success("Áreas de limpeza adicionadas ao template.");
-                  }}
-                >
-                  aplicar limpeza no template
-                </button>
-              </>
-            )}
-          </section>
         </div>
       )}
     </div>

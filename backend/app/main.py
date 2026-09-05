@@ -702,14 +702,30 @@ async def delete_job(job_id: str, x_job_token: Optional[str] = Header(None)):
     return {"ok": True}
 
 
+@app.post("/v1/jobs/{job_id}/cleanup")
+async def cleanup_job_files(job_id: str, x_job_token: Optional[str] = Header(None)):
+    """Remove entrada/intermediários, preservando o resultado e o estado do job."""
+    verify_token(job_id, x_job_token, "control")
+    directory = job_dir(SETTINGS.storage_dir, job_id)
+    with ACTIVE_LOCK:
+        if job_id in ACTIVE_JOBS:
+            raise HTTPException(409, "job ainda esta em processamento")
+
+    for name in ("input.mp4", "preview.mp4", "gpu-plan.json"):
+        (directory / name).unlink(missing_ok=True)
+    for name in ("gpu-sources", "chunks"):
+        await asyncio.to_thread(shutil.rmtree, directory / name, True)
+    _set_state(job_id, {"stage": "resultado entregue; temporarios removidos"})
+    return {"ok": True, "result_preserved": (directory / "output.mp4").is_file()}
+
+
 @app.get("/v1/jobs/{job_id}/result")
-async def get_result(job_id: str, background_tasks: BackgroundTasks, token: Optional[str] = Query(None)):
+async def get_result(job_id: str, token: Optional[str] = Query(None)):
     verify_token(job_id, token, "result")
     directory = job_dir(SETTINGS.storage_dir, job_id)
     path = directory / "output.mp4"
     if not path.is_file():
         raise HTTPException(404, "resultado ainda nao disponivel")
-    background_tasks.add_task(shutil.rmtree, directory, True)
     return FileResponse(
         path,
         media_type="video/mp4",

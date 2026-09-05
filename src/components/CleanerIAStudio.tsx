@@ -6,9 +6,7 @@ import {
   Eye,
   MousePointer2,
   PenTool,
-  Pentagon,
   RefreshCw,
-  Shield,
   Sparkles,
   Square,
   Target,
@@ -22,6 +20,7 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import {
   cleanerHealth,
+  cleanerGpuHealth,
   cleanupCleanerRemoteJob,
   confirmCleanerUpload,
   cancelCleanerJob,
@@ -36,8 +35,6 @@ import {
   saveCleanerMasks,
 } from "@/lib/cleaner.functions";
 import {
-  MODE_HINT,
-  MODE_LABEL,
   PRESET_HINT,
   PRESET_LABEL,
   STAGE_LABEL,
@@ -73,7 +70,12 @@ type Props = {
 
 type Tool = "select" | "rect" | "poly" | "brush" | "protect" | "erase";
 
-const MODES: CleanerMode[] = ["smart", "text", "watermark", "object", "passerby"];
+const MODE_CARDS: { mode: CleanerMode; label: string; hint: string }[] = [
+  { mode: "smart", label: "Automático", hint: "Encontra legendas, textos e marcas sozinho" },
+  { mode: "subtitle", label: "Legendas", hint: "Texto queimado, karaokê e captions" },
+  { mode: "watermark", label: "Marca ou logo", hint: "Marcas fixas, móveis e semitransparentes" },
+  { mode: "object", label: "Objeto ou pessoa", hint: "Seleção manual com rastreamento" },
+];
 const PRESETS: CleanerPreset[] = ["fast", "quality", "max"];
 
 /** Filtros de VISUALIZAÇÃO da lista de áreas — nunca alteram `masks`. */
@@ -155,6 +157,17 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     diagnosis?: string;
     engines?: Record<string, { ready?: boolean; missing?: string[] }>;
   } | null>(null);
+  const [gpuHealthState, setGpuHealthState] = useState<{
+    configured: boolean;
+    online: boolean;
+    workerVersion?: string;
+    gpuVramGb?: number | null;
+    aiReady?: boolean;
+    maxReady?: boolean;
+    engines?: Record<string, { ready?: boolean; missing?: string[] }>;
+    reason?: string;
+  } | null>(null);
+  const [checkingGpu, setCheckingGpu] = useState(false);
 
   const [polling, setPolling] = useState(false);
   const [tool, setTool] = useState<Tool>("rect");
@@ -188,6 +201,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const polyPoints = useRef<{ x: number; y: number }[]>([]);
 
   const getHealth = useServerFn(cleanerHealth);
+  const getGpuHealth = useServerFn(cleanerGpuHealth);
   const confirmUpload = useServerFn(confirmCleanerUpload);
   const createJob = useServerFn(createCleanerJob);
   const detectJob = useServerFn(detectCleanerJob);
@@ -201,6 +215,26 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const cleanupRemoteJob = useServerFn(cleanupCleanerRemoteJob);
   const cancelJobFn = useServerFn(cancelCleanerJob);
   const [cancelling, setCancelling] = useState(false);
+
+  const checkRunPod = async () => {
+    setCheckingGpu(true);
+    try {
+      const headers = await cloudAuthHeaders();
+      const result = (await getGpuHealth({ headers })) as NonNullable<typeof gpuHealthState>;
+      setGpuHealthState(result);
+      if (result.maxReady) toast.success("RunPod pronto para Máxima qualidade.");
+      else if (result.online) toast.warning("RunPod respondeu, mas o DiffuEraser ainda não está pronto.");
+      else toast.error(result.reason || "RunPod indisponível.");
+      return result;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "falha ao verificar RunPod";
+      setGpuHealthState({ configured: false, online: false, reason });
+      toast.error(reason);
+      return null;
+    } finally {
+      setCheckingGpu(false);
+    }
+  };
 
   const cancelRemoteJob = async () => {
     if (!job?.id) return;
@@ -272,12 +306,6 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       window.clearInterval(timer);
     };
   }, [turboGpu, job?.id, polling, getChunks, pumpGpu]);
-
-  useEffect(() => {
-    if (job || !health?.online) return;
-    if (health.ai_ready === false && preset !== "fast") setPreset("fast");
-    else if (preset === "max" && health.max_ready === false) setPreset("quality");
-  }, [health, job, preset]);
 
   useEffect(() => {
     if (!polling || !job?.id) return;
@@ -832,6 +860,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   };
 
   const running = !!job && job.status !== "completed" && job.status !== "queued" && polling;
+  const settingsLocked = uploading || pipelineBusy || polling || cancelling;
   const sel = masks.find((m) => m.id === selected) || null;
 
   const visibleMasks = maskFilter && MASK_FILTERS[maskFilter] ? masks.filter(MASK_FILTERS[maskFilter]) : masks;
@@ -905,28 +934,51 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[200px_1fr_300px]">
-      {/* Modos */}
-      <aside className="space-y-2">
-        <p className="mono-label px-1">Ferramentas de IA</p>
-        {MODES.map((m) => (
-          <button
-            key={m}
-            onClick={() => !job && setMode(m)}
-            disabled={!!job}
-            className={`w-full rounded-xl border p-3 text-left transition ${
-              mode === m
-                ? "border-primary bg-primary/10 shadow-glow"
-                : "border-border/60 bg-surface/40 hover:border-border"
-            } disabled:opacity-60`}
-          >
-            <span className="block text-sm font-display font-bold">{MODE_LABEL[m]}</span>
-            <span className="block text-[10px] leading-tight text-muted-foreground">
-              {MODE_HINT[m]}
-            </span>
-          </button>
-        ))}
-      </aside>
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+      {/* Escolha simples, inspirada no fluxo Auto/Manual do Vmake. */}
+      <section className="xl:col-span-2 rounded-2xl border border-border/70 bg-surface/50 p-3 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="grid shrink-0 grid-cols-2 gap-1 rounded-xl border border-border/70 bg-background/50 p-1 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setWorkMode("auto")}
+              className={`flex items-center justify-center gap-1.5 rounded-lg px-5 py-2.5 transition ${
+                workMode === "auto" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Wand2 className="size-4" /> Automático
+            </button>
+            <button
+              type="button"
+              onClick={() => setWorkMode("manual")}
+              className={`flex items-center justify-center gap-1.5 rounded-lg px-5 py-2.5 transition ${
+                workMode === "manual" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <PenTool className="size-4" /> Manual
+            </button>
+          </div>
+
+          <div className="grid min-w-0 flex-1 grid-cols-2 gap-2 md:grid-cols-4">
+            {MODE_CARDS.map((card) => (
+              <button
+                key={card.mode}
+                type="button"
+                onClick={() => !settingsLocked && setMode(card.mode)}
+                disabled={settingsLocked}
+                className={`rounded-xl border px-3 py-2.5 text-left transition ${
+                  mode === card.mode
+                    ? "border-primary bg-primary/10 ring-1 ring-primary/30"
+                    : "border-border/60 bg-background/35 hover:border-primary/50 hover:bg-background/60"
+                } disabled:opacity-60`}
+              >
+                <span className="block text-xs font-display font-bold">{card.label}</span>
+                <span className="mt-0.5 block text-[10px] leading-tight text-muted-foreground">{card.hint}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* Player + máscaras */}
       <div className="space-y-4">
@@ -1068,33 +1120,55 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           )}
         </div>
 
-        {/* Ferramentas */}
-        <div className="flex flex-wrap items-center gap-2">
-          {(
-            [
-              ["rect", "Retângulo", Square],
-              ["poly", "Polígono", Pentagon],
-              ["brush", "Pincel", PenTool],
-              ["protect", "Proteger", Shield],
-              ["erase", "Apagar", Eraser],
-              ["select", "Selecionar", MousePointer2],
-            ] as const
-          ).map(([id, label, Icon]) => (
-            <button
-              key={id}
-              onClick={() => setTool(id)}
-              className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-                tool === id
-                  ? "border-primary bg-primary/15 text-primary"
-                  : "border-border/60 bg-surface/40"
-              }`}
-            >
-              <Icon className="size-3.5" /> {label}
-            </button>
-          ))}
-          <span className="ml-auto font-mono text-[10px] text-muted-foreground">
-            {time.toFixed(2)}s / {duration.toFixed(2)}s
-          </span>
+        {/* Ferramentas: quatro ações principais, como no Vmake. */}
+        <div className="rounded-xl border border-border/60 bg-surface/40 p-2">
+          {workMode === "manual" ? (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {(
+                [
+                  ["rect", "Caixa", Square],
+                  ["brush", "Escovar", PenTool],
+                  ["erase", "Apagador", Eraser],
+                  ["select", "Selecionar", MousePointer2],
+                ] as const
+              ).map(([id, label, Icon]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setTool(id)}
+                  className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                    tool === id
+                      ? "border-primary bg-primary/15 text-primary"
+                      : "border-border/60 bg-background/40 hover:border-primary/50"
+                  }`}
+                >
+                  <Icon className="size-4" /> {label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-3 px-1">
+              <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Wand2 className="size-4 text-primary" />
+                A IA analisa o vídeo inteiro, rastreia cada área e mostra a máscara antes de limpar.
+              </span>
+              {inputReady && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="ml-auto"
+                  onClick={() => void handleDetect()}
+                  disabled={polling || pipelineBusy}
+                >
+                  <Target className="mr-1.5 size-3.5" /> Detectar agora
+                </Button>
+              )}
+            </div>
+          )}
+          <div className="mt-2 flex items-center justify-between border-t border-border/50 px-1 pt-2 font-mono text-[10px] text-muted-foreground">
+            <span>{masks.length ? `${masks.length} área(s) detectada(s)` : "Nenhuma área marcada"}</span>
+            <span>{time.toFixed(2)}s / {duration.toFixed(2)}s</span>
+          </div>
         </div>
 
         {tool === "poly" && (
@@ -1268,38 +1342,66 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
           <div className="space-y-2">
             <span className="mono-label">Qualidade</span>
-            {PRESETS.map((p) => (
-              <button
-                key={p}
-                onClick={() => !job && setPreset(p)}
-                disabled={
-                  !!job ||
-                  (p === "quality" && health?.online === true && health.ai_ready === false) ||
-                  (p === "max" && health?.online === true && health.max_ready === false)
-                }
-                title={
-                  p === "max" && health?.online && !health.max_ready
-                    ? "DiffuEraser não está pronto no worker"
-                    : p === "quality" && health?.online && !health.ai_ready
-                      ? "ProPainter não está pronto no worker"
-                      : undefined
-                }
-                className={`w-full rounded-lg border p-2.5 text-left text-xs transition ${
-                  preset === p
-                    ? "border-primary bg-primary/10"
-                    : "border-border/60 bg-background/40"
-                } disabled:opacity-60`}
-              >
-                <span className="block font-semibold">{PRESET_LABEL[p]}</span>
-                <span className="block text-[10px] text-muted-foreground">{PRESET_HINT[p]}</span>
-              </button>
-            ))}
+            {PRESETS.map((p) => {
+              const localUnavailable =
+                (p === "quality" && health?.online === true && health.ai_ready === false) ||
+                (p === "max" && health?.online === true && health.max_ready === false);
+              const cloudRecommended = p !== "fast" && localUnavailable;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => {
+                    if (settingsLocked) return;
+                    setPreset(p);
+                    if (cloudRecommended) {
+                      setTurboGpu(true);
+                      toast.info(
+                        p === "max"
+                          ? "Máxima qualidade selecionada. Turbo GPU ativado para usar o DiffuEraser no RunPod."
+                          : "Qualidade selecionada. Turbo GPU ativado para usar o ProPainter no RunPod.",
+                      );
+                    }
+                    if (p === "max") void checkRunPod();
+                  }}
+                  disabled={settingsLocked}
+                  className={`group w-full rounded-xl border p-3 text-left text-xs transition ${
+                    preset === p
+                      ? "border-primary bg-primary/10 ring-1 ring-primary/25"
+                      : "border-border/60 bg-background/40 hover:border-primary/50"
+                  } disabled:cursor-not-allowed disabled:opacity-60`}
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="font-semibold">{PRESET_LABEL[p]}</span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${
+                        p === "fast"
+                          ? "bg-muted text-muted-foreground"
+                          : cloudRecommended
+                            ? "bg-sky-500/15 text-sky-400"
+                            : "bg-emerald-500/15 text-emerald-400"
+                      }`}
+                    >
+                      {p === "fast" ? "mais rápido" : cloudRecommended ? "RunPod" : "disponível"}
+                    </span>
+                  </span>
+                  <span className="mt-1 block text-[10px] leading-relaxed text-muted-foreground">
+                    {PRESET_HINT[p]}
+                  </span>
+                  {cloudRecommended && (
+                    <span className="mt-1 block text-[9px] font-medium text-sky-400">
+                      Clique para selecionar e ativar a GPU automaticamente.
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           <button
             type="button"
-            onClick={() => !job && setTurboGpu((v) => !v)}
-            disabled={!!job}
+            onClick={() => !settingsLocked && setTurboGpu((v) => !v)}
+            disabled={settingsLocked}
             className={`w-full rounded-lg border p-2.5 text-left text-xs transition ${
               turboGpu ? "border-primary bg-primary/10" : "border-border/60 bg-background/40"
             } disabled:opacity-60`}
@@ -1310,6 +1412,45 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               vídeos longos. Continua mesmo se você fechar a página.
             </span>
           </button>
+
+          {turboGpu && (
+            <div className="rounded-xl border border-sky-500/25 bg-sky-500/5 p-3 text-[10px]">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-foreground">
+                    {gpuHealthState === null
+                      ? "RunPod ainda não verificado"
+                      : gpuHealthState.maxReady
+                        ? "RunPod pronto para qualidade máxima"
+                        : gpuHealthState.online
+                          ? "RunPod online · DiffuEraser incompleto"
+                          : "RunPod indisponível"}
+                  </p>
+                  <p className="mt-0.5 text-muted-foreground">
+                    {gpuHealthState?.gpuVramGb
+                      ? `${gpuHealthState.gpuVramGb.toFixed(1)} GB VRAM · ${gpuHealthState.workerVersion ?? "versão não informada"}`
+                      : gpuHealthState?.reason ?? "Confirme a imagem, a GPU e os pesos montados no volume."}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void checkRunPod()}
+                  disabled={checkingGpu || settingsLocked}
+                  className="shrink-0 text-[10px]"
+                >
+                  <RefreshCw className={`mr-1.5 size-3 ${checkingGpu ? "animate-spin" : ""}`} />
+                  {checkingGpu ? "Verificando" : "Testar GPU"}
+                </Button>
+              </div>
+              {gpuHealthState?.online && !gpuHealthState.maxReady && (
+                <p className="mt-2 border-t border-sky-500/15 pt-2 text-amber-400">
+                  Faltando: {(gpuHealthState.engines?.diffueraser?.missing ?? ["pesos do DiffuEraser"]).slice(0, 3).join(", ")}
+                </p>
+              )}
+            </div>
+          )}
 
           {turboGpu && chunks.length > 0 && (
             <div className="space-y-2 rounded-lg border border-border/60 bg-background/40 p-3">
@@ -1444,8 +1585,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               download
               onClick={() => {
                 const id = job.id;
-                window.setTimeout(() => {
-                  void cleanupRemoteJob({ data: { id } });
+                window.setTimeout(async () => {
+                  const headers = await cloudAuthHeaders();
+                  await cleanupRemoteJob({ data: { id }, headers });
                 }, 15000);
               }}
               className="interactive block w-full rounded-lg bg-primary py-2 text-center text-sm font-semibold text-primary-foreground"
@@ -1479,24 +1621,6 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                   </div>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-1 rounded-xl border border-border/70 bg-background/40 p-1 text-xs font-medium">
-                <button
-                  onClick={() => setWorkMode("auto")}
-                  className={`flex items-center justify-center gap-1 rounded-lg py-1.5 transition-colors ${
-                    workMode === "auto" ? "bg-primary/15 text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  <Wand2 className="size-3.5" /> Automático
-                </button>
-                <button
-                  onClick={() => setWorkMode("manual")}
-                  className={`flex items-center justify-center gap-1 rounded-lg py-1.5 transition-colors ${
-                    workMode === "manual" ? "bg-primary/15 text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  <PenTool className="size-3.5" /> Manual
-                </button>
-              </div>
               {workMode === "auto" ? (
                 <div className="space-y-2">
                   <Button

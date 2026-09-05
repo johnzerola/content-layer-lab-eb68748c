@@ -33,6 +33,8 @@ import uuid
 import requests
 
 from app.services.chunking import localize_masks, slice_video, trim_edges
+from app.engines.diffueraser_official import diffueraser_status
+from app.engines.propainter_official import propainter_status
 from app.storage import job_dir as safe_job_dir
 from app.utils.video import probe
 from app.workers.tasks import run_pipeline
@@ -94,10 +96,18 @@ def handler(event: dict) -> dict:
     started = time.monotonic()
     index = int(payload.get("chunk_index", 0))
     if str(payload.get("action") or "") == "health":
+        propainter = propainter_status(require_cuda=True)
+        diffueraser = diffueraser_status()
         return {
             "ok": True,
             "worker_version": WORKER_VERSION,
             "gpu_vram_gb": _gpu_vram_gb(),
+            "ai_ready": propainter.ready,
+            "max_ready": diffueraser.ready,
+            "engines": {
+                "propainter": propainter.as_dict(),
+                "diffueraser": diffueraser.as_dict(),
+            },
         }
     source_url = str(payload.get("source_url") or "")
     source_is_chunk = payload.get("source_is_chunk") is True

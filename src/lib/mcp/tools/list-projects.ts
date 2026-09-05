@@ -5,9 +5,9 @@ import { supabaseForUser, notAuthenticated, errorResult, jsonResult } from "../s
 export default defineTool({
   name: "list_projects",
   title: "Listar projetos",
-  description: "Lista os projetos salvos na nuvem (ViralBatch, CorteIA, LimpaVídeo).",
+  description: "Lista os projetos salvos na nuvem (ViralBatch, CorteIA e CleanerIA legado).",
   inputSchema: {
-    mode: z.string().optional().describe("Filtra por ferramenta: lote, clip ou limpar."),
+    mode: z.string().optional().describe("Filtra por ferramenta: lote, clip ou limpar (histórico legado)."),
     limit: z.number().int().optional().describe("Máximo de projetos (padrão 20)."),
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },

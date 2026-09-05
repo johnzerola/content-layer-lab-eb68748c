@@ -197,6 +197,41 @@ class ApiSecurityTests(unittest.TestCase):
         self.assertEqual(valid.status_code, 200)
         self.assertEqual(valid.content, b"result")
 
+    def test_cleanup_removes_temporaries_and_preserves_repeatable_result(self):
+        directory = Path(TEMPORARY.name) / JOB_ID
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "input.mp4").write_bytes(b"source")
+        (directory / "preview.mp4").write_bytes(b"preview")
+        (directory / "gpu-plan.json").write_text('{"chunks":[]}', encoding="utf-8")
+        (directory / "state.json").write_text('{"status":"completed"}', encoding="utf-8")
+        (directory / "output.mp4").write_bytes(b"result")
+        (directory / "chunks").mkdir()
+        (directory / "chunks" / "chunk-0.mp4").write_bytes(b"chunk")
+        (directory / "gpu-sources").mkdir()
+        (directory / "gpu-sources" / "source-0.mp4").write_bytes(b"source chunk")
+
+        cleaned = self.client.post(
+            f"/v1/jobs/{JOB_ID}/cleanup",
+            headers={"x-job-token": self.token("control")},
+        )
+        first = self.client.get(
+            f"/v1/jobs/{JOB_ID}/result", params={"token": self.token("result")}
+        )
+        second = self.client.get(
+            f"/v1/jobs/{JOB_ID}/result", params={"token": self.token("result")}
+        )
+
+        self.assertEqual(cleaned.status_code, 200)
+        self.assertTrue(cleaned.json()["result_preserved"])
+        self.assertFalse((directory / "input.mp4").exists())
+        self.assertFalse((directory / "preview.mp4").exists())
+        self.assertFalse((directory / "gpu-plan.json").exists())
+        self.assertFalse((directory / "chunks").exists())
+        self.assertFalse((directory / "gpu-sources").exists())
+        self.assertTrue((directory / "state.json").exists())
+        self.assertEqual(first.content, b"result")
+        self.assertEqual(second.content, b"result")
+
     def test_delete_removes_all_job_files_and_rejects_active_job(self):
         directory = Path(TEMPORARY.name) / JOB_ID
         directory.mkdir(parents=True, exist_ok=True)

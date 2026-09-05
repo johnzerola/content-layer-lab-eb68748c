@@ -37,6 +37,21 @@ def _warp(mask: np.ndarray, flow: np.ndarray) -> np.ndarray:
     return cv2.remap(mask, map_x, map_y, cv2.INTER_NEAREST, borderMode=cv2.BORDER_CONSTANT)
 
 
+def _transport(mask: np.ndarray, current: np.ndarray, neighbor: np.ndarray) -> np.ndarray:
+    """Transport a mask using flow calculated only around its active region."""
+    ys, xs = np.where(mask > 0)
+    if ys.size == 0:
+        return np.zeros_like(mask)
+    h, w = mask.shape[:2]
+    margin = max(24, int(round(max(xs.max() - xs.min(), ys.max() - ys.min()) * 0.2)))
+    x0, x1 = max(0, int(xs.min()) - margin), min(w, int(xs.max()) + 1 + margin)
+    y0, y1 = max(0, int(ys.min()) - margin), min(h, int(ys.max()) + 1 + margin)
+    flow = _flow(current[y0:y1, x0:x1], neighbor[y0:y1, x0:x1])
+    result = np.zeros_like(mask)
+    result[y0:y1, x0:x1] = _warp(mask[y0:y1, x0:x1], flow)
+    return result
+
+
 
 def propagate(
     frames: Sequence[np.ndarray],
@@ -50,12 +65,10 @@ def propagate(
     grays = [cv2.cvtColor(f, cv2.COLOR_BGR2GRAY) for f in frames]
 
     for i in range(seed_index + 1, n):
-        flow = _flow(grays[i], grays[i - 1])
-        out[i] = _warp(out[i - 1], flow)
+        out[i] = _transport(out[i - 1], grays[i], grays[i - 1])
 
     for i in range(seed_index - 1, -1, -1):
-        flow = _flow(grays[i], grays[i + 1])
-        out[i] = _warp(out[i + 1], flow)
+        out[i] = _transport(out[i + 1], grays[i], grays[i + 1])
 
     return out
 
@@ -122,24 +135,20 @@ def interpolate_keyframes(
             continue
         fwd = out[a].copy()
         for i in range(a + 1, b):
-            flow = _flow(grays[i], grays[i - 1])
-            fwd = _warp(fwd, flow)
+            fwd = _transport(fwd, grays[i], grays[i - 1])
             out[i] = np.maximum(out[i], fwd)
         bwd = out[b].copy()
         for i in range(b - 1, a, -1):
-            flow = _flow(grays[i], grays[i + 1])
-            bwd = _warp(bwd, flow)
+            bwd = _transport(bwd, grays[i], grays[i + 1])
             out[i] = np.maximum(out[i], bwd)
 
     first, last = key_set[0], key_set[-1]
     cur = out[first].copy()
     for i in range(first - 1, -1, -1):
-        flow = _flow(grays[i], grays[i + 1])
-        cur = _warp(cur, flow)
+        cur = _transport(cur, grays[i], grays[i + 1])
         out[i] = np.maximum(out[i], cur)
     cur = out[last].copy()
     for i in range(last + 1, n):
-        flow = _flow(grays[i], grays[i - 1])
-        cur = _warp(cur, flow)
+        cur = _transport(cur, grays[i], grays[i - 1])
         out[i] = np.maximum(out[i], cur)
     return out

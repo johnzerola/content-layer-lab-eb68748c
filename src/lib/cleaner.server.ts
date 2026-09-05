@@ -381,6 +381,14 @@ export async function workerDelete(jobId: string) {
   return call<{ ok: boolean }>(`/v1/jobs/${jobId}`, { method: "DELETE", jobId });
 }
 
+/** Apaga entrada, proxies e chunks na VPS sem invalidar o link do resultado final. */
+export async function workerCleanup(jobId: string) {
+  return call<{ ok: boolean; result_preserved: boolean }>(`/v1/jobs/${jobId}/cleanup`, {
+    method: "POST",
+    jobId,
+  });
+}
+
 export async function workerUploadToken(jobId: string) {
   return (await usesLegacyWorkerToken()) ? legacyJobToken(jobId) : jobToken(jobId, "upload");
 }

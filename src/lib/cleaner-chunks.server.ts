@@ -220,7 +220,10 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
       .eq("job_id", jobId)
       .order("idx", { ascending: true });
     const chunks = (chunkData ?? []) as unknown as ChunkRow[];
-    if (!chunks.length) return await summarize(jobId);
+    if (!chunks.length) {
+      await db.from("cleaner_jobs").update({ lease_until: null } as never).eq("id", jobId);
+      return await summarize(jobId);
+    }
 
     // 1) Coleta o que está rodando na GPU.
     for (const chunk of chunks.filter((c) => c.status === "running" && c.provider_job_id)) {
@@ -230,7 +233,9 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
         // O provedor pode responder "pronto" sem que o arquivo tenha chegado ao storage.
         const stored = await chunkArtifactExists(chunk.output_url);
         if (!stored) {
-          const attempts = chunk.attempts + 1;
+          // `attempts` is incremented when a request is submitted. A failed
+          // response must not consume a second attempt.
+          const attempts = chunk.attempts;
           const dead = attempts >= MAX_ATTEMPTS;
           chunk.status = dead ? "failed" : "pending";
           chunk.attempts = attempts;
@@ -277,7 +282,7 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
           .eq("id", chunk.id);
 
       } else {
-        const attempts = chunk.attempts + 1;
+        const attempts = chunk.attempts;
         const dead = attempts >= MAX_ATTEMPTS;
         chunk.status = dead ? "failed" : "pending";
         chunk.attempts = attempts;

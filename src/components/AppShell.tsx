@@ -6,7 +6,6 @@ import {
   KeyRound,
   FolderKanban,
   Scissors,
-  Eraser,
   Library,
   Cloud,
   CalendarClock,
@@ -15,7 +14,6 @@ import {
   PanelLeftOpen,
   Sparkle,
   Wand2,
-  Droplets,
   HardDrive,
   Radio,
   Settings2,
@@ -35,7 +33,7 @@ import { useAccess } from "@/lib/subscription";
 import { planFromId } from "@/lib/plan";
 import { markPendingShellMode, type ShellMode } from "@/lib/handoff";
 
-export type AppMode = "lote" | "clip" | "limpar" | "limpar-ia" | "external";
+export type AppMode = "lote" | "clip" | "external";
 
 type ModeDef = {
   id: AppMode;
@@ -87,36 +85,6 @@ const MODES: ModeDef[] = [
     badge: Wand2,
   },
   {
-    id: "limpar",
-    label: "Limpar vídeo",
-    hint: "remover texto e marca",
-    brand: "LimpaVídeo",
-    mark: "LV",
-    tagline: "restauração de quadro",
-    headline: "Apague textos e",
-    accent: "marcas d'água",
-    description:
-      "Detecção automática das áreas fixas + reconstrução por inpainting (Telea) para tirar texto e logo sem borrão, mantendo o enquadramento original.",
-    chips: ["detecção automática", "inpainting HQ", "antes / depois", "sem zoom"],
-    icon: Eraser,
-    badge: Droplets,
-  },
-  {
-    id: "limpar-ia",
-    label: "AI Video Cleaner",
-    hint: "remoção profissional com GPU",
-    brand: "CleanerIA",
-    mark: "CI",
-    tagline: "inpainting profissional",
-    headline: "Remoção profissional com",
-    accent: "ProPainter",
-    description:
-      "Módulo de alta fidelidade para reconstrução temporal profunda. Ideal para vídeos complexos onde a restauração local não é suficiente.",
-    chips: ["ProPainter engine", "processamento configurável", "temporal tracking", "4K support"],
-    icon: Sparkle,
-    badge: Wand2,
-  },
-  {
     id: "external",
     label: "VaiViral",
     hint: "dashboard",
@@ -155,8 +123,6 @@ const ROUTE_PATHS = [
   "/admin",
   "/fotos",
   "/limpar-ia",
-  "/remover",
-
 ] as const;
 
 interface Props {
@@ -358,7 +324,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             }
           />
         ))}
-        {routeLink("/remover", "Remover legenda/marca", Eraser, expanded, close)}
+        {routeLink("/limpar-ia", "CleanerIA", Sparkle, expanded, close)}
         {routeLink("/cortes", "Corte IA & Cortes", Scissors, expanded, close)}
 
         {routeLink("/estudio", "Estúdio de gravação", Radio, expanded, close)}

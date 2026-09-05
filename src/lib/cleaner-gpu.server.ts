@@ -47,6 +47,17 @@ export function gpuConfigured(): boolean {
   return !!endpointId() && !!apiKey();
 }
 
+export type GpuHealth = {
+  configured: boolean;
+  online: boolean;
+  workerVersion?: string;
+  gpuVramGb?: number | null;
+  aiReady?: boolean;
+  maxReady?: boolean;
+  engines?: Record<string, { ready?: boolean; missing?: string[] }>;
+  reason?: string;
+};
+
 async function runpod<T>(path: string, init: RequestInit = {}): Promise<T> {
   const id = endpointId();
   const key = apiKey();
@@ -78,6 +89,46 @@ async function runpod<T>(path: string, init: RequestInit = {}): Promise<T> {
     return (text ? JSON.parse(text) : {}) as T;
   } catch {
     throw new Error("resposta inválida do provedor GPU");
+  }
+}
+
+/** Diagnóstico real do container GPU, incluindo pesos montados no volume. */
+export async function gpuHealth(): Promise<GpuHealth> {
+  if (!gpuConfigured()) {
+    return { configured: false, online: false, reason: "RUNPOD_API_KEY ou RUNPOD_ENDPOINT_ID ausente" };
+  }
+  try {
+    const result = await runpod<{
+      status?: string;
+      output?: Record<string, unknown> | null;
+      error?: unknown;
+    }>("/runsync?wait=120000", {
+      method: "POST",
+      body: JSON.stringify({ input: { action: "health" } }),
+    });
+    const output = (result.output ?? {}) as Record<string, unknown>;
+    if (String(result.status ?? "").toUpperCase() !== "COMPLETED" || output["ok"] !== true) {
+      return {
+        configured: true,
+        online: false,
+        reason: String(output["error"] ?? result.error ?? result.status ?? "worker sem resposta"),
+      };
+    }
+    return {
+      configured: true,
+      online: true,
+      workerVersion: typeof output["worker_version"] === "string" ? output["worker_version"] : undefined,
+      gpuVramGb: Number.isFinite(Number(output["gpu_vram_gb"])) ? Number(output["gpu_vram_gb"]) : null,
+      aiReady: output["ai_ready"] === true,
+      maxReady: output["max_ready"] === true,
+      engines: (output["engines"] as GpuHealth["engines"]) ?? undefined,
+    };
+  } catch (error) {
+    return {
+      configured: true,
+      online: false,
+      reason: error instanceof Error ? error.message : "falha ao consultar RunPod",
+    };
   }
 }
 
@@ -140,7 +191,7 @@ export async function chunkStatus(providerJobId: string): Promise<ChunkStatus> {
   }>(`/status/${encodeURIComponent(providerJobId)}`);
   const raw = String(result.status ?? "").toUpperCase();
   if (raw === "IN_QUEUE") return { state: "queued" };
-  if (raw === "IN_PROGRESS") return { state: "running" };
+  if (raw === "IN_PROGRESS" || raw === "RUNNING") return { state: "running" };
   if (raw === "COMPLETED") {
     const output = (result.output ?? {}) as Record<string, unknown>;
     if (output["ok"] === false) {

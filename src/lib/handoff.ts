@@ -3,7 +3,7 @@
  * Ex.: um corte do Monitora Live vai direto para o ViralBatch ou o CorteIA.
  */
 
-export type HandoffTool = "lote" | "clip" | "limpar";
+export type HandoffTool = "lote" | "clip";
 
 export interface HandoffItem {
   file: File;
@@ -86,7 +86,7 @@ export function takePendingTool(): HandoffTool | null {
 /** Ferramenta escolhida no menu enquanto o usuário estava em outra rota. */
 const SHELL_MODE_KEY = "vv.shell-mode";
 
-export type ShellMode = HandoffTool | "limpar-ia";
+export type ShellMode = HandoffTool;
 
 export function markPendingShellMode(mode: ShellMode) {
   try {

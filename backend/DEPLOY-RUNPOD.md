@@ -1,97 +1,83 @@
-# Cleaner IA na RunPod
+# Pipeline oficial do CleanerIA: Hostinger + RunPod Serverless
 
-O worker do Cleaner IA (`backend/`) é uma API FastAPI + fila Celery que roda em
-Docker. Existem duas formas de hospedá-lo na RunPod:
+Esta é a única arquitetura suportada pelo CleanerIA. O app nunca envia a chave
+do RunPod ao navegador e nunca manda o vídeo original inteiro para uma função
+GPU.
 
-## Opção 1 — GPU Pod persistente (recomendado hoje)
+## Identidade da implantação
 
-A imagem atual funciona **sem alteração de código** num GPU Pod persistente:
+- Endpoint Queue RunPod: `km860ju9ded2e0`
+- API: `https://api.runpod.ai/v2/km860ju9ded2e0`
+- Handler esperado: `backend/runpod_handler.py`, `worker_version=v3`
+- Imagem vista anteriormente no endpoint: `docker.io/nivaldo12/leaneria-runpod:6bba537`
 
-1. Crie um Pod com GPU (RTX 4090 ou A5000, 24 GB) e volume de rede
-   (`/data/storage`, 100 GB+).
-2. Faça o build/push da imagem `backend/Dockerfile` para um registry
-   (GHCR/Docker Hub) ou use o template "RunPod Pytorch" e clone o repo.
-3. Suba os serviços:
+O ID fica no secret `RUNPOD_ENDPOINT_ID`; não deve ser fixado no bundle do
+navegador. Depois de publicar uma nova imagem, o diagnóstico da tela deve
+responder `worker_version=v3`. Se responder outra versão, o endpoint ainda está
+usando uma imagem antiga.
 
-   ```bash
-   docker compose up -d worker api redis
-   ```
+## Fluxo de dados
 
-4. Exponha a porta `8100` (HTTP público do Pod) e configure no app:
+1. O navegador cria o job autenticado e recebe um token temporário de upload.
+2. O vídeo original vai diretamente para a VPS Hostinger. O app apenas faz
+   fallback de proxy se o upload direto falhar.
+3. A VPS valida o arquivo com `ffprobe`, detecta cenas e texto/marca, gera
+   máscaras temporais e planeja chunks de 15 s com 0,6 s de contexto.
+4. O servidor do app cria URLs assinadas e envia cada chunk por `POST /run` ao
+   endpoint Queue. A chave `RUNPOD_API_KEY` existe somente no servidor.
+5. Cada worker RunPod baixa um chunk assinado, localiza a máscara no tempo,
+   processa, remove as bordas de overlap e envia o resultado ao Storage.
+6. O orquestrador consulta `GET /status/{id}`, confirma que o artefato realmente
+   existe e mede texto residual. Somente o chunk ruim é reenviado, até 3 envios.
+7. A VPS baixa os chunks em ordem, concatena, recoloca o áudio original e cria
+   `output.mp4` na resolução do master.
+8. Chunks, proxy, plano e vídeo de entrada são apagados depois da entrega. O
+   `output.mp4` é preservado durante a retenção para permitir novo download.
 
-   - `CLEANER_WORKER_URL` → `https://<pod-id>-8100.proxy.runpod.net`
-   - `CLEANER_WORKER_SECRET` → mesmo segredo configurado no worker
-   - Opcional: `CLEANER_WORKER_PUBLIC_URL` se o callback deve passar por um
-     domínio estável (ex.: Cloudflare Tunnel/Worker na frente).
+## Secrets do app
 
-Custo típico: ~US$ 300–500/mês por GPU dedicada 24/7, sem limite de fila.
+```dotenv
+CLEANER_WORKER_URL=https://SEU-DOMINIO-DA-VPS
+CLEANER_WORKER_PUBLIC_URL=https://SEU-DOMINIO-DA-VPS
+CLEANER_WORKER_SECRET=SEGREDO-ALEATORIO-DE-48-CARACTERES
+RUNPOD_ENDPOINT_ID=km860ju9ded2e0
+RUNPOD_API_KEY=SECRET_DA_RUNPOD
+CLEANER_GPU_CONCURRENCY=3
+```
 
-## Opção 2 — RunPod Serverless (implementada)
+Na VPS, configure o mesmo `CLEANER_WORKER_SECRET`. Na RunPod, use uma GPU por
+worker, `min workers=0`, `max workers=3`, FlashBoot e timeout compatível com o
+maior chunk (recomendado: pelo menos 20 minutos para DiffuEraser).
 
-O handler serverless já existe: `backend/runpod_handler.py` processa **um chunk
-por invocação**, usando a mesma pipeline do worker (`run_pipeline`). A imagem
-é o `backend/Dockerfile.runpod` e o app já possui a orquestração de chunks com
-overlap + concat final (CleanerIA v3).
-
-### Build e push da imagem (na VPS da Hostear)
+## Imagem serverless
 
 ```bash
 cd backend
-REGISTRY_USER=seu_usuario_dockerhub ./scripts/build-push-runpod.sh
+REGISTRY_USER=nivaldo12 IMAGE_NAME=leaneria-runpod ./scripts/build-push-runpod.sh
 ```
 
-O script instala o Docker se necessário, faz login, builda
-`Dockerfile.runpod` e envia para o registry (Docker Hub por padrão; use
-`REGISTRY=ghcr.io` para GHCR).
+Use `backend/Dockerfile.runpod`. Monte o Network Volume em `/runpod-volume` e
+confirme os pesos nos caminhos configurados por `PROPAINTER_*` e
+`DIFFUERASER_*`. Tags imutáveis devem ser usadas no endpoint; evite depender de
+`latest`.
 
-### Criar o endpoint na RunPod
+## Verificação antes de publicar o app
 
-1. **Serverless → New Endpoint → Deploy from a Docker image**
-2. Container image: `<usuario>/cleaneria-runpod:latest`
-3. GPU: RTX 4090 (24 GB); min workers `0`, max workers `3` (escala de zero)
-4. Anexe um **Network Volume** montado em `/runpod-volume` com os pesos:
-   - ProPainter → `/runpod-volume/models`
-   - DiffuEraser → `/runpod-volume/max-models`
-5. Env var do endpoint: `CLEANER_WORKER_SECRET=<mesmo segredo do app>`
-   - `PROPAINTER_MAX_SIDE=1280` (Quality; composição no master original)
-   - `DIFFUERASER_MAX_SIDE=960` (Max; composição no master original)
-6. Copie o **Endpoint ID** e configure os secrets no app:
-   `RUNPOD_API_KEY` e `RUNPOD_ENDPOINT_ID`
+1. No CleanerIA, clique em **Verificar RunPod**. O retorno precisa ter
+   `online=true`, `worker_version=v3`, `ai_ready=true` e, para o modo Máxima,
+   `max_ready=true`.
+2. Envie um vídeo autorizado de 5–10 s com legenda fixa e gere a prévia grátis.
+3. Processe em Qualidade/Turbo e confirme no banco que todos os chunks chegaram
+   a `done`, sem tentativas duplicadas.
+4. Baixe o resultado duas vezes; ambos os downloads devem funcionar.
+5. Confirme que entrada/chunks foram apagados da VPS e que o resultado final foi
+   preservado.
+6. Compare duração, FPS, resolução e presença de áudio com o master.
 
-### Fluxo de dados
+## Licenças
 
-O handler baixa o chunk pela `source_url` (URL assinada do storage do app),
-processa e devolve via `upload_url` (PUT assinado) — portanto o storage
-efêmero do worker não é problema. A VPS da Hostear continua como worker CPU
-(prévia rápida + fallback) e como máquina de build da imagem.
-
-Vídeos 4K não são inteiramente ampliados a partir de 720p/1080p. O motor usa
-proxy para análise e resolução limitada apenas na inferência; depois aplica a
-região reconstruída sobre o chunk original. Assim, tudo fora da máscara e a
-resolução final permanecem iguais ao arquivo enviado pelo cliente.
-
-Custo estimado serverless: ~US$ 0,10–0,40 por minuto de vídeo, conforme GPU
-(4090 ~US$ 0,00034/s; A100 ~US$ 0,0011/s). Sem jobs, custo zero (min workers 0).
-
-**Recomendação:** comece com o GPU Pod persistente. Quando o volume de jobs
-justificar pagamento por uso, migre para serverless com storage S3.
-
-## Opção 3 — Serverless Load Balancer (HTTP direto, implantada)
-
-Neste modo o RunPod expõe a API FastAPI do worker diretamente em
-`https://<endpoint-id>.api.runpod.ai` (sem fila `/run` + `/status`).
-
-1. Crie o endpoint em **Serverless → Deploy from a Docker image** usando a
-   imagem do `backend/Dockerfile` (API FastAPI), não o `Dockerfile.runpod`.
-2. GPU RTX 4090, min workers `0`, max conforme demanda; Network Volume com os
-   pesos em `/runpod-volume` (mesmos caminhos da Opção 2).
-3. Env vars: `CLEANER_WORKER_SECRET`, `PORT=8000` (o worker já respeita PORT).
-4. O RunPod usa `GET /ping` como health check — rota leve que não carrega
-   status de GPU (já incluída no worker).
-5. No app, configure `CLEANER_WORKER_URL` e `CLEANER_WORKER_PUBLIC_URL` com a
-   URL do endpoint. O app trata o endpoint como worker remoto normal
-   (upload → detect → process → resultado), sem precisar de `RUNPOD_*`.
-
-**Atenção:** vídeos grandes não devem atravessar o gateway do Load Balancer —
-prefira URLs assinadas de storage para entrada/saída. Nunca exponha a API key
-do RunPod no navegador.
+ProPainter é distribuído para uso não comercial pela NTU S-Lab. DiffuEraser é
+Apache-2.0, mas sua configuração oficial usa ProPainter como prior e herda essa
+restrição. Não ative esses modelos em um produto pago sem licença/autorização
+compatível. Consulte `MODEL_LICENSES.md`; os fallbacks próprios/OpenCV continuam
+disponíveis para uma rota comercial.

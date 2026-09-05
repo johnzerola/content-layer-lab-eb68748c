@@ -64,13 +64,6 @@ const shape = z.object({
       }),
     )
     .default([]),
-  cleaner: z
-    .object({
-      recommended: z.boolean().default(false),
-      regions: z.array(z.string()).default([]),
-      reason: z.string().default(""),
-    })
-    .default(() => ({}) as never),
 });
 
 export type AiTemplatePlan = z.infer<typeof shape>;
@@ -86,7 +79,6 @@ export const aiTemplatePlan = createServerFn({ method: "POST" })
         niche: z.string().max(80).optional(),
         looks: z.array(z.string().max(40)).min(1).max(40),
         captionPresets: z.array(z.string().max(40)).min(1).max(40),
-        cleanupPresets: z.array(z.string().max(40)).min(1).max(40),
       })
       .parse(input),
   )
@@ -109,12 +101,11 @@ export const aiTemplatePlan = createServerFn({ method: "POST" })
               '"captions":{"preset":string,"color":"#rrggbb","activeColor":"#rrggbb","position":"top|middle|bottom","maxWords":number,"uppercase":boolean,"reason":string},' +
               '"layout":"auto|fill|fit|blur|split|trio|spotlight|centered|horizontal",' +
               '"variations":[{"label":string,"look":string,"speed":number,"zoom":number,"motion":"none|breathe|kenburns|pulse|pushin","reason":string}],' +
-              '"cuts":[{"start":number,"end":number,"title":string,"reason":string,"score":number,"headline":string}],' +
-              '"cleaner":{"recommended":boolean,"regions":[string],"reason":string}}. ' +
+              '"cuts":[{"start":number,"end":number,"title":string,"reason":string,"score":number,"headline":string}]}. ' +
               "Regras: tudo em português; headline com no máximo 42 caracteres; 3 a 5 variações com looks DIFERENTES " +
               "e apenas ids permitidos; speed entre 0.95 e 1.05; zoom entre 0.02 e 0.08; " +
               "cuts entre 15 e 75 segundos, dentro da duração informada, no máximo 6, sem sobreposição, " +
-              "ordenados pelo score (0 a 100); captions.preset e cleaner.regions só com ids permitidos.",
+              "ordenados pelo score (0 a 100); captions.preset só com ids permitidos.",
           },
           {
             role: "user",
@@ -124,7 +115,6 @@ export const aiTemplatePlan = createServerFn({ method: "POST" })
               `Nicho: ${data.niche ?? "detectar pelo conteúdo"}\n` +
               `Ids de look permitidos: ${data.looks.join(", ")}\n` +
               `Ids de preset de legenda permitidos: ${data.captionPresets.join(", ")}\n` +
-              `Ids de área de limpeza permitidos: ${data.cleanupPresets.join(", ")}\n` +
               `Transcrição (com marcas de tempo quando houver):\n${data.transcript}`,
           },
         ],
@@ -157,7 +147,6 @@ export const aiTemplatePlan = createServerFn({ method: "POST" })
 
     const looks = new Set(data.looks);
     const capPresets = new Set(data.captionPresets);
-    const cleanIds = new Set(data.cleanupPresets);
     const p = out.data;
 
     const variations = p.variations
@@ -191,10 +180,5 @@ export const aiTemplatePlan = createServerFn({ method: "POST" })
       layout: p.layout,
       variations,
       cuts,
-      cleaner: {
-        ...p.cleaner,
-        regions: p.cleaner.regions.filter((r) => cleanIds.has(r)).slice(0, 4),
-        reason: p.cleaner.reason.slice(0, 200),
-      },
     } satisfies AiTemplatePlan;
   });

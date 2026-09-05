@@ -38,7 +38,12 @@ def _get_detector():
     if _detector_tried:
         return _detector
     _detector_tried = True
-    if os.getenv("CLEANER_OCR_ENGINE", "rapidocr").lower() == "rapidocr":
+    configured = os.getenv("CLEANER_OCR_ENGINE", os.getenv("CLEANER_TEXT_DETECTOR", "rapidocr")).lower()
+    if configured == "morphology":
+        _detector = None
+        _detector_kind = "morphology"
+        return None
+    if configured == "rapidocr":
         rapid = _try_rapidocr()
         if rapid is not None:
             _detector = rapid
@@ -144,6 +149,7 @@ def _modern_polygons(result: Iterable[Any]) -> List[np.ndarray]:
 
 
 def _boxes_paddle(frame: np.ndarray) -> List[Box]:
+    global _detector, _detector_kind
     detector = _get_detector()
     if detector is None:
         return []
@@ -154,6 +160,9 @@ def _boxes_paddle(frame: np.ndarray) -> List[Box]:
         result = detector.ocr(frame, cls=False)
     except Exception as exc:
         print(f"[text_detect] inference failed ({exc}); using morphology for this frame")
+        # Do not retry a broken optional runtime for every sampled frame.
+        _detector = None
+        _detector_kind = "morphology"
         return []
     boxes: List[Box] = []
     for page in result or []:
@@ -226,6 +235,22 @@ def text_pixel_mask(frame: np.ndarray, box: Box, dilate_ratio: float = 0.32) -> 
     return mask
 
 
+def _bright_subtitle_mask(frame: np.ndarray, roi: np.ndarray) -> np.ndarray:
+    """Conservative fallback for bright subtitle glyphs inside a known ROI."""
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    bright = cv2.inRange(gray, 185, 255)
+    bright = cv2.bitwise_and(bright, roi)
+    # Join letters and short words on the same subtitle line, then include
+    # outline/shadow pixels without expanding into unrelated regions.
+    joined = cv2.morphologyEx(
+        bright,
+        cv2.MORPH_CLOSE,
+        cv2.getStructuringElement(cv2.MORPH_RECT, (13, 3)),
+    )
+    joined = cv2.dilate(joined, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+    return cv2.bitwise_and(joined, roi)
+
+
 def _roi_bbox(roi: np.ndarray, margin: int = 24):
     ys, xs = np.where(roi > 0)
     if ys.size == 0:
@@ -272,5 +297,7 @@ def frame_text_mask(
         )
     if roi is not None:
         out = cv2.bitwise_and(out, roi)
+        if subtitle_only and not np.any(out):
+            out = _bright_subtitle_mask(frame, roi)
     return out
 

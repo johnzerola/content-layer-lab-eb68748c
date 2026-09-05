@@ -10,6 +10,7 @@ import {
   appOrigin,
   jobToken,
   workerPublicBase,
+  workerCleanup,
   workerDelete,
   workerDetect,
   workerHealth,
@@ -43,6 +44,14 @@ export const cleanerHealth = createServerFn({ method: "GET" }).handler(async () 
   const health = await workerHealth();
   return health;
 });
+
+/** Consulta o próprio container RunPod; protegida para não gerar cold starts anônimos. */
+export const cleanerGpuHealth = createServerFn({ method: "GET" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .handler(async () => {
+    const { gpuHealth } = await import("@/lib/cleaner-gpu.server");
+    return await gpuHealth();
+  });
 
 export const createCleanerJob = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
@@ -187,7 +196,10 @@ export const cleanupCleanerRemoteJob = createServerFn({ method: "POST" })
   .validator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     await requireOwnedJob(context.supabase, context.userId, data.id);
-    await workerDelete(data.id).catch(() => null);
+    const cleanup = await workerCleanup(data.id);
+    if (!cleanup.result_preserved) {
+      throw new Error("resultado final não estava disponível; temporários não foram considerados entregues");
+    }
     await context.supabase
       .from("cleaner_jobs")
       .update({ stage: "resultado entregue; arquivos removidos da VPS" })

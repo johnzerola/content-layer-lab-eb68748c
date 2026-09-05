@@ -59,7 +59,6 @@ import { AITemplateStudio } from "@/components/AITemplateStudio";
 import { applyLook } from "@/lib/looks";
 
 import { currentUser, onAuth, pullTemplates, type CloudUser } from "@/lib/cloud";
-import { CleanerIAStudio } from "@/components/CleanerIAStudio";
 import { AutoScheduleModal } from "@/components/AutoScheduleModal";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
 import { failJob, finishJob, setJobCancel, setJobRetry, startJob, updateJob } from "@/lib/jobs";
@@ -74,7 +73,6 @@ import {
   commitTemplate,
   createTemplate,
   defaultCaptions,
-  fitCanvasToSource,
   orientationOf,
   loadTemplates,
   saveTemplates,
@@ -82,13 +80,8 @@ import {
   migrate,
   PLATFORM_PRESETS,
   RATIO_PRESETS,
-  makeCleanupRegion,
-  CLEANUP_PRESETS,
-  type CleanupRegion,
   type Template,
 } from "@/lib/template";
-import { detectOverlays, safeZones } from "@/lib/detect";
-import { buildBackgroundPlate } from "@/lib/plate";
 import { downloadBlob, grabPoster, outputIsWebm, renderVideo } from "@/lib/render";
 import { poolSize } from "@/lib/render-pool";
 import { webCodecsSupported } from "@/lib/encode";
@@ -119,7 +112,6 @@ import {
 import { cuesToSrt, cuesToText, demoCues, generateCaptions, type CaptionCue } from "@/lib/captions";
 import { registerFonts } from "@/lib/fonts";
 import { CaptionStudio } from "@/components/CaptionStudio";
-import { CleanupStudio } from "@/components/CleanupStudio";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
 import { canBrowserDecode, guessMime, isVideoFile, VIDEO_ACCEPT, VIDEO_EXT_RE } from "@/lib/media";
 import { toast } from "sonner";
@@ -225,13 +217,6 @@ interface Item {
   captions?: CaptionCue[] | undefined;
   capStatus?: string | undefined;
   capError?: boolean | undefined;
-  /** áreas de limpeza detectadas/ajustadas para ESTE vídeo (modo LimpaVídeo) */
-  regions?: CleanupRegion[] | undefined;
-  /** estado da análise automática de legenda/marca d'água */
-  detectStatus?: "analisando" | "ok" | "vazio" | "erro" | undefined;
-  detectMsg?: string | undefined;
-  /** URL do vídeo já limpo pela GPU (CleanerIA) — vira a fonte do render */
-  result_url?: string | null | undefined;
 
   error?: string | undefined;
 }
@@ -310,31 +295,6 @@ function stripBranding(t: Template): Template {
   };
 }
 
-/** Modo "limpar": vídeo cheio, sem marca e sem legenda nova — só as áreas de limpeza.
- *  Com as dimensões da fonte, o quadro assume a orientação real (sem zoom nem barras). */
-function cleanOnly(t: Template, src?: { w: number; h: number }): Template {
-  const b = stripBranding(t);
-  const base: Template = {
-    ...b,
-    background: "#000000",
-    video: {
-      ...b.video,
-      x: 0,
-      y: 0,
-      w: b.canvasW ?? CANVAS_W,
-      h: b.canvasH ?? CANVAS_H,
-      rotation: 0,
-      radius: 0,
-      offsetX: 0,
-      offsetY: 0,
-      fit: "auto",
-      visible: true,
-    },
-    captions: { ...(b.captions ?? defaultCaptions()), visible: false },
-  };
-  return src?.w && src?.h ? fitCanvasToSource(base, src.w, src.h) : base;
-}
-
 /** Lembra qual template estava ativo entre sessões. */
 const ACTIVE_KEY = "vv.active-template";
 
@@ -343,14 +303,10 @@ const ACTIVE_KEY = "vv.active-template";
 const queuesState = externalState<Record<Mode, Item[]>>({
   lote: [],
   clip: [],
-  limpar: [],
-  "limpar-ia": [],
 });
 const selectedIdsState = externalState<Record<Mode, string | null>>({
   lote: null,
   clip: null,
-  limpar: null,
-  "limpar-ia": null,
 });
 const runningState = externalState(false);
 const pausedState = externalState(false);
@@ -388,7 +344,7 @@ function Home() {
     return () => {
       alive = false;
     };
-  }, [user?.id]);
+  }, [user]);
 
   const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
@@ -432,7 +388,7 @@ function Home() {
   const setItemsIn = useCallback(
     (m: Mode, upd: Item[] | ((prev: Item[]) => Item[])) =>
       setQueues((q) => ({ ...q, [m]: typeof upd === "function" ? upd(q[m] ?? []) : upd })),
-    [],
+    [setQueues],
   );
   const modeRef = useRef<Mode>(mode);
   modeRef.current = mode;
@@ -444,7 +400,7 @@ function Home() {
   );
   const setSelectedId = useCallback(
     (id: string | null) => setSelectedIds((s) => ({ ...s, [modeRef.current]: id })),
-    [],
+    [setSelectedIds],
   );
 
   const [running, setRunning] = useExternalState(runningState);
@@ -538,9 +494,6 @@ function Home() {
   // transcreve automaticamente no lote quando a legenda está ativa
   const [autoCap, setAutoCap] = useState(true);
   const [capEditor, setCapEditor] = useState<string | null>(null);
-  const [detecting, setDetecting] = useState(false);
-  const [detectMsg, setDetectMsg] = useState<string | undefined>(undefined);
-  const [suggestions, setSuggestions] = useState<CleanupRegion[]>([]);
   const [compare, setCompare] = useState(false);
   /** grade de interface (TikTok/IG/Shorts) sobre a prévia — só visual, não exporta */
   const [uiGrid, setUiGrid] = useState<PlatformUI | "off">(() => {
@@ -687,7 +640,7 @@ function Home() {
                 : p,
             ),
           );
-          if (runMode !== "limpar" && smartRef.current) {
+          if (smartRef.current) {
             const af = await autoFrame(it.file);
             setQ((prev) =>
               prev.map((p) =>
@@ -702,62 +655,8 @@ function Home() {
         }
       }
 
-      if (runMode === "limpar") {
-        const pool = [...created];
-        const worker = async () => {
-          for (;;) {
-            const it = pool.shift();
-            if (!it) return;
-            setQ((prev) =>
-              prev.map((p) =>
-                p.id === it.id
-                  ? { ...p, detectStatus: "analisando", detectMsg: "analisando quadros..." }
-                  : p,
-              ),
-            );
-            try {
-              const found = await detectOverlays(it.file, {
-                onProgress: (d, t) =>
-                  setQ((prev) =>
-                    prev.map((p) =>
-                      p.id === it.id ? { ...p, detectMsg: `analisando ${d}/${t}` } : p,
-                    ),
-                  ),
-              });
-              const regions = found.map((f) => makeCleanupRegion(f));
-              setQ((prev) =>
-                prev.map((p) =>
-                  p.id === it.id
-                    ? {
-                        ...p,
-                        regions,
-                        detectStatus: regions.length ? "ok" : "vazio",
-                        detectMsg: regions.length
-                          ? `${regions.length} area(s) detectada(s)`
-                          : "nada fixo encontrado",
-                      }
-                    : p,
-                ),
-              );
-            } catch (err) {
-              setQ((prev) =>
-                prev.map((p) =>
-                  p.id === it.id
-                    ? {
-                        ...p,
-                        detectStatus: "erro",
-                        detectMsg: String((err as Error)?.message ?? err),
-                      }
-                    : p,
-                ),
-              );
-            }
-          }
-        };
-        void Promise.all([worker(), worker()]);
-      }
     },
-    [setItemsIn],
+    [setItemsIn, setSelectedIds],
   );
 
   const addFiles = useCallback(
@@ -794,7 +693,7 @@ function Home() {
   useEffect(() => {
     const shellMode = takePendingShellMode();
     const pending = takePendingTool();
-    const tool: HandoffTool = pending ?? (shellMode === "limpar-ia" ? "lote" : shellMode) ?? "lote";
+    const tool: HandoffTool = pending ?? shellMode ?? "lote";
     if (shellMode) {
       modeRef.current = shellMode;
       setMode(shellMode);
@@ -1212,38 +1111,6 @@ function Home() {
     return { start, end: start + effDur };
   }, [previewVariation, selected?.duration, selected?.clip?.start, selected?.clip?.end]);
 
-  // placa de fundo real (mediana temporal) usada no preview do LimpaVídeo
-  const [previewPlate, setPreviewPlate] = useState<{
-    canvas: HTMLCanvasElement;
-    ok: Set<string>;
-  } | null>(null);
-  const selRegionsKey = JSON.stringify(
-    (selected?.regions ?? [])
-      .filter((r) => r.enabled)
-      .map((r) => [r.id, r.x, r.y, r.w, r.h, r.mode]),
-  );
-  useEffect(() => {
-    if (mode !== "limpar" || !selected?.file) {
-      setPreviewPlate(null);
-      return;
-    }
-    let alive = true;
-    const regions = (selected.regions ?? []).filter((r) => r.enabled);
-    if (!regions.length) {
-      setPreviewPlate(null);
-      return;
-    }
-    const timer = setTimeout(() => {
-      buildBackgroundPlate(selected.file, regions, { frames: 14 })
-        .then((p) => alive && setPreviewPlate(p))
-        .catch(() => alive && setPreviewPlate(null));
-    }, 350);
-    return () => {
-      alive = false;
-      clearTimeout(timer);
-    };
-  }, [mode, selected?.file, selected?.regions, selRegionsKey]);
-
   const previewDrawOpts = useMemo(
     () =>
       previewVariation
@@ -1257,7 +1124,6 @@ function Home() {
             border: previewVariation.border,
             borderColor: previewVariation.borderColor,
             ...(previewCues?.length ? { captions: previewCues } : {}),
-            ...(previewPlate ? { plate: previewPlate } : {}),
             ...(selected?.preEdit
               ? {
                   pre: selected.preEdit,
@@ -1270,13 +1136,11 @@ function Home() {
               pre: selected.preEdit,
               clip: selected.clip ?? { start: 0, end: selected.duration || 0 },
               ...(previewCues?.length ? { captions: previewCues } : {}),
-              ...(previewPlate ? { plate: previewPlate } : {}),
             }
           : undefined,
     [
       previewVariation,
       previewCues,
-      previewPlate,
       selected?.preEdit,
       selected?.clip,
       selected?.duration,
@@ -1419,35 +1283,8 @@ function Home() {
           const outputs: { blob: Blob; ext: string; label: string }[] = [];
           let step = 0;
 
-          // CleanerIA: o render precisa partir do vídeo já reconstruído pela GPU,
-          // senão a legenda original volta a aparecer na exportação.
-          let sourceFile = item.file;
-          if (runMode === "limpar-ia") {
-            if (!item.result_url) {
-              throw new Error(
-                "Este vídeo ainda não foi limpo pela IA. Marque as áreas e clique em “Enviar para GPU” antes de processar.",
-              );
-            }
-            setItems((p) =>
-              p.map((x) => (x.id === id ? { ...x, stage: "baixando vídeo limpo" } : x)),
-            );
-            updateJob(id, { stage: "baixando vídeo limpo" });
-            setBatchPhase("baixando vídeo limpo", prepScale(0.2));
-
-            const res = await fetch(item.result_url, { signal: ac.signal });
-            if (!res.ok) throw new Error("Não consegui baixar o vídeo limpo da GPU.");
-            const cleaned = await res.blob();
-            sourceFile = new File([cleaned], item.file.name, {
-              type: cleaned.type || "video/mp4",
-            });
-          }
-
-          const baseTpl =
-            runMode === "clip"
-              ? stripBranding(active)
-              : runMode === "limpar" || runMode === "limpar-ia"
-                ? cleanOnly(active)
-                : active;
+          const sourceFile = item.file;
+          const baseTpl = runMode === "clip" ? stripBranding(active) : active;
 
           // transcreve na hora do processamento, para queimar a legenda no vídeo
           let cues = item.captions;
@@ -1514,26 +1351,6 @@ function Home() {
             }
           }
 
-          // LimpaVídeo: recupera o fundo real por mediana temporal antes de renderizar
-          const itemRegions = item.regions?.length ? item.regions : (active.cleanup ?? []);
-          let plate: Awaited<ReturnType<typeof buildBackgroundPlate>> = null;
-          if (runMode === "limpar" && itemRegions.length) {
-            setItems((p) =>
-              p.map((x) => (x.id === id ? { ...x, stage: "recuperando fundo original" } : x)),
-            );
-            updateJob(id, { stage: "recuperando fundo original" });
-            setBatchPhase("recuperando fundo original", prepScale(0.9));
-
-            try {
-              plate = await buildBackgroundPlate(item.file, itemRegions, {
-                ...(item.clip ? { clip: item.clip } : {}),
-                signal: ac.signal,
-              });
-            } catch {
-              plate = null;
-            }
-          }
-
           let lastTick = 0;
           // headline personalizada deste vídeo (própria, banco em rodízio ou variação)
           const itemIndex = Math.max(
@@ -1552,18 +1369,7 @@ function Home() {
           const tasks: RenderTask[] = [];
           for (const plat of outs) {
             // cada plataforma recebe a resolução/fps/bitrate recomendados
-            // no modo "limpar" o quadro segue a orientação real do vídeo (sem recorte)
-            const baseTplForPlat =
-              runMode === "limpar"
-                ? {
-                    ...cleanOnly(active, { w: item.w, h: item.h }),
-                    // cada vídeo usa as áreas detectadas para ele; sem detecção, usa as do template
-                    cleanup: itemRegions,
-                  }
-                : runMode === "limpar-ia"
-                  ? // a limpeza já foi feita na GPU: só reembala mantendo proporção original
-                    { ...cleanOnly(active, { w: item.w, h: item.h }), cleanup: [] }
-                  : applyRatio(baseTpl, plat.w, plat.h);
+            const baseTplForPlat = applyRatio(baseTpl, plat.w, plat.h);
 
             // pequenas mudanças de posição/tamanho para nenhum vídeo sair idêntico
             const tplHead =
@@ -1638,7 +1444,6 @@ function Home() {
               clip: item.clip,
               pre: item.preEdit,
               captions: cues,
-              plate,
               signal: ac.signal,
               onStats: ({ path, fps }) => {
                 setBatchPath(path);
@@ -1870,63 +1675,6 @@ function Home() {
     if (ids.length) void processAll(ids);
   };
 
-  /** Re-analisa o vídeo selecionado e grava as áreas encontradas NELE. */
-  const runDetect = async () => {
-    const it = itemsRef.current.find((x) => x.id === selectedId);
-    if (!it) return;
-    setDetecting(true);
-    setSuggestions([]);
-    setDetectMsg("analisando quadros…");
-    try {
-      const found = await detectOverlays(it.file, {
-        clip: it.clip,
-        onProgress: (d, t) => setDetectMsg(`analisando quadros ${d}/${t}…`),
-      });
-      const regions = found.map((f) => makeCleanupRegion(f));
-      setItems((p) =>
-        p.map((x) =>
-          x.id === it.id
-            ? { ...x, regions, detectStatus: regions.length ? "ok" : "vazio", detectMsg: undefined }
-            : x,
-        ),
-      );
-      if (regions.length) {
-        setDetectMsg(`${regions.length} área(s) aplicada(s) automaticamente`);
-      } else {
-        setSuggestions(safeZones().map((z) => makeCleanupRegion(z)));
-        setDetectMsg("nada fixo encontrado — use as zonas sugeridas ou marque manualmente");
-      }
-    } catch (err) {
-      setSuggestions([]);
-      setDetectMsg(`falha na detecção: ${String((err as Error)?.message ?? err)}`);
-    } finally {
-      setDetecting(false);
-    }
-  };
-
-  /** áreas de limpeza do vídeo selecionado (fallback: as do template) */
-  const cleanupRegions: CleanupRegion[] =
-    mode === "limpar" ? (selected?.regions ?? active.cleanup ?? []) : (active.cleanup ?? []);
-  const setCleanupRegions = (regions: CleanupRegion[]) => {
-    if (mode === "limpar" && selected) {
-      setItems((p) => p.map((x) => (x.id === selected.id ? { ...x, regions } : x)));
-    } else {
-      setActive((t) => ({ ...t, cleanup: regions }));
-    }
-  };
-  const applyRegionsToAll = () => {
-    const regions = cleanupRegions;
-    setItems((p) =>
-      p.map((x) => ({
-        ...x,
-        regions: regions.map((r) => ({ ...r, id: crypto.randomUUID() })),
-        detectStatus: "ok" as const,
-        detectMsg: `${regions.length} área(s) do vídeo modelo`,
-      })),
-    );
-    toast.success(`Áreas aplicadas em ${items.length} vídeo(s).`);
-  };
-
   const readyCount = items.filter((i) => i.status === "pronto").length;
   const errorCount = items.filter((i) => i.status === "erro").length;
   // progresso global do lote: soma do progresso de cada arquivo em andamento/concluído
@@ -2066,21 +1814,16 @@ function Home() {
   };
 
 
-  const baseTpl: Template =
-    mode === "clip"
-      ? stripBranding(active)
-      : mode === "limpar"
-        ? cleanOnly(active, selected ? { w: selected.w, h: selected.h } : undefined)
-        : active;
+  const baseTpl: Template = mode === "clip" ? stripBranding(active) : active;
   const previewTemplate: Template = selected
     ? {
         ...baseTpl,
         headline: { ...baseTpl.headline, text: selected.headline || baseTpl.headline.text },
-        cleanup: mode === "limpar" ? cleanupRegions : (baseTpl.cleanup ?? []),
+        cleanup: baseTpl.cleanup ?? [],
         video: {
           ...baseTpl.video,
-          offsetX: mode === "limpar" ? 0 : selected.offsetX,
-          offsetY: mode === "limpar" ? 0 : selected.offsetY,
+          offsetX: selected.offsetX,
+          offsetY: selected.offsetY,
         },
       }
     : baseTpl;
@@ -2093,8 +1836,6 @@ function Home() {
       counts={{
         lote: queues.lote.length,
         clip: queues.clip.length,
-        limpar: queues.limpar.length,
-        "limpar-ia": queues["limpar-ia"].length,
       }}
       onLibrary={() => setLibraryOpen(true)}
       onCloud={() => setCloudOpen(true)}
@@ -2214,53 +1955,6 @@ function Home() {
               </Button>
             </div>
           </section>
-        ) : mode === "limpar" ? (
-          <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
-            <div>
-              <p className="mono-label">Limpar vídeo</p>
-              <p className="text-lg font-semibold">
-                Remover legenda queimada, marca d'água e textos
-              </p>
-              <p className="text-[12px] text-muted-foreground">
-                marque as áreas sobre o quadro no preview — clonar vizinho, borrão, mosaico ou tarja
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="rounded-full border border-border px-3 py-1 text-[12px] text-muted-foreground">
-                {(active.cleanup ?? []).length} área{(active.cleanup ?? []).length === 1 ? "" : "s"}
-              </span>
-              <select
-                className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm"
-                value={`${active.canvasW ?? 1080}x${active.canvasH ?? 1920}`}
-                onChange={(e) => {
-                  const p = RATIO_PRESETS.find((r) => `${r.w}x${r.h}` === e.target.value);
-                  if (p) setActive(applyRatio(active, p.w, p.h));
-                }}
-              >
-                {RATIO_PRESETS.map((r) => (
-                  <option key={r.id} value={`${r.w}x${r.h}`}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </section>
-        ) : mode === "limpar-ia" ? (
-          <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
-            <div>
-              <p className="mono-label">AI Video Cleaner</p>
-              <p className="text-lg font-semibold">Remoção Profissional com ProPainter (GPU)</p>
-              <p className="text-[12px] text-muted-foreground">
-                reconstrução temporal avançada utilizando frames vizinhos para restaurar o fundo
-                original
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[12px] text-primary">
-                <Sparkles className="size-3" /> motor gpu
-              </span>
-            </div>
-          </section>
         ) : (
           <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
             <div>
@@ -2363,7 +2057,7 @@ function Home() {
                   Reposicione o enquadramento quando o corte automático errar.
                 </p>
               </div>
-              {selected && mode !== "limpar-ia" && (
+              {selected && (
                 <AuthGate>
                   <AITemplateStudio
                     captions={selected.captions}
@@ -2470,41 +2164,11 @@ function Home() {
                         }
                       })();
                     }}
-                    onCleanup={(ids) => {
-                      const regions = ids
-                        .map((id) => CLEANUP_PRESETS.find((p) => p.id === id))
-                        .filter(Boolean)
-                        .map((p) => makeCleanupRegion(p!.region));
-                      if (!regions.length) return;
-                      setActive((t) => ({ ...t, cleanup: [...(t.cleanup ?? []), ...regions] }));
-                    }}
                   />
                 </AuthGate>
               )}
 
-              {mode === "limpar-ia" && selected ? (
-
-                <AuthGate>
-                  <CleanerIAStudio
-                    item={{
-                      id: selected.id,
-                      file: selected.file,
-                      poster: selected.poster,
-                      w: selected.w,
-                      h: selected.h,
-                    }}
-                    onComplete={(url) => {
-                      setItems((prev) =>
-                        prev.map((x) =>
-                          x.id === selected.id
-                            ? { ...x, result_url: url, status: "pronto" as any }
-                            : x,
-                        ),
-                      );
-                    }}
-                  />
-                </AuthGate>
-              ) : selected ? (
+              {selected ? (
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div className="space-y-2">
                     <p className="mono-label">Original</p>
@@ -2580,45 +2244,6 @@ function Home() {
                       >
                         <Repeat className="size-3" /> restaurar auto
                       </button>
-                    </div>
-                    <div className="mt-3 border-t border-border pt-3">
-                      <CleanupStudio
-                        regions={cleanupRegions}
-                        onChange={setCleanupRegions}
-                        poster={selected.poster ?? undefined}
-                        aspect={previewTemplate.video.w / previewTemplate.video.h}
-                        onDetect={() => void runDetect()}
-                        detecting={detecting || selected.detectStatus === "analisando"}
-                        detectMsg={
-                          selected.detectStatus === "analisando"
-                            ? (selected.detectMsg ?? "analisando quadros…")
-                            : (detectMsg ?? selected.detectMsg)
-                        }
-                        perVideo={mode === "limpar"}
-                        onApplyAll={
-                          mode === "limpar" && items.length > 1 ? applyRegionsToAll : undefined
-                        }
-                        onUseSafeZones={() =>
-                          setCleanupRegions([
-                            ...cleanupRegions,
-                            ...safeZones().map((z) => makeCleanupRegion(z)),
-                          ])
-                        }
-                        suggestions={suggestions}
-                        onUseSuggestion={(r) => {
-                          setCleanupRegions([...cleanupRegions, r]);
-                          setSuggestions((s) => s.filter((x) => x.id !== r.id));
-                        }}
-                        onUseAllSuggestions={() => {
-                          setCleanupRegions([...cleanupRegions, ...suggestions]);
-                          setSuggestions([]);
-                          setDetectMsg(undefined);
-                        }}
-                        onClearSuggestions={() => {
-                          setSuggestions([]);
-                          setDetectMsg(undefined);
-                        }}
-                      />
                     </div>
                   </div>
 
@@ -3148,7 +2773,7 @@ function Home() {
                   {eta && <span className="text-primary">● restam ~{eta}</span>}
                 </div>
 
-                {selected && mode !== "limpar" && (
+                {selected && (
                   <div className="rounded-xl border border-border bg-surface-2 p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="mono-label">Legendas automáticas</p>
@@ -3322,7 +2947,7 @@ function Home() {
                   </div>
                 )}
 
-                {selected && mode !== "limpar" && (
+                {selected && (
                   <div className="rounded-xl border border-border bg-surface-2 p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="mono-label">Cortes automáticos</p>
@@ -3748,25 +3373,6 @@ function Home() {
                         {it.status === "processando" ? ` ${Math.round(it.progress * 100)}%` : ""}
                         {it.stage && it.status !== "pendente" ? ` · ${it.stage}` : ""}
                       </p>
-                      {mode === "limpar" && it.detectStatus && (
-                        <p
-                          className={`text-[11px] ${
-                            it.detectStatus === "ok"
-                              ? "text-primary"
-                              : it.detectStatus === "erro"
-                                ? "text-destructive"
-                                : "text-muted-foreground"
-                          }`}
-                        >
-                          {it.detectStatus === "analisando"
-                            ? (it.detectMsg ?? "analisando…")
-                            : it.detectStatus === "ok"
-                              ? `${(it.regions ?? []).length} área(s) detectada(s)`
-                              : it.detectStatus === "vazio"
-                                ? "nada encontrado — marque manual"
-                                : `falha na análise`}
-                        </p>
-                      )}
                       {(it.status === "processando" || it.status === "na fila") && (
                         <div className="mt-1 h-1 overflow-hidden rounded-full bg-muted">
                           <div

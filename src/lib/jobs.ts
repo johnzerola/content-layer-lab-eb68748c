@@ -1,6 +1,6 @@
 /**
  * Central de atividade: uma fila global compartilhada por todas as
- * ferramentas (ViralBatch, CorteIA, LimpaVídeo e Monitora Live).
+ * ferramentas (ViralBatch, CorteIA, CleanerIA legado e Monitora Live).
  *
  * Cada trabalho guarda etapas com carimbo de tempo, o que dá dois ganhos:
  * um painel único de "processando / pronto / falhou" e um log de sessão
@@ -61,7 +61,7 @@ export interface Job {
 export const TOOL_LABEL: Record<JobTool, string> = {
   lote: "ViralBatch",
   clip: "CorteIA",
-  limpar: "LimpaVídeo",
+  limpar: "CleanerIA (legado)",
   "limpar-ia": "CleanerIA",
   live: "Monitora Live",
 };

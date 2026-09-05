@@ -14,7 +14,7 @@ export default defineMcp({
   title: "Video Creator Suite",
   version: "0.1.0",
   instructions:
-    "Ferramentas do VaiViral (Video Creator Suite): consulte templates de vídeo, projetos salvos (ViralBatch, CorteIA, LimpaVídeo), histórico de lotes, arquivos exportados e postagens agendadas do usuário conectado.",
+    "Ferramentas do VaiViral (Video Creator Suite): consulte templates de vídeo, projetos salvos (ViralBatch, CorteIA e CleanerIA), histórico de lotes, arquivos exportados e postagens agendadas do usuário conectado.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated",

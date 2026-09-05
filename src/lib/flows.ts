@@ -1,9 +1,9 @@
 /**
  * Fluxos independentes de importação e exportação.
- * Cada ferramenta (ViralBatch, CorteIA, LimpaVídeo) tem a sua própria fila,
+ * Cada ferramenta ativa (ViralBatch e CorteIA) tem a sua própria fila,
  * as suas próprias fontes de entrada e as suas próprias regras de saída.
  */
-export type Mode = "lote" | "clip" | "limpar" | "limpar-ia";
+export type Mode = "lote" | "clip";
 
 const slug = (s: string) =>
   s
@@ -92,50 +92,6 @@ export const FLOWS: Record<Mode, Flow> = {
       keepSourceName: false,
       zipPrefix: "corteia",
       filePrefix: "corte",
-    },
-  },
-  limpar: {
-    brand: "LimpaVídeo",
-    import: {
-      step: "02",
-      title: "Importe os vídeos para limpar",
-      hint: "arquivos ou pasta · a análise de legenda e marca d'água começa sozinha ao importar",
-      folder: true,
-      link: true,
-      linkPlaceholder: "https://... cole o link público do vídeo",
-      linkHint: "o arquivo original entra direto na fila de detecção e limpeza.",
-      multiple: true,
-      filesLabel: "Selecionar arquivos",
-    },
-    export: {
-      title: "Entrega dos vídeos limpos",
-      platforms: false,
-      variants: false,
-      keepSourceName: true,
-      zipPrefix: "limpavideo",
-      filePrefix: "limpo",
-    },
-  },
-  "limpar-ia": {
-    brand: "CleanerIA",
-    import: {
-      step: "01",
-      title: "Importe o vídeo para limpeza profissional",
-      hint: "a reconstrução ProPainter utiliza frames vizinhos para restaurar o fundo",
-      folder: false,
-      link: true,
-      linkPlaceholder: "https://... cole o link público do vídeo",
-      linkHint: "o arquivo original entra direto na limpeza profissional.",
-      multiple: false,
-      filesLabel: "Selecionar vídeo",
-    },
-    export: {
-      title: "Resultado da limpeza IA",
-      platforms: false,
-      variants: false,
-      keepSourceName: true,
-      zipPrefix: "cleaneria",
-      filePrefix: "pro-limpo",
     },
   },
 };
