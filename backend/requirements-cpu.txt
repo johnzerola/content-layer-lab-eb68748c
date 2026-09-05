@@ -27,7 +27,7 @@ addict==2.4.0
 future==1.0.0
 pyyaml==6.0.2
 yapf==0.40.2
-matplotlib==3.10.9
+matplotlib==3.11.1
 
 # OCR (CPU) — versões disponíveis para Python 3.10
 paddlepaddle==3.3.1
