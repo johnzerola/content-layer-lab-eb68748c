@@ -122,6 +122,17 @@ def build_propainter_command(
     root = propainter_root()
     proc_w, proc_h = _processing_size(width, height, preset, scale_factor)
     tight = scale_factor < 1.0
+    cpu_only = not _propainter_cuda_available()
+    if cpu_only:
+        # Sem GPU a memória do container é o gargalo: janelas curtas evitam que
+        # o kernel mate o processo por falta de RAM.
+        subvideo = "16" if tight else "24"
+        neighbor = "5" if tight else "6"
+        ref_stride = "12"
+    else:
+        subvideo = "40" if tight else ("80" if preset == "max" else "64")
+        neighbor = "8" if tight else ("12" if preset == "max" else "10")
+        ref_stride = "10" if tight else ("5" if preset == "max" else "10")
     command = [
         os.getenv("PROPAINTER_PYTHON", sys.executable),
         str(root / "inference_propainter.py"),
@@ -131,9 +142,9 @@ def build_propainter_command(
         "--width", str(proc_w),
         "--height", str(proc_h),
         "--save_fps", str(max(1, round(fps))),
-        "--subvideo_length", "40" if tight else ("80" if preset == "max" else "64"),
-        "--neighbor_length", "8" if tight else ("12" if preset == "max" else "10"),
-        "--ref_stride", "10" if tight else ("5" if preset == "max" else "10"),
+        "--subvideo_length", subvideo,
+        "--neighbor_length", neighbor,
+        "--ref_stride", ref_stride,
         "--mask_dilation", "2" if preset == "max" else "1",
     ]
     if _propainter_cuda_available() and os.getenv("PROPAINTER_FP16", "1") == "1":
@@ -238,7 +249,13 @@ def run_propainter(
         except OSError:
             pass
         last_error = f"ProPainter falhou (codigo {returncode}).\n{tail}"
-        out_of_memory = "OutOfMemoryError" in tail or "out of memory" in tail.lower()
+        # returncode -9/137 = processo morto pelo kernel/cgroup por falta de RAM
+        # (CPU). Tratado como OOM para acionar a retentativa em escala menor.
+        out_of_memory = (
+            "OutOfMemoryError" in tail
+            or "out of memory" in tail.lower()
+            or returncode in (-9, 137)
+        )
         if not out_of_memory or attempt == len(scales) - 1:
             raise RuntimeError(last_error)
 

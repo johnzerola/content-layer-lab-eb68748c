@@ -16,6 +16,19 @@ yt-dlp==2026.7.4
 scipy==1.11.4
 pillow==12.3.0
 
+# Dependências exigidas pelo ProPainter oficial (inference_propainter.py)
+imageio==2.34.1
+imageio-ffmpeg==0.6.0
+scikit-image==0.22.0
+av==14.0.1
+einops==0.8.0
+timm==1.0.9
+addict==2.4.0
+future==1.0.0
+pyyaml==6.0.2
+yapf==0.40.2
+matplotlib==3.10.9
+
 # OCR (CPU) — versões disponíveis para Python 3.10
 paddlepaddle==3.3.1
 paddleocr==3.7.0
