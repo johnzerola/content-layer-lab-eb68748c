@@ -86,7 +86,10 @@ def _crop_clean_filter(info, opts: Dict) -> str:
 
 
 def _enhance_filter(info, opts: Dict) -> str:
-    enhance = opts.get("enhance") if isinstance(opts.get("enhance"), dict) else {}
+    configured = opts.get("enhance")
+    if configured is False:
+        return ""
+    enhance = configured if isinstance(configured, dict) else {}
     mode = str(enhance.get("mode", "hq"))
     scale = float(enhance.get("scale", 1))
     filters = []
@@ -112,7 +115,13 @@ def _apply_postprocess(input_path: str, output_path: str, info, opts: Dict, emit
         filters.append(_crop_clean_filter(info, opts))
     if enhance_filter:
         filters.append(enhance_filter)
-    emit(96, "melhorando qualidade e reenquadrando", "encoding")
+    if strategy == "crop-clean" and enhance_filter:
+        stage = "reenquadrando e melhorando qualidade"
+    elif strategy == "crop-clean":
+        stage = "reenquadrando sem legenda"
+    else:
+        stage = "aplicando melhoria de qualidade"
+    emit(96, stage, "encoding")
     ffmpeg_filter(source, final_path, ",".join(filters), crf=int(opts.get("crf", 14)))
     os.replace(final_path, output_path)
     return output_path

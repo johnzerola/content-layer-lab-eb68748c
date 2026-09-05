@@ -2,8 +2,9 @@
  * Orquestrador de chunks do CleanerIA v3.
  *
  * Fluxo: planeja janelas com sobreposição -> despacha N chunks em paralelo na
- * GPU -> verifica resíduo de texto por chunk -> reprocessa apenas o que ficou
- * sujo -> concatena e remonta o áudio no worker CPU.
+ * GPU -> mede resíduo de texto por chunk -> concatena e remonta o áudio no
+ * worker CPU. Falhas técnicas ainda são repetidas; score visual alto vira
+ * aviso, pois repetir exatamente o mesmo modelo só triplica tempo e custo.
  *
  * Todo o estado vive no banco (`cleaner_jobs`, `cleaner_chunks`), então a fila
  * sobrevive a reload da página, queda de rede e reinício do servidor.
@@ -56,10 +57,12 @@ async function admin() {
   return supabaseAdmin;
 }
 
-function concurrencyFor(preset: string): number {
+function concurrencyFor(_preset: string): number {
   const configured = Number(process.env["CLEANER_GPU_CONCURRENCY"] ?? "");
   if (Number.isFinite(configured) && configured > 0) return Math.min(12, Math.floor(configured));
-  return preset === "max" ? 3 : 5;
+  // O endpoint de produção possui dois workers. Despachar mais que isso cria
+  // uma fila invisível no RunPod e faz a UI chamar itens enfileirados de ativos.
+  return 2;
 }
 
 function chunkPath(jobId: string, idx: number, attempt: number) {
@@ -264,8 +267,8 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
           continue;
         }
         const residual = state.residualText ?? 0;
-        const dirty = residual > RESIDUAL_LIMIT && chunk.attempts < MAX_ATTEMPTS;
-        chunk.status = dirty ? "pending" : "done";
+        const residualWarning = residual > RESIDUAL_LIMIT;
+        chunk.status = "done";
         chunk.residual_text = residual;
         await db
           .from("cleaner_chunks")
@@ -277,7 +280,7 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
             checksum: state.checksum ?? null,
             bytes: state.bytes ?? null,
             finished_at: new Date().toISOString(),
-            error: dirty ? `resíduo ${residual.toFixed(3)} — reprocessando` : null,
+            error: residualWarning ? `resíduo ${residual.toFixed(3)} — revisar resultado` : null,
           } as never)
           .eq("id", chunk.id);
 
@@ -336,7 +339,8 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
         masks: (row["masks"] as unknown[]) ?? [],
         options: {
           ...((row["options"] as Record<string, unknown>) ?? {}),
-          // Reprocessos usam dilatação mais agressiva no que sobrou.
+          // Reservado para imagens futuras do worker. Retries atuais só
+          // acontecem após falha técnica ou artefato ausente.
           retry_pass: attempt > 1,
         },
       });
