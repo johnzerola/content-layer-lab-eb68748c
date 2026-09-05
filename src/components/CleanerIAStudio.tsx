@@ -110,6 +110,31 @@ function maskBounds(list: CleanerRegion[]): { x: number; y: number; w: number; h
   return { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
 }
 
+/**
+ * Mantém só o que é legenda ou marca d'água. A detecção bruta marca qualquer
+ * texto do cenário (estampa da roupa, crachá, placa) e isso vira reconstrução
+ * onde não devia. Regras: faixa de legenda embaixo, marca d'água pequena nas
+ * bordas/cantos. Áreas manuais e protegidas nunca são filtradas.
+ */
+function isSubtitleOrWatermark(m: CleanerRegion): boolean {
+  const b = regionBox(m);
+  if (!b) return true;
+  const area = b.w * b.h;
+  if (area > 0.35) return false;
+  const label = `${m.label ?? ""} ${m.role ?? ""}`;
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2;
+
+  // faixa de legenda: parte de baixo do quadro, larga e horizontal
+  const subtitle = cy >= 0.55 && b.w >= 0.18 && b.h <= 0.3 && cx > 0.15 && cx < 0.85;
+  // marca d'água: pequena e encostada em uma borda/canto
+  const edge = b.x <= 0.1 || b.x + b.w >= 0.9 || b.y <= 0.14 || b.y + b.h >= 0.94;
+  const watermark = edge && area <= 0.12;
+  const persistent = /persistente|watermark|marca/i.test(label) && area <= 0.12 && edge;
+
+  return subtitle || watermark || persistent;
+}
+
 function overlapsAny(m: CleanerRegion, list: CleanerRegion[]): boolean {
   const a = regionBox(m);
   if (!a) return false;
