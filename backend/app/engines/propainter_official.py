@@ -238,7 +238,13 @@ def run_propainter(
         except OSError:
             pass
         last_error = f"ProPainter falhou (codigo {returncode}).\n{tail}"
-        out_of_memory = "OutOfMemoryError" in tail or "out of memory" in tail.lower()
+        # returncode -9/137 = processo morto pelo kernel/cgroup por falta de RAM
+        # (CPU). Tratado como OOM para acionar a retentativa em escala menor.
+        out_of_memory = (
+            "OutOfMemoryError" in tail
+            or "out of memory" in tail.lower()
+            or returncode in (-9, 137)
+        )
         if not out_of_memory or attempt == len(scales) - 1:
             raise RuntimeError(last_error)
 
