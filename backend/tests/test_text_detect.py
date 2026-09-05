@@ -4,10 +4,23 @@ from unittest.mock import patch
 import numpy as np
 
 from app.services import text_detect
-from app.services.text_detect import _bright_subtitle_mask, frame_text_mask
+from app.services.text_detect import _bright_subtitle_mask, frame_text_mask, text_pixel_mask
 
 
 class FrameTextMaskTests(unittest.TestCase):
+    def test_glyph_mask_does_not_fill_the_complete_subtitle_band(self):
+        cv2 = __import__("cv2")
+        frame = np.zeros((100, 240, 3), dtype=np.uint8)
+        cv2.rectangle(frame, (20, 35), (45, 65), (255, 255, 255), -1)
+        cv2.rectangle(frame, (190, 35), (215, 65), (255, 255, 255), -1)
+
+        result = text_pixel_mask(frame, (10, 25, 220, 50), dilate_ratio=0.12)
+
+        self.assertGreater(result[50, 30], 0)
+        self.assertGreater(result[50, 200], 0)
+        self.assertEqual(result[50, 120], 0)
+        self.assertLess(float((result > 0).mean()), 0.25)
+
     def test_bright_subtitle_mask_keeps_short_words_on_the_same_line(self):
         frame = np.zeros((180, 320, 3), dtype=np.uint8)
         roi = np.zeros((180, 320), dtype=np.uint8)

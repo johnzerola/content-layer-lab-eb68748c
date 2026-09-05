@@ -50,6 +50,7 @@ type ChunkRow = {
   provider_job_id: string | null;
   output_url: string | null;
   residual_text: number | null;
+  lease_until: string | null;
 };
 
 async function admin() {
@@ -219,7 +220,7 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
   try {
     const { data: chunkData } = await db
       .from("cleaner_chunks")
-      .select("id, idx, start_seconds, end_seconds, overlap_seconds, status, attempts, provider_job_id, output_url, residual_text")
+      .select("id, idx, start_seconds, end_seconds, overlap_seconds, status, attempts, provider_job_id, output_url, residual_text, lease_until")
       .eq("job_id", jobId)
       .order("idx", { ascending: true });
     const chunks = (chunkData ?? []) as unknown as ChunkRow[];
@@ -231,7 +232,23 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
     // 1) Coleta o que está rodando na GPU.
     for (const chunk of chunks.filter((c) => c.status === "running" && c.provider_job_id)) {
       const state = await chunkStatus(chunk.provider_job_id!);
-      if (state.state === "queued" || state.state === "running") continue;
+      if (state.state === "queued" || state.state === "running") {
+        const deadline = chunk.lease_until ? Date.parse(chunk.lease_until) : Number.NaN;
+        if (!Number.isFinite(deadline) || deadline > Date.now()) continue;
+
+        await cancelChunk(chunk.provider_job_id!);
+        const message = "RunPod excedeu 30 minutos na fila/execução; solicitação cancelada";
+        await db
+          .from("cleaner_chunks")
+          .update({ status: "failed", error: message, finished_at: new Date().toISOString() } as never)
+          .eq("id", chunk.id);
+        await db
+          .from("cleaner_jobs")
+          .update({ status: "failed", stage: "tempo limite da GPU", error: message, lease_until: null } as never)
+          .eq("id", jobId);
+        await purgeChunkArtifacts(jobId).catch(() => null);
+        return await summarize(jobId);
+      }
       if (state.state === "completed") {
         // O provedor pode responder "pronto" sem que o arquivo tenha chegado ao storage.
         const stored = await chunkArtifactExists(chunk.output_url);

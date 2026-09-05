@@ -221,15 +221,8 @@ def text_pixel_mask(frame: np.ndarray, box: Box, dilate_ratio: float = 0.32) -> 
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
     local = cv2.dilate(local, kernel)
     local = cv2.morphologyEx(local, cv2.MORPH_CLOSE, kernel)
-    # Subtitle boxes: once a line is clearly covered by glyphs, clear the whole
-    # band instead of glyph outlines — leftover strokes/shadows are worse than
-    # rebuilding a slightly larger background plate.
-    rows = np.where(local.mean(axis=1) > 20)[0]
-    if rows.size:
-        pad = max(2, int(round(h * 0.12)))
-        top = max(0, int(rows.min()) - pad)
-        bottom = min(h, int(rows.max()) + 1 + pad)
-        local[top:bottom, :] = 255
+    # Keep the mask around glyphs, outlines and shadows. Filling the complete
+    # OCR bounding-box row creates a conspicuous horizontal smear on motion.
     mask[y:y + h, x:x + w] = local
 
     return mask
