@@ -702,15 +702,20 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       const res = (await detectJob({ data: { id: target.id, mode }, headers })) as CleanerJob;
       // O motor devolve as áreas sem o papel definido; sem isso elas não contariam
       // como área de remoção e o vídeo acabaria só reenquadrado em vez de limpo.
-      const found = ((res.detections || []) as CleanerRegion[]).map((region) => ({
+      const raw = ((res.detections || []) as CleanerRegion[]).map((region) => ({
         ...region,
         role: region.role === "protect" ? ("protect" as const) : ("remove" as const),
         enabled: region.enabled !== false,
       }));
+      const kept = raw.filter((r) => r.role === "protect" || isSubtitleOrWatermark(r));
+      const found = kept.length ? kept : raw;
+      const dropped = raw.length - found.length;
       setMasks((prev) => [...prev, ...found]);
       setJob({ ...res, status: "queued" });
       toast[found.length ? "success" : "warning"](
-        found.length ? `${found.length} área(s) encontrada(s).` : "Nada detectado — marque à mão.",
+        found.length
+          ? `${found.length} área(s) de legenda/marca d'água${dropped ? ` · ${dropped} detecção(ões) do cenário ignorada(s)` : ""}.`
+          : "Nada detectado — marque à mão.",
       );
       return found;
     } catch (e) {
