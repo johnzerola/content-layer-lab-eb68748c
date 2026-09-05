@@ -99,6 +99,7 @@ import { detectNiche, mergeTagWeights, nicheContext } from "@/lib/viral-library"
 import { getClipFeedback } from "@/lib/clip-feedback";
 import { cuesToSentences, speechKeepSegments, zoomKeys, type Sentence } from "@/lib/transcript-clips";
 import { resolveVideoLink } from "@/lib/import.functions";
+import { downloadVideoLink, extractVideoLinks } from "@/lib/link-import";
 import { registerSourceFile } from "@/lib/editor/cuts";
 import {
   downloadAsZip,
@@ -707,47 +708,40 @@ function Home() {
     }
   }, [addVideos]);
 
-  /** Importa um vídeo apenas colando o link (baixa pelo servidor, sem upload). */
+  /** Importa uma lista sequencialmente para não sobrecarregar a origem nem a VPS. */
   const importFromLink = useCallback(async () => {
-    const url = linkUrl.trim();
-    if (!url || linkBusy) return;
+    const urls = extractVideoLinks(linkUrl);
+    if (!urls.length || linkBusy) {
+      if (linkUrl.trim()) setLinkMsg("Não encontrei nenhum link http/https válido no texto.");
+      return;
+    }
     setLinkBusy(true);
     setLinkBlocked(false);
-    setLinkMsg("procurando o vídeo...");
-    try {
-      const res = await resolveVideoLink({ data: { url } });
-      if (!res.ok || !res.videoUrl || !res.proxyUrl) {
-        setLinkBlocked(Boolean(res.blocked));
-        setLinkMsg(res.message ?? "não encontrei o vídeo nesse link");
-        return;
-      }
-      setLinkMsg(`baixando de ${res.source ?? "origem"}...`);
-      const dl = await fetch(res.proxyUrl);
-      if (!dl.ok) {
-        setLinkBlocked(true);
-        setLinkMsg("a origem bloqueou o download desse arquivo");
-        return;
-      }
-      const blob = await dl.blob();
-      const urlExt =
-        res.ext ?? new URL(res.videoUrl).pathname.match(VIDEO_EXT_RE)?.[1]?.toLowerCase() ?? "mp4";
-      const base =
-        (res.title ?? "video")
-          .replace(VIDEO_EXT_RE, "")
-          .replace(/[^\w\-. ]+/g, "")
-          .trim()
-          .slice(0, 60) || "video";
-      const name = `${base}.${urlExt}`;
-      const file = new File([blob], name, { type: blob.type || guessMime(name) });
+    const failed: { url: string; reason: string }[] = [];
+    let imported = 0;
 
-      await addVideos([file], { sourceUrl: url });
-      setLinkMsg(`importado: ${file.name} (${(file.size / 1e6).toFixed(1)} MB)`);
-      setLinkUrl("");
-    } catch (err) {
-      setLinkMsg(String((err as Error)?.message ?? err));
-    } finally {
-      setLinkBusy(false);
+    for (const [index, url] of urls.entries()) {
+      setLinkMsg(`Baixando ${index + 1} de ${urls.length} · ${new URL(url).hostname}…`);
+      try {
+        const { file, resolved } = await downloadVideoLink(url);
+        await addVideos([file], { sourceUrl: url });
+        imported += 1;
+        setLinkMsg(
+          `Importado ${imported}/${urls.length} · ${resolved.provider ?? resolved.source ?? "origem"}`,
+        );
+      } catch (err) {
+        failed.push({ url, reason: String((err as Error)?.message ?? err) });
+      }
     }
+
+    setLinkUrl(failed.map((item) => item.url).join("\n"));
+    setLinkBlocked(failed.length > 0);
+    setLinkMsg(
+      failed.length
+        ? `${imported}/${urls.length} importado(s). ${failed.length} falharam e ficaram no campo para tentar novamente. Último erro: ${failed.at(-1)?.reason}`
+        : `${imported} vídeo(s) importado(s) com sucesso.`,
+    );
+    setLinkBusy(false);
   }, [linkUrl, linkBusy, addVideos]);
 
   /** Snapshot do projeto atual (metadados; o vídeo volta pelo link de origem). */

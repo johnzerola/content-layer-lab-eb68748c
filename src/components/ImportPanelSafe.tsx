@@ -1,8 +1,10 @@
 import React from "react";
 import { FolderOpen, Link2, Loader2, Upload } from "lucide-react";
-import { Button, Input } from "@/components/ui/base";
+import { Button } from "@/components/ui/base";
+import { Textarea } from "@/components/ui/textarea";
 import { ImportPanel } from "@/components/ImportPanel";
 import { FLOWS } from "@/lib/flows";
+import { extractVideoLinks } from "@/lib/link-import";
 
 type ImportPanelProps = React.ComponentProps<typeof ImportPanel>;
 
@@ -20,6 +22,7 @@ function FallbackPanel({ props }: { props: ImportPanelProps }) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const folderRef = React.useRef<HTMLInputElement>(null);
   const flow = FLOWS[props.mode].import;
+  const linkCount = extractVideoLinks(props.linkUrl).length;
 
   return (
     <section className="glass rounded-2xl border border-border p-6 text-center">
@@ -65,23 +68,22 @@ function FallbackPanel({ props }: { props: ImportPanelProps }) {
 
       {flow.link && (
         <div className="mx-auto mt-4 flex max-w-lg gap-2">
-          <Input
+          <Textarea
             value={props.linkUrl}
             onChange={(e) => props.onLinkUrl(e.target.value)}
-            placeholder={flow.linkPlaceholder}
-            className="flex-1"
-            disabled={props.linkBlocked}
+            placeholder={`${flow.linkPlaceholder}\nOu cole uma lista, um link por linha`}
+            className="min-h-20 flex-1"
           />
           <Button
             onClick={props.onImportLink}
-            disabled={props.linkBusy || props.linkBlocked || !props.linkUrl.trim()}
+            disabled={props.linkBusy || !linkCount}
           >
             {props.linkBusy ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
               <Link2 className="size-4" />
             )}
-            Importar
+            {linkCount > 1 ? `Importar ${linkCount}` : "Importar"}
           </Button>
         </div>
       )}

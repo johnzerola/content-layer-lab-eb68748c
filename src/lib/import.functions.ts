@@ -15,6 +15,8 @@ export interface ResolvedVideo {
   title?: string;
   thumbnail?: string;
   source?: string;
+  /** Motor que resolveu a mídia; permite avançar ao fallback se a URL expirar. */
+  provider?: string;
   message?: string;
   /** plataforma que bloqueia download por link (YouTube, IG, TikTok...) */
   blocked?: boolean;
@@ -46,9 +48,14 @@ function pickMeta(html: string, keys: string[]) {
  */
 export const resolveVideoLink = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .validator((input: { url: string }) => {
+  .validator((input: { url: string; excludedProviders?: string[] }) => {
     if (!input?.url || typeof input.url !== "string") throw new Error("link inválido");
-    return { url: input.url.trim() };
+    const excludedProviders = Array.isArray(input.excludedProviders)
+      ? input.excludedProviders
+          .filter((value) => typeof value === "string" && /^[a-z0-9.-]{1,40}$/i.test(value))
+          .slice(0, 8)
+      : [];
+    return { url: input.url.trim(), excludedProviders };
   })
   .handler(async ({ data }): Promise<ResolvedVideo> => {
     const target = await assertSafeRemoteUrl(data.url);
@@ -69,11 +76,12 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
       cobaltConfigured,
     } = await import("./resolvers.server");
     const platform = platformOf(host);
+    const excluded = new Set(data.excludedProviders);
 
     // O worker usa yt-dlp atualizado e e a fonte principal para posts publicos.
     // Cobalt e os resolvedores diretos ficam como fallback, nunca como bloqueio.
     const workerConfigured = Boolean(workerBase());
-    if (shouldTryWorkerResolver(platform, host, workerConfigured)) {
+    if (!excluded.has("yt-dlp") && shouldTryWorkerResolver(platform, host, workerConfigured)) {
       try {
         const media = await workerResolveMedia(target.toString());
         const ticket = mediaProxyTicket(media.url, media.headers);
@@ -84,6 +92,7 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
           ...(media.title ? { title: media.title } : {}),
           ...(media.thumbnail ? { thumbnail: media.thumbnail } : {}),
           source: media.source ?? platform,
+          provider: "yt-dlp",
           ext: media.ext ?? "mp4",
         };
       } catch {
@@ -92,7 +101,10 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
     }
 
     // 1) já é um arquivo de vídeo?
-    if (/\.(mp4|mov|m4v|webm|mkv|ogv|3gp|avi|mpeg|mpg|ts)(\?|$)/i.test(target.pathname + target.search)) {
+    if (
+      !excluded.has("direct") &&
+      /\.(mp4|mov|m4v|webm|mkv|ogv|3gp|avi|mpeg|mpg|ts)(\?|$)/i.test(target.pathname + target.search)
+    ) {
       const ticket = mediaProxyTicket(target.toString());
       return {
         ok: true,
@@ -100,6 +112,7 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
         proxyUrl: `/api/public/media-proxy?t=${encodeURIComponent(ticket)}`,
         title: target.pathname.split("/").pop() ?? "video",
         source: host,
+        provider: "direct",
       };
     }
 
@@ -117,13 +130,18 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
       kwai: resolveOpenGraph,
       dailymotion: resolveOpenGraph,
     };
-    const chain = [resolveWithCobalt, byPlatform[platform], resolveOpenGraph].filter(Boolean) as ((
-      u: string,
-    ) => Promise<import("./resolvers.server").ResolverHit | null>)[];
+    const chain = [
+      { provider: "cobalt", resolve: resolveWithCobalt },
+      { provider: "platform", resolve: byPlatform[platform] },
+      { provider: "opengraph", resolve: resolveOpenGraph },
+    ].filter((entry) => Boolean(entry.resolve) && !excluded.has(entry.provider)) as {
+      provider: string;
+      resolve: (u: string) => Promise<import("./resolvers.server").ResolverHit | null>;
+    }[];
 
-    for (const fn of chain) {
+    for (const entry of chain) {
       try {
-        const hit = await fn(target.toString());
+        const hit = await entry.resolve(target.toString());
         if (hit?.videoUrl && safeRemoteUrl(hit.videoUrl)) {
           const ticket = mediaProxyTicket(hit.videoUrl, hit.headers);
           return {
@@ -133,6 +151,7 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
             ...(hit.title ? { title: hit.title } : {}),
             ...(hit.thumbnail ? { thumbnail: hit.thumbnail } : {}),
             source: hit.source || host,
+            provider: entry.provider,
           };
         }
       } catch {
@@ -141,10 +160,12 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
     }
 
     let head: Response | null = null;
-    try {
-      head = await fetch(target.toString(), { method: "HEAD", headers: { "user-agent": UA } });
-    } catch {
-      head = null;
+    if (!excluded.has("head")) {
+      try {
+        head = await fetch(target.toString(), { method: "HEAD", headers: { "user-agent": UA } });
+      } catch {
+        head = null;
+      }
     }
     const headType = head?.headers.get("content-type") ?? "";
     if (headType.startsWith("video/")) {
@@ -155,6 +176,7 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
         proxyUrl: `/api/public/media-proxy?t=${encodeURIComponent(ticket)}`,
         title: target.pathname.split("/").pop() ?? "video",
         source: host,
+        provider: "head",
       };
     }
 
@@ -190,7 +212,7 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
       !/\.(mp4|m4v|mov|webm|mkv|ogv|3gp|avi|mpeg|mpg|ts)(\?|$)/i.test(u.pathname + u.search);
 
 
-    for (const raw of candidates) {
+    for (const raw of excluded.has("scrape") ? [] : candidates) {
       const cleaned = raw.replace(/\\u0026/g, "&").replace(/\\\//g, "/").replace(/&amp;/g, "&");
       const abs = safeRemoteUrl(cleaned.startsWith("http") ? cleaned : new URL(cleaned, target).toString());
       if (abs && !isPlayerPage(abs)) {
@@ -202,6 +224,7 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
           ...(title ? { title } : {}),
           ...(thumbnail ? { thumbnail } : {}),
           source: host,
+          provider: "scrape",
         };
       }
     }

@@ -2,13 +2,14 @@ import { useRef, useState } from "react";
 import { FolderOpen, Link as LinkIcon, Upload, CheckCircle2, Info } from "lucide-react";
 import {
   Button,
-  Input,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/base";
 import { VIDEO_ACCEPT } from "@/lib/media";
+import { extractVideoLinks } from "@/lib/link-import";
+import { Textarea } from "@/components/ui/textarea";
 import { FLOWS, type Mode } from "@/lib/flows";
 
 interface Props {
@@ -41,6 +42,7 @@ export function ImportPanel({
   const [dragging, setDragging] = useState(false);
   const [dropped, setDropped] = useState(false);
   const flow = FLOWS[mode].import;
+  const linkCount = extractVideoLinks(linkUrl).length;
 
   return (
     <section
@@ -154,30 +156,36 @@ export function ImportPanel({
       {flow.link ? (
         <div className="border-t border-border bg-surface-2/40 px-6 py-6 text-left sm:px-10">
           <div className="mx-auto max-w-2xl">
-            <p className="mono-label">ou cole o link do vídeo</p>
+            <p className="mono-label">ou cole um link ou uma lista inteira</p>
             <div className="mt-2.5 flex flex-col gap-2 sm:flex-row">
-              <Input
+              <Textarea
                 value={linkUrl}
                 onChange={(e) => onLinkUrl(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && onImportLink()}
-                placeholder={flow.linkPlaceholder}
-                className="flex-1 text-sm"
-                aria-label="Link do vídeo"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) onImportLink();
+                }}
+                placeholder={`${flow.linkPlaceholder}\nCole também listas numeradas, com um link por linha.`}
+                className="min-h-24 flex-1 resize-y text-sm"
+                aria-label="Links dos vídeos"
               />
               <Button
                 onClick={onImportLink}
                 loading={linkBusy}
-                disabled={!linkUrl.trim()}
+                disabled={!linkCount}
                 className="sm:w-36"
               >
                 {!linkBusy && <LinkIcon className="size-4" />}
-                {linkBusy ? "Baixando…" : "Importar"}
+                {linkBusy
+                  ? "Baixando…"
+                  : linkCount > 1
+                    ? `Importar ${linkCount}`
+                    : "Importar"}
               </Button>
             </div>
 
             {linkBusy && (
               <p className="mt-2.5 flex items-center gap-1 text-xs text-primary">
-                baixando o arquivo
+                {linkMsg ?? "baixando o arquivo"}
                 <span className="typing-dot">·</span>
                 <span className="typing-dot [animation-delay:150ms]">·</span>
                 <span className="typing-dot [animation-delay:300ms]">·</span>
@@ -187,8 +195,8 @@ export function ImportPanel({
             <p className="mt-2.5 flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
               <Info className="mt-0.5 size-3.5 shrink-0" />
               <span>
-                {flow.linkHint} usa o arquivo original público disponibilizado pela plataforma,
-                quando existente.
+                {flow.linkHint} Cole até 100 links: a fila baixa um por vez e tenta automaticamente
+                yt-dlp, Cobalt e os resolvedores compatíveis.
               </span>
             </p>
 
