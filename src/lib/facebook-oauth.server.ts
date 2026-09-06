@@ -354,7 +354,7 @@ export function verifyFacebookOAuthState(
 export function facebookAuthorizationUrl(
   userId: string,
   environment: NodeJS.ProcessEnv = process.env,
-  options: { forceClassic?: boolean; forceBusiness?: boolean } = {},
+  options: { forceClassic?: boolean; forceBusiness?: boolean; switchAccount?: boolean } = {},
 ): string {
   const loginMode = options.forceBusiness ? "business" : options.forceClassic ? "classic" : null;
   const configuration = facebookOAuthConfiguration(
@@ -368,7 +368,10 @@ export function facebookAuthorizationUrl(
   url.searchParams.set("redirect_uri", configuration.redirectUri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("state", createFacebookOAuthState(userId, environment));
-  url.searchParams.set("auth_type", "rerequest");
+  // `reauthenticate` reabre o login da Meta para conectar OUTRA conta do Facebook
+  // sem desconectar as Páginas já salvas da conta anterior.
+  url.searchParams.set("auth_type", options.switchAccount ? "reauthenticate" : "rerequest");
+
   if (configuration.configId) {
     // No Login para Empresas, as permissões pertencem à configuração da Meta.
     url.searchParams.set("config_id", configuration.configId);
