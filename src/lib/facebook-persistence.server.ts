@@ -21,6 +21,7 @@ export async function persistMetaAccount(
     providerAccountId: string;
     accessToken: string;
     expiresAt: Date;
+    owner?: { id: string; name: string } | null;
   },
 ): Promise<LinkedSocialAccount> {
   // Falha antes de criar registros se a chave de criptografia estiver ausente.
@@ -48,6 +49,9 @@ export async function persistMetaAccount(
           provider: "meta",
           provider_account_id: input.providerAccountId,
           status: "conectado",
+          ...(input.owner
+            ? { owner_provider_id: input.owner.id, owner_label: input.owner.name }
+            : {}),
           updated_at: new Date().toISOString(),
         })
         .eq("id", existing.id)
@@ -64,6 +68,9 @@ export async function persistMetaAccount(
             provider: "meta",
             provider_account_id: input.providerAccountId,
             status: "conectado",
+            ...(input.owner
+              ? { owner_provider_id: input.owner.id, owner_label: input.owner.name }
+              : {}),
             updated_at: new Date().toISOString(),
           },
           { onConflict: "user_id,platform,username" },
@@ -122,6 +129,7 @@ export async function persistFacebookPages(
     pages: FacebookPage[];
     expiresAt: Date;
     selectedChannelKeys?: string[];
+    owner?: { id: string; name: string } | null;
   },
 ): Promise<LinkedSocialAccount[]> {
   const saved: LinkedSocialAccount[] = [];
@@ -137,6 +145,7 @@ export async function persistFacebookPages(
           providerAccountId: page.pageId,
           accessToken: page.pageAccessToken,
           expiresAt: input.expiresAt,
+          owner: input.owner ?? null,
         }),
       );
     }
@@ -154,6 +163,7 @@ export async function persistFacebookPages(
           // O token da Página publica em nome da conta IG Business vinculada.
           accessToken: page.pageAccessToken,
           expiresAt: input.expiresAt,
+          owner: input.owner ?? null,
         }),
       );
     }
