@@ -29,6 +29,8 @@ export type SocialAccount = {
   provider_account_id: string | null;
   status: string;
   is_primary?: boolean;
+  owner_provider_id?: string | null;
+  owner_label?: string | null;
   created_at: string;
   updated_at?: string | null;
 };
@@ -119,7 +121,7 @@ export function resolveAccountLinkUi(
 /* ------------------------------- contas -------------------------------- */
 
 export const SOCIAL_ACCOUNT_SELECT =
-  "id,platform,username,display_name,avatar_url,provider,status,provider_account_id,is_primary,created_at,updated_at";
+  "id,platform,username,display_name,avatar_url,provider,status,provider_account_id,is_primary,owner_provider_id,owner_label,created_at,updated_at";
 
 export async function listAccounts(): Promise<SocialAccount[]> {
   const { data, error } = await supabase
@@ -283,4 +285,30 @@ export async function reschedulePost(id: string, when: Date) {
 export async function deletePost(id: string) {
   const { error } = await supabase.from("scheduled_posts").delete().eq("id", id);
   if (error) throw error;
+}
+
+/** Nome do login (conta) dono da Página/canal, usado para agrupar destinos. */
+export function accountOwnerName(account: SocialAccount): string {
+  if (account.owner_label) return account.owner_label;
+  if (account.provider === "meta") return "Conta Facebook";
+  if (account.platform === "youtube") return "Canais do YouTube";
+  if (account.platform === "tiktok") return "Contas do TikTok";
+  return "Outras contas";
+}
+
+/** Agrupa as contas conectadas por login, preservando a ordem original. */
+export function groupAccountsByOwner<T extends SocialAccount>(
+  accounts: T[],
+): { key: string; name: string; accounts: T[] }[] {
+  const groups = new Map<string, { key: string; name: string; accounts: T[] }>();
+  for (const account of accounts) {
+    const name = accountOwnerName(account);
+    const key = account.owner_provider_id
+      ? `${account.provider}:${account.owner_provider_id}`
+      : name;
+    const group = groups.get(key) ?? { key, name, accounts: [] as T[] };
+    group.accounts.push(account);
+    groups.set(key, group);
+  }
+  return [...groups.values()];
 }

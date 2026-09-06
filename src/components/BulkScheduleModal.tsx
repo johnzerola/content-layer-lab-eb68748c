@@ -11,7 +11,14 @@ import {
   sortByName,
   type SlotMode,
 } from "@/lib/schedule-plan";
-import { KIND_LABEL, schedulePost, uploadPostMedia, type PostKind, type SocialAccount } from "@/lib/social";
+import {
+  KIND_LABEL,
+  groupAccountsByOwner,
+  schedulePost,
+  uploadPostMedia,
+  type PostKind,
+  type SocialAccount,
+} from "@/lib/social";
 
 /** Item pronto vindo de outra ferramenta (ViralBatch / CorteIA). */
 export type BulkScheduleItem = {
@@ -291,10 +298,14 @@ export function BulkScheduleModal({
                   className="mt-1 w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
                 >
                   <option value="">Selecione…</option>
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.display_name || `@${a.username}`} · {a.platform}
-                    </option>
+                  {groupAccountsByOwner(accounts).map((group) => (
+                    <optgroup key={group.key} label={group.name}>
+                      {group.accounts.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.display_name || `@${a.username}`} · {a.platform}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </label>

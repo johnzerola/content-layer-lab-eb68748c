@@ -354,7 +354,7 @@ export function verifyFacebookOAuthState(
 export function facebookAuthorizationUrl(
   userId: string,
   environment: NodeJS.ProcessEnv = process.env,
-  options: { forceClassic?: boolean; forceBusiness?: boolean } = {},
+  options: { forceClassic?: boolean; forceBusiness?: boolean; switchAccount?: boolean } = {},
 ): string {
   const loginMode = options.forceBusiness ? "business" : options.forceClassic ? "classic" : null;
   const configuration = facebookOAuthConfiguration(
@@ -368,7 +368,10 @@ export function facebookAuthorizationUrl(
   url.searchParams.set("redirect_uri", configuration.redirectUri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("state", createFacebookOAuthState(userId, environment));
-  url.searchParams.set("auth_type", "rerequest");
+  // `reauthenticate` reabre o login da Meta para conectar OUTRA conta do Facebook
+  // sem desconectar as Páginas já salvas da conta anterior.
+  url.searchParams.set("auth_type", options.switchAccount ? "reauthenticate" : "rerequest");
+
   if (configuration.configId) {
     // No Login para Empresas, as permissões pertencem à configuração da Meta.
     url.searchParams.set("config_id", configuration.configId);
@@ -765,4 +768,26 @@ export async function fetchUnavailablePageNames(input: {
       return { pageId, name: `Página ${pageId}` };
     }),
   );
+}
+
+export type FacebookOwner = { id: string; name: string };
+
+/** Identifica o login (usuário do Facebook) que autorizou este token. */
+export async function fetchFacebookOwner(input: {
+  accessToken: string;
+  environment?: NodeJS.ProcessEnv;
+  fetch?: typeof fetch;
+}): Promise<FacebookOwner | null> {
+  const environment = input.environment ?? process.env;
+  const request = input.fetch ?? fetch;
+  const url = new URL(`${facebookGraphBase(environment)}/me`);
+  url.searchParams.set("fields", "id,name");
+  try {
+    const payload = await readJson(await graphRequest(url, input.accessToken, request));
+    const id = readString(payload, "id");
+    if (!id) return null;
+    return { id, name: readString(payload, "name") ?? `Conta ${id}` };
+  } catch {
+    return null;
+  }
 }
