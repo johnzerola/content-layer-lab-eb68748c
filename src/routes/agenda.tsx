@@ -38,6 +38,7 @@ import {
   schedulePost,
   socialAccountDetail,
   socialAccountOptionLabel,
+  groupAccountsByOwner,
   socialAccountTitle,
   uploadPostVideo,
   type PostKind,
@@ -610,10 +611,14 @@ function AgendaPage() {
                       className="rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm outline-none"
                     >
                       <option value="">— selecionar —</option>
-                      {accounts.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {socialAccountOptionLabel(a)}
-                        </option>
+                      {groupAccountsByOwner(accounts).map((group) => (
+                        <optgroup key={group.key} label={group.name}>
+                          {group.accounts.map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {socialAccountOptionLabel(a)}
+                            </option>
+                          ))}
+                        </optgroup>
                       ))}
                     </select>
                   </label>
