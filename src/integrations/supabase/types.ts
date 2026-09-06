@@ -934,6 +934,8 @@ export type Database = {
           display_name: string | null
           id: string
           is_primary: boolean
+          owner_label: string | null
+          owner_provider_id: string | null
           platform: string
           provider: string
           provider_account_id: string | null
@@ -948,6 +950,8 @@ export type Database = {
           display_name?: string | null
           id?: string
           is_primary?: boolean
+          owner_label?: string | null
+          owner_provider_id?: string | null
           platform?: string
           provider?: string
           provider_account_id?: string | null
@@ -962,6 +966,8 @@ export type Database = {
           display_name?: string | null
           id?: string
           is_primary?: boolean
+          owner_label?: string | null
+          owner_provider_id?: string | null
           platform?: string
           provider?: string
           provider_account_id?: string | null
