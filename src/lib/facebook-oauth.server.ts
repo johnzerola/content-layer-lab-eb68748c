@@ -769,3 +769,25 @@ export async function fetchUnavailablePageNames(input: {
     }),
   );
 }
+
+export type FacebookOwner = { id: string; name: string };
+
+/** Identifica o login (usuário do Facebook) que autorizou este token. */
+export async function fetchFacebookOwner(input: {
+  accessToken: string;
+  environment?: NodeJS.ProcessEnv;
+  fetch?: typeof fetch;
+}): Promise<FacebookOwner | null> {
+  const environment = input.environment ?? process.env;
+  const request = input.fetch ?? fetch;
+  const url = new URL(`${facebookGraphBase(environment)}/me`);
+  url.searchParams.set("fields", "id,name");
+  try {
+    const payload = await readJson(await graphRequest(url, input.accessToken, request));
+    const id = readString(payload, "id");
+    if (!id) return null;
+    return { id, name: readString(payload, "name") ?? `Conta ${id}` };
+  } catch {
+    return null;
+  }
+}
