@@ -23,6 +23,10 @@ const selectionSchema = z.object({
   userId: z.string().min(1).max(200),
   expiresAt: z.string().datetime(),
   tokenExpiresAt: z.string().datetime(),
+  owner: z
+    .object({ id: z.string().min(1).max(64), name: z.string().min(1).max(200) })
+    .nullable()
+    .optional(),
   pages: z.array(pageSchema).min(1).max(200),
 });
 
@@ -75,6 +79,7 @@ export function createMetaSelection(input: {
   userId: string;
   pages: FacebookPage[];
   tokenExpiresAt: Date;
+  owner?: { id: string; name: string } | null;
   now?: number;
   environment?: NodeJS.ProcessEnv;
 }): { selectionToken: string; candidates: MetaSelectionCandidate[] } {
@@ -87,6 +92,7 @@ export function createMetaSelection(input: {
     userId: input.userId,
     expiresAt,
     tokenExpiresAt: input.tokenExpiresAt.toISOString(),
+    owner: input.owner ?? null,
     pages: input.pages,
   };
   return {

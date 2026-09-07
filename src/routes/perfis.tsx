@@ -61,6 +61,20 @@ function fmt(dt: string | null) {
   return new Date(dt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+/** Separa os perfis pelo login (conta) que os conectou. */
+function ownerGroups(items: ProfileStats[]) {
+  const map = new Map<string, { key: string; name: string; items: ProfileStats[] }>();
+  for (const item of items) {
+    const key = item.ownerProviderId ?? "sem-conta";
+    const name = item.ownerLabel ?? "Conta conectada";
+    const group = map.get(key) ?? { key, name, items: [] as ProfileStats[] };
+    group.items.push(item);
+    map.set(key, group);
+  }
+  const groups = [...map.values()];
+  return groups.map((group) => ({ ...group, showTitle: groups.length > 1 }));
+}
+
 function ProfileCard({ p }: { p: ProfileStats }) {
   const { Icon, label, tone } = platformMeta(p);
   const tokenExpired = p.tokenExpiresAt ? new Date(p.tokenExpiresAt).getTime() < Date.now() : false;
@@ -312,11 +326,18 @@ function ProfilesPage() {
             return (
               <section key={g.label} className="space-y-3">
                 <h2 className="mono-label">{g.label}</h2>
-                <div className="stack-in grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {items.map((p) => (
-                    <ProfileCard key={p.id} p={p} />
-                  ))}
-                </div>
+                {ownerGroups(items).map((owner) => (
+                  <div key={owner.key} className="space-y-2">
+                    {owner.showTitle && (
+                      <p className="text-xs font-medium text-muted-foreground">{owner.name}</p>
+                    )}
+                    <div className="stack-in grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {owner.items.map((p) => (
+                        <ProfileCard key={p.id} p={p} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </section>
             );
           })

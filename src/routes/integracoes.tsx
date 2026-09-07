@@ -184,7 +184,7 @@ function IntegrationsPage() {
   }, [reload, reloadSchedules, user]);
 
   const connect = useCallback(
-    async (platform: PlatformKey) => {
+    async (platform: PlatformKey, options: { switchAccount?: boolean } = {}) => {
       setBusy(platform);
       try {
         if (platform === "youtube") {
@@ -205,7 +205,9 @@ function IntegrationsPage() {
           window.location.href = response.authorizationUrl;
           return;
         }
-        const response = await startFacebook({ data: { forceClassic: true } });
+        const response = await startFacebook({
+          data: { forceClassic: true, switchAccount: options.switchAccount === true },
+        });
 
         if (!response.ok) {
           toast.error(response.error);
@@ -359,7 +361,7 @@ function IntegrationsPage() {
   const continueWithOtherAccount = useCallback(
     async (provider: AccountSwitchProvider) => {
       setAccountSwitchProvider(null);
-      await connect(provider === "meta" ? "facebook" : "youtube");
+      await connect(provider === "meta" ? "facebook" : "youtube", { switchAccount: true });
     },
     [connect],
   );

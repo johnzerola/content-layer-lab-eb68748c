@@ -6,6 +6,7 @@ import {
   diagnoseFacebookOAuth,
   exchangeFacebookAuthorizationCode,
   facebookAuthorizationUrl,
+  fetchFacebookOwner,
   fetchFacebookPages,
   fetchUnavailablePageNames,
   validateFacebookAccessTokenScopes,
@@ -26,6 +27,7 @@ export const beginFacebookOAuth = createServerFn({ method: "POST" })
       .object({
         forceClassic: z.boolean().optional(),
         forceBusiness: z.boolean().optional(),
+        switchAccount: z.boolean().optional(),
       })
       .optional()
       .parse(data) ?? {},
@@ -38,6 +40,7 @@ export const beginFacebookOAuth = createServerFn({ method: "POST" })
       const authorizationUrl = facebookAuthorizationUrl(context.userId, process.env, {
         forceClassic,
         forceBusiness,
+        switchAccount: data.switchAccount === true,
       });
       const parsedUrl = new URL(authorizationUrl);
       const usesConfigId = parsedUrl.searchParams.has("config_id");
@@ -124,10 +127,12 @@ export const completeFacebookOAuth = createServerFn({ method: "POST" })
         };
       }
 
+      const owner = await fetchFacebookOwner({ accessToken: token.accessToken });
       const selection = createMetaSelection({
         userId: context.userId,
         pages: discovery.pages,
         tokenExpiresAt: token.expiresAt,
+        owner,
       });
       return {
         ok: true as const,
@@ -254,8 +259,11 @@ export const applyMetaAccountSelection = createServerFn({ method: "POST" })
         pages: payload.pages,
         expiresAt: new Date(payload.tokenExpiresAt),
         selectedChannelKeys: keep,
+        owner: payload.owner ?? null,
       });
 
+      // Só remove canais desta mesma autorização; Páginas de OUTRAS contas do
+      // Facebook já conectadas permanecem intactas.
       const removed = candidates.filter((candidate) => !keep.includes(candidate.key));
       for (const platform of ["facebook", "instagram"] as const) {
         const providerIds = removed

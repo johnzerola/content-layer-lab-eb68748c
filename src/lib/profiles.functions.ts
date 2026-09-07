@@ -10,6 +10,9 @@ export type ProfileStats = {
   avatarUrl: string | null;
   provider: string;
   providerAccountId: string | null;
+  /** login (conta) dono desta Página/canal */
+  ownerLabel: string | null;
+  ownerProviderId: string | null;
   status: string;
   isPrimary: boolean;
   /** conexão (token) */
@@ -47,7 +50,7 @@ export const getSocialProfiles = createServerFn({ method: "GET" })
       context.supabase
         .from("social_accounts")
         .select(
-          "id, platform, username, display_name, avatar_url, provider, provider_account_id, status, is_primary, created_at",
+          "id, platform, username, display_name, avatar_url, provider, provider_account_id, owner_provider_id, owner_label, status, is_primary, created_at",
         )
         .eq("user_id", context.userId)
         .order("created_at", { ascending: true }),
@@ -105,6 +108,8 @@ export const getSocialProfiles = createServerFn({ method: "GET" })
         avatarUrl: a.avatar_url,
         provider: a.provider,
         providerAccountId: a.provider_account_id,
+        ownerLabel: a.owner_label ?? null,
+        ownerProviderId: a.owner_provider_id ?? null,
         status: a.status,
         isPrimary: a.is_primary,
         connectionStatus: conn?.status ?? null,

@@ -66,7 +66,7 @@
       {
         "name": "list_projects",
         "title": "Listar projetos",
-        "description": "Lista os projetos salvos na nuvem (ViralBatch, CorteIA, LimpaVídeo).",
+        "description": "Lista os projetos salvos na nuvem (ViralBatch, CorteIA e CleanerIA legado).",
         "annotations": {
           "readOnlyHint": true,
           "idempotentHint": true,
@@ -77,7 +77,7 @@
           "type": "object",
           "properties": {
             "mode": {
-              "description": "Filtra por ferramenta: lote, clip ou limpar.",
+              "description": "Filtra por ferramenta: lote, clip ou limpar (histórico legado).",
               "type": "string"
             },
             "limit": {
