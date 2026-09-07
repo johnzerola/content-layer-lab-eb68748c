@@ -1,4 +1,4 @@
-# Pipeline oficial do CleanerIA: Hostinger + RunPod Serverless
+# Pipeline oficial do CleanerIA: Hostear + RunPod Serverless
 
 Esta é a única arquitetura suportada pelo CleanerIA. O app nunca envia a chave
 do RunPod ao navegador e nunca manda o vídeo original inteiro para uma função
@@ -19,7 +19,7 @@ usando uma imagem antiga.
 ## Fluxo de dados
 
 1. O navegador cria o job autenticado e recebe um token temporário de upload.
-2. O vídeo original vai diretamente para a VPS Hostinger. O app apenas faz
+2. O vídeo original vai diretamente para a VPS Hostear. O app apenas faz
    fallback de proxy se o upload direto falhar.
 3. A VPS valida o arquivo com `ffprobe`, detecta cenas e texto/marca, gera
    máscaras temporais e planeja chunks de 15 s com 0,6 s de contexto.
@@ -28,7 +28,8 @@ usando uma imagem antiga.
 5. Cada worker RunPod baixa um chunk assinado, localiza a máscara no tempo,
    processa, remove as bordas de overlap e envia o resultado ao Storage.
 6. O orquestrador consulta `GET /status/{id}`, confirma que o artefato realmente
-   existe e mede texto residual. Somente o chunk ruim é reenviado, até 3 envios.
+   existe e recebe a métrica de texto residual. Falhas técnicas permitem até
+   3 envios; resíduo visual alto gera aviso, sem repetir o mesmo processamento.
 7. A VPS baixa os chunks em ordem, concatena, recoloca o áudio original e cria
    `output.mp4` na resolução do master.
 8. Chunks, proxy, plano e vídeo de entrada são apagados depois da entrega. O
@@ -42,12 +43,17 @@ CLEANER_WORKER_PUBLIC_URL=https://SEU-DOMINIO-DA-VPS
 CLEANER_WORKER_SECRET=SEGREDO-ALEATORIO-DE-48-CARACTERES
 RUNPOD_ENDPOINT_ID=km860ju9ded2e0
 RUNPOD_API_KEY=SECRET_DA_RUNPOD
-CLEANER_GPU_CONCURRENCY=3
+CLEANER_GPU_CONCURRENCY=1
 ```
 
 Na VPS, configure o mesmo `CLEANER_WORKER_SECRET`. Na RunPod, use uma GPU por
-worker, `min workers=0`, `max workers=3`, FlashBoot e timeout compatível com o
-maior chunk (recomendado: pelo menos 20 minutos para DiffuEraser).
+worker, `min workers=0`, `max workers=1` durante a validação de qualidade e
+idle timeout curto (5 s). Confirme estas configurações no endpoint: o código
+do app não altera a quantidade mínima de workers. Após validar o resultado,
+dimensione a concorrência conforme o orçamento. As requisições de chunks
+limitam execução a 10 minutos e permanência total a 30 minutos no provedor,
+mesmo que o navegador feche. Diagnósticos têm execução de 30 s e TTL de 3 min;
+se retornarem ainda pendentes, o app solicita cancelamento.
 
 ## Imagem serverless
 

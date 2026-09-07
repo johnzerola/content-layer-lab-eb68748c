@@ -246,7 +246,7 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
           .from("cleaner_jobs")
           .update({ status: "failed", stage: "tempo limite da GPU", error: message, lease_until: null } as never)
           .eq("id", jobId);
-        await purgeChunkArtifacts(jobId).catch(() => null);
+        await cancelCleanerChunks(jobId);
         return await summarize(jobId);
       }
       if (state.state === "completed") {
@@ -278,7 +278,7 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
                 lease_until: null,
               } as never)
               .eq("id", jobId);
-            await purgeChunkArtifacts(jobId).catch(() => null);
+            await cancelCleanerChunks(jobId);
             return await summarize(jobId);
           }
           continue;
@@ -325,8 +325,9 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
               lease_until: null,
             } as never)
             .eq("id", jobId);
-          // Falha definitiva: nada será montado, então os temporários saem agora.
-          await purgeChunkArtifacts(jobId).catch(() => null);
+          // Stop sibling requests before removing artifacts; otherwise they
+          // keep consuming GPU after the parent job has already failed.
+          await cancelCleanerChunks(jobId);
           return await summarize(jobId);
         }
       }

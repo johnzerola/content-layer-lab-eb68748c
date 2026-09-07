@@ -97,15 +97,24 @@ export async function gpuHealth(): Promise<GpuHealth> {
   if (!gpuConfigured()) {
     return { configured: false, online: false, reason: "RUNPOD_API_KEY ou RUNPOD_ENDPOINT_ID ausente" };
   }
+  let pendingJobId: string | undefined;
   try {
     const result = await runpod<{
+      id?: string;
       status?: string;
       output?: Record<string, unknown> | null;
       error?: unknown;
-    }>("/runsync?wait=120000", {
+    }>("/runsync?wait=60000", {
       method: "POST",
-      body: JSON.stringify({ input: { action: "health" } }),
+      signal: AbortSignal.timeout(70_000),
+      body: JSON.stringify({
+        input: { action: "health" },
+        policy: { executionTimeout: 30_000, ttl: 180_000 },
+      }),
     });
+    if (["IN_QUEUE", "IN_PROGRESS", "RUNNING"].includes(String(result.status).toUpperCase())) {
+      pendingJobId = result.id;
+    }
     const output = (result.output ?? {}) as Record<string, unknown>;
     if (String(result.status ?? "").toUpperCase() !== "COMPLETED" || output["ok"] !== true) {
       return {
@@ -129,6 +138,11 @@ export async function gpuHealth(): Promise<GpuHealth> {
       online: false,
       reason: error instanceof Error ? error.message : "falha ao consultar RunPod",
     };
+  } finally {
+    // runsync can return a queued job: leaving it behind starts a paid worker
+    // even though the UI already reported a failed diagnostic. TTL also covers
+    // a lost HTTP response for which we never received the provider job ID.
+    if (pendingJobId) await cancelChunk(pendingJobId);
   }
 }
 
@@ -149,6 +163,9 @@ export type ChunkPayload = {
 
 export async function submitChunk(payload: ChunkPayload): Promise<string> {
   const body = {
+    // Provider-enforced deadlines remain effective when the browser/ticker is
+    // closed. Align total lifetime with the orchestrator's 30-minute deadline.
+    policy: { executionTimeout: 600_000, ttl: 1_800_000 },
     input: {
       chunk_index: payload.chunkIndex,
       source_url: payload.sourceUrl,
@@ -194,7 +211,7 @@ export async function chunkStatus(providerJobId: string): Promise<ChunkStatus> {
   if (raw === "IN_PROGRESS" || raw === "RUNNING") return { state: "running" };
   if (raw === "COMPLETED") {
     const output = (result.output ?? {}) as Record<string, unknown>;
-    if (output["ok"] === false) {
+    if (output["ok"] !== true) {
       return { state: "failed", error: String(output["error"] ?? "falha no chunk").slice(0, 400) };
     }
     return {
@@ -215,7 +232,10 @@ export async function chunkStatus(providerJobId: string): Promise<ChunkStatus> {
 
 export async function cancelChunk(providerJobId: string): Promise<void> {
   try {
-    await runpod(`/cancel/${encodeURIComponent(providerJobId)}`, { method: "POST" });
+    await runpod(`/cancel/${encodeURIComponent(providerJobId)}`, {
+      method: "POST",
+      signal: AbortSignal.timeout(15_000),
+    });
   } catch {
     // cancelamento é best-effort
   }
