@@ -46,4 +46,18 @@ describe("RunPod lifecycle cost guards", () => {
     fetchMock.mockResolvedValueOnce(Response.json({ status: "COMPLETED", output: {} }));
     expect((await chunkStatus("invalid-result")).state).toBe("failed");
   });
+
+  it("preserves visual review warnings from a completed GPU job", async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ status: "COMPLETED", output: {
+      ok: true, quality_issues: ["possivel_borrado", "texto_residual", null],
+    } }));
+    expect((await chunkStatus("review-result")).qualityIssues).toEqual([
+      "possivel_borrado", "texto_residual",
+    ]);
+  });
+
+  it("does not silently pass outputs from workers without quality verification", async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ status: "COMPLETED", output: { ok: true } }));
+    expect((await chunkStatus("legacy-result")).qualityIssues).toEqual(["verificacao_indisponivel"]);
+  });
 });

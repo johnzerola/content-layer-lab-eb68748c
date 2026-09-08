@@ -44,6 +44,8 @@ from ..services import protect as protect_svc
 from ..services import tracking
 from ..services import verify
 from ..services.scene import detect_scenes
+from ..services.scene_pipeline import frame_spans, run_scenes
+from ..services.quality_policy import review_issues, should_try_alternative, prefer_alternative
 from ..services.text_detect import detect_text_boxes, frame_text_mask
 from ..services.watermark import detect_watermarks, frame_watermark_mask
 from ..security import callback_signature, validate_callback_url
@@ -141,8 +143,7 @@ def _composite_step(
     try:
         return composite_masked(input_path, inpainted_path, mask_dir, fps, composited)
     except Exception as exc:
-        print(f"[composite] fallback para saida integral do modelo: {exc}")
-        return inpainted_path
+        raise RuntimeError("falha ao preservar os pixels fora da mascara; resultado nao aprovado") from exc
 
 
 def sign_payload(payload: dict, secret: str) -> str:
@@ -236,13 +237,17 @@ def _window_masks(
         regions, w, h, frame_offset, n, info.fps
     )
     fixed_watermark_masks = np.zeros_like(base_masks)
-    if mode in ("watermark", "logo"):
+    if mode in ("watermark", "logo", "smart"):
         fixed_regions = []
         for region in regions:
+            if mode == "smart":
+                if region.get("mask_kind") == "graphic":
+                    fixed_regions.append(region)
+                continue
             region_id = str(region.get("id", ""))
             label = str(region.get("label", "")).lower()
             automatically_moving = region_id.startswith(("wt_", "mv_"))
-            is_fixed = mode == "logo" or (
+            is_fixed = mode == "logo" or region.get("mask_kind") == "graphic" or (
                 not automatically_moving
                 and ("persistente" in label or not region_id.startswith("wm_"))
             )
@@ -254,7 +259,9 @@ def _window_masks(
             )
 
     if mode in ("subtitle", "text", "smart", "karaoke", "watermark", "logo") and dynamic:
-        keys = list(range(0, n, max(1, key_step)))
+        # Karaoke may replace a word on any frame. Background optical flow
+        # cannot determine where an independently animated overlay moved.
+        keys = list(range(0, n, 1 if mode == "karaoke" else max(1, key_step)))
         if keys[-1] != n - 1:
             keys.append(n - 1)
         key_masks = []
@@ -269,7 +276,7 @@ def _window_masks(
                 cv2.cvtColor(probe_src, cv2.COLOR_BGR2GRAY), (96, 54),
                 interpolation=cv2.INTER_AREA,
             ).astype(np.int16)
-            if previous_mask is not None and previous_probe is not None:
+            if mode not in ("subtitle", "karaoke", "text", "smart") and previous_mask is not None and previous_probe is not None:
                 if float(np.mean(np.abs(probe - previous_probe))) < 1.5:
                     key_masks.append(previous_mask.copy())
                     continue
@@ -286,6 +293,7 @@ def _window_masks(
                     detected = np.maximum(
                         detected, frame_watermark_mask(frames[key], roi=base)
                     )
+                    detected = np.maximum(detected, fixed_watermark_masks[key])
             previous_probe = probe
             previous_mask = detected
             key_masks.append(detected)
@@ -311,7 +319,11 @@ def _window_masks(
         current = cv2.bitwise_and(current, base_masks[index])
         if protect_masks[index].max() > 0:
             current = cv2.bitwise_and(current, cv2.bitwise_not(protect_masks[index]))
-        out[index] = mask_svc.refine(current)
+        refined = mask_svc.refine(current)
+        # Morphology must not grow back into protected pixels or outside the
+        # selected region after those constraints have already been applied.
+        refined = cv2.bitwise_and(refined, base_masks[index])
+        out[index] = cv2.bitwise_and(refined, cv2.bitwise_not(protect_masks[index]))
     return out
 
 
@@ -351,7 +363,8 @@ def _write_mask_sequence(
             context_start,
             auto_protect,
         )
-        masks = tracking.stabilize(masks) if len(masks) > 2 else masks
+        # _window_masks already stabilizes overlays and enforces timed remove /
+        # protect regions. Do not grow masks again after those constraints.
         offset = start - context_start
         core_len = min(core, total - start, len(frames) - offset)
         for local in range(offset, offset + core_len):
@@ -364,8 +377,8 @@ def _write_mask_sequence(
         start += core_len
         if core_len <= 0:
             break
-    if written == 0:
-        raise RuntimeError("nenhuma mascara foi gerada")
+    if written != total:
+        raise RuntimeError(f"sequencia de mascaras incompleta: {written}/{total} quadros")
     return written
 
 
@@ -401,12 +414,14 @@ def _audit_video(video_path: str, mask_dir: str, fps: float) -> tuple[List[Dict]
     for index, frame in enumerate(read_frames(video_path)):
         mask = cv2.imread(str(Path(mask_dir) / f"{index:06d}.png"), cv2.IMREAD_GRAYSCALE)
         if mask is None:
-            break
+            raise RuntimeError("mascara ausente durante a verificacao do resultado")
         chunk_frames.append(frame)
         chunk_masks.append(mask)
         if len(chunk_frames) >= 48:
             flush()
     flush()
+    if not segments:
+        raise RuntimeError("nenhum quadro verificado")
     return segments, worst
 
 
@@ -425,7 +440,16 @@ def _run_official_pipeline(
     emit,
     cancel_file: Optional[str] = None,
     composite_on: bool = True,
+    scene_cuts=(),
+    refinement_budget=None,
 ) -> tuple[List[Dict], dict, int]:
+    if len(frame_spans(info.frames, scene_cuts)) > 1:
+        return run_scenes(input_path, output_path, job_dir, regions, info, scene_cuts,
+            lambda source, output, directory, masks, part_info, progress:
+                _run_official_pipeline(source, output, directory, masks, part_info,
+                    mode, preset, dynamic, key_step, auto_protect, verify_on,
+                    progress, cancel_file, composite_on,
+                    refinement_budget=refinement_budget), emit, cancel_file)
     mask_dir = os.path.join(job_dir, "masks")
     run_dir = os.path.join(job_dir, "propainter-run")
     emit(18, "gerando mascaras temporais", "tracking")
@@ -471,6 +495,36 @@ def _run_official_pipeline(
         metrics = {"residual_text": 0.0, "sharpness_ratio": 1.0, "temporal_consistency": 1.0}
     emit(96, "remontando audio", "encoding")
     mux_audio(normalized_video, input_path, output_path, info.has_audio)
+    # Opt-in, at most one extra attempt per job, and only a <=5s scene. Always
+    # feed the ORIGINAL into the alternative's native ProPainter+diffusion
+    # pipeline. Never stack hallucinated pixels from one candidate onto another.
+    if (refinement_budget and refinement_budget[0] > 0 and verify_on
+            and info.duration <= 5.001 and should_try_alternative(metrics)
+            and diffueraser_status().ready):
+        refinement_budget[0] -= 1
+        alternate_dir = os.path.join(job_dir, "alternative")
+        os.makedirs(alternate_dir, exist_ok=True)
+        alternate_path = os.path.join(alternate_dir, "output.mp4")
+        emit(96, "comparando alternativa no trecho original (limite: uma tentativa)", "refining")
+        try:
+            alt_segments, alt_metrics, alt_frames = _run_diffusion_pipeline(
+                input_path, alternate_path, alternate_dir, regions, info, mode,
+                dynamic, key_step, auto_protect, True, emit, cancel_file, composite_on)
+            alt_info = probe(alternate_path)
+            valid = (alt_frames == frames and alt_info.frames == frames
+                     and (alt_info.width, alt_info.height) == (info.width, info.height))
+            if valid and prefer_alternative(metrics, alt_metrics):
+                os.replace(alternate_path, output_path)
+                segments, metrics = alt_segments, alt_metrics
+                metrics["selected_engine"] = "diffueraser-official"
+            metrics["alternative_attempts"] = 1
+        except Exception:
+            if cancel_file and Path(cancel_file).exists():
+                raise JobCancelled("job cancelado")
+            # A failed comparison must not destroy the primary artifact or
+            # start another expensive retry. Report the failure for review.
+            metrics["alternative_attempts"] = 1
+            metrics["alternative_failed"] = True
     return segments, metrics, frames
 
 
@@ -488,7 +542,14 @@ def _run_diffusion_pipeline(
     emit,
     cancel_file: Optional[str] = None,
     composite_on: bool = True,
+    scene_cuts=(),
 ) -> tuple[List[Dict], dict, int]:
+    if len(frame_spans(info.frames, scene_cuts)) > 1:
+        return run_scenes(input_path, output_path, job_dir, regions, info, scene_cuts,
+            lambda source, output, directory, masks, part_info, progress:
+                _run_diffusion_pipeline(source, output, directory, masks, part_info,
+                    mode, dynamic, key_step, auto_protect, verify_on,
+                    progress, cancel_file, composite_on), emit, cancel_file)
     mask_dir = os.path.join(job_dir, "masks")
     mask_video = os.path.join(job_dir, "masks.mp4")
     run_dir = os.path.join(job_dir, "diffueraser-run")
@@ -592,7 +653,7 @@ def _run_classic_pipeline(
                 context_start,
                 auto_protect,
             )
-            masks = tracking.stabilize(masks) if len(masks) > 2 else masks
+            # Preserve the per-frame region/protection constraints above.
             result = process_windowed(engine, list(frames), masks, len(frames), 0)
             metrics = {"residual_text": 0.0, "sharpness_ratio": 1.0, "temporal_consistency": 1.0}
             if verify_on:
@@ -759,6 +820,7 @@ def run_pipeline(
                 emit,
                 str(cancel_path),
                 composite_on,
+                scene_cuts=cuts,
             )
             engine_name = "diffueraser-official"
             pass_count = 2
@@ -783,6 +845,8 @@ def run_pipeline(
                 emit,
                 str(cancel_path),
                 composite_on,
+                scene_cuts=cuts,
+                refinement_budget=[1 if opts.get("selective_second_pass") is True else 0],
             )
             engine_name = "propainter-official"
             pass_count = 1
@@ -810,17 +874,24 @@ def run_pipeline(
 
         _apply_postprocess(input_path, output_path, info, opts, emit)
 
+        issues = review_issues(aggregate, verify_on)
+        if aggregate.get("alternative_failed"):
+            issues.append("alternativa_falhou")
         callback_seq += 1
         result_payload = {
             "job_id": job_id,
             "callback_seq": callback_seq,
             "status": "completed",
             "progress": 100,
-            "stage": "concluído",
+            "stage": "concluído — revisar resultado" if issues else "concluído",
             result_key: result_path,
             "detections": regions,
             "segments": segments,
             "metrics": {
+                "quality_status": "needs_review" if issues else "checks_passed",
+                "quality_issues": issues,
+                "alternative_attempts": aggregate.get("alternative_attempts", 0),
+                "selected_engine": aggregate.get("selected_engine", engine_name),
                 "temporal_consistency": round(aggregate["temporal_consistency"], 3),
                 "sharpness_ratio": round(aggregate["sharpness_ratio"], 3),
                 "residual_text": round(aggregate["residual_text"], 4),

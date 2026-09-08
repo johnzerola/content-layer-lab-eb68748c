@@ -191,6 +191,7 @@ export async function submitChunk(payload: ChunkPayload): Promise<string> {
 
 export type ChunkStatus = {
   state: "queued" | "running" | "completed" | "failed";
+  qualityIssues?: string[];
   residualText?: number;
   outputUrl?: string | null;
   seconds?: number;
@@ -216,6 +217,9 @@ export async function chunkStatus(providerJobId: string): Promise<ChunkStatus> {
     }
     return {
       state: "completed",
+      qualityIssues: Array.isArray(output["quality_issues"])
+        ? output["quality_issues"].filter((item): item is string => typeof item === "string").slice(0, 10)
+        : ["verificacao_indisponivel"],
       residualText: Number(output["residual_text"] ?? 0) || 0,
       outputUrl: (output["output_url"] as string | undefined) ?? null,
       seconds: Number(output["seconds"] ?? (result.executionTime ?? 0) / 1000) || 0,

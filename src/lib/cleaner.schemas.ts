@@ -17,4 +17,5 @@ export const cleanerRegionSchema = z.object({
   enabled: z.boolean().optional(),
   label: z.string().optional(),
   score: z.number().optional(),
+  mask_kind: z.literal("graphic").optional(),
 });

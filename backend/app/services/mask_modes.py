@@ -1,9 +1,7 @@
 """Modos de máscara inspirados em projetos open source de remoção.
 
-- `karaoke_union`: legendas karaokê/pulantes mudam de cor e largura a cada
-  palavra. Detectar frame a frame faz a máscara "piscar" e sobra resíduo nas
-  bordas. A união temporal da janela (mesma ideia usada pelo
-  video-subtitle-remover) cobre toda a extensão que o texto ocupa no trecho.
+- `karaoke_union`: mantém somente bordas compatíveis em quadros adjacentes,
+  sem congelar uma faixa que una palavras de momentos/posições diferentes.
 - `lock_region`: marca d'água estática. Votando a região recorrente nos
   primeiros frames (abordagem do IOPaint/watermark-remover) a máscara fica
   travada para o vídeo todo — mais rápido e sem flicker.
@@ -17,22 +15,29 @@ import numpy as np
 
 
 def karaoke_union(masks: Sequence[np.ndarray], dilate: int = 3) -> List[np.ndarray]:
-    """Une as máscaras da janela e devolve a mesma máscara para todos os frames."""
+    """Stabilize only adjacent, matching glyph masks; never union a whole shot.
+
+    Keep the public name for callers, but do not bridge words, empty frames or
+    positions. Text outlines are already included by the pixel detector.
+    """
     if len(masks) == 0:
         return list(masks)
-    union = np.zeros_like(masks[0])
-    for mask in masks:
-        union = np.maximum(union, mask)
-    if union.max() == 0:
-        return [mask.copy() for mask in masks]
-    # Fecha buracos entre palavras destacadas e a linha base.
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (31, 5))
-    union = cv2.morphologyEx(union, cv2.MORPH_CLOSE, kernel)
-    if dilate > 0:
-        union = cv2.dilate(
-            union, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (dilate * 2 + 1, dilate * 2 + 1))
-        )
-    return [union.copy() for _ in masks]
+    result = []
+    radius = max(0, min(1, dilate))
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (radius * 2 + 1,) * 2)
+    for index, mask in enumerate(masks):
+        current = mask > 0
+        merged = mask.copy()
+        if current.any():
+            support = cv2.dilate(mask, kernel)
+            for neighbor in masks[max(0, index - 1):index + 2]:
+                other = neighbor > 0
+                union_size = np.count_nonzero(current | other)
+                similarity = np.count_nonzero(current & other) / max(1, union_size)
+                if similarity >= 0.85:
+                    merged = np.maximum(merged, cv2.bitwise_and(neighbor, support))
+        result.append(merged)
+    return result
 
 
 def vote_locked_mask(masks: Sequence[np.ndarray], ratio: float = 0.6) -> np.ndarray | None:

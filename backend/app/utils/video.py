@@ -99,14 +99,17 @@ def mux_audio(video_only: str, original: str, output: str, has_audio: bool) -> N
             os.remove(video_only)
         return
 
-    subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error",
+    command = ["ffmpeg", "-y", "-loglevel", "error",
          "-i", video_only, "-i", original,
          "-map", "0:v:0", "-map", "1:a:0",
-         "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
-         "-shortest", output],
-        check=True,
-    )
+         "-c:v", "copy", "-c:a", "copy", "-shortest", output]
+    try:
+        subprocess.run(command, check=True, capture_output=True)
+    except subprocess.CalledProcessError:
+        # Some source audio codecs cannot be muxed into MP4. Only then encode.
+        position = command.index("-c:a") + 1
+        command[position:position + 1] = ["aac", "-b:a", "192k"]
+        subprocess.run(command, check=True)
     try:
         os.remove(video_only)
     except OSError:

@@ -101,6 +101,7 @@ def handler(event: dict) -> dict:
         return {
             "ok": True,
             "worker_version": WORKER_VERSION,
+            "pipeline_revision": "scene-masks-v1",
             "gpu_vram_gb": _gpu_vram_gb(),
             "ai_ready": propainter.ready,
             "max_ready": diffueraser.ready,
@@ -139,7 +140,9 @@ def handler(event: dict) -> dict:
     overlap = max(0.0, float(payload.get("overlap", 0.5)))
     read_start = max(0.0, start - overlap)
     head = start - read_start
-    body = max(0.2, end - start)
+    body = end - start
+    if body <= 0:
+        return {"ok": False, "chunk_index": index, "error": "intervalo do trecho invalido"}
     read_duration = (end + overlap) - read_start
 
     job_id = str(uuid.uuid4())
@@ -172,7 +175,16 @@ def handler(event: dict) -> dict:
             raise RuntimeError("pipeline não gerou output.mp4")
 
         # Descarta o contexto de sobreposição: só o miolo vai para a concatenação.
-        final = trim_edges(str(processed), str(scratch / f"chunk-{index:04d}.mp4"), head, body)
+        processed_info = probe(str(processed))
+        if abs(processed_info.duration - info.duration) > max(0.1, 2 / info.fps):
+            raise RuntimeError("motor alterou a duracao do trecho")
+        if (processed_info.width, processed_info.height) != (info.width, info.height):
+            raise RuntimeError("motor alterou o enquadramento do trecho")
+        # No overlap at scene boundaries: avoid an unnecessary extra encode.
+        if head <= 0.001 and abs(processed_info.duration - body) <= 1 / info.fps:
+            final = str(processed)
+        else:
+            final = trim_edges(str(processed), str(scratch / f"chunk-{index:04d}.mp4"), head, body)
 
         metrics = (result or {}).get("metrics") or {}
         final_path = Path(final)
@@ -182,6 +194,10 @@ def handler(event: dict) -> dict:
             "seconds": round(time.monotonic() - started, 2),
             "frames": info.frames,
             "residual_text": float(metrics.get("residual_text", 0.0) or 0.0),
+            "quality_status": metrics.get("quality_status", "unverified"),
+            "quality_issues": metrics.get("quality_issues", []),
+            "alternative_attempts": metrics.get("alternative_attempts", 0),
+            "selected_engine": metrics.get("selected_engine"),
             "engine": metrics.get("engine"),
             "device": metrics.get("device"),
             "checksum": _sha256(final_path),

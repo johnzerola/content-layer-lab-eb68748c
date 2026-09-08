@@ -1,0 +1,10 @@
+# Overlay for the existing Hostear reverse proxy. Use together with the CPU
+# compose file and project cleaner-cpu; do not create/restart Caddy.
+services:
+  worker:
+    networks:
+      - cleaner-existing-proxy
+networks:
+  cleaner-existing-proxy:
+    external: true
+    name: cleaner-cpu-net

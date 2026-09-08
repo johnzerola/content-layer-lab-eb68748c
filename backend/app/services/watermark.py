@@ -59,6 +59,41 @@ def frame_watermark_mask(frame: np.ndarray, roi: np.ndarray | None = None) -> np
     return out
 
 
+def _graphic_on_flat_border(candidate: Dict, frames: List[np.ndarray]) -> bool:
+    """Conservative static emblem candidate on a uniform outer canvas.
+
+    Edge persistence alone also detects clothing/buildings. Only use whole
+    regions automatically for compact, stationary graphics near an outer edge
+    with a uniform surrounding ring in every sampled frame. Other detections
+    remain glyph-only/manual proposals.
+    """
+    height, width = frames[0].shape[:2]
+    x = int(round(candidate["x"] * width))
+    y = int(round(candidate["y"] * height))
+    w = int(round(candidate["w"] * width))
+    h = int(round(candidate["h"] * height))
+    if not (w > 4 and h > 4 and 0.65 <= w / h <= 1.6):
+        return False
+    if not (w < width * 0.25 and h < height * 0.15
+            and (y + h < height * 0.2 or y > height * 0.9)):
+        return False
+    pad = max(5, int(min(w, h) * 0.08))
+    x0, x1, y0, y1 = x - pad, x + w + pad, y - pad, y + h + pad
+    if x0 < 0 or y0 < 0 or x1 > width or y1 > height:
+        return False
+    ring = np.ones((y1 - y0, x1 - x0), dtype=bool)
+    ring[pad:pad + h, pad:pad + w] = False
+    first = frames[0][y:y + h, x:x + w].astype(np.float32)
+    for frame in frames:
+        pixels = frame[y0:y1, x0:x1][ring].astype(np.float32)
+        median = np.median(pixels, axis=0)
+        if np.mean(np.max(np.abs(pixels - median), axis=1) <= 12) < 0.92:
+            return False
+        if np.mean(np.abs(frame[y:y + h, x:x + w].astype(np.float32) - first)) > 8:
+            return False
+    return True
+
+
 def detect_watermarks(frames: List[np.ndarray]) -> List[Dict]:
     if not frames:
         return []
@@ -99,6 +134,10 @@ def detect_watermarks(frames: List[np.ndarray]) -> List[Dict]:
     regions = _boxes_from_mask(
         persistent_edges, width, height, "wm", "Marca d'agua persistente"
     )
+    for region in regions:
+        if _graphic_on_flat_border(region, frames):
+            region["mask_kind"] = "graphic"
+            region["label"] = "Simbolo estatico sobre borda uniforme"
     regions.extend(
         _boxes_from_mask(persistent_text, width, height, "wt", "Texto persistente")
     )

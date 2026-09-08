@@ -201,7 +201,7 @@ def detect_text_boxes(frame: np.ndarray) -> List[Box]:
 
 
 
-def text_pixel_mask(frame: np.ndarray, box: Box, dilate_ratio: float = 0.32) -> np.ndarray:
+def text_pixel_mask(frame: np.ndarray, box: Box, dilate_ratio: float = 0.12) -> np.ndarray:
     """Mask glyphs, outline, shadow and glow inside a detected text box."""
     h_img, w_img = frame.shape[:2]
     x, y, w, h = box
@@ -213,14 +213,21 @@ def text_pixel_mask(frame: np.ndarray, box: Box, dilate_ratio: float = 0.32) -> 
     roi = frame[y:y + h, x:x + w]
     gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
     gray = cv2.bilateralFilter(gray, 5, 40, 40)
-    bright = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-    dark = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
-    local = bright if bright.mean() < dark.mean() else dark
+    threshold, bright = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    dark = cv2.bitwise_not(bright)
+    # Thick headlines can occupy >50% of the OCR box. Choosing the minority
+    # class then masks BACKGROUND instead of letters. Estimate polarity from
+    # the perimeter, where the surrounding background is normally visible.
+    perimeter = np.concatenate((gray[0], gray[-1], gray[1:-1, 0], gray[1:-1, -1]))
+    local = bright if float(np.median(perimeter)) <= threshold else dark
     local = cv2.bitwise_or(local, cv2.Canny(gray, 60, 160))
-    kernel_size = max(3, int(round(h * dilate_ratio)) | 1)
+    # A radius proportional to a large headline merged whole words into a
+    # rectangle. Bound halo growth to three pixels and close only tiny holes.
+    kernel_size = min(7, max(3, int(round(h * dilate_ratio)) | 1))
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
     local = cv2.dilate(local, kernel)
-    local = cv2.morphologyEx(local, cv2.MORPH_CLOSE, kernel)
+    local = cv2.morphologyEx(local, cv2.MORPH_CLOSE,
+                             cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
     # Keep the mask around glyphs, outlines and shadows. Filling the complete
     # OCR bounding-box row creates a conspicuous horizontal smear on motion.
     mask[y:y + h, x:x + w] = local
@@ -233,12 +240,11 @@ def _bright_subtitle_mask(frame: np.ndarray, roi: np.ndarray) -> np.ndarray:
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     bright = cv2.inRange(gray, 185, 255)
     bright = cv2.bitwise_and(bright, roi)
-    # Join letters and short words on the same subtitle line, then include
-    # outline/shadow pixels without expanding into unrelated regions.
+    # Close only tiny glyph holes; do not join neighboring words into a band.
     joined = cv2.morphologyEx(
         bright,
         cv2.MORPH_CLOSE,
-        cv2.getStructuringElement(cv2.MORPH_RECT, (13, 3)),
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)),
     )
     joined = cv2.dilate(joined, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
     return cv2.bitwise_and(joined, roi)

@@ -8,6 +8,15 @@ from app.services.text_detect import _bright_subtitle_mask, frame_text_mask, tex
 
 
 class FrameTextMaskTests(unittest.TestCase):
+    def test_large_headline_dilation_preserves_narrow_word_gap(self):
+        cv2 = __import__("cv2")
+        frame = np.zeros((160, 250, 3), dtype=np.uint8)
+        cv2.rectangle(frame, (20, 30), (70, 120), (255, 255, 255), -1)
+        cv2.rectangle(frame, (100, 30), (150, 120), (255, 255, 255), -1)
+        result = text_pixel_mask(frame, (10, 20, 150, 110))
+        self.assertEqual(result[70, 85], 0)
+        self.assertGreater(result[70, 50], 0)
+
     def test_glyph_mask_does_not_fill_the_complete_subtitle_band(self):
         cv2 = __import__("cv2")
         frame = np.zeros((100, 240, 3), dtype=np.uint8)

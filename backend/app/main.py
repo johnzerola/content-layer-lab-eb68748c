@@ -245,7 +245,9 @@ async def health():
         },
 
         "detectors": {"text": detector_status()},
-        "features": {"batch_render": True},
+        "features": {"batch_render": True, "scene_isolated_inpainting": True,
+                     "conservative_karaoke_masks": True, "quality_review_signals": True},
+        "pipeline_revision": "scene-masks-v1",
         "limits": {
             "max_upload_bytes": SETTINGS.max_upload_bytes,
             "max_duration_seconds": SETTINGS.max_duration_seconds,

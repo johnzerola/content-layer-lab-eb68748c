@@ -134,6 +134,8 @@ export interface CleanerRegion {
   label?: string;
   /** confiança quando veio do detector */
   score?: number;
+  /** Full graphic mask; ordinary text keeps glyph-level masking. */
+  mask_kind?: "graphic";
 }
 
 export interface CleanerProbe {
@@ -159,6 +161,10 @@ export interface CleanerMetrics {
   engine?: string;
   /** número de passes executados */
   passes?: number;
+  quality_status?: "checks_passed" | "needs_review";
+  quality_issues?: string[];
+  selected_engine?: string;
+  alternative_attempts?: number;
 }
 
 export interface CleanerJob {

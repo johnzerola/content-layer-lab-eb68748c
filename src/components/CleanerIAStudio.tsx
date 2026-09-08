@@ -123,6 +123,8 @@ function isSubtitleOrWatermark(m: CleanerRegion): boolean {
   if (!b) return true;
   const area = b.w * b.h;
   if (area > 0.35) return false;
+  // The detector already verified a stationary graphic on a flat border.
+  if (m.mask_kind === "graphic") return true;
   const label = `${m.label ?? ""} ${m.role ?? ""}`;
   const cx = b.x + b.w / 2;
   const cy = b.y + b.h / 2;

@@ -74,26 +74,17 @@ def propagate(
 
 
 def stabilize(masks: np.ndarray, window: int = 5, motion_thresh: float = 0.02) -> np.ndarray:
-    """Suaviza a máscara no tempo: dissolve piscadas e prende regiões estáticas."""
-    t = len(masks)
-    if t < 3:
-        return masks
-    out = masks.copy()
-    half = max(1, window // 2)
-    for i in range(t):
-        lo, hi = max(0, i - half), min(t, i + half + 1)
-        stack = masks[lo:hi].astype(np.float32) / 255.0
-        avg = stack.mean(axis=0)
-        keep = (avg >= 0.5) | (masks[i] > 0) & (avg >= 0.3)
-        out[i] = np.where(keep, 255, 0).astype(np.uint8)
+    """Local glyph stabilization, without freezing small moving masks globally.
 
-    # se o conteúdo é praticamente estático, congela a união (evita respirar)
-    diffs = [float(np.mean(np.abs(masks[i].astype(np.int16) - masks[i - 1].astype(np.int16))) / 255.0)
-             for i in range(1, t)]
-    if diffs and float(np.mean(diffs)) < motion_thresh:
-        union = np.max(masks, axis=0)
-        out[:] = union[None, ...]
-    return out
+    The former full-frame difference classified any small subtitle as static,
+    even when its position changed completely. Preserve empty/current frames.
+    Legacy arguments remain accepted for API compatibility.
+    """
+    from .mask_modes import karaoke_union
+
+    if len(masks) == 0:
+        return masks.copy()
+    return np.asarray(karaoke_union(masks, dilate=1), dtype=np.uint8)
 
 
 def static_regions(path_frames: Sequence[np.ndarray], min_ratio: float = 0.7) -> np.ndarray:

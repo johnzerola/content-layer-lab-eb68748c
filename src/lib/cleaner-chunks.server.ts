@@ -26,7 +26,7 @@ const TARGET_SECONDS = 15;
 const OVERLAP_SECONDS = 0.6;
 /** Resíduo de OCR aceitável no chunk final. */
 const RESIDUAL_LIMIT = 0.05;
-const MAX_ATTEMPTS = 3;
+const MAX_ATTEMPTS = 2;
 const LEASE_MS = 3 * 60 * 1000;
 
 export type PumpResult = {
@@ -50,6 +50,7 @@ type ChunkRow = {
   provider_job_id: string | null;
   output_url: string | null;
   residual_text: number | null;
+  error: string | null;
   lease_until: string | null;
 };
 
@@ -61,9 +62,8 @@ async function admin() {
 function concurrencyFor(_preset: string): number {
   const configured = Number(process.env["CLEANER_GPU_CONCURRENCY"] ?? "");
   if (Number.isFinite(configured) && configured > 0) return Math.min(12, Math.floor(configured));
-  // O endpoint de produção possui dois workers. Despachar mais que isso cria
-  // uma fila invisível no RunPod e faz a UI chamar itens enfileirados de ativos.
-  return 2;
+  // Validate one GPU request at a time. More concurrency requires explicit configuration.
+  return 1;
 }
 
 function chunkPath(jobId: string, idx: number, attempt: number) {
@@ -220,7 +220,7 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
   try {
     const { data: chunkData } = await db
       .from("cleaner_chunks")
-      .select("id, idx, start_seconds, end_seconds, overlap_seconds, status, attempts, provider_job_id, output_url, residual_text, lease_until")
+      .select("id, idx, start_seconds, end_seconds, overlap_seconds, status, attempts, provider_job_id, output_url, residual_text, lease_until, error")
       .eq("job_id", jobId)
       .order("idx", { ascending: true });
     const chunks = (chunkData ?? []) as unknown as ChunkRow[];
@@ -287,6 +287,9 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
         const residualWarning = residual > RESIDUAL_LIMIT;
         chunk.status = "done";
         chunk.residual_text = residual;
+        chunk.error = state.qualityIssues?.length
+          ? `${state.qualityIssues.join(", ")} — revisar resultado`
+          : residualWarning ? `resíduo ${residual.toFixed(3)} — revisar resultado` : null;
         await db
           .from("cleaner_chunks")
           .update({
@@ -297,7 +300,7 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
             checksum: state.checksum ?? null,
             bytes: state.bytes ?? null,
             finished_at: new Date().toISOString(),
-            error: residualWarning ? `resíduo ${residual.toFixed(3)} — revisar resultado` : null,
+            error: chunk.error,
           } as never)
           .eq("id", chunk.id);
 
@@ -390,6 +393,13 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
         parts.push({ index: chunk.idx, url: link.signedUrl });
       }
       const worst = done.reduce((max, c) => Math.max(max, Number(c.residual_text ?? 0)), 0);
+      const reviewNotes = done.filter((c) => c.error).map((c) => `trecho ${c.idx + 1}: ${c.error}`);
+      const review = worst > RESIDUAL_LIMIT || reviewNotes.length > 0;
+      const metrics = {
+        residual_text: worst, chunks: parts.length, engine: "gpu",
+        quality_status: review ? "needs_review" : "checks_passed",
+        quality_issues: reviewNotes,
+      };
       await db
         .from("cleaner_jobs")
         .update({
@@ -399,7 +409,7 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
         } as never)
         .eq("id", jobId);
       // Só depois da montagem confirmada os temporários podem sair.
-      await workerAssemble(jobId, parts, { residual_text: worst, chunks: parts.length });
+      await workerAssemble(jobId, parts, metrics);
       await db
         .from("cleaner_jobs")
         .update({
@@ -422,12 +432,12 @@ export async function pumpCleanerJob(jobId: string): Promise<PumpResult> {
         .from("cleaner_jobs")
         .update({
           status: "completed",
-          stage: "concluído",
+          stage: review ? "concluído — revisar resultado" : "concluído",
           progress: 1,
           chunks_done: done.length,
           result_url: resultUrl,
-          metrics: { residual_text: worst, chunks: parts.length, engine: "gpu" },
-          error: null,
+          metrics,
+          error: review ? "Há trechos com alertas de qualidade; confira a prévia." : null,
           lease_until: null,
         } as never)
         .eq("id", jobId);

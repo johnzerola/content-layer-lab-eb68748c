@@ -1,15 +1,14 @@
 """Fatiamento e remontagem de vídeo para a orquestração por chunks.
 
-A ideia (usada por ProPainter/E2FGVI em produção e pelos pipelines de
-inpainting distribuído) é simples: cada worker recebe uma janela do vídeo com
-uma pequena sobreposição nas bordas. O overlap dá contexto temporal suficiente
-para o inpainting não "piscar" na emenda e permite um crossfade curto na hora
-de concatenar.
+Cada worker recebe uma janela pertencente a uma única cena. Contexto temporal
+é limitado à mesma cena; a montagem descarta o contexto e concatena os miolos.
+Não há crossfade artificial entre cenas.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+import math
 import subprocess
 from typing import List, Sequence
 
@@ -60,33 +59,33 @@ def plan_chunks(
     cuts: Sequence[float] = (),
     max_chunks: int = 64,
 ) -> List[Chunk]:
-    """Divide o vídeo preferindo cortes de cena próximos ao alvo de duração."""
-    duration = max(0.1, float(duration))
+    """Partition every shot, keeping both context edges inside that shot.
+
+    A symmetric overlap is retained for compatibility with queued GPU jobs.
+    At a scene boundary it becomes zero, never borrowing another shot.
+    """
+    duration = float(duration)
+    if not math.isfinite(duration) or duration <= 0:
+        raise ValueError("duracao invalida")
     target = max(4.0, float(target_seconds))
-    if duration <= target * 1.35:
-        return [Chunk(0, 0.0, duration, 0.0)]
-
-    ordered = sorted({round(float(c), 3) for c in cuts if 0.0 < float(c) < duration})
-    bounds: List[float] = [0.0]
-    while bounds[-1] < duration - 1.0:
-        ideal = bounds[-1] + target
-        if ideal >= duration - 1.0:
-            break
-        window = target * 0.35
-        near = [c for c in ordered if abs(c - ideal) <= window and c > bounds[-1] + 2.0]
-        bounds.append(min(near, key=lambda c: abs(c - ideal)) if near else ideal)
-        if len(bounds) > max_chunks:
-            break
-    bounds.append(duration)
-
+    if not math.isfinite(target) or not math.isfinite(overlap) or overlap < 0:
+        raise ValueError("parametros de fatiamento invalidos")
+    boundaries = [0.0, *sorted({float(c) for c in cuts if 0 < float(c) < duration}), duration]
+    counts = [max(1, math.ceil((b - a) / target)) for a, b in zip(boundaries, boundaries[1:])]
+    if sum(counts) > max_chunks:
+        raise ValueError("muitas cenas/partes; reduza o trecho antes de enviar para GPU")
     chunks: List[Chunk] = []
-    for index in range(len(bounds) - 1):
-        chunks.append(Chunk(index, bounds[index], bounds[index + 1], overlap))
+    for (scene_start, scene_end), count in zip(zip(boundaries, boundaries[1:]), counts):
+        for index in range(count):
+            start = scene_start + (scene_end - scene_start) * index / count
+            end = scene_start + (scene_end - scene_start) * (index + 1) / count
+            context = max(0.0, min(overlap, start - scene_start, scene_end - end))
+            chunks.append(Chunk(len(chunks), start, end, context))
     return chunks
 
 
 def slice_video(source: str, destination: str, start: float, duration: float) -> str:
-    """Corte preciso (re-encode) preservando áudio — usado por chunk."""
+    """Silent GPU input; original audio stays on Hostear until final assembly."""
     subprocess.run(
         [
             "ffmpeg", "-y", "-loglevel", "error",
@@ -95,7 +94,7 @@ def slice_video(source: str, destination: str, start: float, duration: float) ->
             "-t", f"{max(0.1, duration):.3f}",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "16",
             "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-b:a", "160k",
+            "-an",
             "-movflags", "+faststart",
             destination,
         ],
