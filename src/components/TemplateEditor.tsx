@@ -20,7 +20,9 @@ import { TemplateCanvas, LAYER_ORDER, LAYER_LABELS, layerOf, selectableIds } fro
 import {
   defaultCaptions,
   makeExtra,
+  type BoxLayer,
   type CaptionStyle,
+
   type ImageLayer,
   type LayerId,
   type SelId,
