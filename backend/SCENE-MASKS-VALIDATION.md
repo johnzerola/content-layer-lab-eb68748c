@@ -2,6 +2,38 @@
 
 Atualização: 2026-09-08. Infraestrutura: Hostear (CPU) + RunPod (GPU).
 
+## Atualização do teste autenticado (2026-09-08)
+
+O acesso REST/GraphQL foi liberado. O endpoint foi atualizado para o template
+de validação `wblwqgy54h`, com a imagem corrigida por digest e a credencial
+privada de Docker Hub já cadastrada na conta. O primeiro template criado pelo
+teste não tinha herdado a credencial; esse vínculo foi corrigido. A imagem
+permanece privada. `PROPAINTER_MAX_SIDE` passou de 1280 para 960 no template
+de validação; esse ajuste ainda não teve benchmark GPU.
+
+Os diagnósticos não chegaram a executar o handler: houve workers unhealthy/
+EXITED e espera em fila até o limite de 240 segundos. O primeiro diagnóstico
+foi cancelado; o último expirou e sua consulta passou a retornar 404. Foram
+enviados somente diagnósticos de saúde, nenhum job de inpainting. Isso não
+prova custo zero de infraestrutura durante as tentativas de inicialização.
+
+Estado final consultado: `workersMin=0`, `workersMax=0`; todos os contadores
+de workers em zero e fila/execução em zero. Volumes e modelos não foram
+excluídos. **O endpoint está pausado para evitar novas alocações e precisa
+ser reabilitado conscientemente após resolver a inicialização.** Não
+publique como remoção validada. Os logs dos workers encerrados não estavam
+disponíveis pela consulta tentada; foi solicitado o export da aba Logs.
+
+Artefatos locais em `G:\dowloand\teste\cleaneria-validacao-20260908`:
+original de teste de 15 s, quadros comparativos e relatórios `gpu-teste-*`.
+O arquivo original com `(15)` no nome tem 80,68 s, não 15 s. Não há novo
+vídeo limpo. O executor `scripts/validate_runpod_sample.py` limita amostras a
+5 s, preserva o áudio via montagem Hostear, valida checksum/dimensões e
+desativa capacidade no finally; dois testes unitários cobrem bloqueio da
+remoção quando o diagnóstico falha e preservação da credencial privada.
+
+As seções abaixo registram a etapa anterior de implementação/validação CPU.
+
 ## Implementado
 
 - Inferência separada em cada mudança de cena, sem misturar quadros de cenas diferentes.
