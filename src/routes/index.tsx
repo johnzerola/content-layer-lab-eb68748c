@@ -81,6 +81,7 @@ import {
   PLATFORM_PRESETS,
   RATIO_PRESETS,
   type Template,
+  type CleanupRegion,
 } from "@/lib/template";
 import { downloadBlob, grabPoster, outputIsWebm, renderVideo } from "@/lib/render";
 import { poolSize } from "@/lib/render-pool";
@@ -216,6 +217,8 @@ interface Item {
   /** todas as variações geradas deste vídeo */
   outputs?: { blob: Blob; ext: string; label: string }[] | undefined;
   captions?: CaptionCue[] | undefined;
+  /** áreas de limpeza marcadas para este vídeo */
+  regions?: CleanupRegion[] | undefined;
   capStatus?: string | undefined;
   capError?: boolean | undefined;
 
