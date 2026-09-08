@@ -184,7 +184,8 @@ function withTransform(
   fn: () => void,
 ) {
   ctx.save();
-  if (l.opacity != null && l.opacity !== 1) ctx.globalAlpha = l.opacity;
+  if (l.opacity != null && l.opacity !== 1) ctx.globalAlpha *= l.opacity;
+
   if (l.rotation) {
     const cx = l.x + l.w / 2;
     const cy = l.y + l.h / 2;
