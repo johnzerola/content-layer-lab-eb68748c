@@ -27,7 +27,16 @@ export interface BoxLayer {
   z?: number;
   /** opacidade 0..1 (padrão 1) */
   opacity?: number;
+  /** segundo em que a camada aparece (padrão 0) */
+  tStart?: number;
+  /** segundo em que a camada some · null/undefined = fica até o fim */
+  tEnd?: number | null;
+  /** duração do fade de entrada, em segundos */
+  fadeIn?: number;
+  /** duração do fade de saída, em segundos */
+  fadeOut?: number;
 }
+
 
 export interface TextLayer extends BoxLayer {
   text: string;
