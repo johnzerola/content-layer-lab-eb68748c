@@ -77,6 +77,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     return;
   }
   const { id } = msg;
+  let lastProgressAt = -Infinity;
   // pulso a cada 3s: o vigia distingue "quadro lento" de "travou de vez"
   const beat = setInterval(() => post({ type: "alive", id }), 3_000);
   try {
@@ -100,7 +101,13 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       plate: msg.plate ? { canvas: msg.plate.bitmap, ok: new Set(msg.plate.ok) } : null,
       audio: msg.audio,
       envelope: msg.envelope,
-      onProgress: (p) => post({ type: "progress", id, p }),
+      onProgress: (p) => {
+        const now = performance.now();
+        if (p >= 1 || now - lastProgressAt >= 100) {
+          lastProgressAt = now;
+          post({ type: "progress", id, p });
+        }
+      },
       onPhase: (phase) => post({ type: "phase", id, phase }),
       isCancelled: () => cancelled.has(id),
     });

@@ -142,7 +142,9 @@ export class FrameReader {
   private async feed() {
     const dec = this.decoder;
     if (!dec) return;
-    while (this.next < this.track.samples.length && dec.decodeQueueSize < 8) {
+    // Bound decoded frames too: a fast decoder can empty its input queue while
+    // rendering is still busy. Input queue size alone does not bound GPU memory.
+    while (this.next < this.track.samples.length && dec.decodeQueueSize < 8 && this.queue.length < 12) {
       const s = this.track.samples[this.next]!;
       const data = await this.bytes.read(s.offset, s.size);
       dec.decode(
@@ -178,18 +180,23 @@ export class FrameReader {
         continue;
       }
       await this.feed();
+      // Outputs can arrive during the awaited byte reads. Do not miss that
+      // notification and pay the 40ms fallback when frames are already ready.
+      if (this.failed || this.queue.length >= 4 || this.next >= this.track.samples.length) continue;
       await new Promise<void>((res) => {
-        const t = setTimeout(res, 40);
-        this.wake = () => {
+        const finish = () => {
           clearTimeout(t);
           this.wake = null;
           res();
         };
+        const t = setTimeout(finish, 40);
+        this.wake = finish;
       });
     }
   }
 
   close() {
+    this.wake?.();
     this.drain();
     try {
       this.decoder?.close();

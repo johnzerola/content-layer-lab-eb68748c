@@ -8,6 +8,7 @@
  */
 import { ArrayBufferTarget, Muxer } from "mp4-muxer";
 import { drawFrame, setBackdropQuality } from "./draw";
+import { waitForEncoderCapacity } from './encoder-capacity';
 import { CANVAS_H, CANVAS_W, type Template } from "./template";
 import { motionAt, type Variation } from "./variation";
 import type { CaptionCue } from "./captions";
@@ -60,7 +61,6 @@ export function coreEncodeSupported() {
   );
 }
 
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 const cancelled = () => new DOMException("cancelado", "AbortError");
 
@@ -113,6 +113,7 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
       encoderError = e;
     },
   });
+  try {
   encoder.configure(picked.cfg);
 
   const canvas = new OffscreenCanvas(W, H);
@@ -232,24 +233,13 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
       timestamp: frameIndex * frameDur,
       duration: frameDur,
     });
-    encoder.encode(frame, { keyFrame: frameIndex % (fps * 2) === 0 });
-    frame.close();
+    try {
+      encoder.encode(frame, { keyFrame: frameIndex % (fps * 2) === 0 });
+    } finally { frame.close(); }
     frameIndex++;
 
-    let waitStarted = Date.now();
-    let recovered = false;
-    while (encoder.encodeQueueSize > 6) {
-      if (encoderError) throw encoderError;
-      if (abort()) throw cancelled();
-      if (Date.now() - waitStarted > 20_000) {
-        if (recovered) throw new Error("O codificador de vídeo parou de responder");
-        recovered = true;
-        await encoder.flush().catch(() => {});
-        waitStarted = Date.now();
-        continue;
-      }
-      await sleep(2);
-    }
+    if (encoderError) throw encoderError;
+    if (encoder.encodeQueueSize > 6) await waitForEncoderCapacity(encoder, abort, () => encoderError);
   };
 
   let cur: DecodedFrame | null = null;
@@ -356,4 +346,8 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
   opts.onProgress?.(1);
   const raw = muxer.target.buffer as ArrayBuffer;
   return t.antiDup?.cleanMetadata === false ? raw : cleanMp4Metadata(raw);
+  } finally {
+    reader.close();
+    if (encoder.state !== 'closed') encoder.close();
+  }
 }
