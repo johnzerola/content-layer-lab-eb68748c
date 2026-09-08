@@ -216,6 +216,8 @@ interface Item {
   /** todas as variações geradas deste vídeo */
   outputs?: { blob: Blob; ext: string; label: string }[] | undefined;
   captions?: CaptionCue[] | undefined;
+  /** áreas de limpeza marcadas para este vídeo */
+  regions?: CleanupRegion[] | undefined;
   capStatus?: string | undefined;
   capError?: boolean | undefined;
 
