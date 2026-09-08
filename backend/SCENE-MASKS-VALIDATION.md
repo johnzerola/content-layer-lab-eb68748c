@@ -24,6 +24,7 @@ Atualização: 2026-09-08. Infraestrutura: Hostear (CPU) + RunPod (GPU).
 
 - Backend: 70 testes passaram, incluindo montagem real de um vídeo sintético com FFmpeg.
 - Integração TypeScript: 9 testes direcionados passaram (ciclo GPU e transporte das máscaras).
+- Após integrar as alterações remotas do Lovable: suíte completa do app com 213 testes em 33 arquivos passou; build de produção passou. Existem avisos de depreciação já presentes no build.
 - Amostra real: `G:\dowloand\teste\padro-01-001-teste-5s.mp4`, duração confirmada de 5 segundos.
 - Detecção/máscaras executadas somente na CPU Hostear: 27 regiões, uma cena; cobertura aproximada 5,85%, 6,06%, 6,14% nos três quadros inspecionados.
 - Prévia local revisada: `G:\dowloand\teste\cleaneria-mascaras-20260907\revisada\mask-preview`.
