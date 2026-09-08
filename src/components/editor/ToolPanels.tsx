@@ -4,6 +4,7 @@
  */
 import { CROP_PRESETS, LAYOUTS, cropForRatio, defaultPreEdit, type PreEdit } from "@/lib/preedit";
 import { LOOKS, applyLook, lookPreviewFilter } from "@/lib/looks";
+import { boundCrop, FULL_CROP } from '@/lib/editor/crop-controls';
 
 export type ToolPatch = (patch: Partial<PreEdit>, label?: string) => void;
 
@@ -128,6 +129,8 @@ export function FramePanel({
   srcW: number;
   srcH: number;
 }) {
+  const crop = preedit.crop ?? FULL_CROP;
+  const setCrop = (next: typeof crop) => onChange({ crop: boundCrop(next), keys: [] }, 'enquadrar');
   return (
     <div className="space-y-3 text-sm">
       <p className="font-mono text-[11px] uppercase text-muted-foreground">Recorte</p>
@@ -136,13 +139,19 @@ export function FramePanel({
           <button
             key={p.id}
             type="button"
-            onClick={() => onChange({ crop: p.ratio ? cropForRatio(p.ratio, srcW, srcH) : null }, "enquadrar")}
+            onClick={() => onChange({ crop: p.ratio ? cropForRatio(p.ratio, srcW, srcH) : null, keys: [] }, "enquadrar")}
             className="rounded-lg border border-border/60 px-2 py-1.5 text-xs hover:border-primary/60"
           >
             {p.label}
           </button>
         ))}
       </div>
+      <p className="text-xs text-muted-foreground">Recorte fixo para todo este vídeo. Arraste a seleção na imagem original ou ajuste os valores abaixo.</p>
+      {preedit.keys.length > 0 && <p className="text-xs text-amber-400">Este vídeo tem enquadramento animado. Um novo recorte fixo substitui esses keyframes; você pode desfazer.</p>}
+      <div className="grid grid-cols-2 gap-2">
+        {([['x', 'Posição horizontal'], ['y', 'Posição vertical'], ['w', 'Largura'], ['h', 'Altura']] as const).map(([key, label]) => <label key={key} className="space-y-1 text-xs text-muted-foreground">{label} (%)<input aria-label={`${label} do recorte (%)`} type="number" min={key === 'w' || key === 'h' ? 2 : 0} max={100} step={0.1} className="field w-full" value={Number((crop[key] * 100).toFixed(1))} onChange={e => { if (Number.isFinite(e.target.valueAsNumber)) setCrop({ ...crop, [key]: e.target.valueAsNumber / 100 }); }} /></label>)}
+      </div>
+      <button type="button" className="text-xs text-muted-foreground underline" onClick={() => onChange({ crop: null, keys: [], rotate: 0, flipH: false, flipV: false }, 'restaurar-enquadramento')}>Restaurar vídeo inteiro</button>
       <Row label="Girar">
         <div className="flex gap-1.5">
           {([0, 90, 180, 270] as const).map((r) => (

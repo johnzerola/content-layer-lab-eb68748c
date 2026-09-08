@@ -70,6 +70,8 @@ import { saveRenderedVideo } from "@/lib/editor/download";
 import { CutPanel, FramePanel, GradePanel, LayoutPanel, TitlesPanel } from "@/components/editor/ToolPanels";
 import { EditorCanvas } from "@/components/vtemplate/EditorCanvas";
 import { MediaStage } from "@/components/editor/MediaStage";
+import { SourceCropEditor } from '@/components/editor/SourceCropEditor';
+import { FULL_CROP } from '@/lib/editor/crop-controls';
 import { AnimationPanel } from "@/components/vtemplate/AnimationPanel";
 import { AnimationLibrary } from "@/components/editor/AnimationLibrary";
 import { BrandKitPanel } from "@/components/vtemplate/BrandKitPanel";
@@ -194,6 +196,8 @@ function EditorPage() {
   const [transitionPreview, setTransitionPreview] = useState<PreEdit | null>(null);
   const [cutOnRemove, setCutOnRemove] = useState(true);
   const [saveState, setSaveState] = useState<"idle" | "dirty" | "saving" | "saved">("idle");
+  const [cropResult, setCropResult] = useState(false);
+  const [applyingCrop, setApplyingCrop] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -214,6 +218,7 @@ function EditorPage() {
 
   const history = useEditorHistory<EditorProjectDoc | null>(null);
   const doc = history.state;
+  useEffect(() => { setRendered(null); }, [doc?.preedit, doc?.composition, doc?.media]);
 
   useEffect(() => {
     let alive = true;
@@ -891,6 +896,7 @@ function EditorPage() {
                     type="button"
                     onClick={() => {
                       setTool(t.id);
+                      if (t.id === 'enquadrar') { setCropResult(false); setPlaying(false); }
                       if (t.id === "texto") setLeftTab("texto");
                       if (t.id === "estilos") setLeftTab("estilos");
                     }}
@@ -968,7 +974,7 @@ function EditorPage() {
 
         {/* CANVAS */}
         <main className="order-1 flex min-h-[56vh] min-w-0 flex-col items-center justify-center gap-3 overflow-hidden bg-black/30 p-2 sm:p-4 lg:order-none lg:min-h-0">
-          <div className="relative h-full max-h-full overflow-hidden rounded-xl bg-black" style={{ aspectRatio: "9 / 16" }}>
+          <div className="relative h-full max-h-full overflow-hidden rounded-xl bg-black" style={{ aspectRatio: `${doc.composition.canvas.width} / ${doc.composition.canvas.height}` }}>
             <MediaStage
               videoRef={videoRef}
               src={src}
@@ -978,8 +984,8 @@ function EditorPage() {
               clip={duration > 0 ? { start: 0, end: duration } : null}
               onTimeUpdate={setCurrentTime}
               onLoadedMetadata={(video) => {
-                if (!doc.media.duration) {
-                  patchDoc({ media: { ...doc.media, duration: video.duration } }, "duracao");
+                if (doc.media.duration !== video.duration || doc.media.width !== video.videoWidth || doc.media.height !== video.videoHeight) {
+                  patchDoc({ media: { ...doc.media, duration: video.duration, width: video.videoWidth, height: video.videoHeight } }, "metadados");
                 }
               }}
             />
@@ -998,7 +1004,8 @@ function EditorPage() {
                 showSafeArea
               />
             </div>
-
+            {tool === 'enquadrar' && !cropResult && <SourceCropEditor key={src ?? 'empty'} videoRef={videoRef} crop={pre.crop ?? FULL_CROP}
+              onChange={crop => { setPlaying(false); patchPre({ crop, keys: [] }, 'arrastar-recorte'); }} />}
           </div>
 
           <div className="flex items-center gap-2 text-sm">
@@ -1052,12 +1059,33 @@ function EditorPage() {
               />
             )}
             {tool === "enquadrar" && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" className={`rounded-lg border p-2 text-xs ${!cropResult ? 'border-primary bg-primary/20' : 'border-border'}`} onClick={() => { setPlaying(false); setCropResult(false); }}>Editar recorte</button>
+                  <button type="button" className={`rounded-lg border p-2 text-xs ${cropResult ? 'border-primary bg-primary/20' : 'border-border'}`} onClick={() => setCropResult(true)}>Ver resultado</button>
+                </div>
               <FramePanel
                 preedit={pre}
-                onChange={patchPre}
+                onChange={(patch, label) => {
+                  patchPre(patch, label);
+                  setCropResult(!('crop' in patch));
+                }}
                 srcW={doc.media.width ?? 1920}
                 srcH={doc.media.height ?? 1080}
               />
+                <button type="button" disabled={!src || !recordId || applyingCrop} className="w-full rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50" onClick={async () => {
+                  if (!recordId) return;
+                  setApplyingCrop(true);
+                  try {
+                    await saveEditorProject(recordId, doc);
+                    setCropResult(true);
+                    toast.success('Enquadramento salvo só neste vídeo.');
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : 'Não foi possível salvar o enquadramento. Tente novamente.');
+                  } finally { setApplyingCrop(false); }
+                }}>{applyingCrop ? 'Salvando…' : 'Aplicar só neste vídeo'}</button>
+                <p className="text-xs text-muted-foreground">Salva o projeto deste vídeo. Para copiar a outros vídeos, use “Aplicar em lote”.</p>
+              </div>
             )}
             {tool === "transicoes" && (
               <div className="space-y-4">
