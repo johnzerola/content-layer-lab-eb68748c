@@ -320,7 +320,7 @@ export function drawCaptions(
   else if (anim === "fade") alphaIn = p;
 
   ctx.save();
-  ctx.globalAlpha = (s.opacity ?? 1) * alphaIn;
+  ctx.globalAlpha *= (s.opacity ?? 1) * alphaIn;
   ctx.font = `${s.weight} ${s.size}px ${s.font}`;
   ctx.textBaseline = "top";
   // espaçamento entre letras (Chrome/Edge; ignorado silenciosamente onde não há suporte)
