@@ -1478,7 +1478,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               </div>
               {gpuHealthState?.online && !gpuHealthState.maxReady && (
                 <p className="mt-2 border-t border-sky-500/15 pt-2 text-amber-400">
-                  Faltando: {(gpuHealthState.engines?.diffueraser?.missing ?? ["pesos do DiffuEraser"]).slice(0, 3).join(", ")}
+                  Faltando: {(gpuHealthState.engines?.["diffueraser"]?.missing ?? ["pesos do DiffuEraser"]).slice(0, 3).join(", ")}
                 </p>
               )}
             </div>

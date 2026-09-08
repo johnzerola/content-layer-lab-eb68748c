@@ -184,7 +184,8 @@ function withTransform(
   fn: () => void,
 ) {
   ctx.save();
-  if (l.opacity != null && l.opacity !== 1) ctx.globalAlpha = l.opacity;
+  if (l.opacity != null && l.opacity !== 1) ctx.globalAlpha *= l.opacity;
+
   if (l.rotation) {
     const cx = l.x + l.w / 2;
     const cy = l.y + l.h / 2;
@@ -253,7 +254,8 @@ function drawImageLayer(ctx: CanvasRenderingContext2D, l: ImageLayer) {
   const img = getImage(l.src);
   if (!img) return;
   withTransform(ctx, { ...l, opacity: 1 }, () => {
-    ctx.globalAlpha = l.opacity;
+    ctx.globalAlpha *= l.opacity;
+
     if (l.round) {
       ctx.beginPath();
       ctx.arc(l.x + l.w / 2, l.y + l.h / 2, Math.min(l.w, l.h) / 2, 0, Math.PI * 2);
@@ -318,7 +320,7 @@ export function drawCaptions(
   else if (anim === "fade") alphaIn = p;
 
   ctx.save();
-  ctx.globalAlpha = (s.opacity ?? 1) * alphaIn;
+  ctx.globalAlpha *= (s.opacity ?? 1) * alphaIn;
   ctx.font = `${s.weight} ${s.size}px ${s.font}`;
   ctx.textBaseline = "top";
   // espaçamento entre letras (Chrome/Edge; ignorado silenciosamente onde não há suporte)
@@ -1101,39 +1103,66 @@ export function drawFrame(
     ctx.translate(-W / 2, -H / 2);
   }
 
-  // ordem de empilhamento configurável (z-index por camada)
-  const jobs: { z: number; i: number; run: () => void }[] = [];
-  const push = (z: number | undefined, fallback: number, run: () => void) =>
-    jobs.push({ z: z ?? fallback, i: jobs.length, run });
+  // janela de tempo por camada (aparece/some com fade)
+  const layerTime = Math.max(0, (opts?.time ?? 0) - (opts?.clip?.start ?? 0));
+  const timeAlpha = (l: {
+    tStart?: number;
+    tEnd?: number | null;
+    fadeIn?: number;
+    fadeOut?: number;
+  }) => {
+    const start = l.tStart ?? 0;
+    const end = l.tEnd != null && l.tEnd > start ? l.tEnd : null;
+    if (layerTime < start) return 0;
+    if (end != null && layerTime > end) return 0;
+    let a = 1;
+    const fi = l.fadeIn ?? 0;
+    if (fi > 0) a = Math.min(a, (layerTime - start) / fi);
+    const fo = l.fadeOut ?? 0;
+    if (fo > 0 && end != null) a = Math.min(a, (end - layerTime) / fo);
+    return Math.max(0, Math.min(1, a));
+  };
 
-  push(t.video.z, 0, () => drawVideoLayer(ctx, t, source, opts));
-  push(t.watermark.z, 10, () => drawImageLayer(ctx, t.watermark));
-  push(t.avatar.z, 20, () => drawImageLayer(ctx, t.avatar));
-  push(t.name_.z, 30, () => drawText(ctx, t.name_));
-  push(t.handle.z, 40, () => drawText(ctx, t.handle));
-  push(t.headline.z, 50, () => drawText(ctx, t.headline));
-  push(t.cta.z, 60, () => drawText(ctx, t.cta));
+  // ordem de empilhamento configurável (z-index por camada)
+  const jobs: { z: number; i: number; alpha: number; run: () => void }[] = [];
+  const push = (
+    layer: { z?: number; tStart?: number; tEnd?: number | null; fadeIn?: number; fadeOut?: number },
+    fallback: number,
+    run: () => void,
+  ) => jobs.push({ z: layer.z ?? fallback, i: jobs.length, alpha: timeAlpha(layer), run });
+
+  push(t.video, 0, () => drawVideoLayer(ctx, t, source, opts));
+  push(t.watermark, 10, () => drawImageLayer(ctx, t.watermark));
+  push(t.avatar, 20, () => drawImageLayer(ctx, t.avatar));
+  push(t.name_, 30, () => drawText(ctx, t.name_));
+  push(t.handle, 40, () => drawText(ctx, t.handle));
+  push(t.headline, 50, () => drawText(ctx, t.headline));
+  push(t.cta, 60, () => drawText(ctx, t.cta));
   (t.extras ?? []).forEach((extra, i) =>
-    push(extra.z, 100 + i, () => ("src" in extra ? drawImageLayer(ctx, extra) : drawText(ctx, extra))),
+    push(extra, 100 + i, () => ("src" in extra ? drawImageLayer(ctx, extra) : drawText(ctx, extra))),
   );
   if (t.captions && opts?.captions?.length) {
     const cues = opts.captions;
     const time = opts.time ?? 0;
-    push(t.captions.z, 70, () => drawCaptions(ctx, t.captions!, cues, time));
+    push(t.captions, 70, () => drawCaptions(ctx, t.captions!, cues, time));
   }
+
 
   // cada camada desenha isolada: espelho/rotação do vídeo nunca vaza para
   // legendas, textos ou marca d'água
   jobs
     .sort((a, b) => a.z - b.z || a.i - b.i)
     .forEach((j) => {
+      if (j.alpha <= 0) return;
       ctx.save();
+      if (j.alpha < 1) ctx.globalAlpha *= j.alpha;
       try {
         j.run();
       } finally {
         ctx.restore();
       }
     });
+
   if (animating) ctx.restore();
   ctx.restore();
 }

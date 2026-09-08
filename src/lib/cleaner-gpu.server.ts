@@ -126,11 +126,13 @@ export async function gpuHealth(): Promise<GpuHealth> {
     return {
       configured: true,
       online: true,
-      workerVersion: typeof output["worker_version"] === "string" ? output["worker_version"] : undefined,
+      ...(typeof output["worker_version"] === "string"
+        ? { workerVersion: output["worker_version"] }
+        : {}),
       gpuVramGb: Number.isFinite(Number(output["gpu_vram_gb"])) ? Number(output["gpu_vram_gb"]) : null,
       aiReady: output["ai_ready"] === true,
       maxReady: output["max_ready"] === true,
-      engines: (output["engines"] as GpuHealth["engines"]) ?? undefined,
+      engines: (output["engines"] as GpuHealth["engines"] | undefined) ?? {},
     };
   } catch (error) {
     return {
