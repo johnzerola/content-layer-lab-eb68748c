@@ -132,7 +132,7 @@ export async function gpuHealth(): Promise<GpuHealth> {
       gpuVramGb: Number.isFinite(Number(output["gpu_vram_gb"])) ? Number(output["gpu_vram_gb"]) : null,
       aiReady: output["ai_ready"] === true,
       maxReady: output["max_ready"] === true,
-      engines: (output["engines"] as GpuHealth["engines"]) ?? undefined,
+      engines: (output["engines"] as GpuHealth["engines"] | undefined) ?? {},
     };
   } catch (error) {
     return {
