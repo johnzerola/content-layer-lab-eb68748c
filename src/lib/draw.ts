@@ -1153,13 +1153,16 @@ export function drawFrame(
   jobs
     .sort((a, b) => a.z - b.z || a.i - b.i)
     .forEach((j) => {
+      if (j.alpha <= 0) return;
       ctx.save();
+      if (j.alpha < 1) ctx.globalAlpha *= j.alpha;
       try {
         j.run();
       } finally {
         ctx.restore();
       }
     });
+
   if (animating) ctx.restore();
   ctx.restore();
 }
