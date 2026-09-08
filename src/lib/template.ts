@@ -310,6 +310,8 @@ export const CLEANUP_PRESETS: { id: string; label: string; region: Partial<Clean
 
 
 export interface Template {
+  timelineDuration?: number;
+  fullscreenClips?: { id: string; start: number; end: number; fade: number }[];
   id: string;
   name: string;
   version?: number;

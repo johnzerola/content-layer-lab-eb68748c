@@ -1,3 +1,4 @@
+import { fullscreenAt } from './template-timeline';
 import {
   CANVAS_H,
   CANVAS_W,
@@ -1082,6 +1083,8 @@ export function drawFrame(
   source?: FrameSource | null,
   opts?: DrawOpts,
 ) {
+  const fullscreen = fullscreenAt(t, Math.max(0, (opts?.time ?? 0) - (opts?.clip?.start ?? 0)));
+  if (fullscreen.amount > 0) t = { ...t, video: fullscreen.video };
   const W = t.canvasW ?? CANVAS_W;
   const H = t.canvasH ?? CANVAS_H;
   ctx.save();
@@ -1129,7 +1132,7 @@ export function drawFrame(
     layer: { z?: number; tStart?: number; tEnd?: number | null; fadeIn?: number; fadeOut?: number },
     fallback: number,
     run: () => void,
-  ) => jobs.push({ z: layer.z ?? fallback, i: jobs.length, alpha: timeAlpha(layer), run });
+  ) => jobs.push({ z: layer.z ?? fallback, i: jobs.length, alpha: timeAlpha(layer) * (layer === t.video ? 1 : 1 - fullscreen.amount), run });
 
   push(t.video, 0, () => drawVideoLayer(ctx, t, source, opts));
   push(t.watermark, 10, () => drawImageLayer(ctx, t.watermark));

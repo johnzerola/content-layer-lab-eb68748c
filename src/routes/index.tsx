@@ -3478,6 +3478,7 @@ function Home() {
       {editing && (
         <TemplateEditor
           value={active}
+          previewFile={selected?.file ?? items[0]?.file}
           onCancel={() => setEditing(false)}
           onUse={(t) => {
             setActive(t);

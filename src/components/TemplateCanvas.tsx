@@ -153,7 +153,13 @@ export function TemplateCanvas({
   debugBoxes = true,
   uiOverlay = null,
   frameClassName,
+  timelineTime,
+  timelinePlaying = false,
+  onDuration,
 }: {
+  timelineTime?: number;
+  timelinePlaying?: boolean;
+  onDuration?: (duration: number) => void;
   template: Template;
   selected?: SelId | null;
   onSelect?: (id: SelId) => void;
@@ -205,6 +211,8 @@ export function TemplateCanvas({
   }, [poster]);
 
   const videoEl = useRef<HTMLVideoElement | null>(null);
+  const timelineState = useRef({ timelineTime, timelinePlaying, onDuration });
+  timelineState.current = { timelineTime, timelinePlaying, onDuration };
   useEffect(() => {
     if (!previewFile) {
       videoEl.current = null;
@@ -218,12 +226,17 @@ export function TemplateCanvas({
     v.playsInline = true;
     // repete exatamente a janela que será exportada (clipe + corte anti-duplicidade)
     const onLoop = () => {
+      if (timelineState.current.timelineTime !== undefined) return;
       const end = Math.min(loopEnd ?? Infinity, v.duration || Infinity);
       if (v.currentTime < loopStart - 0.05 || v.currentTime >= end) v.currentTime = loopStart;
     };
-    v.addEventListener("loadedmetadata", onLoop);
+    const onMetadata = () => {
+      if (Number.isFinite(v.duration) && v.duration > 0) timelineState.current.onDuration?.(v.duration);
+      onLoop();
+    };
+    v.addEventListener("loadedmetadata", onMetadata);
     v.addEventListener("timeupdate", onLoop);
-    const promise = v.play();
+    const promise = timelineState.current.timelineTime === undefined ? v.play() : undefined;
     if (promise !== undefined) {
       promise.catch((e) => {
         if (e.name !== "NotAllowedError") {
@@ -234,7 +247,7 @@ export function TemplateCanvas({
     videoEl.current = v;
     if (videoRef) videoRef.current = v;
     return () => {
-      v.removeEventListener("loadedmetadata", onLoop);
+      v.removeEventListener("loadedmetadata", onMetadata);
       v.removeEventListener("timeupdate", onLoop);
       v.pause();
       videoEl.current = null;
@@ -270,6 +283,13 @@ export function TemplateCanvas({
       const ctx = canvasRef.current?.getContext("2d");
       if (ctx) {
         const vid = videoEl.current;
+        const controlled = timelineState.current;
+        if (vid && controlled.timelineTime !== undefined && vid.readyState >= 1) {
+          const target = Math.min(controlled.timelineTime, Math.max(0, vid.duration - 0.01));
+          if (!vid.seeking && Math.abs(vid.currentTime - target) > (controlled.timelinePlaying ? 0.2 : 0.015)) vid.currentTime = target;
+          if (controlled.timelinePlaying && vid.paused && !vid.ended) void vid.play().catch(() => {});
+          if (!controlled.timelinePlaying && !vid.paused) vid.pause();
+        }
         const p = posterImg.current;
         // readyState < 2 = ainda não há quadro decodificado: desenhar o <video>
         // agora pintaria preto. Nesse caso usamos o poster até o vídeo abrir.
@@ -278,7 +298,7 @@ export function TemplateCanvas({
           : p
             ? { el: p, width: p.naturalWidth, height: p.naturalHeight }
             : null;
-        const time = vid?.currentTime ?? (performance.now() - t0) / 1000;
+        const time = controlled.timelineTime ?? vid?.currentTime ?? (performance.now() - t0) / 1000;
         let extra: DrawOpts | undefined;
         if (hasMotion && motionVar) {
           const rate = Math.max(0.25, speed || 1);

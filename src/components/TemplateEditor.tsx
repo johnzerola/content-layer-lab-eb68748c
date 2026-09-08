@@ -31,6 +31,7 @@ import {
 } from "@/lib/template";
 import { BUILTIN_FONTS, fileToFont, registerFonts } from "@/lib/fonts";
 import { defaultAntiDup, makeVariation, describeVariation } from "@/lib/variation";
+import { TemplateTimeline } from './TemplateTimeline';
 
 
 const KEY_OF: Record<LayerId, keyof Template> = {
@@ -205,13 +206,35 @@ export function TemplateEditor({
   onCancel,
   onSave,
   onUse,
+  previewFile,
 }: {
+  previewFile?: File | null | undefined;
   value: Template;
   onCancel: () => void;
   onSave: (t: Template) => void;
   onUse: (t: Template) => void;
 }) {
   const [t, setTRaw] = useState<Template>(value);
+  const [time, setTime] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [mediaDuration, setMediaDuration] = useState<number | null>(null);
+  const duration = mediaDuration ?? t.timelineDuration ?? 30;
+  useEffect(() => {
+    if (!playing) return;
+    let frame = 0;
+    const start = performance.now();
+    const initial = time;
+    const tick = () => {
+      const next = initial + (performance.now() - start) / 1000;
+      setTime(Math.min(next, duration));
+      if (next >= duration) setPlaying(false);
+      else frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+    // The starting position is captured when playback begins.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, duration]);
   const [selected, setSelected] = useState<SelId | null>("headline");
   const [open, setOpen] = useState<SelId | null>("headline");
   const [snap, setSnap] = useState(true);
@@ -551,6 +574,10 @@ export function TemplateEditor({
               <TemplateCanvas
                 frameClassName="h-[min(62vh,660px)] w-auto max-w-full shadow-[0_24px_60px_-24px_rgba(0,0,0,0.8)]"
                 template={t}
+                previewFile={previewFile ?? null}
+                timelineTime={time}
+                timelinePlaying={playing}
+                onDuration={setMediaDuration}
                 selected={selected}
                 onSelect={setSelected}
                 onChange={setT}
@@ -565,6 +592,10 @@ export function TemplateEditor({
               />
             </div>
 
+            <TemplateTimeline template={t} onChange={setT} selected={selected} onSelect={setSelected}
+              time={time} onSeek={n => { setPlaying(false); setTime(n); }} playing={playing}
+              onPlay={() => { if (time >= duration) setTime(0); setPlaying(p => !p); }}
+              duration={duration} onDuration={n => { setPlaying(false); setMediaDuration(null); setTime(v => Math.min(v, n)); setT({ ...t, timelineDuration: n }); }} />
             {debug ? <DebugPanel
               t={t}
               selected={selected}
