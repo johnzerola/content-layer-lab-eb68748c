@@ -81,6 +81,7 @@ import {
   PLATFORM_PRESETS,
   RATIO_PRESETS,
   type Template,
+  type CleanupRegion,
 } from "@/lib/template";
 import { downloadBlob, grabPoster, outputIsWebm, renderVideo } from "@/lib/render";
 import { poolSize } from "@/lib/render-pool";
