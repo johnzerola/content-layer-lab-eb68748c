@@ -976,6 +976,7 @@ function EditorPage() {
         <main className="order-1 flex min-h-[56vh] min-w-0 flex-col items-center justify-center gap-3 overflow-hidden bg-black/30 p-2 sm:p-4 lg:order-none lg:min-h-0">
           <div className="relative h-full max-h-full overflow-hidden rounded-xl bg-black" style={{ aspectRatio: `${doc.composition.canvas.width} / ${doc.composition.canvas.height}` }}>
             <MediaStage
+              suspended={tool === 'enquadrar' && !cropResult}
               videoRef={videoRef}
               src={src}
               composition={doc.composition}
@@ -989,7 +990,7 @@ function EditorPage() {
                 }
               }}
             />
-            <div className="absolute inset-0">
+            {!(tool === 'enquadrar' && !cropResult) && <div className="absolute inset-0">
               <EditorCanvas
                 bare
                 hideMedia
@@ -1003,7 +1004,7 @@ function EditorPage() {
                 zoom={1}
                 showSafeArea
               />
-            </div>
+            </div>}
             {tool === 'enquadrar' && !cropResult && <SourceCropEditor key={src ?? 'empty'} videoRef={videoRef} crop={pre.crop ?? FULL_CROP}
               onChange={crop => { setPlaying(false); patchPre({ crop, keys: [] }, 'arrastar-recorte'); }} />}
           </div>

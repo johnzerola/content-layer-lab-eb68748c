@@ -746,14 +746,15 @@ export let lastQuotaOverflow = 0;
 
 export function saveTemplates(list: Template[]) {
   if (typeof window === "undefined") return;
-  if (!safeWrite(KEY, JSON.stringify(list))) {
+  const serialized = JSON.stringify(list);
+  if (!safeWrite(KEY, serialized)) {
     // libera espaço descartando o histórico de versões e tenta de novo
     try {
       localStorage.removeItem(VKEY);
     } catch {
       /* ignora */
     }
-    if (!safeWrite(KEY, JSON.stringify(list))) {
+    if (!safeWrite(KEY, serialized)) {
       console.warn("Armazenamento local cheio: salvando templates na nuvem.");
       lastQuotaOverflow = Date.now();
       quotaFallback?.(list);

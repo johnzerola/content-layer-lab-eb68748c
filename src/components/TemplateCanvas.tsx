@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { useInView } from '@/hooks/use-in-view';
+import { previewSize } from '@/lib/editor/preview-paint';
 import {
   CANVAS_H,
   CANVAS_W,
@@ -196,8 +198,10 @@ export function TemplateCanvas({
   const W = template.canvasW ?? CANVAS_W;
   const H = template.canvasH ?? CANVAS_H;
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const inView = useInView(canvasRef);
   const wrapRef = useRef<HTMLDivElement>(null);
   const posterImg = useRef<HTMLImageElement | null>(null);
+  const assetRevision = useRef(0);
   const [guides, setGuides] = useState<Guide[]>([]);
 
   useEffect(() => {
@@ -213,6 +217,10 @@ export function TemplateCanvas({
   const videoEl = useRef<HTMLVideoElement | null>(null);
   const timelineState = useRef({ timelineTime, timelinePlaying, onDuration });
   timelineState.current = { timelineTime, timelinePlaying, onDuration };
+  const clockAnchor = useRef({ time: timelineTime, playing: timelinePlaying, at: 0 });
+  if (clockAnchor.current.time !== timelineTime || clockAnchor.current.playing !== timelinePlaying) {
+    clockAnchor.current = { time: timelineTime, playing: timelinePlaying, at: performance.now() };
+  }
   useEffect(() => {
     if (!previewFile) {
       videoEl.current = null;
@@ -263,29 +271,58 @@ export function TemplateCanvas({
     if (videoEl.current) videoEl.current.playbackRate = Math.max(0.25, Math.min(4, speed || 1));
   }, [speed, previewFile]);
 
+  useEffect(() => {
+    const video = videoEl.current;
+    if (!video) return;
+    if (!inView) video.pause();
+    else if (timelineState.current.timelineTime === undefined || timelineState.current.timelinePlaying) {
+      void video.play().catch(() => {});
+    }
+  }, [inView, previewFile]);
+
+  useEffect(() => {
+    const loaded = () => { assetRevision.current++; };
+    document.fonts?.addEventListener('loadingdone', loaded);
+    return () => document.fonts?.removeEventListener('loadingdone', loaded);
+  }, []);
+
   // Patch cache removido: limpeza profissional agora é feita no backend CleanerIA.
 
 
   useEffect(() => {
     for (const src of [template.avatar.src, template.watermark.src]) {
-      if (src) void preloadImage(src);
+      if (src) void preloadImage(src).then(() => { assetRevision.current++; });
     }
     for (const e of template.extras ?? []) {
-      if ("src" in e && e.src) void preloadImage(e.src);
+      if ("src" in e && e.src) void preloadImage(e.src).then(() => { assetRevision.current++; });
     }
   }, [template.avatar.src, template.watermark.src, template.extras]);
 
   useEffect(() => {
+    if (!inView) return;
     let raf = 0;
+    let lastPaint = -Infinity;
+    let lastKey = '';
     const t0 = performance.now();
     const hasMotion = Boolean(motionVar && motionVar.motion && motionVar.motion.preset !== "none");
+    const hasTiming = !!template.fullscreenClips?.length ||
+      [...ORDER.map(id => layerOf(template, id)), ...(template.extras ?? [])].some(layer => {
+        const l = layer as { tStart?: number; tEnd?: number | null; fadeIn?: number; fadeOut?: number } | null;
+        return l && (l.tStart || l.tEnd != null || l.fadeIn || l.fadeOut);
+      });
     const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const now = performance.now();
+      if (now - lastPaint < 1000 / 30) return;
+      lastPaint = now;
       const ctx = canvasRef.current?.getContext("2d");
       if (ctx) {
         const vid = videoEl.current;
         const controlled = timelineState.current;
+        const targetTime = controlled.timelineTime === undefined ? undefined : controlled.timelineTime +
+          (controlled.timelinePlaying ? Math.max(0, now - clockAnchor.current.at) / 1000 : 0);
         if (vid && controlled.timelineTime !== undefined && vid.readyState >= 1) {
-          const target = Math.min(controlled.timelineTime, Math.max(0, vid.duration - 0.01));
+          const target = Math.min(targetTime!, Math.max(0, vid.duration - 0.01));
           if (!vid.seeking && Math.abs(vid.currentTime - target) > (controlled.timelinePlaying ? 0.2 : 0.015)) vid.currentTime = target;
           if (controlled.timelinePlaying && vid.paused && !vid.ended) void vid.play().catch(() => {});
           if (!controlled.timelinePlaying && !vid.paused) vid.pause();
@@ -298,7 +335,15 @@ export function TemplateCanvas({
           : p
             ? { el: p, width: p.naturalWidth, height: p.naturalHeight }
             : null;
-        const time = controlled.timelineTime ?? vid?.currentTime ?? (performance.now() - t0) / 1000;
+        const time = targetTime ?? vid?.currentTime ?? (hasMotion || hasTiming ? (now - t0) / 1000 : 0);
+        const canvas = canvasRef.current!;
+        const size = previewSize(W, H, canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio);
+        const key = `${time}:${vid?.currentTime}:${vid?.seeking}:${vid?.readyState}:${p?.src}:${size.width}:${size.height}:${assetRevision.current}`;
+        // A paused, unchanged frame does not need to be composited again.
+        if (key === lastKey) return;
+        lastKey = key;
+        if (canvas.width !== size.width || canvas.height !== size.height) { canvas.width = size.width; canvas.height = size.height; }
+        ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
         let extra: DrawOpts | undefined;
         if (hasMotion && motionVar) {
           const rate = Math.max(0.25, speed || 1);
@@ -318,11 +363,10 @@ export function TemplateCanvas({
         }
         drawFrame(ctx, template, source, { ...drawOpts, ...extra, time });
       }
-      raf = requestAnimationFrame(tick);
     };
     tick();
     return () => cancelAnimationFrame(raf);
-  }, [template, drawOpts, motionVar, speed, loopStart, loopEnd]);
+  }, [template, drawOpts, motionVar, speed, loopStart, loopEnd, inView, W, H]);
 
 
   const [live, setLive] = useState<{ id: SelId; r: Rect } | null>(null);

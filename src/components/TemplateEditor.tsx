@@ -224,9 +224,13 @@ export function TemplateEditor({
     let frame = 0;
     const start = performance.now();
     const initial = time;
+    let lastUpdate = -Infinity;
     const tick = () => {
       const next = initial + (performance.now() - start) / 1000;
-      setTime(Math.min(next, duration));
+      if (next - lastUpdate >= 0.1 || next >= duration) {
+        setTime(Math.min(next, duration));
+        lastUpdate = next;
+      }
       if (next >= duration) setPlaying(false);
       else frame = requestAnimationFrame(tick);
     };

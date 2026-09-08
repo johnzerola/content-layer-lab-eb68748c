@@ -4,6 +4,7 @@ import { animationCss } from "@/lib/video-template/animations";
 import { filterToCss } from "@/lib/video-template/factory";
 import type { StickerLayer, TemplateDoc, TemplateLayer } from "@/lib/video-template/types";
 import { drawSticker, type StickerId } from "@/lib/editor/stickers";
+import { useInView } from '@/hooks/use-in-view';
 
 type Handle = "move" | "nw" | "ne" | "sw" | "se" | "rotate";
 
@@ -26,13 +27,19 @@ function bgStyle(doc: TemplateDoc): React.CSSProperties {
 /** Prévia do sticker: usa a mesma função de desenho da exportação. */
 const StickerPreview = memo(function StickerPreview({ layer }: { layer: StickerLayer }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
+  const inView = useInView(ref);
   useEffect(() => {
     const canvas = ref.current;
     const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
+    if (!canvas || !ctx || !inView) return;
     let raf = 0;
+    let last = -Infinity;
     const t0 = performance.now();
     const loop = () => {
+      raf = requestAnimationFrame(loop);
+      const now = performance.now();
+      if (now - last < 1000 / 30) return;
+      last = now;
       const box = canvas.getBoundingClientRect();
       const w = Math.max(2, Math.round(box.width));
       const h = Math.max(2, Math.round(box.height));
@@ -49,11 +56,10 @@ const StickerPreview = memo(function StickerPreview({ layer }: { layer: StickerL
         fontFamily: layer.fontFamily,
         speed: layer.speed || 1,
       });
-      raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [layer]);
+  }, [layer, inView]);
   return <canvas ref={ref} className="h-full w-full" />;
 });
 

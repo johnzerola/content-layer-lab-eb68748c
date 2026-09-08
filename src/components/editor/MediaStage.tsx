@@ -18,8 +18,11 @@ import {
 import { drawMediaFrame, mediaFrameFromPre } from "@/lib/editor/media-frame";
 import { applyEffectTransform, type ClipEffect } from "@/lib/editor/effects";
 import type { TemplateDoc } from "@/lib/video-template/types";
+import { previewSize, watchVideoPaint } from '@/lib/editor/preview-paint';
+import { useInView } from '@/hooks/use-in-view';
 
 interface Props {
+  suspended?: boolean;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   src: string | null;
   composition: TemplateDoc;
@@ -60,27 +63,29 @@ export function MediaStage({
   clip = null,
   onTimeUpdate,
   onLoadedMetadata,
+  suspended = false,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const inView = useInView(canvasRef);
+  const painter = useRef<ReturnType<typeof watchVideoPaint> | null>(null);
   const state = useRef({ composition, preedit, effects, clip });
   state.current = { composition, preedit, effects, clip };
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-    let raf = 0;
+    if (!canvas || !ctx || suspended || !inView) return;
 
     const loop = () => {
-      raf = requestAnimationFrame(loop);
       const { composition: doc, preedit: pre, effects: fx, clip: window_ } = state.current;
       const W = doc.canvas.width;
       const H = doc.canvas.height;
-      if (canvas.width !== W || canvas.height !== H) {
-        canvas.width = W;
-        canvas.height = H;
+      const size = previewSize(W, H, canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio);
+      if (canvas.width !== size.width || canvas.height !== size.height) {
+        canvas.width = size.width;
+        canvas.height = size.height;
       }
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
       ctx.globalAlpha = 1;
       ctx.filter = "none";
       ctx.clearRect(0, 0, W, H);
@@ -132,9 +137,14 @@ export function MediaStage({
       ctx.restore();
     };
 
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [videoRef]);
+    const controller = watchVideoPaint(videoRef.current, loop);
+    painter.current = controller;
+    const resize = new ResizeObserver(controller.invalidate);
+    resize.observe(canvas);
+    return () => { resize.disconnect(); controller.dispose(); painter.current = null; };
+  }, [videoRef, src, suspended, inView]);
+
+  useEffect(() => { painter.current?.invalidate(); }, [composition, preedit, effects, clip?.start, clip?.end]);
 
   return (
     <>
