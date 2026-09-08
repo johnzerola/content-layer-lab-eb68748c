@@ -254,7 +254,8 @@ function drawImageLayer(ctx: CanvasRenderingContext2D, l: ImageLayer) {
   const img = getImage(l.src);
   if (!img) return;
   withTransform(ctx, { ...l, opacity: 1 }, () => {
-    ctx.globalAlpha = l.opacity;
+    ctx.globalAlpha *= l.opacity;
+
     if (l.round) {
       ctx.beginPath();
       ctx.arc(l.x + l.w / 2, l.y + l.h / 2, Math.min(l.w, l.h) / 2, 0, Math.PI * 2);
