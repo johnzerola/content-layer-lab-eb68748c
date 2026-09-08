@@ -334,11 +334,97 @@ export function TemplateEditor({
     setT({ ...t, fonts: [...(t.fonts ?? []).filter((x) => x.name !== font.name), font] });
   };
 
+  const timing = (
+    layer: { tStart?: number; tEnd?: number | null; fadeIn?: number; fadeOut?: number },
+    apply: (data: Record<string, unknown>) => void,
+  ) => {
+    const start = layer.tStart ?? 0;
+    const end = layer.tEnd ?? null;
+    return (
+      <div className="space-y-2 border-t border-border pt-2">
+        <p className="mono-label">Tempo em tela</p>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Aparece em (s)">
+            <input
+              type="number"
+              min={0}
+              step={0.5}
+              className={inputCls}
+              value={start}
+              onChange={(e) => apply({ tStart: Math.max(0, Number(e.target.value) || 0) })}
+            />
+          </Field>
+          <Field label="Some em (s)">
+            <input
+              type="number"
+              min={0}
+              step={0.5}
+              placeholder="até o fim"
+              className={inputCls}
+              value={end ?? ""}
+              onChange={(e) =>
+                apply({ tEnd: e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0) })
+              }
+            />
+          </Field>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Deixe “Some em” vazio para o elemento ficar durante o vídeo inteiro.
+        </p>
+        <Slider
+          label="Fade de entrada (s)"
+          value={layer.fadeIn ?? 0}
+          min={0}
+          max={3}
+          step={0.1}
+          onChange={(v) => apply({ fadeIn: v })}
+        />
+        <Slider
+          label="Fade de saída (s)"
+          value={layer.fadeOut ?? 0}
+          min={0}
+          max={3}
+          step={0.1}
+          onChange={(v) => apply({ fadeOut: v })}
+        />
+        <div className="flex flex-wrap gap-2">
+          {[
+            ["Só 5s", 5],
+            ["Só 15s", 15],
+            ["Só 30s", 30],
+          ].map(([label, secs]) => (
+            <button
+              key={label as string}
+              onClick={() => apply({ tStart: 0, tEnd: secs, fadeIn: 0.4, fadeOut: 0.6 })}
+              className="rounded-md border border-border px-2 py-1 font-mono text-[11px] hover:border-primary"
+            >
+              {label as string}
+            </button>
+          ))}
+          <button
+            onClick={() => apply({ tStart: 0, tEnd: null, fadeIn: 0, fadeOut: 0 })}
+            className="rounded-md border border-border px-2 py-1 font-mono text-[11px] hover:border-primary"
+          >
+            Vídeo todo
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const zOpacity = (
-    layer: { z?: number; opacity?: number },
+    layer: {
+      z?: number;
+      opacity?: number;
+      tStart?: number;
+      tEnd?: number | null;
+      fadeIn?: number;
+      fadeOut?: number;
+    },
     apply: (data: Record<string, unknown>) => void,
   ) => (
     <div className="space-y-2 border-t border-border pt-2">
+
       <Slider
         label="Ordem (z-index)"
         value={layer.z ?? 0}
