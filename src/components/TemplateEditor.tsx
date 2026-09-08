@@ -640,7 +640,7 @@ export function TemplateEditor({
             </div>
 
             {LAYER_ORDER.map((id) => {
-              const layer = t[KEY_OF[id]] as unknown as { visible: boolean; z?: number; opacity?: number } | undefined;
+              const layer = t[KEY_OF[id]] as unknown as (BoxLayer & { visible: boolean }) | undefined;
               if (!layer) return null;
               const isOpen = open === id;
               return (
