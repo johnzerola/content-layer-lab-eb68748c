@@ -453,7 +453,9 @@ export function TemplateEditor({
           <ArrowDown className="size-3" /> trás
         </button>
       </div>
+      {timing(layer, apply)}
     </div>
+
   );
 
   const fontSelect = (val: string, onPick: (v: string) => void) => (
