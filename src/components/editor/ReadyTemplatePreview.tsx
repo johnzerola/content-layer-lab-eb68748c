@@ -1,13 +1,93 @@
+/**
+ * Miniatura 9:16 de um TEMPLATE PRONTO do editor profissional.
+ * Só apresentação: monta as camadas do preset e desenha em escala reduzida.
+ */
+import { useMemo } from "react";
 import type { ReadyTemplate } from "@/lib/editor/template-presets";
-import { DEFAULT_BRAND_KIT } from "@/lib/brand-kit";
+import { loadAnimIdentity } from "@/lib/editor/animation-library";
+import { DEFAULT_BRAND_KIT, loadBrandKit, type BrandKit } from "@/lib/brand-kit";
+import type { TemplateLayer } from "@/lib/video-template/types";
 
-export function ReadyTemplatePreview({ template }: { template: ReadyTemplate }) {
-  const layers = template.build([], { handle: "criador", name: "Seu nome", role: "Conteúdo" }, DEFAULT_BRAND_KIT);
-  return <span className="relative block aspect-[9/12] overflow-hidden" style={{ background: template.swatch[0] }} aria-hidden="true">
-    {layers.map((layer) => {
-      const color = "fill" in layer ? layer.fill : "color" in layer ? layer.color : template.swatch[1];
-      return <span key={layer.id} className="absolute overflow-hidden rounded-sm text-center font-semibold" style={{ left: `${layer.x}%`, top: `${layer.y}%`, width: `${layer.width}%`, height: `${layer.height}%`, background: "fill" in layer ? color : "transparent", color: "color" in layer ? color : template.swatch[1], fontSize: `${Math.max(7, layer.height * 0.9)}px`, lineHeight: 1.1, opacity: layer.opacity }}>{"text" in layer ? layer.text : ""}</span>;
-    })}
-    <span className="pointer-events-none absolute inset-x-2 bottom-2 border-t border-white/25 pt-1 text-[8px] font-medium uppercase tracking-wide text-white/80">{template.label}</span>
-  </span>;
+const CANVAS_W = 1080;
+const CANVAS_H = 1920;
+
+export function ReadyTemplatePreview({
+  template,
+  className,
+}: {
+  template: ReadyTemplate;
+  className?: string;
+}) {
+  const brand = useMemo<BrandKit>(() => loadBrandKit() ?? DEFAULT_BRAND_KIT, []);
+  const kit = useMemo<BrandKit>(
+    () => ({ ...brand, ...(template.palette ?? {}) }) as BrandKit,
+    [brand, template],
+  );
+
+  const layers = useMemo<TemplateLayer[]>(() => {
+    const identity = loadAnimIdentity();
+    try {
+      return template.build([], { handle: identity.handle, name: identity.name, role: identity.role }, kit);
+    } catch {
+      return [];
+    }
+  }, [template, kit]);
+
+  return (
+    <span
+      className={className ?? "relative block w-full overflow-hidden rounded-md border border-border/60"}
+      style={
+        {
+          aspectRatio: "9 / 16",
+          background: template.swatch[0] ?? kit.background,
+          containerType: "size",
+        } as React.CSSProperties
+      }
+    >
+      {layers.map((l) => {
+        const anyL = l as TemplateLayer & Record<string, unknown>;
+        const common: React.CSSProperties = {
+          position: "absolute",
+          left: `${l.x}%`,
+          top: `${l.y}%`,
+          width: `${l.width}%`,
+          height: `${l.height}%`,
+        };
+        if (l.type === "text" || l.type === "caption") {
+          const size = Number(anyL["fontSize"] ?? 40) / CANVAS_H;
+          return (
+            <span
+              key={l.id}
+              style={{
+                ...common,
+                display: "flex",
+                alignItems: "center",
+                justifyContent:
+                  anyL["align"] === "left" ? "flex-start" : anyL["align"] === "right" ? "flex-end" : "center",
+                color: String(anyL["color"] ?? template.swatch[1] ?? "#fff"),
+                fontFamily: String(anyL["fontFamily"] ?? kit.bodyFont),
+                fontWeight: Number(anyL["fontWeight"] ?? 700),
+                textTransform: anyL["uppercase"] ? "uppercase" : "none",
+                fontSize: `${size * 100}cqh`,
+                lineHeight: 1.05,
+                overflow: "hidden",
+              }}
+            >
+              {String(anyL["text"] ?? "")}
+            </span>
+          );
+        }
+        return (
+          <span
+            key={l.id}
+            style={{
+              ...common,
+              background: String(anyL["fill"] ?? "#ffffff22"),
+              borderRadius: `${(Number(anyL["radius"] ?? 0) / CANVAS_W) * 100}%`,
+            }}
+          />
+        );
+      })}
+    </span>
+  );
 }
