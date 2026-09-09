@@ -6,3 +6,8 @@ services:
       AUDIO_MODEL_CACHE: /app/models/demucs-hf
       # Preflight must populate this cache before activation. No model updates per job.
       AUDIO_MODEL_OFFLINE: "1"
+      # Tune to the reserved CPU count; keep one separation job at a time.
+      AUDIO_SEPARATION_THREADS: "2"
+      AUDIO_SEPARATION_TIMEOUT_SECONDS: "900"
+      AUDIO_SEPARATION_QUALITY: "fast"
+      AUDIO_SEPARATION_ENSEMBLE: "0"

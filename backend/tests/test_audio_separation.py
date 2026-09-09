@@ -72,6 +72,14 @@ def test_ensemble_mix_is_shell_free(tmp_path):
     assert "amix=inputs=2" in args[args.index("-filter_complex") + 1]
 
 
+def test_capabilities_expose_hostear_cpu_limits(monkeypatch):
+    monkeypatch.setenv("AUDIO_SEPARATION_THREADS", "4")
+    monkeypatch.setenv("AUDIO_SEPARATION_TIMEOUT_SECONDS", "1200")
+    info = capabilities()
+    assert info["threads"] == 4
+    assert info["timeout_seconds"] == 1200
+
+
 def test_missing_and_wrong_scope_tokens_are_denied(service):
     manager, client = service
     job_id = str(uuid.uuid4())

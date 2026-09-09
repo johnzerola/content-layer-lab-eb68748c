@@ -55,6 +55,8 @@ def capabilities():
                          "quality": {"model": "htdemucs_ft", "interactive": False}},
             "ensemble": {"enabled": ensemble, "model": os.getenv("AUDIO_SEPARATION_ENSEMBLE_MODEL", "mdx_extra"),
                          "requiresBenchmark": True},
+            "threads": max(1, min(16, int(os.getenv("AUDIO_SEPARATION_THREADS", "2")))),
+            "timeout_seconds": max(60, min(3600, int(os.getenv("AUDIO_SEPARATION_TIMEOUT_SECONDS", "900")))),
             "shifts": shifts, "overlap": overlap, "losslessIntermediate": True,
             "max_duration": MAX_SECONDS, "max_bytes": MAX_BYTES,
             "notice": NOTICE}
@@ -112,14 +114,16 @@ def separate(directory: Path, cancel: threading.Event):
     source = directory / "input.wav"
     duration = audio_info(source)
     output = directory / "separated"
-    env = {**os.environ, "OMP_NUM_THREADS": "2", "MKL_NUM_THREADS": "2"}
+    threads = max(1, min(16, int(os.getenv("AUDIO_SEPARATION_THREADS", "2"))))
+    env = {**os.environ, "OMP_NUM_THREADS": str(threads), "MKL_NUM_THREADS": str(threads)}
     # Scope model cache/offline mode to Demucs, not OCR or other worker engines.
     if os.getenv("AUDIO_MODEL_CACHE"):
         env["HF_HOME"] = os.environ["AUDIO_MODEL_CACHE"]
     if os.getenv("AUDIO_MODEL_OFFLINE", "0") == "1":
         env["HF_HUB_OFFLINE"] = "1"
     # No CPU/GPU fallback cascade and no retry after a model error.
-    deadline = time.monotonic() + 900
+    timeout_seconds = max(60, min(3600, int(os.getenv("AUDIO_SEPARATION_TIMEOUT_SECONDS", "900"))))
+    deadline = time.monotonic() + timeout_seconds
     with (directory / "engine.log").open("wb") as log:
         process = subprocess.Popen(command(source, output), stdout=log, stderr=log,
                                    env=env, start_new_session=os.name != "nt")
@@ -201,6 +205,7 @@ class AudioSeparation:
             raise HTTPException(401, "Token de áudio inválido ou expirado.") from None
 
     def run(self, job_id, directory, event):
+        started = time.monotonic()
         try:
             write_state(directory, {"status": "processing", "stage": "separating"})
             duration = separate(directory, event)
@@ -210,6 +215,7 @@ class AudioSeparation:
                                     "engine": "demucs", "model": model, "shifts": shifts,
                                     "overlap": overlap, "quality": quality if quality in {"fast", "quality"} else "fast",
                                     "ensemble": os.getenv("AUDIO_SEPARATION_ENSEMBLE", "0") == "1",
+                                    "processing_seconds": round(time.monotonic() - started, 3),
                                     "format": "wav", "notice": NOTICE})
         except Exception as exc:
             # Only safe, controlled diagnostics are exposed. Engine logs stay private.
