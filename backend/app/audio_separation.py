@@ -27,15 +27,25 @@ from .storage import job_dir, read_state, write_state, cleanup_expired, director
 MAX_SECONDS = 180
 MAX_BYTES = 64 * 1024 * 1024
 MODEL = "htdemucs"
+def separation_settings() -> tuple[str, int, float]:
+    quality = os.getenv("AUDIO_SEPARATION_QUALITY", "fast").lower()
+    model = os.getenv("AUDIO_SEPARATION_MODEL", "htdemucs_ft" if quality == "quality" else MODEL)
+    shifts = int(os.getenv("AUDIO_SEPARATION_SHIFTS", "1" if quality == "quality" else "0"))
+    overlap = float(os.getenv("AUDIO_SEPARATION_OVERLAP", "0.5" if quality == "quality" else "0.25"))
+    if model not in {"htdemucs", "htdemucs_ft", "mdx_extra", "mdx_extra_q"}:
+        model = MODEL
+    return model, max(0, min(2, shifts)), max(0.1, min(0.75, overlap))
 NOTICE = "Pode haver resíduos de música; canto pode permanecer junto da fala."
 
 
 def capabilities():
     enabled = os.getenv("AUDIO_SEPARATION_ENABLED", "0") == "1"
     installed = importlib.util.find_spec("demucs") is not None
+    model, shifts, overlap = separation_settings()
     return {"ready": enabled and installed and bool(shutil.which("ffmpeg"))
-            and bool(shutil.which("ffprobe")),
-            "engine": "demucs", "model": MODEL, "device": "cpu",
+            and bool(shutil.which("ffprobe")), "engine": "demucs", "model": model,
+            "device": "cpu", "quality": os.getenv("AUDIO_SEPARATION_QUALITY", "fast"),
+            "shifts": shifts, "overlap": overlap, "losslessIntermediate": True,
             "max_duration": MAX_SECONDS, "max_bytes": MAX_BYTES,
             "notice": NOTICE}
 
@@ -60,11 +70,11 @@ def audio_info(path: Path):
 
 
 def command(source: Path, output: Path):
-    # Fixed model/device; user-supplied strings never become CLI switches.
-    return [sys.executable, "-m", "demucs.separate", "-n", MODEL,
-            "--two-stems", "vocals", "--device", "cpu", "--shifts", "1",
-            "--segment", "7", "--overlap", "0.25", "-j", "0",
-            "--mp3", "--mp3-bitrate", "192", "-o", str(output), str(source)]
+    model, shifts, overlap = separation_settings()
+    return [sys.executable, "-m", "demucs.separate", "-n", model,
+            "--two-stems", "vocals", "--device", "cpu", "--shifts", str(shifts),
+            "--segment", "7", "--overlap", str(overlap), "-j", "0",
+            "--float32", "-o", str(output), str(source)]
 
 
 def stop_process(process):
@@ -108,8 +118,9 @@ def separate(directory: Path, cancel: threading.Event):
                 raise RuntimeError("Demucs falhou. Consulte engine.log no servidor; o original foi preservado.")
         finally:
             stop_process(process)
+    model, _, _ = separation_settings()
     for stem in ("vocals", "no_vocals"):
-        path = output / MODEL / "input" / f"{stem}.mp3"
+        path = output / model / "input" / f"{stem}.wav"
         if not path.is_file() or path.stat().st_size < 128:
             raise RuntimeError("O motor não produziu as duas trilhas.")
         if abs(audio_info(path) - duration) > 0.15:
@@ -146,8 +157,10 @@ class AudioSeparation:
         try:
             write_state(directory, {"status": "processing", "stage": "separating"})
             duration = separate(directory, event)
+            model, shifts, overlap = separation_settings()
             write_state(directory, {"status": "completed", "duration": duration,
-                                    "engine": "demucs", "model": MODEL, "notice": NOTICE})
+                                    "engine": "demucs", "model": model, "shifts": shifts,
+                                    "overlap": overlap, "format": "wav", "notice": NOTICE})
         except Exception as exc:
             # Only safe, controlled diagnostics are exposed. Engine logs stay private.
             message = str(exc) if isinstance(exc, (RuntimeError, TimeoutError, ValueError)) else "Falha ao separar o áudio."
@@ -255,5 +268,6 @@ class AudioSeparation:
             if read_state(directory).get("status") != "completed":
                 raise HTTPException(409, "As duas trilhas ainda não estão prontas.")
             name = "vocals" if stem == "voice" else "no_vocals"
-            return FileResponse(directory / "separated" / MODEL / "input" / f"{name}.mp3",
-                                media_type="audio/mpeg", filename=f"{stem}.mp3")
+            model = read_state(directory).get("model") or separation_settings()[0]
+            return FileResponse(directory / "separated" / model / "input" / f"{name}.wav",
+                                media_type="audio/wav", filename=f"{stem}.wav")

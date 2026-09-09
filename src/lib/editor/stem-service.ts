@@ -62,7 +62,7 @@ export async function runStemJob(
             if (!response.headers.get("content-type")?.startsWith("audio/"))
               throw new Error("Servidor não retornou uma trilha de áudio.");
             const blob = await response.blob();
-            if (blob.size < 128 || blob.size > 20 * 1024 * 1024)
+            if (blob.size < 128 || blob.size > 256 * 1024 * 1024)
               throw new Error("Trilha vazia ou grande demais para salvar.");
             return blob;
           }),

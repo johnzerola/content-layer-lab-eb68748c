@@ -43,7 +43,18 @@ def test_fixed_command_is_audio_only_cpu(tmp_path):
     assert args[args.index("--device") + 1] == "cpu"
     assert args[args.index("--two-stems") + 1] == "vocals"
     assert args[args.index("-n") + 1] == "htdemucs"
+    assert args[args.index("--shifts") + 1] == "0"
+    assert "--float32" in args
+    assert "--mp3" not in args
     assert "runpod" not in " ".join(args)
+
+def test_quality_command_uses_lossless_finetuned_model(tmp_path, monkeypatch):
+    monkeypatch.setenv("AUDIO_SEPARATION_QUALITY", "quality")
+    args = command(tmp_path / "input.wav", tmp_path / "out")
+    assert args[args.index("-n") + 1] == "htdemucs_ft"
+    assert args[args.index("--shifts") + 1] == "1"
+    assert args[args.index("--overlap") + 1] == "0.5"
+    assert "--float32" in args
 
 
 def test_missing_and_wrong_scope_tokens_are_denied(service):
