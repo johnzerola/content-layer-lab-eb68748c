@@ -47,11 +47,14 @@ def capabilities():
     quality = os.getenv("AUDIO_SEPARATION_QUALITY", "fast").lower()
     if quality not in {"fast", "quality"}:
         quality = "fast"
+    ensemble = os.getenv("AUDIO_SEPARATION_ENSEMBLE", "0") == "1"
     return {"ready": enabled and installed and bool(shutil.which("ffmpeg"))
             and bool(shutil.which("ffprobe")), "engine": "demucs", "model": model,
             "device": "cpu", "quality": quality,
             "profiles": {"fast": {"model": "htdemucs", "interactive": True},
                          "quality": {"model": "htdemucs_ft", "interactive": False}},
+            "ensemble": {"enabled": ensemble, "model": os.getenv("AUDIO_SEPARATION_ENSEMBLE_MODEL", "mdx_extra"),
+                         "requiresBenchmark": True},
             "shifts": shifts, "overlap": overlap, "losslessIntermediate": True,
             "max_duration": MAX_SECONDS, "max_bytes": MAX_BYTES,
             "notice": NOTICE}
@@ -82,6 +85,13 @@ def command(source: Path, output: Path):
             "--two-stems", "vocals", "--device", "cpu", "--shifts", str(shifts),
             "--segment", "7", "--overlap", str(overlap), "-j", "0",
             "--float32", "-o", str(output), str(source)]
+
+
+def mix_command(first: Path, second: Path, output: Path):
+    """Average two lossless stems without invoking a shell."""
+    return ["ffmpeg", "-y", "-v", "error", "-i", str(first), "-i", str(second),
+            "-filter_complex", "[0:a][1:a]amix=inputs=2:duration=longest:normalize=1",
+            "-c:a", "pcm_f32le", str(output)]
 
 
 def stop_process(process):
@@ -126,6 +136,36 @@ def separate(directory: Path, cancel: threading.Event):
         finally:
             stop_process(process)
     model, _, _ = separation_settings()
+    if os.getenv("AUDIO_SEPARATION_ENSEMBLE", "0") == "1":
+        ensemble_model = os.getenv("AUDIO_SEPARATION_ENSEMBLE_MODEL", "mdx_extra")
+        if ensemble_model not in {"mdx_extra", "mdx_extra_q", "mdx_q"}:
+            raise RuntimeError("Modelo de ensemble não permitido.")
+        second_output = directory / "separated-ensemble"
+        with (directory / "ensemble.log").open("wb") as log:
+            process = subprocess.Popen(
+                [sys.executable, "-m", "demucs.separate", "-n", ensemble_model,
+                 "--two-stems", "vocals", "--device", "cpu", "--shifts", "0",
+                 "--segment", "7", "--overlap", "0.25", "-j", "0", "--float32",
+                 "-o", str(second_output), str(source)], stdout=log, stderr=log,
+                 env=env, start_new_session=os.name != "nt")
+            try:
+                while process.poll() is None:
+                    if cancel.wait(0.25):
+                        raise RuntimeError("Separação cancelada.")
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("Ensemble excedeu 15 minutos.")
+                if process.returncode != 0:
+                    raise RuntimeError("A segunda passagem MDX falhou; a saída primária foi preservada.")
+            finally:
+                stop_process(process)
+        for stem in ("vocals", "no_vocals"):
+            primary = output / model / "input" / f"{stem}.wav"
+            secondary = second_output / ensemble_model / "input" / f"{stem}.wav"
+            if not secondary.is_file():
+                raise RuntimeError("O ensemble MDX não produziu as duas trilhas.")
+            mixed = directory / f"ensemble-{stem}.wav"
+            subprocess.run(mix_command(primary, secondary, mixed), check=True, timeout=120)
+            shutil.copyfile(mixed, primary)
     for stem in ("vocals", "no_vocals"):
         path = output / model / "input" / f"{stem}.wav"
         if not path.is_file() or path.stat().st_size < 128:
@@ -169,6 +209,7 @@ class AudioSeparation:
             write_state(directory, {"status": "completed", "duration": duration,
                                     "engine": "demucs", "model": model, "shifts": shifts,
                                     "overlap": overlap, "quality": quality if quality in {"fast", "quality"} else "fast",
+                                    "ensemble": os.getenv("AUDIO_SEPARATION_ENSEMBLE", "0") == "1",
                                     "format": "wav", "notice": NOTICE})
         except Exception as exc:
             # Only safe, controlled diagnostics are exposed. Engine logs stay private.

@@ -9,7 +9,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.audio_separation import AudioSeparation, audio_info, capabilities, command
+from app.audio_separation import AudioSeparation, audio_info, capabilities, command, mix_command
 from app.security import create_job_token
 from app.storage import read_state, write_state, cleanup_expired
 
@@ -63,6 +63,13 @@ def test_unknown_quality_falls_back_to_fast_profile(monkeypatch, tmp_path):
     assert args[args.index("-n") + 1] == "htdemucs"
     assert capabilities()["quality"] == "fast"
     assert set(capabilities()["profiles"]) == {"fast", "quality"}
+
+
+def test_ensemble_mix_is_shell_free(tmp_path):
+    args = mix_command(tmp_path / "a.wav", tmp_path / "b.wav", tmp_path / "out.wav")
+    assert args[0] == "ffmpeg"
+    assert "|" not in " ".join(args)
+    assert "amix=inputs=2" in args[args.index("-filter_complex") + 1]
 
 
 def test_missing_and_wrong_scope_tokens_are_denied(service):

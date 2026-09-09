@@ -21,19 +21,21 @@ exportador.
 
 ## Próximo incremento de qualidade
 
-O próximo passo é um adaptador de ensemble, executado somente quando o perfil
-`quality` for solicitado e houver memória suficiente:
+O adaptador MDX foi implementado como segunda passagem opcional, desligado por
+padrão (`AUDIO_SEPARATION_ENSEMBLE=0`). O script
+`scripts/benchmark_audio_separation.py` mede `htdemucs`, `mdx_extra` e
+`htdemucs_ft` no mesmo arquivo antes de ativá-lo. Ele só deve ser ligado após
+comparar tempo e escuta das trilhas:
 
 1. Demucs/HTDemucs gera a primeira estimativa de voz e acompanhamento.
-2. Um modelo MDX-Net ou RoFormer faz uma segunda estimativa em trechos de até
-   7,8 s.
-3. As duas estimativas são alinhadas, normalizadas e combinadas por um peso
+2. O modelo `mdx_extra` faz uma segunda estimativa em trechos de até 7,8 s.
+3. As duas estimativas são alinhadas, normalizadas e combinadas por média
    configurável; não há soma que possa estourar o sinal.
 4. Um passe leve de redução espectral e gate de silêncio remove resíduos entre
    frases. O resultado é medido por duração, pico, RMS e correlação entre a
    voz e o acompanhamento antes de chegar ao navegador.
 
-MDX-Net é uma opção apropriada para demixing musical, enquanto AudioSep é uma
+MDX-Net/RoFormer continua como opção de modelo dedicado, enquanto AudioSep é uma
 opção mais ampla para consultas como “fala humana” ou “aplausos”. AudioSep
 exige uma pilha maior e, por isso, fica fora do perfil CPU inicial. O ensemble
 deve ser ativado por feature flag após um benchmark com amostras reais; não há
@@ -67,6 +69,7 @@ antes de uma compra.
 
 | Cenário | Tarifa usada | 10 min | 1 h | 8 h |
 | --- | ---: | ---: | ---: | ---: |
+| Pod RTX 3090 | US$ 0,50/h | US$ 0,08 | US$ 0,50 | US$ 4,00 |
 | Pod A40 | US$ 0,49/h | US$ 0,08 | US$ 0,49 | US$ 3,92 |
 | Pod RTX 4090 | US$ 0,74/h | US$ 0,12 | US$ 0,74 | US$ 5,92 |
 | Serverless A40/A6000 flex | US$ 1,22/h equivalente | US$ 0,20 | US$ 1,22 | US$ 9,76 |
