@@ -60,7 +60,38 @@ class TemporalFillEngineTests(unittest.TestCase):
         with patch("app.engines.inpainting.cv2.calcOpticalFlowFarneback", side_effect=fake_flow):
             engine.process(frames, masks)
 
-        self.assertLessEqual(len(calls), (len(frames) - 1) * 2)
+        # Two flow estimates per donor: forward and backward.
+        self.assertLessEqual(len(calls), (len(frames) - 1) * 2 * 2)
+
+    def test_inconsistent_flow_is_not_copied(self):
+        flow = np.zeros((20, 30, 2), np.float32)
+        reverse = np.ones_like(flow) * 5
+        x, y = np.meshgrid(np.arange(30, dtype=np.float32), np.arange(20, dtype=np.float32))
+        self.assertFalse(TemporalFillEngine._consistent_flow(flow, reverse, x, y).any())
+
+    def test_consistent_translation_and_outside_donors(self):
+        flow = np.zeros((20, 30, 2), np.float32)
+        flow[..., 0] = 4
+        reverse = -flow
+        x, y = np.meshgrid(np.arange(30, dtype=np.float32), np.arange(20, dtype=np.float32))
+        valid = TemporalFillEngine._consistent_flow(flow, reverse, x + 4, y)
+        self.assertTrue(valid[5:15, 5:20].all())
+        self.assertFalse(valid[:, 25:].any())
+
+    def test_bad_donor_uses_fallback_without_changing_unmasked_pixels(self):
+        frames = np.full((2, 80, 120, 3), 100, dtype=np.uint8)
+        frames[1] = 220
+        masks = np.zeros((2, 80, 120), np.uint8)
+        masks[0, 30:40, 50:70] = 255
+
+        def invalid_flow(current, *_args):
+            return np.full((*current.shape, 2), 1000, np.float32)
+
+        with patch("app.engines.inpainting.cv2.calcOpticalFlowFarneback", side_effect=invalid_flow), \
+             patch("app.engines.inpainting.patch_fill", side_effect=lambda frame, mask: frame) as fill:
+            output = TemporalFillEngine(context_radius=1).process(frames, masks)
+        self.assertEqual(fill.call_count, 1)
+        np.testing.assert_array_equal(output, frames)
 
     def test_only_requested_target_frames_are_reconstructed(self):
         frames = np.full((5, 80, 120, 3), 100, dtype=np.uint8)

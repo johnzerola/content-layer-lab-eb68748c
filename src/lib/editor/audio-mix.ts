@@ -1,7 +1,7 @@
 import { decodeSourceAudio, type AudioTrack } from "@/lib/audio-track";
 import { duckGainAt, type AudioClip, type EditorAudio } from "./audio";
 
-export type AudioRange = { start: number; end: number };
+export type AudioRange = { start: number; end: number; speed?: number };
 
 export function clipGain(clip: AudioClip, localTime: number, duration: number): number {
   if (clip.muted || localTime < 0 || localTime >= duration) return 0;
@@ -23,14 +23,15 @@ export function clipWindows(clip: AudioClip, mediaDuration: number, segments: Au
       clip.startTime + duration,
       clip.loop ? Infinity : clip.startTime + mediaDuration,
     );
+    const speed = Math.max(0.05, segment.speed ?? 1);
     const window = {
-      when: cursor + start - segment.start,
+      when: cursor + (start - segment.start) / speed,
       offset: start - clip.startTime,
-      duration: finish - start,
+      duration: (finish - start) / speed,
       clipDuration: duration,
       sourceTime: start,
     };
-    cursor += Math.max(0, segment.end - segment.start);
+    cursor += Math.max(0, segment.end - segment.start) / speed;
     return window.duration > 0 ? [window] : [];
   });
 }
@@ -45,6 +46,18 @@ export async function renderEditorAudio(
   if (duration <= 0) return null;
   const sampleRate = 48000;
   const ctx = new OfflineAudioContext(2, Math.ceil(duration * sampleRate), sampleRate);
+  const master = audio.masterCompression !== false && typeof ctx.createDynamicsCompressor === "function"
+    ? ctx.createDynamicsCompressor()
+    : null;
+  if (master) {
+    master.threshold.value = -18;
+    master.knee.value = 18;
+    master.ratio.value = 4;
+    master.attack.value = 0.003;
+    master.release.value = 0.2;
+    master.connect(ctx.destination);
+  }
+  const output = master ?? ctx.destination;
   let hasAudio = false;
   if (!audio.originalMuted && audio.originalVolume > 0) {
     const original = await decodeSourceAudio(file);
@@ -53,15 +66,16 @@ export async function renderEditorAudio(
       for (const segment of segments) {
         const source = ctx.createBufferSource();
         source.buffer = original;
+        source.playbackRate.value = Math.max(0.05, segment.speed ?? 1);
         const gain = ctx.createGain();
         gain.gain.value = Math.max(0, Math.min(1.5, audio.originalVolume));
-        source.connect(gain).connect(ctx.destination);
+        source.connect(gain).connect(output);
         const length = Math.max(0, Math.min(segment.end, original.duration) - segment.start);
         if (length > 0) {
           source.start(cursor, segment.start, length);
           hasAudio = true;
         }
-        cursor += Math.max(0, segment.end - segment.start);
+        cursor += Math.max(0, segment.end - segment.start) / Math.max(0.05, segment.speed ?? 1);
       }
     }
   }
@@ -86,7 +100,7 @@ export async function renderEditorAudio(
             : 1);
       }
       gain.gain.setValueCurveAtTime(curve, window.when, window.duration);
-      source.connect(gain).connect(ctx.destination);
+      source.connect(gain).connect(output);
       source.start(
         window.when,
         clip.loop ? window.offset % buffer.duration : window.offset,

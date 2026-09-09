@@ -46,8 +46,10 @@ def run_scenes(input_path, output_path, job_dir, regions, info, cuts, run_one, e
 
         if not scene_regions:
             # A timed overlay may not exist in this shot. Preserve the shot.
-            from ..utils.video import normalize_video
-            normalize_video(str(source), str(result), info.width, info.height, info.fps)
+            # normalize_video returns source for matching geometry without
+            # creating result. Copy explicitly so later assembly has a file.
+            import shutil
+            shutil.copyfile(source, result)
             scene_segments, metrics, written = [], {
                 "residual_text": 0.0, "sharpness_ratio": 1.0, "temporal_consistency": 1.0
             }, end - start

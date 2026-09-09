@@ -53,6 +53,8 @@ export type LayoutKind =
 export interface Segment {
   start: number;
   end: number;
+  /** velocidade constante deste trecho; 1 = tempo original */
+  speed?: number;
 }
 
 export interface PreEdit {
@@ -177,7 +179,7 @@ export function keptSegments(
 
 /** Duração total dos trechos mantidos. */
 export function segmentsDuration(segs: Segment[]) {
-  return segs.reduce((acc, s) => acc + Math.max(0, s.end - s.start), 0);
+  return segs.reduce((acc, s) => acc + Math.max(0, s.end - s.start) / Math.max(0.05, s.speed ?? 1), 0);
 }
 
 /** Converte o tempo da saída (0..total) para o tempo do vídeo original. */
@@ -185,11 +187,24 @@ export function srcTimeAt(segs: Segment[], out: number) {
   let left = Math.max(0, out);
   for (const s of segs) {
     const len = Math.max(0, s.end - s.start);
-    if (left < len) return s.start + left;
-    left -= len;
+    const outputLen = len / Math.max(0.05, s.speed ?? 1);
+    if (left < outputLen) return s.start + left * Math.max(0.05, s.speed ?? 1);
+    left -= outputLen;
   }
   const last = segs[segs.length - 1];
   return last ? last.end : out;
+}
+
+/** Converte o tempo original para o relógio compacto da montagem. */
+export function outputTimeAtSrc(segs: Segment[], source: number) {
+  let out = 0;
+  for (const s of segs) {
+    if (source < s.start) return out;
+    const speed = Math.max(0.05, s.speed ?? 1);
+    if (source <= s.end) return out + Math.max(0, source - s.start) / speed;
+    out += Math.max(0, s.end - s.start) / speed;
+  }
+  return out;
 }
 
 /** Divide o trecho que contém `t` em dois (corte de tesoura). */

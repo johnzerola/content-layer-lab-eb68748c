@@ -36,6 +36,8 @@ export interface EditorAudio {
   duckUnderSpeech: boolean;
   /** quanto abaixar durante a fala (0..1) */
   duckAmount: number;
+  /** compressor de segurança para evitar clipping ao somar trilhas */
+  masterCompression: boolean;
 }
 
 export function defaultEditorAudio(): EditorAudio {
@@ -45,6 +47,7 @@ export function defaultEditorAudio(): EditorAudio {
     originalVolume: 1,
     duckUnderSpeech: true,
     duckAmount: 0.65,
+    masterCompression: true,
   };
 }
 

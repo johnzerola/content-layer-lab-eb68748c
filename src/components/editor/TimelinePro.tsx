@@ -1,5 +1,5 @@
 /** Timeline multitrack: régua, playhead, tracks por layer, zoom e cortes. */
-import { memo, useCallback, useRef } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { TemplateLayer } from "@/lib/video-template/types";
 import type { TimeRange } from "@/lib/editor/transcript";
 
@@ -20,6 +20,8 @@ interface Props {
   onTrim?: (id: string, startTime: number, endTime: number) => void;
   /** Faixa base do vídeo importado. */
   media?: { name: string; segments: TimeRange[] } | null;
+  audio?: { id: string; name: string; url: string; startTime: number; duration: number; kind: string; volume: number; muted?: boolean }[];
+  thumbnailUrl?: string | null;
   /** corta o vídeo na agulha (playhead), criando dois trechos */
   onSplitMedia?: (() => void) | undefined;
   /** arrasta as bordas de um trecho do vídeo */
@@ -32,6 +34,36 @@ interface Props {
   keyframes?: number[];
   /** adiciona keyframe no tempo atual */
   onAddKeyframe?: (() => void) | undefined;
+  height?: number;
+  onHeightChange?: ((height: number) => void) | undefined;
+}
+
+const waveformCache = new Map<string, number[]>();
+async function loadWaveform(url: string): Promise<number[]> {
+  const cached = waveformCache.get(url);
+  if (cached) return cached;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("waveform");
+  const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioCtx) throw new Error("audio-context");
+  const context = new AudioCtx();
+  try {
+    const buffer = await context.decodeAudioData(await response.arrayBuffer());
+    const channel = buffer.getChannelData(0);
+    const count = 72;
+    const step = Math.max(1, Math.floor(channel.length / count));
+    const peaks = Array.from({ length: count }, (_, index) => {
+      let peak = 0;
+      for (let i = index * step; i < Math.min(channel.length, (index + 1) * step); i += 8) peak = Math.max(peak, Math.abs(channel[i] ?? 0));
+      return peak;
+    });
+    const max = Math.max(0.001, ...peaks);
+    const normalized = peaks.map((peak) => peak / max);
+    waveformCache.set(url, normalized);
+    return normalized;
+  } finally {
+    void context.close();
+  }
 }
 
 
@@ -159,16 +191,33 @@ export function TimelinePro({
   segmentTransitions = [],
   keyframes = [],
   onAddKeyframe,
+  audio = [],
+  thumbnailUrl = null,
+  height,
+  onHeightChange,
 }: Props) {
 
   const trackRef = useRef<HTMLDivElement | null>(null);
+  const [waveforms, setWaveforms] = useState<Record<string, number[]>>({});
+  useEffect(() => {
+    let alive = true;
+    for (const track of audio) {
+      if (!track.url || waveforms[track.id]) continue;
+      void loadWaveform(track.url).then((peaks) => { if (alive) setWaveforms((current) => ({ ...current, [track.id]: peaks })); }).catch(() => undefined);
+    }
+    return () => { alive = false; };
+  }, [audio, waveforms]);
 
   const seekFromEvent = useCallback(
     (clientX: number) => {
       const el = trackRef.current;
       if (!el || !duration) return;
       const rect = el.getBoundingClientRect();
-      const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+      // Each track reserves 7rem for its label. Keep the ruler/playhead in
+      // the same coordinate system as clips instead of including that label.
+      const contentLeft = rect.left + 112;
+      const contentWidth = Math.max(1, rect.width - 112);
+      const ratio = Math.min(1, Math.max(0, (clientX - contentLeft) / contentWidth));
       onSeek(ratio * duration);
     },
     [duration, onSeek],
@@ -178,7 +227,26 @@ export function TimelinePro({
   const ordered = [...layers].sort((a, b) => b.zIndex - a.zIndex);
 
   return (
-    <div className="flex h-full flex-col border-t border-border/60 bg-card/40">
+    <div className="relative flex h-full flex-col border-t border-border/60 bg-card/40">
+      {onHeightChange && <div
+        role="separator"
+        aria-label="Redimensionar altura da timeline"
+        tabIndex={0}
+        className="absolute inset-x-0 -top-1 z-40 h-2 cursor-row-resize"
+        onPointerDown={(event) => {
+          event.preventDefault();
+          const origin = event.clientY;
+          const start = height ?? 224;
+          const move = (e: PointerEvent) => onHeightChange(Math.max(160, Math.min(520, start - (e.clientY - origin))));
+          const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+          window.addEventListener("pointermove", move);
+          window.addEventListener("pointerup", up);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowUp") onHeightChange?.(Math.min(520, (height ?? 224) + 16));
+          if (event.key === "ArrowDown") onHeightChange?.(Math.max(160, (height ?? 224) - 16));
+        }}
+      />}
       <div className="flex items-center gap-2 px-3 py-2 text-xs">
         <span className="font-mono">{fmt(currentTime)}</span>
         <span className="text-muted-foreground">/ {fmt(duration)}</span>
@@ -303,7 +371,8 @@ export function TimelinePro({
                           className="absolute top-1 h-7 truncate rounded-md border border-primary/40 bg-primary/30 px-3 text-[11px] leading-7"
                           style={{ left: `${left}%`, width: `${width}%` }}
                         >
-                          {media.name}
+                          {thumbnailUrl && <span className="pointer-events-none absolute inset-0 opacity-25" style={{ backgroundImage: `url(${thumbnailUrl})`, backgroundSize: "cover" }} />}
+                          <span className="relative">{media.name}</span>
                           {onTrimSegment && media.segments.length > 0 && (
                             <>
                               <span
@@ -339,6 +408,25 @@ export function TimelinePro({
                 </div>
               </div>
             )}
+            {audio.map((track) => {
+              const left = duration ? (track.startTime / duration) * 100 : 0;
+              const width = duration ? Math.max(1, (Math.min(track.duration || duration, duration - track.startTime) / duration) * 100) : 100;
+              return (
+                <div key={track.id} className="relative h-9 border-b border-border/30">
+                  <div className="absolute left-0 top-0 z-20 flex h-full w-28 items-center gap-1 bg-card/80 px-2 text-[11px]">
+                    <span className="truncate">{track.kind === "voice" ? "voz" : "música"}</span>
+                  </div>
+                  <div className="absolute inset-y-0 left-28 right-0">
+                    <div className={`absolute top-1 h-7 overflow-hidden rounded-md border px-2 text-[11px] ${track.muted ? "opacity-35" : "border-cyan-400/40 bg-cyan-400/15"}`} style={{ left: `${left}%`, width: `${width}%` }} title={`${track.name} · volume ${Math.round(track.volume * 100)}%`}>
+                      <div className="flex h-full items-center gap-px opacity-80" aria-hidden="true">
+                        {(waveforms[track.id] ?? Array.from({ length: 36 }, () => 0.18)).map((peak, i) => <span key={i} className="w-0.5 rounded-full bg-cyan-300/70" style={{ height: `${Math.max(8, peak * 88)}%` }} />)}
+                      </div>
+                      <span className="absolute inset-x-2 top-1 truncate">{track.name}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
             {ordered.map((layer) => (
 
               <div key={layer.id} className="relative h-9 border-b border-border/30">

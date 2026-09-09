@@ -18,7 +18,6 @@ import uuid
 import requests
 
 ENDPOINT = "km860ju9ded2e0"
-IMAGE = "docker.io/nivaldo12/leaneria-runpod@sha256:df9b6633b6941491b7fb57391923b436396c24a463fe7f29684784947f3fe243"
 REST = "https://rest.runpod.io/v1"
 API = f"https://api.runpod.ai/v2/{ENDPOINT}"
 HOST = "https://cleaner-104-234-186-50.nip.io"
@@ -41,7 +40,11 @@ def main():
     parser.add_argument("output", type=Path)
     parser.add_argument("--reuse-template", help="Explicit existing template ID after configuration review")
     parser.add_argument("--prepared-report", type=Path, help="Reuse this exact sample's verified Hostear upload/masks")
+    parser.add_argument("--expected-revision", default="scene-roi-v1", help="Required revision before any inpainting job")
+    parser.add_argument("--image", required=True, help="Reviewed GPU image containing this revision, pinned by sha256 digest")
     args = parser.parse_args()
+    if not re.fullmatch(r"[^\s]+@sha256:[0-9a-f]{64}", args.image):
+        raise ValueError("GPU image must use an immutable sha256 digest")
     info = probe(args.source)
     duration = float(info["format"]["duration"])
     if not 0 < duration <= 5.05:
@@ -129,7 +132,7 @@ def main():
             raise RuntimeError("Custom Docker args require explicit review")
         if not template.get("containerRegistryAuthId"):
             raise RuntimeError("Private CleanerIA image requires reviewed registry authentication")
-        if args.reuse_template and template.get("imageName") != IMAGE:
+        if args.reuse_template and template.get("imageName") != args.image:
             raise RuntimeError("Reuse template does not contain the reviewed image digest")
 
         # Validate the CPU path before enabling any GPU capacity.
@@ -162,7 +165,7 @@ def main():
 
         env = {v["key"]: v["value"] for v in template["env"]}
         configuration = {
-            "name": "cleaneria-scene-masks-validation-20260908", "imageName": IMAGE,
+            "name": "cleaneria-roi-validation", "imageName": args.image,
             "isServerless": True, "isPublic": False, "category": "NVIDIA",
             "containerDiskInGb": template["containerDiskInGb"], "volumeInGb": 0,
             "volumeMountPath": "/runpod-volume", "ports": [], "env": env}
@@ -186,7 +189,7 @@ def main():
         capability = run({"action": "health"}, 60)
         report["capabilities"] = capability
         save()
-        if capability.get("pipeline_revision") != "scene-masks-v1" or not capability.get("ai_ready"):
+        if capability.get("pipeline_revision") != args.expected_revision or not capability.get("ai_ready"):
             raise RuntimeError("Updated worker/model not ready; refusing an expensive run")
         log("Corrected ProPainter worker ready; submitting ONE 5s sample")
         output = run({"chunk_index": 0, "source_url": signed(job, "chunks/0/source"),

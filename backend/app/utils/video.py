@@ -33,9 +33,31 @@ def probe(path: str) -> Probe:
     has_audio = any(s["codec_type"] == "audio" for s in data["streams"])
     num, den = (v.get("avg_frame_rate") or "30/1").split("/")
     fps = float(num) / float(den or 1) if float(den or 1) else 30.0
-    duration = float(data["format"].get("duration") or 0.0)
-    frames = int(v.get("nb_frames") or 0) or int(round(duration * fps))
-    return Probe(int(v["width"]), int(v["height"]), fps or 30.0, frames, duration, has_audio)
+    fps = fps or 30.0
+    try:
+        frames = int(v.get("nb_frames") or 0)
+    except (TypeError, ValueError):
+        frames = 0
+    if frames <= 0:
+        # Matroska/WebM commonly omit nb_frames. Container duration can include
+        # a longer audio track, so duration * FPS is not a valid mask count.
+        counted = json.loads(subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_frames",
+             "-show_entries", "stream=nb_read_frames", "-of", "json", path],
+            capture_output=True, text=True, check=True,
+        ).stdout)
+        streams = counted.get("streams") or []
+        try:
+            frames = int(streams[0].get("nb_read_frames") or 0) if streams else 0
+        except (TypeError, ValueError):
+            frames = 0
+        if frames <= 0:
+            raise ValueError("nao foi possivel contar os quadros do video")
+    # Some demuxers also populate stream.duration from the container's longer
+    # audio span. The frame-based pipeline renders at this FPS, so its actual
+    # video duration comes from the decoded frame count, not either duration.
+    duration = frames / fps
+    return Probe(int(v["width"]), int(v["height"]), fps, frames, duration, has_audio)
 
 
 def read_frames(path: str) -> Iterator[np.ndarray]:
@@ -167,8 +189,9 @@ def composite_masked(
 ) -> str:
     """Composite seletivo: pixels do original em tudo, do inpainting só na máscara.
 
-    A máscara é suavizada (boxblur) antes do maskedmerge para evitar costura
-    visível na borda da região reconstruída.
+    Merge in RGB: a grayscale mask converted to YUV has neutral chroma (128),
+    which otherwise blends original subtitle colors back into cleaned pixels.
+    Keep the supplied mask opaque and do not blur it into protected pixels.
     """
     subprocess.run(
         [
@@ -177,7 +200,8 @@ def composite_masked(
             "-i", inpainted,
             "-framerate", f"{fps:.6f}", "-i", os.path.join(mask_dir, "%06d.png"),
             "-filter_complex",
-            "[2:v]boxblur=4:2[m];[0:v][1:v][m]maskedmerge[v]",
+            "[0:v]format=gbrp[a];[1:v]format=gbrp[b];"
+            "[2:v]format=gbrp[m];[a][b][m]maskedmerge,format=yuv420p[v]",
             "-map", "[v]",
             "-c:v", "libx264", "-preset", "slow", "-crf", "16",
             "-pix_fmt", "yuv420p",

@@ -67,7 +67,7 @@ import type { LibraryCut } from "@/lib/editor/cuts.service";
 import { uploadSourceFile } from "@/lib/editor/media-cloud";
 import { saveRenderedVideo } from "@/lib/editor/download";
 
-import { CutPanel, FramePanel, GradePanel, LayoutPanel, TitlesPanel } from "@/components/editor/ToolPanels";
+import { CutPanel, FramePanel, GradePanel, LayoutPanel, SpeedPanel, TitlesPanel } from "@/components/editor/ToolPanels";
 import { EditorCanvas } from "@/components/vtemplate/EditorCanvas";
 import { MediaStage } from "@/components/editor/MediaStage";
 import { SourceCropEditor } from '@/components/editor/SourceCropEditor';
@@ -85,7 +85,8 @@ import { refineTranscriptWords } from "@/lib/transcribe.functions";
 import { applyBrandKitToDoc, DEFAULT_BRAND_KIT, type BrandKit } from "@/lib/brand-kit";
 import { defaultPreEdit, TRANSITIONS, type PreEdit } from "@/lib/preedit";
 import { ensureTranscript, saveTranscript } from "@/lib/editor/transcript.service";
-import { emptyTranscript, removedRanges, silenceRanges, transcriptFromCues, type TranscriptDoc } from "@/lib/editor/transcript";
+import { emptyTranscript, removedRanges, silenceRanges, subtractRanges, transcriptFromCues, type TranscriptDoc } from "@/lib/editor/transcript";
+import { outputTimeAtSrc } from "@/lib/preedit";
 import { findCaptionPreset } from "@/lib/editor/caption-styles";
 import { listMyTemplates } from "@/lib/video-template/service";
 import { applyTemplateToVideo } from "@/lib/video-template/bindings";
@@ -122,6 +123,7 @@ export const Route = createFileRoute("/projects/$projectId/editor/$videoId")({
 
 type ToolId =
   | "corte"
+  | "velocidade"
   | "enquadrar"
   | "transicoes"
   | "keyframes"
@@ -146,6 +148,7 @@ const TOOL_GROUPS: { title: string; tools: { id: ToolId; label: string; icon: ty
     title: "Ferramentas",
     tools: [
       { id: "corte", label: "Corte", icon: Scissors },
+      { id: "velocidade", label: "Velocidade", icon: Gauge },
       { id: "enquadrar", label: "Enquadrar", icon: Crop },
       { id: "transicoes", label: "Transições", icon: Shuffle },
       { id: "keyframes", label: "Keyframes", icon: Diamond },
@@ -195,7 +198,7 @@ function EditorPage() {
   const [lookPreview, setLookPreview] = useState<Partial<PreEdit> | null>(null);
   const [transitionPreview, setTransitionPreview] = useState<PreEdit | null>(null);
   const [cutOnRemove, setCutOnRemove] = useState(true);
-  const [saveState, setSaveState] = useState<"idle" | "dirty" | "saving" | "saved">("idle");
+  const [saveState, setSaveState] = useState<"idle" | "dirty" | "saving" | "saved" | "error">("idle");
   const [cropResult, setCropResult] = useState(false);
   const [applyingCrop, setApplyingCrop] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
@@ -209,9 +212,11 @@ function EditorPage() {
   const [rendered, setRendered] = useState<File | null>(null);
   const [rendering, setRendering] = useState(false);
   const [renderPct, setRenderPct] = useState(0);
+  const renderAbortRef = useRef<AbortController | null>(null);
   const [transcribing, setTranscribing] = useState(false);
   const [transcribeProgress, setTranscribeProgress] = useState("");
   const [quality, setQuality] = useState<ExportQuality>("1080");
+  const [timelineHeight, setTimelineHeight] = useState(224);
 
   useEffect(() => setQuality(loadExportQuality()), []);
 
@@ -261,7 +266,7 @@ function EditorPage() {
       setSaveState("saving");
       void saveEditorProject(recordId, doc)
         .then(() => setSaveState("saved"))
-        .catch(() => setSaveState("idle"));
+        .catch(() => setSaveState("error"));
     }, 1000);
     return () => clearTimeout(t);
   }, [doc, recordId]);
@@ -299,6 +304,47 @@ function EditorPage() {
 
   const cuts = useMemo(() => (cutOnRemove ? removedRanges(transcript) : []), [transcript, cutOnRemove]);
   const silences = useMemo(() => silenceRanges(transcript, 0.6), [transcript]);
+  const timelineSegments = useMemo(() => {
+    const base = doc?.preedit?.segments?.length
+      ? doc.preedit.segments
+      : [{ start: 0, end: doc?.media.duration || transcript.duration }];
+    return cutOnRemove ? subtractRanges(base, cuts) : base;
+  }, [cuts, cutOnRemove, doc?.media.duration, doc?.preedit?.segments, transcript.duration]);
+  const boundCaptions = useMemo(() => transcript.words
+    .filter((word) => !word.removed && timelineSegments.some((s) => word.end > s.start && word.start < s.end))
+    .map((word) => ({
+      start: outputTimeAtSrc(timelineSegments, Math.max(word.start, timelineSegments[0]?.start ?? 0)),
+      end: outputTimeAtSrc(timelineSegments, Math.min(word.end, timelineSegments[timelineSegments.length - 1]?.end ?? word.end)),
+      text: word.word,
+    })), [timelineSegments, transcript.words]);
+  const previewComposition = useMemo(() => {
+    if (!doc) return null;
+    return { ...doc.composition, settings: { ...(doc.composition.settings ?? {}), boundCaptions } };
+  }, [boundCaptions, doc?.composition]);
+  const handleTimeUpdate = useCallback((sourceTime: number) => {
+    if (!timelineSegments.length) {
+      setCurrentTime(sourceTime);
+      return;
+    }
+    const index = timelineSegments.findIndex((segment) => sourceTime >= segment.start && sourceTime <= segment.end + 0.02);
+    if (index < 0) {
+      const next = timelineSegments.find((segment) => segment.start > sourceTime + 0.02);
+      if (next && videoRef.current) {
+        videoRef.current.currentTime = next.start + 0.001;
+        setCurrentTime(outputTimeAtSrc(timelineSegments, next.start));
+      }
+      return;
+    }
+    setCurrentTime(outputTimeAtSrc(timelineSegments, sourceTime));
+    const segment = timelineSegments[index];
+    if (!segment) return;
+    if (videoRef.current) videoRef.current.playbackRate = Math.max(0.05, (segment as { speed?: number }).speed ?? 1);
+    if (playing && sourceTime >= segment.end - 0.015) {
+      const next = timelineSegments[index + 1];
+      if (next && videoRef.current) videoRef.current.currentTime = next.start + 0.001;
+      else if (!next) setPlaying(false);
+    }
+  }, [playing, timelineSegments]);
 
   /** Renderiza o corte atual no próprio editor e (opcionalmente) abre a publicação. */
   const renderAndPublish = useCallback(
@@ -314,23 +360,35 @@ function EditorPage() {
         return;
       }
       // com vários trechos, a pré-edição define os cortes; com um só, ele vira a janela
-      const segList = doc.preedit?.segments ?? [];
+      const baseSegments = doc.preedit?.segments?.length
+        ? doc.preedit.segments
+        : [{ start: 0, end: doc.media.duration || transcript.duration }];
+      const segList = cutOnRemove ? subtractRanges(baseSegments, cuts) : baseSegments;
+      if (!segList.length) {
+        toast.error("O corte ficou sem trechos. Restaure uma palavra ou um segmento antes de renderizar.");
+        return;
+      }
       const seg = segList.length === 1 ? segList[0]! : null;
+      const renderPreedit = { ...(doc.preedit ?? defaultPreEdit()), segments: segList };
+      const renderDoc = { ...doc.composition, settings: { ...(doc.composition.settings ?? {}), boundCaptions } };
 
       setRendering(true);
       setRenderPct(0);
+      const controller = new AbortController();
+      renderAbortRef.current = controller;
       try {
         const blob = await renderTemplateProject({
-          doc: doc.composition,
+          doc: renderDoc,
           file,
           cut: seg ? { start: seg.start, end: seg.end } : null,
-          preedit: doc.preedit ?? null,
+          preedit: renderPreedit,
           audio: doc.audio,
           speech: transcript.words.map((word) => ({ start: word.start, end: word.end })),
           scale: exportScale(quality),
           onQualityDrop: (h) =>
             toast.info(`Este aparelho não aguentou a resolução escolhida — exportando em ${h}p.`),
           onProgress: setRenderPct,
+          signal: controller.signal,
         });
 
         const out = new File(
@@ -342,12 +400,14 @@ function EditorPage() {
         toast.success("Corte renderizado.");
         if (publish) setPublishOpen(true);
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Falha ao renderizar o corte.");
+        if (e instanceof DOMException && e.name === "AbortError") toast.info("Renderização cancelada.");
+        else toast.error(e instanceof Error ? e.message : "Falha ao renderizar o corte.");
       } finally {
         setRendering(false);
+        renderAbortRef.current = null;
       }
     },
-    [doc, quality, videoId, transcript.words],
+    [boundCaptions, cutOnRemove, cuts, doc, quality, transcript.duration, transcript.words, videoId],
   );
 
 
@@ -692,7 +752,7 @@ function EditorPage() {
         else history.undo();
       } else if (meta && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        if (recordId && doc) void saveEditorProject(recordId, doc).then(() => setSaveState("saved"));
+        if (recordId && doc) void saveEditorProject(recordId, doc).then(() => setSaveState("saved")).catch(() => setSaveState("error"));
       } else if (!meta && e.key.toLowerCase() === "s" && doc) {
         e.preventDefault();
         const total = doc.media.duration || transcript.duration;
@@ -800,7 +860,7 @@ function EditorPage() {
           className="min-w-40 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-sm text-white outline-none focus:border-primary/70"
         />
         <span className="text-xs text-white/55">
-          {saveState === "saving" ? "Salvando..." : saveState === "dirty" ? "Alterações pendentes" : "Salvo"}
+          {saveState === "saving" ? "Salvando..." : saveState === "dirty" ? "Alterações pendentes" : saveState === "error" ? "Falha ao salvar" : saveState === "saved" ? "Salvo" : "Ainda não salvo"}
         </span>
         <MediaSourceBar
           videoId={videoId}
@@ -853,6 +913,7 @@ function EditorPage() {
           >
             {rendering ? `Renderizando ${Math.round(renderPct * 100)}%` : "Renderizar"}
           </button>
+          {rendering && <button type="button" onClick={() => renderAbortRef.current?.abort()} className="rounded-lg border border-destructive/50 px-2 py-1.5 text-xs text-destructive">Cancelar</button>}
           {rendered && (
             <button
               type="button"
@@ -983,11 +1044,11 @@ function EditorPage() {
               suspended={tool === 'enquadrar' && !cropResult}
               videoRef={videoRef}
               src={src}
-              composition={doc.composition}
+              composition={previewComposition ?? doc.composition}
               preedit={transitionPreview ?? (lookPreview ? { ...pre, ...lookPreview } : pre)}
               effects={(doc.composition.effects ?? []) as ClipEffect[]}
               clip={duration > 0 ? { start: 0, end: duration } : null}
-              onTimeUpdate={setCurrentTime}
+              onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={(video) => {
                 if (doc.media.duration !== video.duration || doc.media.width !== video.videoWidth || doc.media.height !== video.videoHeight) {
                   patchDoc({ media: { ...doc.media, duration: video.duration, width: video.videoWidth, height: video.videoHeight } }, "metadados");
@@ -1007,6 +1068,7 @@ function EditorPage() {
                 onChange={updateLayer}
                 zoom={1}
                 showSafeArea
+                currentTime={currentTime}
               />
             </div>}
             {tool === 'enquadrar' && !cropResult && <SourceCropEditor key={src ?? 'empty'} videoRef={videoRef} crop={pre.crop ?? FULL_CROP}
@@ -1091,6 +1153,9 @@ function EditorPage() {
                 }}>{applyingCrop ? 'Salvando…' : 'Aplicar só neste vídeo'}</button>
                 <p className="text-xs text-muted-foreground">Salva o projeto deste vídeo. Para copiar a outros vídeos, use “Aplicar em lote”.</p>
               </div>
+            )}
+            {tool === "velocidade" && (
+              <SpeedPanel preedit={pre} onChange={patchPre} duration={duration} currentTime={videoRef.current?.currentTime ?? 0} />
             )}
             {tool === "transicoes" && (
               <div className="space-y-4">
@@ -1432,7 +1497,7 @@ function EditorPage() {
       )}
 
       {/* TIMELINE */}
-      <div className="order-5 h-44 shrink-0 lg:h-56">
+      <div className="order-5 shrink-0" style={{ height: timelineHeight }}>
 
         <TimelinePro
           duration={duration}
@@ -1446,6 +1511,19 @@ function EditorPage() {
           onZoom={(z) => patchDoc({ timelineZoom: z }, "zoom")}
           onTrim={(id, startTime, endTime) => updateLayer(id, { startTime, endTime })}
           media={src ? { name: "vídeo", segments: pre.segments ?? [] } : null}
+          thumbnailUrl={doc.media.posterUrl}
+          height={timelineHeight}
+          onHeightChange={setTimelineHeight}
+          audio={(doc.audio?.tracks ?? []).map((track) => ({
+            id: track.id,
+            name: track.name,
+            url: track.url,
+            startTime: track.startTime,
+            duration: track.duration || duration,
+            kind: track.kind,
+            volume: track.volume,
+            muted: track.muted,
+          }))}
           keyframes={(pre.keys ?? []).map((k) => k.t)}
           onAddKeyframe={() => {
             setTool("keyframes");

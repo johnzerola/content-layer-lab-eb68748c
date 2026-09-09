@@ -2,6 +2,19 @@
 
 Atualização: 2026-09-08. Infraestrutura: Hostear (CPU) + RunPod (GPU).
 
+## Comparação com Vmake e bloqueio confirmado
+
+O print mais recente da RunPod identifica `IMAGE_AUTH_ERROR`: falha de
+autenticação ao baixar a imagem privada. Ter um ID de credencial vinculado
+não comprova que a credencial funciona. Não iniciar mais testes GPU antes
+de validar esse acesso. A consulta desta comparação confirmou escala zero,
+nenhum worker e nenhum job em fila/execução.
+
+A referência `VMAKE.IA.mp4` foi comparada localmente com a saída antiga;
+tem apenas 4,928 s. Evidências, limitações e correção local do modo rápido
+estão em [VMAKE-COMPARISON.md](VMAKE-COMPARISON.md). Não houve novo deploy
+nem remoção GPU nessa comparação.
+
 ## Atualização do teste autenticado (2026-09-08)
 
 O acesso REST/GraphQL foi liberado. O endpoint foi atualizado para o template

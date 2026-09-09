@@ -1,10 +1,54 @@
 import unittest
 from unittest.mock import patch
 
+import cv2
 import numpy as np
+import pytest
 
 from app.services import text_detect
 from app.services.text_detect import _bright_subtitle_mask, frame_text_mask, text_pixel_mask
+
+
+@pytest.mark.parametrize("color", [(20, 145, 55), (52, 72, 55)])
+def test_colored_and_faded_subtitle_survives_empty_ocr(color):
+    frame = np.full((300, 600, 3), 50, np.uint8)
+    roi = np.zeros(frame.shape[:2], np.uint8)
+    roi[190:280, 40:560] = 255
+    glyphs = np.zeros_like(roi)
+    cv2.putText(glyphs, "WORD", (150, 255), cv2.FONT_HERSHEY_SIMPLEX, 2, 255, 5)
+    frame[glyphs > 0] = color
+    with patch("app.services.text_detect.detect_text_boxes", return_value=[]):
+        result = frame_text_mask(frame, roi, subtitle_only=True)
+    assert (result[glyphs > 0] > 0).mean() > .95
+    assert not result[roi == 0].any()
+
+
+def test_empty_ocr_does_not_erase_uniform_colored_background_or_blank_frame():
+    roi = np.zeros((300, 600), np.uint8)
+    roi[190:280, 40:560] = 255
+    for color in [(20, 145, 55), (50, 50, 50)]:
+        frame = np.full((300, 600, 3), color, np.uint8)
+        with patch("app.services.text_detect.detect_text_boxes", return_value=[]):
+            assert not frame_text_mask(frame, roi, subtitle_only=True).any()
+
+
+def test_partial_ocr_still_masks_short_saturated_word():
+    frame = np.full((300, 600, 3), 50, np.uint8)
+    roi = np.zeros(frame.shape[:2], np.uint8)
+    roi[190:280, 40:560] = 255
+    glyphs = np.zeros_like(roi)
+    cv2.putText(glyphs, "E", (200, 255), cv2.FONT_HERSHEY_SIMPLEX, 2, 255, 5)
+    frame[glyphs > 0] = (20, 145, 55)
+    # A spurious OCR box elsewhere must not disable the color supplement.
+    def partial_mask(search, _box):
+        found = np.zeros(search.shape[:2], np.uint8)
+        found[50:55, 80:85] = 255
+        return found
+    with patch("app.services.text_detect.detect_text_boxes", return_value=[(80, 50, 5, 5)]), \
+         patch("app.services.text_detect.text_pixel_mask", side_effect=partial_mask):
+        result = frame_text_mask(frame, roi, subtitle_only=True)
+    assert result[218, 98] == 255
+    assert (result[glyphs > 0] > 0).mean() > .95
 
 
 class FrameTextMaskTests(unittest.TestCase):

@@ -68,11 +68,13 @@ const LayerView = memo(function LayerView({
   doc,
   sampleVideoUrl,
   hideMedia,
+  currentTime,
 }: {
   layer: TemplateLayer;
   doc: TemplateDoc;
   sampleVideoUrl: string | null;
   hideMedia?: boolean | undefined;
+  currentTime: number;
 }) {
   // o palco em canvas já desenha o vídeo com a pré-edição aplicada:
   // aqui a camada vira só uma área invisível de seleção/arraste.
@@ -182,6 +184,15 @@ const LayerView = memo(function LayerView({
 
   // caption
   const s = layer.style;
+  const rawCues = doc.settings?.["boundCaptions"];
+  const cue = Array.isArray(rawCues)
+    ? rawCues.find((item) => {
+        if (!item || typeof item !== "object") return false;
+        const c = item as { start?: number; end?: number };
+        return typeof c.start === "number" && typeof c.end === "number" && currentTime >= c.start && currentTime <= c.end;
+      }) as { text?: string } | undefined
+    : undefined;
+  if (!cue) return null;
   return (
     <div
       className="flex h-full w-full items-center"
@@ -203,7 +214,7 @@ const LayerView = memo(function LayerView({
           textShadow: s.shadow ? "0 2px 10px rgba(0,0,0,.7)" : undefined,
         }}
       >
-        Suas <span style={{ color: s.highlightColor }}>legendas</span> aqui
+        {cue.text ?? ""}
       </span>
       <span className="sr-only">{scale}</span>
     </div>
@@ -223,6 +234,7 @@ export function EditorCanvas({
   animPreview,
   bare,
   hideMedia,
+  currentTime = 0,
 }: {
   doc: TemplateDoc;
   selectedId: string | null;
@@ -237,6 +249,7 @@ export function EditorCanvas({
   bare?: boolean;
   /** não desenha a camada de vídeo (quem desenha é o palco em canvas atrás) */
   hideMedia?: boolean;
+  currentTime?: number;
   /** dispara a prévia da animação de uma camada: { key, layerId, slot } */
   animPreview?: { key: number; layerId: string; slot: "animationIn" | "animationOut" | "animationLoop" } | null;
 }) {
@@ -330,7 +343,7 @@ export function EditorCanvas({
       >
 
         {ordered.map((layer) =>
-          layer.visible ? (
+          layer.visible && currentTime >= layer.startTime && (layer.endTime == null || currentTime <= layer.endTime) ? (
             <div
               key={
                 animPreview && animPreview.layerId === layer.id ? `${layer.id}-${animPreview.key}` : layer.id
@@ -358,6 +371,7 @@ export function EditorCanvas({
                 doc={doc}
                 sampleVideoUrl={doc.sampleVideoUrl ?? null}
                 hideMedia={hideMedia}
+                currentTime={currentTime}
               />
               {interactive && selectedId === layer.id && !layer.locked && (
                 <>

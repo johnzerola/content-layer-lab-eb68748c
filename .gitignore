@@ -39,3 +39,6 @@ backend/storage/
 *.njsproj
 *.sln
 *.sw?
+# Local browser QA artifacts (may contain private project data)
+output/playwright/
+.playwright-mcp/

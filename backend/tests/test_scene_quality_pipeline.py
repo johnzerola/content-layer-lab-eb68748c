@@ -78,6 +78,24 @@ def test_karaoke_checks_every_frame_even_when_the_background_probe_is_identical(
     assert len(result) == 4
 
 
+def test_subtitle_shadow_halo_respects_timed_protection_and_empty_frames():
+    frames = [np.full((100, 160, 3), 80, np.uint8)] * 2
+    detected = np.zeros((100, 160), np.uint8)
+    detected[70:78, 60:85] = 255
+    regions = [
+        {"kind": "rect", "role": "remove", "x": .25, "y": .6, "w": .5, "h": .3},
+        {"kind": "rect", "role": "protect", "x": .5, "y": .65, "w": .1, "h": .2, "from": 0, "to": .1},
+    ]
+    with patch.dict("os.environ", {"CLEANER_SUBTITLE_SHADOW_PX": "10"}), \
+         patch("app.workers.tasks.frame_text_mask", side_effect=[detected, np.zeros_like(detected)]):
+        masks = _window_masks(frames, regions, SimpleNamespace(width=160, height=100, fps=30),
+                              "karaoke", True, 1, 0, False)
+    assert masks[0, 65, 62] == 255  # Beyond the glyph, over its shadow.
+    assert not masks[0, 65:86, 80:97].any()  # Protected hole stays protected.
+    assert not masks[0, :60].any() and not masks[0, :, :40].any()
+    assert not masks[1].any()
+
+
 def test_short_video_still_splits_at_each_scene_cut():
     chunks = plan_chunks(5, target_seconds=15, overlap=0.6, cuts=[0, 1, 2.5, 4])
     assert [(c.start, c.end) for c in chunks] == [(0, 1), (1, 2.5), (2.5, 4), (4, 5)]

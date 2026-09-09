@@ -134,26 +134,36 @@ class TemporalFillEngine(InpaintingEngine):
                 flow = cv2.calcOpticalFlowFarneback(
                     current_gray, neighbor_gray, None, 0.5, 2, 15, 2, 5, 1.1, 0
                 )
+                reverse = cv2.calcOpticalFlowFarneback(
+                    neighbor_gray, current_gray, None, 0.5, 2, 15, 2, 5, 1.1, 0
+                )
                 if flow.shape[:2] != (height, width):
                     flow = cv2.resize(flow, (width, height), interpolation=cv2.INTER_LINEAR)
                     flow[..., 0] *= scale_x
                     flow[..., 1] *= scale_y
+                    reverse = cv2.resize(reverse, (width, height), interpolation=cv2.INTER_LINEAR)
+                    reverse[..., 0] *= scale_x
+                    reverse[..., 1] *= scale_y
+                map_x, map_y = grid_x + flow[..., 0], grid_y + flow[..., 1]
+                valid = self._consistent_flow(flow, reverse, map_x, map_y)
                 warped = cv2.remap(
                     frames[neighbor],
-                    grid_x + flow[..., 0],
-                    grid_y + flow[..., 1],
+                    map_x,
+                    map_y,
                     cv2.INTER_LINEAR,
                     borderMode=cv2.BORDER_REPLICATE,
                 )
                 warped_mask = cv2.remap(
                     masks[neighbor],
-                    grid_x + flow[..., 0],
-                    grid_y + flow[..., 1],
-                    cv2.INTER_NEAREST,
+                    map_x,
+                    map_y,
+                    # Match bilinear image sampling: any masked contributor
+                    # invalidates the donor, not just its nearest pixel.
+                    cv2.INTER_LINEAR,
                     borderMode=cv2.BORDER_CONSTANT,
+                    borderValue=255,
                 )
-                usable = cv2.bitwise_and(remaining, cv2.bitwise_not(warped_mask))
-                selected = usable > 0
+                selected = (remaining > 0) & (warped_mask == 0) & valid
                 current[selected] = warped[selected]
                 remaining[selected] = 0
                 used_neighbors += 1
@@ -163,6 +173,26 @@ class TemporalFillEngine(InpaintingEngine):
                 current = patch_fill(current, remaining)
             output[index] = current
         return np.asarray(output)
+
+    @staticmethod
+    def _consistent_flow(flow, reverse, map_x, map_y):
+        """Reject out-of-frame and inconsistent temporal donors.
+
+        Forward/backward consistency is a necessary check, not proof that
+        hidden background was recovered. Rejected pixels use the explicit
+        spatial fallback, which can still blur large holes.
+        """
+        height, width = flow.shape[:2]
+        valid = (np.isfinite(map_x) & np.isfinite(map_y)
+                 & (map_x >= 0) & (map_x < width - 1)
+                 & (map_y >= 0) & (map_y < height - 1))
+        backward = cv2.remap(
+            reverse, map_x, map_y, cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_CONSTANT,
+        )
+        error = np.sum((flow + backward) ** 2, axis=2)
+        motion = np.sum(flow ** 2 + backward ** 2, axis=2)
+        return valid & np.isfinite(error) & (error <= 0.01 * motion + 0.5)
 
     @staticmethod
     def _flow_inputs(

@@ -8,3 +8,10 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+## Product UI work
+
+For VaiViral UI/UX, styling and editor interaction tasks, read
+`.agents/skills/vaiviral-product-design/SKILL.md` and follow its scoped guidance.
+Impeccable is available at `.agents/skills/impeccable/SKILL.md` for visual design.
+Do not apply design workflows to unrelated backend/infrastructure-only requests.

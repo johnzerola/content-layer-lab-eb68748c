@@ -34,6 +34,7 @@ export interface TranscriptDoc {
 export interface TimeRange {
   start: number;
   end: number;
+  speed?: number;
 }
 
 let seq = 0;
@@ -147,6 +148,24 @@ export function keptRanges(duration: number, removed: TimeRange[]): TimeRange[] 
   }
   if (cursor < duration) out.push({ start: cursor, end: duration });
   return out.filter((r) => r.end - r.start > 0.01);
+}
+
+/** Remove intervalos da montagem existente, preservando a ordem dos segmentos. */
+export function subtractRanges(base: TimeRange[], removed: TimeRange[]): TimeRange[] {
+  const cuts = mergeRanges(removed);
+  const out: TimeRange[] = [];
+  for (const segment of base) {
+    let cursor = segment.start;
+    for (const cut of cuts) {
+      if (cut.end <= cursor) continue;
+      if (cut.start >= segment.end) break;
+      if (cut.start > cursor) out.push({ start: cursor, end: Math.min(cut.start, segment.end), ...(segment.speed == null ? {} : { speed: segment.speed }) });
+      cursor = Math.max(cursor, cut.end);
+      if (cursor >= segment.end) break;
+    }
+    if (cursor < segment.end) out.push({ start: cursor, end: segment.end, ...(segment.speed == null ? {} : { speed: segment.speed }) });
+  }
+  return out.filter((range) => range.end - range.start > 0.01);
 }
 
 export function keptDuration(duration: number, removed: TimeRange[]): number {

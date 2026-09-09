@@ -6,6 +6,7 @@
 import { useMemo } from "react";
 import type { PreEdit } from "@/lib/preedit";
 import { EXPORT_QUALITIES, loadExportQuality } from "@/lib/editor/export-quality";
+import { segmentsDuration } from "@/lib/preedit";
 
 function fmt(t: number): string {
   const m = Math.floor(t / 60);
@@ -30,7 +31,7 @@ export function RenderReport({
     () => (preedit.segments?.length ? preedit.segments : [{ start: 0, end: duration }]),
     [preedit.segments, duration],
   );
-  const total = segments.reduce((acc, s) => acc + Math.max(0, s.end - s.start), 0);
+  const total = segmentsDuration(segments);
   const keys = useMemo(() => [...(preedit.keys ?? [])].sort((a, b) => a.t - b.t), [preedit.keys]);
   const transitions = preedit.transitions ?? [];
 
@@ -61,7 +62,7 @@ export function RenderReport({
             >
               <span>Corte {i + 1}</span>
               <span className="font-mono text-muted-foreground">
-                {fmt(s.start)} → {fmt(s.end)} · {(s.end - s.start).toFixed(2)}s
+                {fmt(s.start)} → {fmt(s.end)} · {(Math.max(0, s.end - s.start) / Math.max(0.05, s.speed ?? 1)).toFixed(2)}s · {s.speed && s.speed !== 1 ? `${s.speed}×` : "1×"}
                 {t?.kind && t.kind !== "none" ? ` · ${t.kind} ${t.dur?.toFixed(2)}s` : ""}
               </span>
             </button>

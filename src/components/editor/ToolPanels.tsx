@@ -66,9 +66,16 @@ export function CutPanel({
   silenceCount: number;
   onCutSilences: () => void;
 }) {
-  const seg = preedit.segments[0] ?? { start: 0, end: duration };
-  const setSeg = (s: number, e: number) =>
-    onChange({ segments: [{ start: Math.max(0, Math.min(s, e - 0.2)), end: Math.min(duration, Math.max(e, s + 0.2)) }] }, "corte");
+  const selectedIndex = Math.max(0, preedit.segments.findIndex((item) => currentTime >= item.start && currentTime <= item.end));
+  const seg = preedit.segments[selectedIndex] ?? { start: 0, end: duration };
+  const setSeg = (s: number, e: number) => {
+    const next = preedit.segments.length
+      ? preedit.segments.map((item, index) => index === selectedIndex
+          ? { start: Math.max(0, Math.min(s, e - 0.2)), end: Math.min(duration, Math.max(e, s + 0.2)) }
+          : item)
+      : [{ start: Math.max(0, Math.min(s, e - 0.2)), end: Math.min(duration, Math.max(e, s + 0.2)) }];
+    onChange({ segments: next }, "corte");
+  };
 
   return (
     <div className="space-y-3 text-sm">
@@ -113,6 +120,48 @@ export function CutPanel({
       >
         Restaurar clipe inteiro
       </button>
+    </div>
+  );
+}
+
+/** VELOCIDADE — ajuste constante do trecho sob a agulha. */
+export function SpeedPanel({ preedit, onChange, duration, currentTime }: {
+  preedit: PreEdit;
+  onChange: ToolPatch;
+  duration: number;
+  currentTime: number;
+}) {
+  const index = preedit.segments.findIndex((segment) => currentTime >= segment.start && currentTime <= segment.end);
+  const selectedIndex = index >= 0 ? index : 0;
+  const segment = preedit.segments[selectedIndex] ?? { start: 0, end: duration, speed: 1 };
+  const speed = segment.speed ?? 1;
+  const setSpeed = (value: number) => {
+    const next = preedit.segments.length
+      ? preedit.segments.map((item, i) => i === selectedIndex ? { ...item, speed: value } : item)
+      : [{ ...segment, speed: value }];
+    onChange({ segments: next }, "velocidade");
+  };
+  const outputDuration = Math.max(0, segment.end - segment.start) / speed;
+  return (
+    <div className="space-y-3 text-sm">
+      <div>
+        <p className="font-medium">Velocidade do trecho</p>
+        <p className="mt-1 text-xs text-muted-foreground">Ajuste o trecho sob a agulha. A duração e as legendas acompanham a mudança.</p>
+      </div>
+      <div className="grid grid-cols-4 gap-1.5">
+        {[0.5, 1, 1.5, 2].map((value) => (
+          <button key={value} type="button" onClick={() => setSpeed(value)} className={`rounded-md border px-2 py-1.5 text-xs ${speed === value ? "border-primary bg-primary/20" : "border-border/60"}`}>
+            {value}×
+          </button>
+        ))}
+      </div>
+      <Row label="Velocidade">
+        <Slider value={speed} onChange={setSpeed} min={0.25} max={4} step={0.05} format={(n) => `${n.toFixed(2)}×`} />
+      </Row>
+      <div className="rounded-lg border border-border/60 bg-card/50 p-2 text-xs text-muted-foreground">
+        Duração do trecho: <strong className="text-foreground">{outputDuration.toFixed(2)}s</strong>
+      </div>
+      {!preedit.segments.length && <p className="text-[11px] text-muted-foreground">Aplique a velocidade para criar um trecho editável a partir do vídeo inteiro.</p>}
     </div>
   );
 }

@@ -250,6 +250,47 @@ def _bright_subtitle_mask(frame: np.ndarray, roi: np.ndarray) -> np.ndarray:
     return cv2.bitwise_and(joined, roi)
 
 
+def _colored_subtitle_mask(frame: np.ndarray, roi: np.ndarray) -> np.ndarray:
+    """Recover colored/fading words missed by OCR inside a reviewed subtitle ROI.
+
+    Luminance thresholding misses dark green karaoke letters and their faded
+    transitions. Group by hue and require small horizontal components so a
+    uniformly colored garment/background does not become a removal mask.
+    """
+    bounds = _roi_bbox(roi, margin=0)
+    out = np.zeros(roi.shape, np.uint8)
+    if bounds is None:
+        return out
+    y0, y1, x0, x1 = bounds
+    selected = roi[y0:y1, x0:x1]
+    height, width = selected.shape
+    if height > frame.shape[0] * .4:
+        return out  # Color alone is not evidence over a whole-frame search.
+    hsv = cv2.cvtColor(frame[y0:y1, x0:x1], cv2.COLOR_BGR2HSV)
+    local = np.zeros(selected.shape, np.uint8)
+    join = cv2.getStructuringElement(cv2.MORPH_RECT, (max(3, height // 8), 3))
+    for hue in range(0, 180, 30):
+        pixels = cv2.inRange(hsv, (hue, 40, 35), (min(179, hue + 29), 255, 255))
+        pixels = cv2.bitwise_and(pixels, selected)
+        grouped = cv2.morphologyEx(pixels, cv2.MORPH_CLOSE, join)
+        count, labels, stats, _ = cv2.connectedComponentsWithStats(grouped)
+        for index in range(1, count):
+            _, _, w, h, area = stats[index]
+            component = (labels == index) & (pixels > 0)
+            strong = bool(component.any() and (hsv[:, :, 1][component] >= 120).mean() > .45)
+            # Saturated karaoke can be a single short word/letter. Faded,
+            # low-saturation candidates need stronger word-shape evidence.
+            minimum_width = max(8, width * .012) if strong else max(12, width * .12)
+            if (w < minimum_width or not 3 <= h <= height * .85
+                    or w / max(h, 1) < (.35 if strong else 2)
+                    or area < max(12, width * height * .002)):
+                continue
+            local[component] = 255
+    local = cv2.dilate(local, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+    out[y0:y1, x0:x1] = cv2.bitwise_and(local, selected)
+    return out
+
+
 def _roi_bbox(roi: np.ndarray, margin: int = 24):
     ys, xs = np.where(roi > 0)
     if ys.size == 0:
@@ -296,7 +337,11 @@ def frame_text_mask(
         )
     if roi is not None:
         out = cv2.bitwise_and(out, roi)
-        if subtitle_only and not np.any(out):
-            out = _bright_subtitle_mask(frame, roi)
+        if subtitle_only:
+            # OCR can detect only part of a word on textured clothes. Those
+            # exposed letters contaminate temporal donors even with a halo.
+            if not np.any(out):
+                out = _bright_subtitle_mask(frame, roi)
+            out = cv2.bitwise_or(out, _colored_subtitle_mask(frame, roi))
     return out
 

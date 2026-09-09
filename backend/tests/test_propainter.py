@@ -40,6 +40,18 @@ class ProPainterAdapterTests(unittest.TestCase):
             self.assertEqual(command[command.index("--save_fps") + 1], "30")
             self.assertIn("--fp16", command)
 
+    def test_memory_retry_preserves_explicit_small_temporal_budget(self):
+        with patch.dict(os.environ, {
+            "PROPAINTER_SUBVIDEO_LENGTH": "24", "PROPAINTER_NEIGHBOR_LENGTH": "6",
+            "PROPAINTER_REF_STRIDE": "12",
+        }), patch("app.engines.propainter_official._propainter_cuda_available", return_value=True):
+            for scale in (1.0, 0.72):
+                command = build_propainter_command("input", "masks", "output", 720, 256,
+                                                   30, "quality", scale)
+                self.assertEqual(command[command.index("--subvideo_length") + 1], "24")
+                self.assertEqual(command[command.index("--neighbor_length") + 1], "6")
+                self.assertEqual(command[command.index("--ref_stride") + 1], "12")
+
 
 if __name__ == "__main__":
     unittest.main()

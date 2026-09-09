@@ -45,6 +45,7 @@ from ..services import tracking
 from ..services import verify
 from ..services.scene import detect_scenes
 from ..services.scene_pipeline import frame_spans, run_scenes
+from ..services.inference_region import prepare_inference_region, restore_inference_region
 from ..services.quality_policy import review_issues, should_try_alternative, prefer_alternative
 from ..services.text_detect import detect_text_boxes, frame_text_mask
 from ..services.watermark import detect_watermarks, frame_watermark_mask
@@ -314,12 +315,21 @@ def _window_masks(
         if automatic is not None:
             protect_masks = np.maximum(protect_masks, automatic[None, ...])
 
+    # Native-pixel halo for thick subtitle outlines/shadows. Scale the default
+    # with the source rather than the model's smaller inference dimensions.
+    subtitle_halo = 0
+    if dynamic and mode in ("subtitle", "karaoke"):
+        configured_halo = os.getenv("CLEANER_SUBTITLE_SHADOW_PX", "").strip()
+        subtitle_halo = max(0, min(24, int(configured_halo) if configured_halo else round(max(w, h) / 192)))
+    halo_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * subtitle_halo + 1, 2 * subtitle_halo + 1))
     out = np.zeros((n, h, w), np.uint8)
     for index, current in enumerate(masks):
         current = cv2.bitwise_and(current, base_masks[index])
         if protect_masks[index].max() > 0:
             current = cv2.bitwise_and(current, cv2.bitwise_not(protect_masks[index]))
         refined = mask_svc.refine(current)
+        if subtitle_halo:
+            refined = cv2.dilate(refined, halo_kernel)
         # Morphology must not grow back into protected pixels or outside the
         # selected region after those constraints have already been applied.
         refined = cv2.bitwise_and(refined, base_masks[index])
@@ -425,6 +435,33 @@ def _audit_video(video_path: str, mask_dir: str, fps: float) -> tuple[List[Dict]
     return segments, worst
 
 
+def _prepare_official_region(input_path, mask_dir, job_dir, info, emit, cancel_file):
+    """Keep a stable spatial context for all frames within this scene."""
+    enabled = os.getenv("CLEANER_INFERENCE_ROI", "1") == "1"
+    margin = max(0, int(os.getenv("CLEANER_INFERENCE_ROI_MARGIN", "96")))
+    region = prepare_inference_region(
+        input_path, mask_dir, job_dir, info,
+        margin=margin if enabled else max(info.width, info.height),
+        cancel_file=cancel_file,
+    )
+    Path(job_dir, "inference-region.json").write_text(json.dumps({
+        "enabled": enabled, "active": region.active, "box": region.box,
+        "source_size": [info.width, info.height],
+        "inference_input_size": [region.width, region.height],
+        "context_margin": margin,
+    }, indent=2), encoding="utf-8")
+    if region.active:
+        emit(33, f"contexto de reconstrucao: {region.width}x{region.height}", "inpainting")
+    return region
+
+
+def _copy_unmasked_scene(input_path, output_path, frames):
+    # mux_audio can move/delete its video argument; never pass it the source.
+    shutil.copyfile(input_path, output_path)
+    return [], {"residual_text": 0.0, "sharpness_ratio": 1.0,
+                "temporal_consistency": 1.0, "no_masked_pixels": True}, frames
+
+
 def _run_official_pipeline(
     input_path: str,
     output_path: str,
@@ -442,7 +479,10 @@ def _run_official_pipeline(
     composite_on: bool = True,
     scene_cuts=(),
     refinement_budget=None,
+    prepared_mask_dir: Optional[str] = None,
 ) -> tuple[List[Dict], dict, int]:
+    if prepared_mask_dir and len(frame_spans(info.frames, scene_cuts)) > 1:
+        raise ValueError("mascaras revisadas devem ser fornecidas separadamente por cena")
     if len(frame_spans(info.frames, scene_cuts)) > 1:
         return run_scenes(input_path, output_path, job_dir, regions, info, scene_cuts,
             lambda source, output, directory, masks, part_info, progress:
@@ -450,10 +490,10 @@ def _run_official_pipeline(
                     mode, preset, dynamic, key_step, auto_protect, verify_on,
                     progress, cancel_file, composite_on,
                     refinement_budget=refinement_budget), emit, cancel_file)
-    mask_dir = os.path.join(job_dir, "masks")
+    mask_dir = prepared_mask_dir or os.path.join(job_dir, "masks")
     run_dir = os.path.join(job_dir, "propainter-run")
     emit(18, "gerando mascaras temporais", "tracking")
-    frames = _write_mask_sequence(
+    frames = info.frames if prepared_mask_dir else _write_mask_sequence(
         input_path,
         mask_dir,
         regions,
@@ -464,28 +504,35 @@ def _run_official_pipeline(
         auto_protect,
         lambda ratio: emit(18 + ratio * 14, "gerando mascaras temporais", "tracking"),
     )
+    region = _prepare_official_region(input_path, mask_dir, job_dir, info, emit, cancel_file)
+    if not region.active:
+        return _copy_unmasked_scene(input_path, output_path, frames)
     emit(34, "iniciando ProPainter oficial", "inpainting")
     video_only = run_propainter(
-        input_path,
-        mask_dir,
+        region.source_path,
+        region.mask_dir,
         run_dir,
-        info.width,
-        info.height,
+        region.width,
+        region.height,
         info.fps,
         preset,
         lambda stage: emit(36, stage, "inpainting"),
         cancel_file,
     )
-    normalized_video = normalize_video(
-        video_only,
-        os.path.join(job_dir, "propainter-native.mp4"),
-        info.width,
-        info.height,
-        info.fps,
+    normalized_video = restore_inference_region(
+        video_only, region, input_path,
+        os.path.join(job_dir, "propainter-native.mp4"), info,
+        cancel_file=cancel_file,
     )
     if composite_on:
         normalized_video = _composite_step(
             input_path, normalized_video, mask_dir, info.fps, job_dir, emit
+        )
+    else:
+        # RGB-lossless restoration is an intermediate, not a browser delivery.
+        normalized_video = ffmpeg_filter(
+            normalized_video, os.path.join(job_dir, "propainter-delivery.mp4"),
+            "null", crf=16,
         )
     emit(91, "validando resultado", "refining")
     if verify_on:
@@ -509,7 +556,8 @@ def _run_official_pipeline(
         try:
             alt_segments, alt_metrics, alt_frames = _run_diffusion_pipeline(
                 input_path, alternate_path, alternate_dir, regions, info, mode,
-                dynamic, key_step, auto_protect, True, emit, cancel_file, composite_on)
+                dynamic, key_step, auto_protect, True, emit, cancel_file, composite_on,
+                prepared_mask_dir=mask_dir)
             alt_info = probe(alternate_path)
             valid = (alt_frames == frames and alt_info.frames == frames
                      and (alt_info.width, alt_info.height) == (info.width, info.height))
@@ -543,18 +591,21 @@ def _run_diffusion_pipeline(
     cancel_file: Optional[str] = None,
     composite_on: bool = True,
     scene_cuts=(),
+    prepared_mask_dir: Optional[str] = None,
 ) -> tuple[List[Dict], dict, int]:
+    if prepared_mask_dir and len(frame_spans(info.frames, scene_cuts)) > 1:
+        raise ValueError("mascaras revisadas devem ser fornecidas separadamente por cena")
     if len(frame_spans(info.frames, scene_cuts)) > 1:
         return run_scenes(input_path, output_path, job_dir, regions, info, scene_cuts,
             lambda source, output, directory, masks, part_info, progress:
                 _run_diffusion_pipeline(source, output, directory, masks, part_info,
                     mode, dynamic, key_step, auto_protect, verify_on,
                     progress, cancel_file, composite_on), emit, cancel_file)
-    mask_dir = os.path.join(job_dir, "masks")
+    mask_dir = prepared_mask_dir or os.path.join(job_dir, "masks")
     mask_video = os.path.join(job_dir, "masks.mp4")
     run_dir = os.path.join(job_dir, "diffueraser-run")
     emit(18, "gerando mascaras temporais", "tracking")
-    frames = _write_mask_sequence(
+    frames = info.frames if prepared_mask_dir else _write_mask_sequence(
         input_path,
         mask_dir,
         regions,
@@ -565,26 +616,32 @@ def _run_diffusion_pipeline(
         auto_protect,
         lambda ratio: emit(18 + ratio * 12, "gerando mascaras temporais", "tracking"),
     )
-    masks_to_video(mask_dir, mask_video, info.fps)
+    region = _prepare_official_region(input_path, mask_dir, job_dir, info, emit, cancel_file)
+    if not region.active:
+        return _copy_unmasked_scene(input_path, output_path, frames)
+    masks_to_video(region.mask_dir, mask_video, info.fps)
     emit(32, "iniciando DiffuEraser oficial", "inpainting")
     video_only = run_diffueraser(
-        input_path,
+        region.source_path,
         mask_video,
         run_dir,
         info.duration,
         lambda stage: emit(34, stage, "inpainting"),
         cancel_file,
     )
-    normalized_video = normalize_video(
-        video_only,
-        os.path.join(job_dir, "diffueraser-native.mp4"),
-        info.width,
-        info.height,
-        info.fps,
+    normalized_video = restore_inference_region(
+        video_only, region, input_path,
+        os.path.join(job_dir, "diffueraser-native.mp4"), info,
+        cancel_file=cancel_file,
     )
     if composite_on:
         normalized_video = _composite_step(
             input_path, normalized_video, mask_dir, info.fps, job_dir, emit
+        )
+    else:
+        normalized_video = ffmpeg_filter(
+            normalized_video, os.path.join(job_dir, "diffueraser-delivery.mp4"),
+            "null", crf=16,
         )
     emit(92, "validando resultado", "refining")
     if verify_on:

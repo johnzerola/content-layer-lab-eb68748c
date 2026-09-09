@@ -21,7 +21,8 @@ def test_private_auth_preserved_and_capacity_disabled_after_failed_readiness(tmp
     source = tmp_path / "input.mp4"
     source.write_bytes(b"sample")
     output = tmp_path / "result"
-    monkeypatch.setattr(sys, "argv", ["validate", str(source), str(output)])
+    image = "registry.example/cleaneria@sha256:" + "a" * 64
+    monkeypatch.setattr(sys, "argv", ["validate", str(source), str(output), "--image", image])
     monkeypatch.setenv("RUNPOD_API_KEY", "test-key")
     monkeypatch.setenv("RUNPOD_ENDPOINT_ID", runner.ENDPOINT)
     monkeypatch.setenv("CLEANER_WORKER_SECRET", "test-secret-not-a-real-secret")
@@ -51,6 +52,7 @@ def test_private_auth_preserved_and_capacity_disabled_after_failed_readiness(tmp
                     "id": "old", "dockerArgs": "{}", "containerDiskInGb": 24,
                     "containerRegistryAuthId": "private-registry", "env": []}}]}}})
             if url.endswith("/templates"):
+                assert kwargs["json"]["imageName"] == image
                 assert kwargs["json"]["containerRegistryAuthId"] == "private-registry"
                 assert kwargs["json"]["isPublic"] is False
                 return Response({"id": "new"})

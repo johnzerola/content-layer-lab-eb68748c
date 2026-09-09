@@ -58,7 +58,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 export function AudioPanel({ audio, onChange, scriptText = "", currentTime, getSourceFile }: Props) {
-  const state = audio ?? defaultEditorAudio();
+  const state = { ...defaultEditorAudio(), ...(audio ?? {}) };
   const fileRef = useRef<HTMLInputElement>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const [recording, setRecording] = useState(false);
@@ -208,6 +208,10 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime, getS
     <div className="space-y-4 text-sm">
       <section className="rounded-xl border border-border/60 p-2.5">
         <p className="mb-1 font-mono text-[11px] uppercase text-muted-foreground">Áudio original</p>
+        <Row label="Proteção">
+          <input type="checkbox" checked={state.masterCompression} onChange={(e) => patch({ masterCompression: e.target.checked }, "compressao-master")} />
+          <span className="text-[11px] text-muted-foreground">evita distorção ao misturar trilhas</span>
+        </Row>
         <Row label="Silenciar">
           <input
             type="checkbox"
@@ -415,6 +419,16 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime, getS
 
       <section className="space-y-2">
         <p className="font-mono text-[11px] uppercase text-muted-foreground">Clipes de áudio ({state.tracks.length})</p>
+        {state.tracks.some((clip) => clip.kind === "music") && (
+          <div className="flex flex-wrap gap-1.5">
+            <button type="button" className="rounded border border-border/60 px-2 py-1 text-[11px]" onClick={() => patch({ tracks: state.tracks.map((clip) => clip.kind === "music" ? { ...clip, muted: true } : clip) }, "silenciar-musica")}>
+              Silenciar músicas
+            </button>
+            <button type="button" className="rounded border border-destructive/40 px-2 py-1 text-[11px] text-destructive" onClick={() => patch({ tracks: state.tracks.filter((clip) => clip.kind !== "music") }, "remover-musicas")}>
+              Remover músicas
+            </button>
+          </div>
+        )}
         {!state.tracks.length && (
           <p className="text-xs text-muted-foreground">Nenhuma faixa ainda. Envie uma música ou grave sua voz.</p>
         )}

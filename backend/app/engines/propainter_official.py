@@ -90,7 +90,7 @@ def _propainter_cuda_available() -> bool:
             ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            timeout=15,
+            timeout=60,
         )
         return completed.returncode == 0
     except Exception:
@@ -122,7 +122,8 @@ def build_propainter_command(
     root = propainter_root()
     proc_w, proc_h = _processing_size(width, height, preset, scale_factor)
     tight = scale_factor < 1.0
-    cpu_only = not _propainter_cuda_available()
+    has_cuda = _propainter_cuda_available()
+    cpu_only = not has_cuda
     if cpu_only:
         # Sem GPU a memória do container é o gargalo: janelas curtas evitam que
         # o kernel mate o processo por falta de RAM.
@@ -133,6 +134,12 @@ def build_propainter_command(
         subvideo = "40" if tight else ("80" if preset == "max" else "64")
         neighbor = "8" if tight else ("12" if preset == "max" else "10")
         ref_stride = "10" if tight else ("5" if preset == "max" else "10")
+    # Permit small GPUs to keep spatial detail by reducing temporal memory
+    # first. OOM retries must never increase a user-specified temporal budget.
+    subvideo = str(max(4, min(int(subvideo), int(os.getenv("PROPAINTER_SUBVIDEO_LENGTH", subvideo)))))
+    neighbor_limit = max(2, min(int(neighbor), int(os.getenv("PROPAINTER_NEIGHBOR_LENGTH", neighbor))))
+    neighbor = str(min(int(subvideo), neighbor_limit) // 2 * 2)
+    ref_stride = str(max(1, int(os.getenv("PROPAINTER_REF_STRIDE", ref_stride))))
     command = [
         os.getenv("PROPAINTER_PYTHON", sys.executable),
         str(root / "inference_propainter.py"),
@@ -147,7 +154,7 @@ def build_propainter_command(
         "--ref_stride", ref_stride,
         "--mask_dilation", "2" if preset == "max" else "1",
     ]
-    if _propainter_cuda_available() and os.getenv("PROPAINTER_FP16", "1") == "1":
+    if has_cuda and os.getenv("PROPAINTER_FP16", "1") == "1":
         command.append("--fp16")
     return command
 

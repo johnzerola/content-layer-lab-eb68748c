@@ -101,7 +101,8 @@ def handler(event: dict) -> dict:
         return {
             "ok": True,
             "worker_version": WORKER_VERSION,
-            "pipeline_revision": "scene-masks-v1",
+            "pipeline_revision": "scene-roi-v1",
+            "inference_roi": os.getenv("CLEANER_INFERENCE_ROI", "1") == "1",
             "gpu_vram_gb": _gpu_vram_gb(),
             "ai_ready": propainter.ready,
             "max_ready": diffueraser.ready,
