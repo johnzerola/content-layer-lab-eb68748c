@@ -9,6 +9,8 @@ import { drawSticker, type StickerId } from "@/lib/editor/stickers";
 import { applyEffectOverlay, applyEffectTransform, type ClipEffect } from "@/lib/editor/effects";
 import { pickAudioCodec, pickBitrate, pickVideoCodec } from "@/lib/encode-presets";
 import { renderAudioTrack } from "@/lib/audio-track";
+import { renderEditorAudio, type AudioRange } from "./audio-mix";
+import type { EditorAudio } from "./audio";
 import { cleanMp4Metadata } from "@/lib/mp4meta";
 import { bgSleep } from "@/lib/keepalive";
 import { FrameReader, type DecodedFrame } from "@/lib/decode";
@@ -39,6 +41,8 @@ export interface TemplateRenderCut {
 }
 
 export interface TemplateRenderOptions {
+  audio?: EditorAudio | undefined;
+  speech?: AudioRange[];
   doc: TemplateDoc;
   file: File;
   cut?: TemplateRenderCut | null;
@@ -52,7 +56,6 @@ export interface TemplateRenderOptions {
   onProgress?: (p: number) => void;
   signal?: AbortSignal | undefined;
 }
-
 
 export function templateRenderSupported(): boolean {
   return (
@@ -102,7 +105,12 @@ interface AnimState {
 const NEUTRAL_ANIM: AnimState = { alpha: 1, scale: 1, dx: 0, dy: 0, rotate: 0 };
 
 /** Estado visual de uma animação (entrada/saída/loop) em `k` de 0 a 1. */
-function animState(spec: AnimationSpec | null | undefined, k: number, outward: boolean, loop = false): AnimState {
+function animState(
+  spec: AnimationSpec | null | undefined,
+  k: number,
+  outward: boolean,
+  loop = false,
+): AnimState {
   if (!spec || !spec.type || spec.type === "none") return NEUTRAL_ANIM;
   const e = (EASE[spec.easing] ?? EASE["easeOut"]!)(Math.min(1, Math.max(0, k)));
   const inv = 1 - e;
@@ -157,11 +165,16 @@ function layerAnim(layer: TemplateLayer, t: number): AnimState {
   const loopSpec = layer.animationLoop;
   if (loopSpec && loopSpec.duration > 0) {
     const l = animState(loopSpec, (local % loopSpec.duration) / loopSpec.duration, false, true);
-    s = { alpha: s.alpha * l.alpha, scale: s.scale * l.scale, dx: s.dx + l.dx, dy: s.dy + l.dy, rotate: s.rotate + l.rotate };
+    s = {
+      alpha: s.alpha * l.alpha,
+      scale: s.scale * l.scale,
+      dx: s.dx + l.dx,
+      dy: s.dy + l.dy,
+      rotate: s.rotate + l.rotate,
+    };
   }
   return s;
 }
-
 
 /** Fonte de imagem do corte: elemento <video> ou quadro decodificado (WebCodecs). */
 export interface FrameSource {
@@ -208,7 +221,13 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
-function paintBackground(ctx: CanvasRenderingContext2D, doc: TemplateDoc, W: number, H: number, images: Map<string, HTMLImageElement>) {
+function paintBackground(
+  ctx: CanvasRenderingContext2D,
+  doc: TemplateDoc,
+  W: number,
+  H: number,
+  images: Map<string, HTMLImageElement>,
+) {
   const bg = doc.canvas.background;
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, W, H);
@@ -228,7 +247,14 @@ function paintBackground(ctx: CanvasRenderingContext2D, doc: TemplateDoc, W: num
   }
 }
 
-function drawText(ctx: CanvasRenderingContext2D, layer: Extract<TemplateLayer, { type: "text" }>, x: number, y: number, w: number, h: number) {
+function drawText(
+  ctx: CanvasRenderingContext2D,
+  layer: Extract<TemplateLayer, { type: "text" }>,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) {
   const text = layer.uppercase ? layer.text.toUpperCase() : layer.text;
   if (!text) return;
   ctx.font = `${layer.italic ? "italic " : ""}${layer.fontWeight} ${layer.fontSize}px ${layer.fontFamily}, sans-serif`;
@@ -282,7 +308,14 @@ function drawText(ctx: CanvasRenderingContext2D, layer: Extract<TemplateLayer, {
   });
 }
 
-function drawShape(ctx: CanvasRenderingContext2D, layer: Extract<TemplateLayer, { type: "shape" }>, x: number, y: number, w: number, h: number) {
+function drawShape(
+  ctx: CanvasRenderingContext2D,
+  layer: Extract<TemplateLayer, { type: "shape" }>,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) {
   ctx.fillStyle = layer.fill;
   ctx.strokeStyle = layer.stroke;
   ctx.lineWidth = layer.strokeWidth;
@@ -383,7 +416,15 @@ export function drawTemplateFrame(
           ctx,
           src.el,
           crop,
-          { x, y, w, h, fit: layer.fit ?? "cover", radius: layer.radius || 0, circle: layer.mask === "circle" },
+          {
+            x,
+            y,
+            w,
+            h,
+            fit: layer.fit ?? "cover",
+            radius: layer.radius || 0,
+            circle: layer.mask === "circle",
+          },
           grade,
         );
       } else {
@@ -391,7 +432,6 @@ export function drawTemplateFrame(
       }
       ctx.restore();
     } else if (layer.type === "image" && layer.src) {
-
       const img = images.get(layer.src);
       if (img) {
         ctx.save();
@@ -459,14 +499,16 @@ export function drawTemplateFrame(
 
 function collectImageSources(doc: TemplateDoc): string[] {
   const out = new Set<string>();
-  if (doc.canvas.background.kind === "image" && doc.canvas.background.src) out.add(doc.canvas.background.src);
+  if (doc.canvas.background.kind === "image" && doc.canvas.background.src)
+    out.add(doc.canvas.background.src);
   for (const l of doc.layers) if (l.type === "image" && l.src) out.add(l.src);
   return [...out];
 }
 
 /** Renderiza o projeto para um MP4 real (H.264 + AAC). */
 export async function renderTemplateProject(opts: TemplateRenderOptions): Promise<Blob> {
-  if (!templateRenderSupported()) throw new Error("Este navegador não suporta a renderização de vídeo (WebCodecs).");
+  if (!templateRenderSupported())
+    throw new Error("Este navegador não suporta a renderização de vídeo (WebCodecs).");
   const { doc, file } = opts;
   const fps = opts.fps ?? 30;
   const size = ASPECT_SIZES[doc.aspectRatio] ?? ASPECT_SIZES["9:16"];
@@ -477,8 +519,12 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
   // qualidade automaticamente até achar uma configuração que o aparelho aceite.
   const wanted = Math.max(1, Math.min(2, opts.scale ?? 1));
   const ladder = [wanted, 4 / 3, 1].filter((s, i, arr) => s <= wanted && arr.indexOf(s) === i);
-  let chosen: { q: number; picked: NonNullable<Awaited<ReturnType<typeof pickVideoCodec>>>; w: number; h: number } | null =
-    null;
+  let chosen: {
+    q: number;
+    picked: NonNullable<Awaited<ReturnType<typeof pickVideoCodec>>>;
+    w: number;
+    h: number;
+  } | null = null;
   for (const s of ladder) {
     const w = Math.round((W * s) / 2) * 2;
     const h = Math.round((H * s) / 2) * 2;
@@ -525,15 +571,29 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
       if (img) images.set(src, img);
     }
 
-    const audio = await renderAudioTrack(file, segs.length ? segs : [{ start, end }], 1, 0, 0).catch(() => null);
+    const audioSegments = segs.length ? segs : [{ start, end }];
+    // Explicit editor stems must not silently fall back to the original mix.
+    const audio = opts.audio
+      ? await renderEditorAudio(file, audioSegments, opts.audio, opts.speech)
+      : await renderAudioTrack(file, audioSegments, 1, 0, 0).catch(() => null);
     const audioCodec = audio ? await pickAudioCodec(audio.channels, audio.sampleRate) : null;
-
+    if (opts.audio && audio && (!audioCodec || typeof window.AudioEncoder === "undefined")) {
+      throw new Error(
+        "Este navegador não consegue exportar as trilhas de áudio. Use um navegador com AudioEncoder.",
+      );
+    }
 
     const muxer = new Muxer({
       target: new ArrayBufferTarget(),
       video: { codec: picked.mux, width: outW, height: outH, frameRate: fps },
       ...(audio && audioCodec
-        ? { audio: { codec: audioCodec, numberOfChannels: audio.channels, sampleRate: audio.sampleRate } }
+        ? {
+            audio: {
+              codec: audioCodec,
+              numberOfChannels: audio.channels,
+              sampleRate: audio.sampleRate,
+            },
+          }
         : {}),
       fastStart: "in-memory",
     });
@@ -628,7 +688,11 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
           if (!cur) break;
           // salto para trás (emendas fora de ordem): volta ao caminho preciso
           if (cur.time > tSrc + 0.5) break;
-          await emit(i, tSrc, { el: cur.frame, width: cur.frame.displayWidth, height: cur.frame.displayHeight });
+          await emit(i, tSrc, {
+            el: cur.frame,
+            width: cur.frame.displayWidth,
+            height: cur.frame.displayHeight,
+          });
           done = i + 1;
         }
       } catch (err) {
@@ -648,16 +712,17 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
       await emit(i, tSrc, { el: video, width: video.videoWidth, height: video.videoHeight });
     }
 
-
     await encoder.flush();
     encoder.close();
 
-
     if (audio && audioCodec && typeof window.AudioEncoder !== "undefined") {
       const { rendered, channels, sampleRate } = audio;
+      let audioError: Error | null = null;
       const aenc = new window.AudioEncoder({
         output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
-        error: () => undefined,
+        error: (error) => {
+          audioError = error;
+        },
       });
       const cfg: AudioEncoderConfig = {
         codec: audioCodec === "aac" ? "mp4a.40.2" : "opus",
@@ -666,28 +731,37 @@ export async function renderTemplateProject(opts: TemplateRenderOptions): Promis
         bitrate: 128_000,
       };
       const sup = await window.AudioEncoder.isConfigSupported(cfg).catch(() => null);
-      if (sup?.supported) {
-        aenc.configure(cfg);
-        const chunkSize = 4800;
-        const planes: Float32Array[] = [];
-        for (let c = 0; c < channels; c++) planes.push(rendered.getChannelData(c));
-        for (let off = 0; off < rendered.length; off += chunkSize) {
-          const len = Math.min(chunkSize, rendered.length - off);
-          const data = new Float32Array(len * channels);
-          for (let c = 0; c < channels; c++) data.set(planes[c]!.subarray(off, off + len), c * len);
-          const ad = new AudioData({
-            format: "f32-planar",
-            sampleRate,
-            numberOfFrames: len,
-            numberOfChannels: channels,
-            timestamp: Math.round((off / sampleRate) * 1_000_000),
-            data,
-          });
-          aenc.encode(ad);
-          ad.close();
+      try {
+        if (sup?.supported) {
+          aenc.configure(cfg);
+          const chunkSize = 4800;
+          const planes: Float32Array[] = [];
+          for (let c = 0; c < channels; c++) planes.push(rendered.getChannelData(c));
+          for (let off = 0; off < rendered.length; off += chunkSize) {
+            const len = Math.min(chunkSize, rendered.length - off);
+            const data = new Float32Array(len * channels);
+            for (let c = 0; c < channels; c++)
+              data.set(planes[c]!.subarray(off, off + len), c * len);
+            const ad = new AudioData({
+              format: "f32-planar",
+              sampleRate,
+              numberOfFrames: len,
+              numberOfChannels: channels,
+              timestamp: Math.round((off / sampleRate) * 1_000_000),
+              data,
+            });
+            aenc.encode(ad);
+            ad.close();
+          }
+          await aenc.flush();
+          if (audioError) throw audioError;
+        } else if (opts.audio) {
+          throw new Error(
+            "Configuração de áudio não suportada; exportação cancelada para não perder as trilhas.",
+          );
         }
-        await aenc.flush();
-        aenc.close();
+      } finally {
+        if (aenc.state !== "closed") aenc.close();
       }
     }
 

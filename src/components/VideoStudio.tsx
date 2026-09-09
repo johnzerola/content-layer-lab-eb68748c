@@ -578,15 +578,7 @@ export function VideoStudio({
   const separateAudioTracks = async () => {
     setSeparating(true);
     try {
-      // Aqui chamaremos a função server-side ou worker quando integrada
-      toast.promise(
-        new Promise((resolve) => setTimeout(resolve, 2000)),
-        {
-          loading: "Analisando frequências e separando trilhas...",
-          success: "Áudio separado com sucesso! (Modo Simulação)",
-          error: "Erro ao processar áudio.",
-        }
-      );
+      toast.info("Para separar com Demucs, abra o painel Áudio do editor profissional. Este painel de pré-corte não cria trilhas de áudio.");
     } finally {
       setSeparating(false);
     }

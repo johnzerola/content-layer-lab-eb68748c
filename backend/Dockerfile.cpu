@@ -23,6 +23,11 @@ COPY requirements-cpu.txt .
 RUN pip install --upgrade pip setuptools wheel && \
     pip install -r requirements-cpu.txt
 
+# Opt-in: does not activate GPU, and existing CleanerIA images stay unchanged.
+ARG INSTALL_AUDIO_SEPARATOR=0
+COPY requirements-audio.txt .
+RUN if [ "$INSTALL_AUDIO_SEPARATOR" = "1" ]; then pip install -r requirements-audio.txt; fi
+
 COPY app/ ./app/
 COPY scripts/ ./scripts/
 

@@ -1,5 +1,5 @@
 /** Mixagem: música de fundo, áudio original, gravação e narração por IA. */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AudioWaveform, Mic, Sparkles, Square, Trash2, Upload } from "lucide-react";
 import {
   createAudioClip,
@@ -70,6 +70,11 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime, getS
   const [error, setError] = useState<string | null>(null);
   const [splitting, setSplitting] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [stage, setStage] = useState("");
+  const separationRef = useRef<AbortController | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  useEffect(() => () => separationRef.current?.abort(), []);
 
   const patch = (p: Partial<EditorAudio>, label = "audio") => onChange({ ...state, ...p }, label);
   const addClip = (clip: AudioClip) => patch({ tracks: [...state.tracks, clip] }, "add-audio");
@@ -79,31 +84,29 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime, getS
 
   /** Separa o áudio do vídeo em trilha de voz e trilha de música. */
   async function splitStems() {
-    if (!getSourceFile || splitting) return;
+    if (!getSourceFile || separationRef.current) return;
+    const controller = new AbortController();
+    separationRef.current = controller;
     setSplitting(true);
     setProgress(0);
     setError(null);
     try {
       const file = await getSourceFile();
       if (!file) throw new Error("Não encontrei o vídeo de origem para separar o áudio.");
-      const stems = await separateStems(file, {}, setProgress);
-      const urlFor = async (blob: Blob) => {
-        try {
-          return await toPersistentUrl(blob);
-        } catch {
-          // grande demais para salvar no projeto: continua utilizável nesta sessão
-          return URL.createObjectURL(blob);
-        }
-      };
-      const [voiceUrl, musicUrl] = await Promise.all([urlFor(stems.voice), urlFor(stems.music)]);
-      patch(
+      const stems = await separateStems(file, { signal: controller.signal, onStage: setStage }, setProgress);
+      const [voiceUrl, musicUrl] = await Promise.all([toPersistentUrl(stems.voice), toPersistentUrl(stems.music)]);
+      controller.signal.throwIfAborted();
+      onChange(
         {
+          ...stateRef.current,
           originalMuted: true,
+          duckUnderSpeech: false,
           tracks: [
-            ...state.tracks,
+            ...stateRef.current.tracks.filter((clip) => !clip.stemRole),
             createAudioClip({
               kind: "voice",
-              name: "Trilha de voz",
+              stemRole: "voice",
+              name: "Voz — Demucs",
               url: voiceUrl,
               startTime: 0,
               duration: stems.duration,
@@ -113,11 +116,12 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime, getS
             }),
             createAudioClip({
               kind: "music",
-              name: "Trilha de música/ambiente",
+              stemRole: "music",
+              name: "Música e ambiente — Demucs",
               url: musicUrl,
               startTime: 0,
               duration: stems.duration,
-              volume: 0.8,
+              volume: 1,
               fadeIn: 0,
               fadeOut: 0,
             }),
@@ -126,8 +130,9 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime, getS
         "separar-trilhas",
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Não consegui separar o áudio deste vídeo.");
+      setError(controller.signal.aborted ? "Separação cancelada; áudio original preservado." : e instanceof Error ? e.message : "Não consegui separar o áudio deste vídeo.");
     } finally {
+      separationRef.current = null;
       setSplitting(false);
     }
   }
@@ -214,7 +219,7 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime, getS
           <input
             type="range"
             min={0}
-            max={1.5}
+            max={1}
             step={0.05}
             value={state.originalVolume}
             onChange={(e) => patch({ originalVolume: Number(e.target.value) }, "vol-original")}
@@ -248,9 +253,10 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime, getS
       <section className="rounded-xl border border-border/60 p-2.5">
         <p className="mb-1 font-mono text-[11px] uppercase text-muted-foreground">Separar voz e música</p>
         <p className="mb-2 text-[11px] text-muted-foreground">
-          Divide o áudio do vídeo em duas trilhas independentes (voz e música/ambiente) para você controlar volume,
-          fade e mudo de cada uma. O processamento acontece no seu navegador.
+          Demucs separa voz e acompanhamento em duas trilhas editáveis. Apenas o áudio é enviado à Hostear;
+          a imagem do vídeo não muda. Até 3 minutos por vez. Em CPU, pode levar vários minutos.
         </p>
+        <p className="mb-2 text-[11px] text-muted-foreground">Pode restar música na voz. Canto da música pode ficar junto da fala.</p>
         <button
           type="button"
           disabled={!getSourceFile || splitting}
@@ -258,13 +264,24 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime, getS
           className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs disabled:opacity-50"
         >
           <AudioWaveform className="h-3.5 w-3.5" />
-          {splitting ? `Separando… ${Math.round(progress * 100)}%` : "Separar trilhas"}
+          {splitting ? "Separando…" : "Separar com Demucs"}
         </button>
         {splitting && (
-          <div className="mt-2 h-1 overflow-hidden rounded bg-muted">
+          <div className="mt-2" role="status">
+            <p className="mb-2 text-xs">{stage}</p>
+            <button type="button" onClick={() => separationRef.current?.abort()} className="mb-2 rounded border px-2 py-1 text-xs">Cancelar</button>
+            <div className="h-1 overflow-hidden rounded bg-muted">
             <div className="h-full bg-primary transition-all" style={{ width: `${progress * 100}%` }} />
+            </div>
           </div>
         )}
+        {state.tracks.some((clip) => clip.stemRole) && !splitting && (
+          <button type="button" className="mt-2 rounded border px-2 py-1 text-xs" onClick={() => patch({
+            originalMuted: true,
+            tracks: state.tracks.map((clip) => ({ ...clip, muted: clip.stemRole !== "voice" })),
+          }, "somente-fala")}>Ouvir somente a voz separada</button>
+        )}
+        {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
       </section>
 
       <section className="rounded-xl border border-border/60 p-2.5">
@@ -411,6 +428,10 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime, getS
               </button>
             </div>
             <audio src={c.url} controls className="mt-1.5 h-8 w-full" />
+            {c.stemRole && <a href={c.url} download={`${c.stemRole}.mp3`} className="mt-1 inline-block text-xs underline">Baixar esta trilha</a>}
+            <Row label="Mudo">
+              <input type="checkbox" checked={c.muted} onChange={(e) => updateClip(c.id, { muted: e.target.checked })} />
+            </Row>
             <Row label="Início">
               <input
                 type="number"
@@ -426,7 +447,7 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime, getS
               <input
                 type="range"
                 min={0}
-                max={1.5}
+                max={1}
                 step={0.05}
                 value={c.volume}
                 onChange={(e) => updateClip(c.id, { volume: Number(e.target.value) })}

@@ -1,12 +1,14 @@
 /**
  * TRILHA DE ÁUDIO do editor profissional.
- * Guarda apenas metadados (JSONB no documento do projeto). A mixagem real
- * continua em `src/lib/audio-track.ts` (Web Audio) na hora de exportar.
+ * Guarda clipes no documento do projeto, incluindo URLs de áudio persistidas.
+ * A mixagem do editor profissional fica em `src/lib/editor/audio-mix.ts`.
  */
 
 export type AudioClipKind = "music" | "voice" | "sfx" | "replacement";
 
 export interface AudioClip {
+  /** Identifies generated stems for safe replacement on a second separation. */
+  stemRole?: "voice" | "music";
   id: string;
   kind: AudioClipKind;
   name: string;

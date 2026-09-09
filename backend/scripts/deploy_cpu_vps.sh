@@ -17,7 +17,7 @@ echo "==> Enviando release para $USER@$HOST:$REMOTE_DIR"
 ssh "$USER@$HOST" "mkdir -p '$REMOTE_DIR'"
 rsync -az --delete \
   --exclude data --exclude .env --exclude __pycache__ --exclude '*.pyc' \
-  ./app ./scripts ./requirements-cpu.txt ./Dockerfile.cpu ./docker-compose.cpu.yml \
+  ./app ./scripts ./requirements-cpu.txt ./requirements-audio.txt ./Dockerfile.cpu ./docker-compose.cpu.yml \
   ./Caddyfile.cleaner "$USER@$HOST:$REMOTE_DIR/"
 
 ssh "$USER@$HOST" \

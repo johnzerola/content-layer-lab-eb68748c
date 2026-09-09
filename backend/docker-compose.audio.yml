@@ -1,0 +1,8 @@
+# Existing Hostear service only; leave its resource limits, proxy and GPU alone.
+services:
+  worker:
+    environment:
+      AUDIO_SEPARATION_ENABLED: "1"
+      AUDIO_MODEL_CACHE: /app/models/demucs-hf
+      # Preflight must populate this cache before activation. No model updates per job.
+      AUDIO_MODEL_OFFLINE: "1"

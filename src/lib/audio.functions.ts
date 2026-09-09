@@ -1,36 +1,31 @@
 import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-/**
- * Interface para representar o resultado da separação de áudio.
- * Como rodar modelos de separação (ex: Spleeter, Demucs) no navegador é pesado e lento,
- * e a Lovable Cloud é baseada em Workers/Edge, o ideal seria uma API externa.
- * 
- * Se o usuário tiver um worker Python/GPU (como o do CleanerIA), podemos adicionar 
- * um endpoint lá. Por enquanto, vamos preparar a estrutura.
- */
-
-export const separateAudio = createServerFn({ method: "POST" })
+/** Only scoped, short-lived tickets leave the server, never the worker secret. */
+export const prepareAudioSeparation = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .inputValidator((data) =>
-    z
-      .object({
-        fileUrl: z.string().url(),
-      })
-      .parse(data)
-  )
-  .handler(async ({ data }) => {
-    // Nota: Esta é uma implementação mock/preparatória.
-    // Em produção, isso enviaria o arquivo para um worker com GPU rodando Demucs/Spleeter.
-    
-    console.log("Solicitando separação de áudio para:", data.fileUrl);
-    
-    // Mock de resposta
+  .handler(async () => {
+    const { jobToken, workerBase, workerPublicBase } = await import("@/lib/cleaner.server");
+    const base = workerBase();
+    const publicBase = workerPublicBase();
+    if (!base || !publicBase) throw new Error("Servidor de separação de áudio não configurado.");
+    const response = await fetch(`${base}/v1/audio/capabilities`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok)
+      throw new Error("Publique o serviço Demucs na Hostear antes de separar as trilhas.");
+    const caps = (await response.json()) as { ready?: boolean; max_duration?: number };
+    if (caps.ready !== true)
+      throw new Error(
+        "Demucs não está instalado/habilitado na Hostear. O áudio original não foi alterado.",
+      );
+    const jobId = crypto.randomUUID();
     return {
-      vocalsUrl: null, // URL para o áudio apenas com voz
-      musicUrl: null,  // URL para o áudio apenas com música
-      message: "Serviço de separação de áudio por IA em fase de integração.",
+      base: `${publicBase}/v1/audio/jobs/${jobId}`,
+      uploadToken: jobToken(jobId, "upload", 600),
+      controlToken: jobToken(jobId, "control", 1800),
+      resultToken: jobToken(jobId, "result", 1800),
+      maxDuration: Math.min(180, caps.max_duration ?? 180),
     };
   });

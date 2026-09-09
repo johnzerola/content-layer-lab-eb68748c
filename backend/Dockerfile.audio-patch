@@ -1,0 +1,8 @@
+# Add only audio routes to the already validated Hostear image.
+ARG BASE_IMAGE=content-layer-lab-cleaner-worker-cpu:before-audio-20260908
+FROM ${BASE_IMAGE}
+USER root
+COPY requirements-audio.txt /app/requirements-audio.txt
+RUN pip install --constraint /app/requirements-cpu.txt -r /app/requirements-audio.txt
+COPY app/audio_separation.py app/main.py app/storage.py /app/app/
+USER cleaner

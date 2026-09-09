@@ -218,7 +218,7 @@ function EditorPage() {
 
   const history = useEditorHistory<EditorProjectDoc | null>(null);
   const doc = history.state;
-  useEffect(() => { setRendered(null); }, [doc?.preedit, doc?.composition, doc?.media]);
+  useEffect(() => { setRendered(null); }, [doc?.preedit, doc?.composition, doc?.media, doc?.audio]);
 
   useEffect(() => {
     let alive = true;
@@ -325,6 +325,8 @@ function EditorPage() {
           file,
           cut: seg ? { start: seg.start, end: seg.end } : null,
           preedit: doc.preedit ?? null,
+          audio: doc.audio,
+          speech: transcript.words.map((word) => ({ start: word.start, end: word.end })),
           scale: exportScale(quality),
           onQualityDrop: (h) =>
             toast.info(`Este aparelho não aguentou a resolução escolhida — exportando em ${h}p.`),
@@ -345,7 +347,7 @@ function EditorPage() {
         setRendering(false);
       }
     },
-    [doc, quality, videoId],
+    [doc, quality, videoId, transcript.words],
   );
 
 
@@ -976,6 +978,8 @@ function EditorPage() {
         <main className="order-1 flex min-h-[56vh] min-w-0 flex-col items-center justify-center gap-3 overflow-hidden bg-black/30 p-2 sm:p-4 lg:order-none lg:min-h-0">
           <div className="relative h-full max-h-full overflow-hidden rounded-xl bg-black" style={{ aspectRatio: `${doc.composition.canvas.width} / ${doc.composition.canvas.height}` }}>
             <MediaStage
+              audio={doc.audio}
+              speech={transcript.words}
               suspended={tool === 'enquadrar' && !cropResult}
               videoRef={videoRef}
               src={src}
@@ -1281,6 +1285,7 @@ function EditorPage() {
             )}
             {tool === "audio" && (
               <AudioPanel
+                key={`${videoId}:${doc.media.storagePath ?? "local"}`}
                 getSourceFile={() => loadSourceFile(videoId, doc.media.storagePath ?? null)}
                 audio={doc.audio ?? defaultEditorAudio()}
                 onChange={(next, label) => patchDoc({ audio: next }, label ?? "audio")}

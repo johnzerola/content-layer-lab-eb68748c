@@ -20,6 +20,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from .config import get_settings
+from .audio_separation import AudioSeparation
 from .engines.diffueraser_official import diffueraser_status
 from .engines.inpainting import cuda_available, device_name
 from .engines.propainter_official import propainter_status
@@ -35,6 +36,7 @@ from .utils.video import mux_audio, probe
 
 SETTINGS = get_settings()
 SETTINGS.storage_dir.mkdir(parents=True, exist_ok=True)
+AUDIO = AudioSeparation(SETTINGS)
 JOBS: Dict[str, dict] = {}
 ACTIVE_JOBS: set[str] = set()
 ACTIVE_LOCK = threading.Lock()
@@ -60,18 +62,23 @@ VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi"}
 async def _cleanup_loop() -> None:
     while True:
         await asyncio.sleep(3600)
-        await asyncio.to_thread(cleanup_expired, SETTINGS.storage_dir, SETTINGS.retention_seconds)
+        await asyncio.to_thread(cleanup_expired, SETTINGS.storage_dir, SETTINGS.retention_seconds, ("audio-stems",))
+        await asyncio.to_thread(AUDIO.cleanup)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    cleanup_expired(SETTINGS.storage_dir, SETTINGS.retention_seconds)
+    cleanup_expired(SETTINGS.storage_dir, SETTINGS.retention_seconds, ("audio-stems",))
     RENDER.start()
+    AUDIO.recover()
+    AUDIO.cleanup()
     task = asyncio.create_task(_cleanup_loop())
     try:
         yield
     finally:
         task.cancel()
+        for event in list(AUDIO.active.values()):
+            event.set()
         RENDER.shutdown()
 
 
@@ -83,6 +90,7 @@ app = FastAPI(
     openapi_url=None if SETTINGS.production else "/openapi.json",
     lifespan=lifespan,
 )
+app.include_router(AUDIO.router)
 
 if SETTINGS.allowed_hosts:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(SETTINGS.allowed_hosts))

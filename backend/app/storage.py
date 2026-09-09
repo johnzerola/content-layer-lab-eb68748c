@@ -46,12 +46,14 @@ def write_state(directory: Path, state: Dict[str, object]) -> None:
     os.replace(temporary, directory / "state.json")
 
 
-def cleanup_expired(storage_dir: Path, retention_seconds: int) -> int:
+def cleanup_expired(storage_dir: Path, retention_seconds: int, exclude_names=()) -> int:
     if not storage_dir.exists():
         return 0
     cutoff = time.time() - retention_seconds
     removed = 0
     for directory in storage_dir.iterdir():
+        if directory.name in exclude_names:
+            continue
         if not directory.is_dir():
             continue
         state = read_state(directory)

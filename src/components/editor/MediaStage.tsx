@@ -20,8 +20,15 @@ import { applyEffectTransform, type ClipEffect } from "@/lib/editor/effects";
 import type { TemplateDoc } from "@/lib/video-template/types";
 import { previewSize, watchVideoPaint } from '@/lib/editor/preview-paint';
 import { useInView } from '@/hooks/use-in-view';
+import { useAudioPreview } from './useAudioPreview';
+import type { EditorAudio } from '@/lib/editor/audio';
+import type { AudioRange } from '@/lib/editor/audio-mix';
+
+const NO_SPEECH: AudioRange[] = [];
 
 interface Props {
+  audio?: EditorAudio | undefined;
+  speech?: AudioRange[];
   suspended?: boolean;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   src: string | null;
@@ -55,6 +62,8 @@ function paintBg(ctx: CanvasRenderingContext2D, doc: TemplateDoc, w: number, h: 
 }
 
 export function MediaStage({
+  audio,
+  speech = NO_SPEECH,
   videoRef,
   src,
   composition,
@@ -65,6 +74,7 @@ export function MediaStage({
   onLoadedMetadata,
   suspended = false,
 }: Props) {
+  const audioError = useAudioPreview(videoRef, src, audio, speech);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const inView = useInView(canvasRef);
   const painter = useRef<ReturnType<typeof watchVideoPaint> | null>(null);
@@ -148,6 +158,7 @@ export function MediaStage({
 
   return (
     <>
+      {audioError && <p role="alert" className="absolute bottom-0 z-20 rounded bg-background p-2 text-xs text-destructive">{audioError}</p>}
       {src ? (
         <video
           ref={videoRef}

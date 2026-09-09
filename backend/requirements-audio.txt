@@ -1,0 +1,3 @@
+# Optional inference dependency, separate from visual-cleaner requirements.
+# MIT: https://github.com/adefossez/demucs/blob/main/LICENSE
+demucs==4.1.0
