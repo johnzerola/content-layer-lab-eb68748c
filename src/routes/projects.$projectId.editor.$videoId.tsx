@@ -1524,6 +1524,14 @@ function EditorPage() {
             volume: track.volume,
             muted: track.muted,
           }))}
+          onAudioVolume={(id, volume) => {
+            const audio = doc.audio ?? defaultEditorAudio();
+            patchDoc({ audio: { ...audio, tracks: audio.tracks.map((track) => track.id === id ? { ...track, volume } : track) } }, "volume-audio");
+          }}
+          onAudioMute={(id, muted) => {
+            const audio = doc.audio ?? defaultEditorAudio();
+            patchDoc({ audio: { ...audio, tracks: audio.tracks.map((track) => track.id === id ? { ...track, muted } : track) } }, "mute-audio");
+          }}
           keyframes={(pre.keys ?? []).map((k) => k.t)}
           onAddKeyframe={() => {
             setTool("keyframes");

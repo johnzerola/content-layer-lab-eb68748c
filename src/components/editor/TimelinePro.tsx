@@ -36,6 +36,8 @@ interface Props {
   onAddKeyframe?: (() => void) | undefined;
   height?: number;
   onHeightChange?: ((height: number) => void) | undefined;
+  onAudioVolume?: ((id: string, volume: number) => void) | undefined;
+  onAudioMute?: ((id: string, muted: boolean) => void) | undefined;
 }
 
 const waveformCache = new Map<string, number[]>();
@@ -195,6 +197,8 @@ export function TimelinePro({
   thumbnailUrl = null,
   height,
   onHeightChange,
+  onAudioVolume,
+  onAudioMute,
 }: Props) {
 
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -218,10 +222,28 @@ export function TimelinePro({
       const contentLeft = rect.left + 112;
       const contentWidth = Math.max(1, rect.width - 112);
       const ratio = Math.min(1, Math.max(0, (clientX - contentLeft) / contentWidth));
-      onSeek(ratio * duration);
+      const raw = ratio * duration;
+      const anchors = [0, duration, ...keyframes, ...removed.flatMap((range) => [range.start, range.end])];
+      const nearest = anchors.reduce((best, anchor) => Math.abs(anchor - raw) < Math.abs(best - raw) ? anchor : best, raw);
+      onSeek(Math.abs(nearest - raw) <= Math.max(0.08, duration / 180) ? nearest : raw);
     },
-    [duration, onSeek],
+    [duration, keyframes, onSeek, removed],
   );
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        event.preventDefault();
+        onSeek(Math.max(0, Math.min(duration, currentTime + (event.shiftKey ? 1 : 1 / 30) * (event.key === "ArrowLeft" ? -1 : 1))));
+      }
+      if (event.key.toLowerCase() === "j") onSeek(Math.max(0, currentTime - 1));
+      if (event.key.toLowerCase() === "l") onSeek(Math.min(duration, currentTime + 1));
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [currentTime, duration, onSeek]);
 
   const ticks = Math.min(14, Math.max(4, Math.round(duration / 10) || 4));
   const ordered = [...layers].sort((a, b) => b.zIndex - a.zIndex);
@@ -247,7 +269,7 @@ export function TimelinePro({
           if (event.key === "ArrowDown") onHeightChange?.(Math.max(160, (height ?? 224) - 16));
         }}
       />}
-      <div className="flex items-center gap-2 px-3 py-2 text-xs">
+      <div className="flex items-center gap-2 border-b border-border/50 px-3 py-2 text-xs">
         <span className="font-mono">{fmt(currentTime)}</span>
         <span className="text-muted-foreground">/ {fmt(duration)}</span>
         <button type="button" onClick={onSplit} className="rounded-md border border-border/60 px-2 py-1">
@@ -287,6 +309,12 @@ export function TimelinePro({
         </div>
       </div>
 
+      <div className="flex items-center gap-3 border-b border-border/40 bg-background/50 px-3 py-1.5 text-[10px] text-muted-foreground">
+        <span className="font-medium text-foreground">Timeline multitrack</span>
+        <span>Arraste para mover · bordas para aparar · S divide · Delete remove</span>
+        <span className="ml-auto">Snapping: ativo</span>
+      </div>
+
       <div className="min-h-0 flex-1 overflow-auto">
         <div style={{ width: `${zoom * 100}%`, minWidth: "100%" }}>
           <div
@@ -316,6 +344,11 @@ export function TimelinePro({
               />
             ))}
           </div>
+
+          {keyframes.length > 0 && <div className="relative h-6 border-b border-border/30 bg-amber-400/5">
+            <span className="absolute left-2 top-1 z-30 text-[10px] font-medium text-amber-300">Keyframes</span>
+            {keyframes.map((t, i) => <button key={`lane-${i}`} type="button" onClick={() => onSeek(t)} aria-label={`Editar keyframe em ${fmt(t)}`} className="absolute top-1.5 size-3 rotate-45 rounded-[2px] border border-amber-200 bg-amber-400 shadow-[0_0_0_2px_rgba(251,191,36,.15)]" style={{ left: `calc(${duration ? (t / duration) * 100 : 0}% - 6px)` }} />)}
+          </div>}
 
           <div className="relative" ref={trackRef} onPointerDown={(e) => seekFromEvent(e.clientX)}>
             {removed.map((r, i) => (
@@ -413,8 +446,9 @@ export function TimelinePro({
               const width = duration ? Math.max(1, (Math.min(track.duration || duration, duration - track.startTime) / duration) * 100) : 100;
               return (
                 <div key={track.id} className="relative h-9 border-b border-border/30">
-                  <div className="absolute left-0 top-0 z-20 flex h-full w-28 items-center gap-1 bg-card/80 px-2 text-[11px]">
-                    <span className="truncate">{track.kind === "voice" ? "voz" : "música"}</span>
+                  <div className="absolute left-0 top-0 z-20 flex h-full w-28 items-center gap-1 bg-card/90 px-2 text-[11px]">
+                    <button type="button" onClick={() => onAudioMute?.(track.id, !track.muted)} className={`rounded px-1 ${track.muted ? "text-destructive" : "text-cyan-300"}`} aria-label={`${track.muted ? "Ativar" : "Silenciar"} ${track.name}`}>{track.muted ? "M" : "♪"}</button>
+                    <span className="truncate">{track.kind === "voice" ? "Voz" : "Música"}</span>
                   </div>
                   <div className="absolute inset-y-0 left-28 right-0">
                     <div className={`absolute top-1 h-7 overflow-hidden rounded-md border px-2 text-[11px] ${track.muted ? "opacity-35" : "border-cyan-400/40 bg-cyan-400/15"}`} style={{ left: `${left}%`, width: `${width}%` }} title={`${track.name} · volume ${Math.round(track.volume * 100)}%`}>
@@ -422,6 +456,7 @@ export function TimelinePro({
                         {(waveforms[track.id] ?? Array.from({ length: 36 }, () => 0.18)).map((peak, i) => <span key={i} className="w-0.5 rounded-full bg-cyan-300/70" style={{ height: `${Math.max(8, peak * 88)}%` }} />)}
                       </div>
                       <span className="absolute inset-x-2 top-1 truncate">{track.name}</span>
+                      {onAudioVolume && <input aria-label={`Volume de ${track.name}`} className="absolute bottom-0.5 right-1 h-1 w-16 accent-cyan-300" type="range" min={0} max={1} step={0.01} value={track.volume} onClick={(e) => e.stopPropagation()} onChange={(e) => onAudioVolume(track.id, Number(e.target.value))} />}
                     </div>
                   </div>
                 </div>
