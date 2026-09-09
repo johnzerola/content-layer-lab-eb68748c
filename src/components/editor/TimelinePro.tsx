@@ -9,9 +9,10 @@ interface Props {
   zoom: number;
   layers: TemplateLayer[];
   selectedId: string | null;
+  selectedIds?: string[];
   removed: TimeRange[];
   onSeek: (time: number) => void;
-  onSelect: (id: string) => void;
+  onSelect: (id: string, additive?: boolean) => void;
   onZoom: (zoom: number) => void;
   onToggleVisible: (id: string) => void;
   onToggleLock: (id: string) => void;
@@ -85,7 +86,7 @@ const Clip = memo(function Clip({
   layer: TemplateLayer;
   duration: number;
   selected: boolean;
-  onSelect: () => void;
+  onSelect: (additive?: boolean) => void;
   onTrim?: ((id: string, startTime: number, endTime: number) => void) | undefined;
 }) {
   const start = Math.max(0, layer.startTime);
@@ -147,7 +148,7 @@ const Clip = memo(function Clip({
     >
       <button
         type="button"
-        onClick={onSelect}
+        onClick={(event) => onSelect(event.shiftKey || event.ctrlKey || event.metaKey)}
         onPointerDown={drag("move")}
         className="h-full w-full cursor-grab truncate px-3 text-left text-[11px] active:cursor-grabbing"
       >
@@ -178,6 +179,7 @@ export function TimelinePro({
   zoom,
   layers,
   selectedId,
+  selectedIds = selectedId ? [selectedId] : [],
   removed,
   onSeek,
   onSelect,
@@ -492,8 +494,8 @@ export function TimelinePro({
                   <Clip
                     layer={layer}
                     duration={duration}
-                    selected={layer.id === selectedId}
-                    onSelect={() => onSelect(layer.id)}
+                    selected={selectedIds.includes(layer.id)}
+                    onSelect={(additive) => onSelect(layer.id, additive)}
                     onTrim={onTrim}
                   />
                 </div>

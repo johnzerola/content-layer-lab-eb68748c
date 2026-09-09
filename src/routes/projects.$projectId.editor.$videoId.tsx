@@ -25,6 +25,7 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { TranscriptPanel } from "@/components/editor/TranscriptPanel";
 import { StylesPanel } from "@/components/editor/StylesPanel";
 import { KeyframePanel } from "@/components/editor/KeyframePanel";
+import { ReadyTemplatePreview } from "@/components/editor/ReadyTemplatePreview";
 import { RenderReport } from "@/components/editor/RenderReport";
 import { READY_TEMPLATES } from "@/lib/editor/template-presets";
 import { loadAnimIdentity } from "@/lib/editor/animation-library";
@@ -193,6 +194,7 @@ function EditorPage() {
   const [joinIndex, setJoinIndex] = useState<number | null>(null);
   const [templateTab, setTemplateTab] = useState<"prontos" | "meus" | "cortes">("prontos");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [lookPreview, setLookPreview] = useState<Partial<PreEdit> | null>(null);
@@ -774,18 +776,22 @@ function EditorPage() {
         setJoinIndex(index);
         setTool("transicoes");
         toast.success("Vídeo dividido. Escolha a transição da emenda.");
-      } else if (e.key === "Delete" && selectedId) {
+      } else if (e.key === "Delete" && (selectedId || selectedIds.length)) {
+        const ids = selectedIds.length ? selectedIds : selectedId ? [selectedId] : [];
+        const removedLayers = (doc?.composition.layers ?? []).filter((l) => ids.includes(l.id));
+        const ripple = removedLayers.reduce((max, layer) => Math.max(max, Math.max(0, (layer.endTime ?? transcript.duration) - layer.startTime)), 0);
         history.set(
           (d) =>
-            d ? { ...d, composition: { ...d.composition, layers: d.composition.layers.filter((l) => l.id !== selectedId) } } : d,
-          "excluir",
+            d ? { ...d, composition: { ...d.composition, layers: d.composition.layers.filter((l) => !ids.includes(l.id)).map((layer) => layer.startTime >= currentTime ? { ...layer, startTime: Math.max(0, layer.startTime - ripple), endTime: layer.endTime == null ? null : Math.max(0, layer.endTime - ripple) } : layer) } } : d,
+          "excluir-ripple",
         );
         setSelectedId(null);
+        setSelectedIds([]);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [history, recordId, doc, selectedId, transcript.duration, currentTime]);
+  }, [history, recordId, doc, selectedId, selectedIds, transcript.duration, currentTime]);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -829,8 +835,9 @@ function EditorPage() {
   const duration = doc.media.duration || transcript.duration;
   const pre = doc.preedit ?? defaultPreEdit();
   const selectedLayer = doc.composition.layers.find((l) => l.id === selectedId) ?? null;
-  const selectLayer = (id: string | null) => {
+  const selectLayer = (id: string | null, additive = false) => {
     setSelectedId(id);
+    setSelectedIds((current) => id == null ? [] : additive ? (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]) : [id]);
     // Clicking the composition should always reveal the controls for the
     // selected object, matching the direct-manipulation model users expect.
     if (id) setTool("camada");
@@ -1220,6 +1227,8 @@ function EditorPage() {
                 duration={duration}
                 currentTime={currentTime}
                 onSeek={seek}
+                layer={selectedLayer}
+                onUpdateLayer={(patch) => selectedLayer && updateLayer(selectedLayer.id, patch)}
               />
             )}
             {tool === "render" && (
@@ -1411,12 +1420,7 @@ function EditorPage() {
                         }}
                         className="group overflow-hidden rounded-xl border border-border/60 bg-card/40 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/70 hover:shadow-lg"
                       >
-                        <span
-                          className="flex aspect-[9/12] items-end justify-center p-3 text-center text-[11px] font-black uppercase transition-transform group-hover:scale-[1.03]"
-                          style={{ background: t.swatch[0], color: t.swatch[1] }}
-                        >
-                          {t.label}
-                        </span>
+                        <ReadyTemplatePreview template={t} />
                         <span className="block px-2 py-1.5">
                           <span className="block text-xs font-medium">{t.label}</span>
                           <span className="block text-[10px] text-muted-foreground">{t.hint}</span>
@@ -1505,6 +1509,7 @@ function EditorPage() {
           zoom={doc.timelineZoom}
           layers={doc.composition.layers}
           selectedId={selectedId}
+          selectedIds={selectedIds}
           removed={cuts}
           onSeek={seek}
           onSelect={selectLayer}

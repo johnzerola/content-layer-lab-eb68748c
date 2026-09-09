@@ -26,6 +26,7 @@ import {
   type PreEdit,
   type TransitionState,
 } from "@/lib/preedit";
+import { resolveLayerAtTime } from "@/lib/video-template/layer-keyframes";
 import {
   ASPECT_SIZES,
   NEUTRAL_FILTER,
@@ -381,7 +382,7 @@ export function drawTemplateFrame(
   paintBackground(ctx, doc, W, H, images);
   ctx.restore();
 
-  const layers = [...doc.layers].sort((a, b) => a.zIndex - b.zIndex);
+  const layers = [...doc.layers].map((layer) => resolveLayerAtTime(layer, t)).sort((a, b) => a.zIndex - b.zIndex);
   for (const layer of layers) {
     if (!activeAt(layer, t)) continue;
     const x = (layer.x / 100) * W;

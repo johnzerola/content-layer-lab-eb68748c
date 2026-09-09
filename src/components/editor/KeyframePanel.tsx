@@ -5,6 +5,8 @@
  */
 import { useMemo } from "react";
 import { cropAt, type PreCrop, type PreEdit } from "@/lib/preedit";
+import type { TemplateLayer } from "@/lib/video-template/types";
+import { upsertLayerKeyframe } from "@/lib/video-template/layer-keyframes";
 
 interface Props {
   preedit: PreEdit;
@@ -12,6 +14,8 @@ interface Props {
   duration: number;
   currentTime: number;
   onSeek: (t: number) => void;
+  layer?: TemplateLayer | null;
+  onUpdateLayer?: (patch: Partial<TemplateLayer>) => void;
 }
 
 const FULL: PreCrop = { x: 0, y: 0, w: 1, h: 1 };
@@ -26,7 +30,7 @@ function fmt(t: number): string {
   return `${Math.floor(t / 60)}:${Math.floor(t % 60).toString().padStart(2, "0")}`;
 }
 
-export function KeyframePanel({ preedit, onChange, duration, currentTime, onSeek }: Props) {
+export function KeyframePanel({ preedit, onChange, duration, currentTime, onSeek, layer, onUpdateLayer }: Props) {
   const keys = useMemo(() => [...(preedit.keys ?? [])].sort((a, b) => a.t - b.t), [preedit.keys]);
   const current = cropAt(preedit, currentTime) ?? preedit.crop ?? FULL;
   const zoom = Number((1 / Math.max(0.05, current.w)).toFixed(2));
@@ -59,6 +63,11 @@ export function KeyframePanel({ preedit, onChange, duration, currentTime, onSeek
       },
       label,
     );
+  };
+
+  const addLayerKeyframe = () => {
+    if (!layer || !onUpdateLayer) return;
+    onUpdateLayer({ keyframes: upsertLayerKeyframe(layer, currentTime, { x: layer.x, y: layer.y, width: layer.width, height: layer.height, rotation: layer.rotation, opacity: layer.opacity }) });
   };
 
   return (
@@ -119,6 +128,22 @@ export function KeyframePanel({ preedit, onChange, duration, currentTime, onSeek
           ◆ Adicionar keyframe em {fmt(currentTime)}
         </button>
       </div>
+
+      {layer && onUpdateLayer && <div className="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium text-foreground">Propriedades da camada</p>
+          <span className="font-mono text-[10px] text-primary">{layer.keyframes?.length ?? 0} pontos</span>
+        </div>
+        <p className="text-[11px] text-muted-foreground">Anime posição, tamanho, rotação e opacidade no tempo atual.</p>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <label>X <input aria-label="Posição X" type="number" value={layer.x} onChange={(e) => onUpdateLayer({ x: Number(e.target.value) })} className="mt-1 w-full rounded border border-border bg-background px-2 py-1" /></label>
+          <label>Y <input aria-label="Posição Y" type="number" value={layer.y} onChange={(e) => onUpdateLayer({ y: Number(e.target.value) })} className="mt-1 w-full rounded border border-border bg-background px-2 py-1" /></label>
+          <label>Escala X <input aria-label="Largura" type="number" value={layer.width} onChange={(e) => onUpdateLayer({ width: Number(e.target.value) })} className="mt-1 w-full rounded border border-border bg-background px-2 py-1" /></label>
+          <label>Opacidade <input aria-label="Opacidade" type="number" min="0" max="1" step="0.05" value={layer.opacity} onChange={(e) => onUpdateLayer({ opacity: Number(e.target.value) })} className="mt-1 w-full rounded border border-border bg-background px-2 py-1" /></label>
+        </div>
+        <button type="button" onClick={addLayerKeyframe} className="w-full rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground">◆ Gravar propriedades em {fmt(currentTime)}</button>
+        {!!layer.keyframes?.length && <div className="space-y-1 border-t border-border/50 pt-2">{layer.keyframes.map((key) => <button type="button" key={key.id} onClick={() => onSeek(key.time)} className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-[11px] hover:bg-primary/10"><span className="font-mono text-primary">{fmt(key.time)}</span><span className="text-muted-foreground">X {Math.round(key.values.x ?? 0)} · Y {Math.round(key.values.y ?? 0)}</span></button>)}</div>}
+      </div>}
 
       <div className="space-y-2">
         <p className="font-mono text-[11px] uppercase tracking-wide text-muted-foreground">Movimentos prontos</p>

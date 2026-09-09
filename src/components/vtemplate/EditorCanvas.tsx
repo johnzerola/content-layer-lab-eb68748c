@@ -5,6 +5,7 @@ import { filterToCss } from "@/lib/video-template/factory";
 import type { StickerLayer, TemplateDoc, TemplateLayer } from "@/lib/video-template/types";
 import { drawSticker, type StickerId } from "@/lib/editor/stickers";
 import { useInView } from '@/hooks/use-in-view';
+import { resolveLayerAtTime } from "@/lib/video-template/layer-keyframes";
 
 type Handle = "move" | "nw" | "ne" | "sw" | "se" | "rotate";
 
@@ -342,8 +343,9 @@ export function EditorCanvas({
         }}
       >
 
-        {ordered.map((layer) =>
-          layer.visible && currentTime >= layer.startTime && (layer.endTime == null || currentTime <= layer.endTime) ? (
+        {ordered.map((sourceLayer) => {
+          const layer = resolveLayerAtTime(sourceLayer, currentTime);
+          return layer.visible && currentTime >= layer.startTime && (layer.endTime == null || currentTime <= layer.endTime) ? (
             <div
               key={
                 animPreview && animPreview.layerId === layer.id ? `${layer.id}-${animPreview.key}` : layer.id
@@ -397,8 +399,8 @@ export function EditorCanvas({
                 </>
               )}
             </div>
-          ) : null,
-        )}
+          ) : null;
+        })}
 
         {showGrid && (
           <div className="pointer-events-none absolute inset-0" style={{ zIndex: 9999 }}>

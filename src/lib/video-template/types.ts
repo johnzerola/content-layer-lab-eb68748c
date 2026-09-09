@@ -49,6 +49,19 @@ export const ASPECT_SIZES: Record<AspectRatio, { width: number; height: number }
 
 export type Easing = "linear" | "easeIn" | "easeOut" | "easeInOut";
 
+/** Anima propriedades de uma camada ao longo da timeline. Valores numéricos
+ * interpolam; cores e textos usam o valor do keyframe anterior. */
+export interface LayerKeyframe {
+  id: string;
+  time: number;
+  easing?: Easing;
+  values: Partial<Pick<BaseLayer, "x" | "y" | "width" | "height" | "rotation" | "opacity">> & {
+    volume?: number;
+    speed?: number;
+    blur?: number;
+  };
+}
+
 export interface AnimationSpec {
   type: string;
   duration: number;
@@ -107,6 +120,7 @@ export interface BaseLayer {
   animationOut?: AnimationSpec | null;
   animationLoop?: AnimationSpec | null;
   filter?: Partial<FilterValues> | null;
+  keyframes?: LayerKeyframe[];
 }
 
 export interface TextLayer extends BaseLayer {
