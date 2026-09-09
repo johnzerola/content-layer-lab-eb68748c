@@ -73,10 +73,13 @@ export async function downloadAsZip(
   zipName = "vaiviral.zip",
   onProgress?: (p: SaveProgress) => void,
 ) {
-  if (!files.length) return;
+  const valid = files.filter((file) => file.blob.size > 0);
+  if (!valid.length) throw new Error("Nenhum vídeo pronto para baixar.");
+  files = valid;
   // um único arquivo não precisa de ZIP (evita cópia de centenas de MB na memória)
   if (files.length === 1) {
     triggerDownload(files[0]!.blob, files[0]!.name);
+    onProgress?.({ bytes: files[0]!.blob.size, total: files[0]!.blob.size, files: 1, target: "memória" });
     return;
   }
 
@@ -99,6 +102,7 @@ export async function downloadAsZip(
     onProgress?.({ bytes, total, files: 0, target: "memória" });
   }
   triggerDownload(new Blob(chunks, { type: "application/zip" }), zipName);
+  onProgress?.({ bytes, total, files: files.length, target: "memória" });
 }
 
 /** Pede uma pasta ao usuário (para salvar agora ou automaticamente durante o lote). */

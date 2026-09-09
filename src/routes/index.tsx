@@ -1537,7 +1537,9 @@ function Home() {
             } catch (err) {
               lastErr = err;
               const aborted = (err as Error)?.name === "AbortError" || ctrl.cancelled;
-              if (aborted || attempt === 2) break;
+              const message = String((err as Error)?.message ?? err).toLowerCase();
+              const deterministicMediaError = /decoder|bitstream|codec|formato incompatível|não foi possível ler/.test(message);
+              if (aborted || deterministicMediaError || attempt === 2) break;
               setItems((p) =>
                 p.map((x) =>
                   x.id === id

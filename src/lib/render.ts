@@ -53,6 +53,11 @@ function pickMime() {
   return "video/webm";
 }
 
+function decoderCompatibilityError(error: unknown) {
+  const message = String((error as Error)?.message ?? error).toLowerCase();
+  return /decoder|bitstream|avc|h264|hevc|vp9|codec|coded.?size|configur/.test(message);
+}
+
 /** true quando o navegador só consegue gerar WebM (rejeitado por Instagram/TikTok). */
 export function outputIsWebm() {
   if (webCodecsSupported()) return false;
@@ -266,6 +271,7 @@ async function runRender(
   skipPool = false,
 ): Promise<{ blob: Blob; ext: string }> {
   opts.onPhase?.("iniciando processamento", 0.02);
+  let poolDecoderError = false;
   // 1ª opção: pool de workers (OffscreenCanvas) — vários vídeos em paralelo
   // sem travar a interface. Cai para os caminhos antigos se algo não rolar.
   if (!skipPool && poolSupported()) {
@@ -276,13 +282,14 @@ async function runRender(
     } catch (err) {
       if ((err as Error)?.name === "AbortError") throw err;
       console.warn("Pool de workers falhou, usando exportação na tela:", err);
+      poolDecoderError = decoderCompatibilityError(err);
       opts.onPhase?.(`worker indisponível (${(err as Error)?.message ?? "erro"}) — exportando na tela`);
     }
   }
 
   if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
 
-  if (webCodecsSupported()) {
+  if (webCodecsSupported() && !poolDecoderError) {
 
     try {
       const blob = await encodeMp4({
@@ -309,6 +316,7 @@ async function runRender(
       return { blob, ext: "mp4" };
     } catch (err) {
       if ((err as Error)?.name === "AbortError" || (err as Error)?.name === "RenderStalledError") throw err;
+      if (decoderCompatibilityError(err)) opts.onPhase?.("formato incompatível — usando compatibilidade do navegador", 0.94);
       console.warn("WebCodecs falhou, usando fallback:", err);
     }
   }
