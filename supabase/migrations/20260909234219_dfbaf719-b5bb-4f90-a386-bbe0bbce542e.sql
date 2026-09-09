@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.prune_template_versions() FROM PUBLIC, anon, authenticated;
