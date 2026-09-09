@@ -110,6 +110,7 @@ import {
   saveToFolder,
   writeToFolder,
 } from "@/lib/zip";
+import { batchPolicy } from "@/lib/batch-policy";
 
 import { cuesToSrt, cuesToText, demoCues, generateCaptions, type CaptionCue } from "@/lib/captions";
 import { registerFonts } from "@/lib/fonts";
@@ -1224,6 +1225,7 @@ function Home() {
 
 
     const queue = [...pending];
+    const queueTotal = queue.length;
     setItems((p) =>
       p.map((x) =>
         queue.includes(x.id)
@@ -1577,7 +1579,10 @@ function Home() {
       }
     };
 
-    await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
+    const policy = batchPolicy(queueTotal, concurrency, typeof navigator !== "undefined" ? navigator.hardwareConcurrency : 4);
+    if (policy.serverRecommended) toast.info(`${queueTotal} vídeos: fila protegida ativada. Para maior velocidade, use Renderizar na nuvem.`);
+    setBatchPhase(policy.reason);
+    await Promise.all(Array.from({ length: policy.concurrency }, worker));
     setRunning(false);
     endBatchProgress();
     releaseBackground();
