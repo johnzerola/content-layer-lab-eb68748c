@@ -99,12 +99,62 @@ export async function separateStems(
   options.signal?.throwIfAborted();
   onProgress?.(0.2);
   const result = await runStemJob(ticket, wav, options);
+  options.onStage?.("Limpando vazamento musical da voz…");
+  const cleanedVoice = await cleanVoiceBlob(result.voice, result.music, 44100);
   onProgress?.(1);
-  return { ...result, sampleRate: 44100 };
+  return { ...result, voice: cleanedVoice, sampleRate: 44100 };
 }
 
 export function levelOf(samples: Float32Array): number {
   return Math.sqrt(
     samples.reduce((sum, value) => sum + value * value, 0) / Math.max(1, samples.length),
   );
+}
+
+/** Reduz vazamento musical residual na saída vocals do Demucs. O stem musical
+ * permanece intocado; calculamos a projeção do stem de voz sobre a música e
+ * removemos apenas essa parcela correlacionada, com limite conservador. */
+export function suppressMusicBleed(
+  voice: Float32Array[],
+  music: Float32Array[],
+  maxGain = 0.65,
+): Float32Array[] {
+  const channels = Math.min(voice.length, music.length);
+  return Array.from({ length: channels }, (_, channel) => {
+    const source = voice[channel]!;
+    const bed = music[channel]!;
+    const n = Math.min(source.length, bed.length);
+    let cross = 0;
+    let bedEnergy = 0;
+    for (let i = 0; i < n; i++) {
+      cross += source[i]! * bed[i]!;
+      bedEnergy += bed[i]! * bed[i]!;
+    }
+    const gain = Math.max(0, Math.min(maxGain, bedEnergy > 1e-8 ? cross / bedEnergy : 0));
+    const clean = new Float32Array(source);
+    for (let i = 0; i < n; i++) clean[i] = Math.max(-1, Math.min(1, source[i]! - gain * bed[i]!));
+    return clean;
+  });
+}
+
+async function cleanVoiceBlob(voice: Blob, music: Blob, sampleRate: number): Promise<Blob> {
+  const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioCtx) return voice;
+  const context = new AudioCtx();
+  try {
+    const [voiceBuffer, musicBuffer] = await Promise.all([
+      context.decodeAudioData(await voice.arrayBuffer()),
+      context.decodeAudioData(await music.arrayBuffer()),
+    ]);
+    const channels = Math.min(2, voiceBuffer.numberOfChannels, musicBuffer.numberOfChannels);
+    const cleaned = suppressMusicBleed(
+      Array.from({ length: channels }, (_, i) => voiceBuffer.getChannelData(i)),
+      Array.from({ length: channels }, (_, i) => musicBuffer.getChannelData(i)),
+    );
+    return encodeStereoWav(cleaned, sampleRate);
+  } catch {
+    return voice;
+  } finally {
+    await context.close();
+  }
 }
