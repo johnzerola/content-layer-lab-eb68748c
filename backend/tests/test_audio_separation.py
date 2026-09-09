@@ -9,7 +9,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.audio_separation import AudioSeparation, audio_info, command
+from app.audio_separation import AudioSeparation, audio_info, capabilities, command
 from app.security import create_job_token
 from app.storage import read_state, write_state, cleanup_expired
 
@@ -55,6 +55,14 @@ def test_quality_command_uses_lossless_finetuned_model(tmp_path, monkeypatch):
     assert args[args.index("--shifts") + 1] == "1"
     assert args[args.index("--overlap") + 1] == "0.5"
     assert "--float32" in args
+
+
+def test_unknown_quality_falls_back_to_fast_profile(monkeypatch, tmp_path):
+    monkeypatch.setenv("AUDIO_SEPARATION_QUALITY", "ensemble")
+    args = command(tmp_path / "input.wav", tmp_path / "out")
+    assert args[args.index("-n") + 1] == "htdemucs"
+    assert capabilities()["quality"] == "fast"
+    assert set(capabilities()["profiles"]) == {"fast", "quality"}
 
 
 def test_missing_and_wrong_scope_tokens_are_denied(service):

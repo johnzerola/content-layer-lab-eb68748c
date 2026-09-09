@@ -29,6 +29,8 @@ MAX_BYTES = 64 * 1024 * 1024
 MODEL = "htdemucs"
 def separation_settings() -> tuple[str, int, float]:
     quality = os.getenv("AUDIO_SEPARATION_QUALITY", "fast").lower()
+    if quality not in {"fast", "quality"}:
+        quality = "fast"
     model = os.getenv("AUDIO_SEPARATION_MODEL", "htdemucs_ft" if quality == "quality" else MODEL)
     shifts = int(os.getenv("AUDIO_SEPARATION_SHIFTS", "1" if quality == "quality" else "0"))
     overlap = float(os.getenv("AUDIO_SEPARATION_OVERLAP", "0.5" if quality == "quality" else "0.25"))
@@ -42,9 +44,14 @@ def capabilities():
     enabled = os.getenv("AUDIO_SEPARATION_ENABLED", "0") == "1"
     installed = importlib.util.find_spec("demucs") is not None
     model, shifts, overlap = separation_settings()
+    quality = os.getenv("AUDIO_SEPARATION_QUALITY", "fast").lower()
+    if quality not in {"fast", "quality"}:
+        quality = "fast"
     return {"ready": enabled and installed and bool(shutil.which("ffmpeg"))
             and bool(shutil.which("ffprobe")), "engine": "demucs", "model": model,
-            "device": "cpu", "quality": os.getenv("AUDIO_SEPARATION_QUALITY", "fast"),
+            "device": "cpu", "quality": quality,
+            "profiles": {"fast": {"model": "htdemucs", "interactive": True},
+                         "quality": {"model": "htdemucs_ft", "interactive": False}},
             "shifts": shifts, "overlap": overlap, "losslessIntermediate": True,
             "max_duration": MAX_SECONDS, "max_bytes": MAX_BYTES,
             "notice": NOTICE}
@@ -158,9 +165,11 @@ class AudioSeparation:
             write_state(directory, {"status": "processing", "stage": "separating"})
             duration = separate(directory, event)
             model, shifts, overlap = separation_settings()
+            quality = os.getenv("AUDIO_SEPARATION_QUALITY", "fast").lower()
             write_state(directory, {"status": "completed", "duration": duration,
                                     "engine": "demucs", "model": model, "shifts": shifts,
-                                    "overlap": overlap, "format": "wav", "notice": NOTICE})
+                                    "overlap": overlap, "quality": quality if quality in {"fast", "quality"} else "fast",
+                                    "format": "wav", "notice": NOTICE})
         except Exception as exc:
             # Only safe, controlled diagnostics are exposed. Engine logs stay private.
             message = str(exc) if isinstance(exc, (RuntimeError, TimeoutError, ValueError)) else "Falha ao separar o áudio."
