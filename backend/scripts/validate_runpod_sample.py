@@ -208,6 +208,10 @@ def main():
         api("PATCH", REST + f"/endpoints/{ENDPOINT}", json={
             "templateId": new["id"], "workersMin": 0, "workersMax": 1,
             "idleTimeout": 5, "executionTimeoutMs": 600000})
+        configured = api("GET", REST + f"/endpoints/{ENDPOINT}")
+        if (configured.get("workersMin") != 0 or configured.get("workersMax") != 1
+                or configured.get("templateId") != new["id"]):
+            raise RuntimeError("Endpoint did not confirm the reviewed template and one-worker limit")
         log("Corrected image configured; maximum one worker, minimum zero")
         # Queue API receives endpoint scaling changes asynchronously.
         time.sleep(12)
@@ -279,6 +283,9 @@ def main():
         if managed:
             try:
                 api("PATCH", REST + f"/endpoints/{ENDPOINT}", json={"workersMin": 0, "workersMax": 0})
+                stopped = api("GET", REST + f"/endpoints/{ENDPOINT}")
+                if stopped.get("workersMin") != 0 or stopped.get("workersMax") != 0:
+                    raise RuntimeError("Endpoint did not confirm zero capacity")
                 report["capacity_disabled"] = True
                 log("RunPod capacity set to ZERO; no volumes deleted")
             except Exception:
@@ -303,6 +310,10 @@ def main():
                 report.setdefault("project_cleanup_pending", []).append(owned_job)
         save()
 
+    return int(bool(report.get("error") or report.get("cancellation_failed")
+                    or report.get("project_cleanup_pending")
+                    or (managed and not report.get("capacity_disabled"))))
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

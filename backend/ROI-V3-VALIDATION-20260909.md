@@ -3,6 +3,13 @@
 Atualização de 09/09/2026, aproximadamente 22:43 BRT. Substitui, para o estado
 atual, a auditoria anterior em `CLEANERIA-ESTADO-E-CUSTOS-20260909.md`.
 
+**Continuação em 10/09:** o código foi enviado à `main` do GitHub (`44ec662`),
+mas a publicação do site continua pendente. O diagnóstico identificou falha ao
+baixar a imagem privada; a credencial foi corrigida, porém as novas tentativas
+limitadas ainda expiraram na fila. Estado final, limpeza e comparação direta
+com o refinado aprovado: [RUNPOD-DIAGNOSTICO-20260910.md](RUNPOD-DIAGNOSTICO-20260910.md).
+Os estados locais/anteriores abaixo descrevem a verificação original das 22:43.
+
 ## Resultado e limites
 
 Nova comparação: `G:\dowloand\teste\resultado-automatico-v3-20260909\comparison.html`.

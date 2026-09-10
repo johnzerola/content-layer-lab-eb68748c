@@ -15,8 +15,11 @@ def load_runner():
     return module
 
 
-@pytest.mark.parametrize("health_state", ["COMPLETED", "FAILED"])
-def test_private_auth_preserved_and_capacity_disabled_after_failed_readiness(tmp_path, monkeypatch, health_state):
+@pytest.mark.parametrize("health_state,confirm_limits", [
+    ("COMPLETED", True), ("FAILED", True), ("IN_QUEUE", True), ("COMPLETED", False),
+])
+def test_private_auth_preserved_and_capacity_disabled_after_failed_readiness(
+        tmp_path, monkeypatch, health_state, confirm_limits):
     runner = load_runner()
     source = tmp_path / "input.mp4"
     source.write_bytes(b"sample")
@@ -28,6 +31,9 @@ def test_private_auth_preserved_and_capacity_disabled_after_failed_readiness(tmp
     monkeypatch.setenv("CLEANER_WORKER_SECRET", "test-secret-not-a-real-secret")
     monkeypatch.setattr(runner, "probe", lambda _: {"format": {"duration": "5"}})
     monkeypatch.setattr(runner.time, "sleep", lambda _: None)
+    if health_state == "IN_QUEUE":
+        clock = iter([0, 241])
+        monkeypatch.setattr(runner.time, "monotonic", lambda: next(clock))
     calls = []
 
     class Response:
@@ -42,9 +48,16 @@ def test_private_auth_preserved_and_capacity_disabled_after_failed_readiness(tmp
 
     class Session:
         headers = {}
+        endpoint = {"templateId": "old", "workersMin": 0, "workersMax": 2}
 
         def request(self, method, url, **kwargs):
             calls.append((method, url, kwargs.get("json")))
+            if "/endpoints/" in url:
+                if method == "PATCH":
+                    self.endpoint.update(kwargs["json"])
+                    if not confirm_limits and kwargs["json"].get("workersMax") == 1:
+                        self.endpoint["workersMax"] = 3
+                return Response(dict(self.endpoint))
             if url.endswith("/health"):
                 return Response({"jobs": {"inProgress": 0, "inQueue": 0}, "workers": {}})
             if url.endswith("/graphql"):
@@ -72,12 +85,19 @@ def test_private_auth_preserved_and_capacity_disabled_after_failed_readiness(tmp
 
     monkeypatch.setattr(runner.requests, "Session", Session)
     monkeypatch.setattr(runner.requests, "request", cpu)
-    runner.main()
+    monkeypatch.setattr(runner.requests, "delete", lambda *args, **kwargs: Response({"ok": True}))
+    assert runner.main() == 1
     patches = [data for method, _, data in calls if method == "PATCH"]
     assert patches[-1] == {"workersMin": 0, "workersMax": 0}
-    assert len([1 for _, url, _ in calls if url.endswith("/run")]) == 1
+    assert len([1 for _, url, _ in calls if url.endswith("/run")]) == int(confirm_limits)
     report = json.loads((output / "report.json").read_text())
     assert report["capacity_disabled"] is True
     assert "error" in report
+    assert report["temporary_projects_deleted"] == [report["hostear_job"]]
+    if not confirm_limits:
+        assert "one-worker limit" in report["error"]
+    if health_state == "IN_QUEUE":
+        assert report["error"] == "Bounded sample deadline reached"
+        assert any(url.endswith("/cancel/health-job") for _, url, _ in calls)
     assert "test-key" not in (output / "report.json").read_text()
     assert not (output / "resultado-5s-REVISAR.mp4").exists()
