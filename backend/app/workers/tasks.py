@@ -46,11 +46,12 @@ from ..services import verify
 from ..services.scene import detect_scenes
 from ..services.scene_pipeline import frame_spans, run_scenes
 from ..services.inference_region import prepare_inference_region, restore_inference_region
+from ..services.subtitle_policy import prepare_subtitle_policy
 from ..services.quality_policy import review_issues, should_try_alternative, prefer_alternative
 from ..services.text_detect import detect_text_boxes, frame_text_mask
 from ..services.watermark import detect_watermarks, frame_watermark_mask
 from ..security import callback_signature, validate_callback_url
-from ..storage import job_dir as safe_job_dir, read_state, write_state
+from ..storage import job_dir as safe_job_dir, read_state, write_state, cleanup_intermediates
 from ..utils.video import (
     RawWriter,
     composite_masked,
@@ -262,7 +263,7 @@ def _window_masks(
     if mode in ("subtitle", "text", "smart", "karaoke", "watermark", "logo") and dynamic:
         # Karaoke may replace a word on any frame. Background optical flow
         # cannot determine where an independently animated overlay moved.
-        keys = list(range(0, n, 1 if mode == "karaoke" else max(1, key_step)))
+        keys = list(range(0, n, 1 if mode in ("karaoke", "subtitle") else max(1, key_step)))
         if keys[-1] != n - 1:
             keys.append(n - 1)
         key_masks = []
@@ -504,7 +505,13 @@ def _run_official_pipeline(
         auto_protect,
         lambda ratio: emit(18 + ratio * 14, "gerando mascaras temporais", "tracking"),
     )
-    region = _prepare_official_region(input_path, mask_dir, job_dir, info, emit, cancel_file)
+    policy = None
+    if (not prepared_mask_dir and dynamic and mode in ("subtitle", "karaoke")
+            and os.getenv("CLEANER_SUBTITLE_POLICY", "1") == "1"):
+        policy = prepare_subtitle_policy(mask_dir, job_dir, regions, info, cancel_file)
+    inference_masks = policy.inference_mask_dir if policy else mask_dir
+    composite_masks = policy.composite_mask_dir if policy else mask_dir
+    region = _prepare_official_region(input_path, inference_masks, job_dir, info, emit, cancel_file)
     if not region.active:
         return _copy_unmasked_scene(input_path, output_path, frames)
     emit(34, "iniciando ProPainter oficial", "inpainting")
@@ -518,6 +525,8 @@ def _run_official_pipeline(
         preset,
         lambda stage: emit(36, stage, "inpainting"),
         cancel_file,
+        **({"reference_stride": policy.reference_stride,
+            "temporal_window": policy.temporal_window} if policy else {}),
     )
     normalized_video = restore_inference_region(
         video_only, region, input_path,
@@ -526,7 +535,7 @@ def _run_official_pipeline(
     )
     if composite_on:
         normalized_video = _composite_step(
-            input_path, normalized_video, mask_dir, info.fps, job_dir, emit
+            input_path, normalized_video, composite_masks, info.fps, job_dir, emit
         )
     else:
         # RGB-lossless restoration is an intermediate, not a browser delivery.
@@ -536,7 +545,7 @@ def _run_official_pipeline(
         )
     emit(91, "validando resultado", "refining")
     if verify_on:
-        segments, metrics = _audit_video(normalized_video, mask_dir, info.fps)
+        segments, metrics = _audit_video(normalized_video, composite_masks, info.fps)
     else:
         segments = []
         metrics = {"residual_text": 0.0, "sharpness_ratio": 1.0, "temporal_consistency": 1.0}
@@ -545,7 +554,9 @@ def _run_official_pipeline(
     # Opt-in, at most one extra attempt per job, and only a <=5s scene. Always
     # feed the ORIGINAL into the alternative's native ProPainter+diffusion
     # pipeline. Never stack hallucinated pixels from one candidate onto another.
-    if (refinement_budget and refinement_budget[0] > 0 and verify_on
+    if policy:
+        metrics["subtitle_policy"] = policy.report
+    if (not policy and refinement_budget and refinement_budget[0] > 0 and verify_on
             and info.duration <= 5.001 and should_try_alternative(metrics)
             and diffueraser_status().ready):
         refinement_budget[0] -= 1
@@ -765,7 +776,6 @@ def run_pipeline(
 
     job_path = safe_job_dir(SETTINGS.storage_dir, job_id)
     cancel_path = job_path / ".cancel"
-    cancel_path.unlink(missing_ok=True)
     job_dir = str(job_path)
     input_path = str(job_path / "input.mp4")
     tmp_path = str(job_path / "video_only.mp4")
@@ -774,6 +784,10 @@ def run_pipeline(
     result_path = f"/v1/jobs/{job_id}/preview" if is_preview else f"/v1/jobs/{job_id}/result"
     result_key = "preview_url" if is_preview else "result_url"
     callback_seq = int(read_state(job_path).get("callback_seq", 0))
+    processing_marker = job_path / ".processing"
+    job_path.mkdir(parents=True, exist_ok=True)
+    with processing_marker.open("x", encoding="utf-8") as marker:
+        json.dump({"pid": os.getpid(), "started_at": time.time()}, marker)
 
     def emit(progress: float, stage: str, status: str = "processing", **extra) -> None:
         nonlocal callback_seq
@@ -790,6 +804,8 @@ def run_pipeline(
         _notify(callback_url, payload)
 
     try:
+        if cancel_path.exists():
+            raise JobCancelled("job cancelado antes da execucao")
         if not os.path.exists(input_path):
             raise FileNotFoundError(f"vídeo de entrada ausente para {job_id}")
 
@@ -962,6 +978,8 @@ def run_pipeline(
                 "subject_protection": auto_protect,
                 "composite": composite_on,
                 "preview": is_preview,
+                "subtitle_policy": aggregate.get("subtitle_policy"),
+                "scene_policies": aggregate.get("scene_policies", []),
             },
             "probe": {
                 "width": info.width, "height": info.height,
@@ -996,6 +1014,18 @@ def run_pipeline(
         write_state(job_path, {**read_state(job_path), **failure})
         _notify(callback_url, failure)
         raise
+    finally:
+        processing_marker.unlink(missing_ok=True)
+        if os.getenv("CLEANER_CLEANUP_INTERMEDIATES", "1") == "1":
+            try:
+                cleanup = cleanup_intermediates(SETTINGS.storage_dir, job_id)
+                state = read_state(job_path)
+                write_state(job_path, {**state, "cleanup": cleanup,
+                    "cleanup_pending": bool(cleanup.get("failed_paths") or cleanup.get("skipped_links"))})
+            except Exception as cleanup_error:
+                state = read_state(job_path)
+                write_state(job_path, {**state, "cleanup_pending": True,
+                    "cleanup_error": type(cleanup_error).__name__})
 
 
 @celery_app.task(name="process_video_task", bind=True)

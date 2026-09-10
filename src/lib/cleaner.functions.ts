@@ -166,28 +166,24 @@ export const cancelCleanerJob = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireOwnedJob(context.supabase, context.userId, data.id);
 
-    // 1) interrompe o worker CPU da VPS
-    await workerCancel(data.id).catch(() => null);
-    // 2) interrompe as partes em GPU e limpa artefatos das partes
+    // Persist cancellation before remote calls; failed cleanup remains retryable by the cron.
     const { cancelCleanerChunks } = await import("@/lib/cleaner-chunks.server");
-    await cancelCleanerChunks(data.id).catch(() => null);
-    // 3) remove os arquivos temporários do job na VPS
-    await workerDelete(data.id).catch(() => null);
-
-    const { data: row, error } = await context.supabase
-      .from("cleaner_jobs")
-      .update({
-        status: "cancelled",
-        stage: "cancelado pelo usuário; temporários removidos",
-        progress: 0,
-        error: null,
-        lease_until: null,
-      } as never)
+    let cleanupPending = false;
+    try {
+      await cancelCleanerChunks(data.id);
+    } catch {
+      cleanupPending = true;
+    }
+    // Cancellation preserves the original, downloadable result and project history.
+    const { data: row, error } = await context.supabase.from("cleaner_jobs")
+      .select("*")
       .eq("id", data.id)
       .eq("user_id", context.userId)
-      .select("*")
       .single();
     if (error) throw new Error(error.message);
+    if (cleanupPending && row?.status !== "cancelled" && row?.status !== "failed" && row?.status !== "completed") {
+      throw new Error("Nao foi possivel confirmar o cancelamento. Tente novamente.");
+    }
     return row as unknown as CleanerJob;
   });
 
@@ -197,12 +193,12 @@ export const cleanupCleanerRemoteJob = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireOwnedJob(context.supabase, context.userId, data.id);
     const cleanup = await workerCleanup(data.id);
-    if (!cleanup.result_preserved) {
+    if (!cleanup.ok || !cleanup.result_preserved) {
       throw new Error("resultado final não estava disponível; temporários não foram considerados entregues");
     }
     await context.supabase
       .from("cleaner_jobs")
-      .update({ stage: "resultado entregue; arquivos removidos da VPS" })
+      .update({ stage: "resultado disponivel; arquivos temporarios removidos" })
       .eq("id", data.id)
       .eq("user_id", context.userId);
     return { ok: true };
@@ -363,11 +359,17 @@ export const startCleanerGpuJob = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireOwnedJob(context.supabase, context.userId, data.id);
+    const { data: previous, error: previousError } = await context.supabase.from("cleaner_jobs")
+      .select("status").eq("id", data.id).eq("user_id", context.userId).single();
+    if (previousError) throw new Error(previousError.message);
+    if (["completed", "failed", "cancelled"].includes(previous.status)) {
+      throw new Error("Este processamento terminou; crie um novo job para processar novamente.");
+    }
     const { gpuConfigured } = await import("@/lib/cleaner-gpu.server");
     if (!gpuConfigured()) {
       throw new Error("Modo GPU indisponível: configure RUNPOD_API_KEY e RUNPOD_ENDPOINT_ID.");
     }
-    const { error } = await context.supabase
+    const { data: updated, error } = await context.supabase
       .from("cleaner_jobs")
       .update({
         mode: data.mode,
@@ -379,8 +381,11 @@ export const startCleanerGpuJob = createServerFn({ method: "POST" })
         preview_url: null,
       })
       .eq("id", data.id)
-      .eq("user_id", context.userId);
+      .eq("user_id", context.userId)
+      .not("status", "in", "(completed,failed,cancelled)")
+      .select("id");
     if (error) throw new Error(error.message);
+    if (!updated?.length) throw new Error("O job foi encerrado antes do inicio.");
 
     const { planCleanerChunks, pumpCleanerJob } = await import("@/lib/cleaner-chunks.server");
     const total = await planCleanerChunks(data.id, context.userId);

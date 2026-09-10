@@ -8,6 +8,8 @@
 import { jobToken, workerPublicBase } from "@/lib/cleaner.server";
 
 const RUNPOD_BASE = "https://api.runpod.ai/v2";
+const RUNPOD_CONTROL_BASE = "https://rest.runpod.io/v1";
+export const CLEANER_PIPELINE_REVISION = "scene-roi-v3";
 
 export type GpuDenied = { denied: true; status: number; message: string; requires?: string };
 
@@ -51,12 +53,44 @@ export type GpuHealth = {
   configured: boolean;
   online: boolean;
   workerVersion?: string;
+  pipelineRevision?: string;
+  gpuName?: string;
   gpuVramGb?: number | null;
   aiReady?: boolean;
   maxReady?: boolean;
   engines?: Record<string, { ready?: boolean; missing?: string[] }>;
   reason?: string;
 };
+
+/** Read-only preflight: never submit paid work to always-on/unbounded capacity. */
+export async function ensureGpuAutoShutdown(): Promise<void> {
+  const id = endpointId();
+  const key = apiKey();
+  if (!id || !key) throw new GpuBlockedError(403, "GPU não configurada", "admin_action");
+  const response = await fetch(`${RUNPOD_CONTROL_BASE}/endpoints/${encodeURIComponent(id)}`, {
+    headers: { authorization: `Bearer ${key}` },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) {
+    throw new GpuBlockedError(503, "Não foi possível conferir o desligamento automático da GPU", "admin_action");
+  }
+  const config = await response.json() as Record<string, unknown>;
+  // Use the provider's actual settings, not a local checkbox or stale cache.
+  // One endpoint can serve several jobs: scale-to-zero belongs to RunPod, not
+  // to a per-job shutdown request that could interrupt somebody else's work.
+  if (config["workersMin"] !== 0 || config["gpuCount"] !== 1
+      || typeof config["idleTimeout"] !== "number" || config["idleTimeout"] < 1 || config["idleTimeout"] > 5
+      || typeof config["workersMax"] !== "number" || config["workersMax"] > 1
+      || typeof config["executionTimeoutMs"] !== "number"
+      || config["executionTimeoutMs"] < 5_000 || config["executionTimeoutMs"] > 600_000) {
+    throw new GpuBlockedError(409,
+      "GPU pausada: configure mínimo 0, máximo 1, uma GPU, desligamento em até 5 s e execução em até 10 min",
+      "admin_action");
+  }
+  if (config["workersMax"] !== 1) {
+    throw new GpuBlockedError(409, "GPU desligada: endpoint sem capacidade habilitada", "admin_action");
+  }
+}
 
 async function runpod<T>(path: string, init: RequestInit = {}): Promise<T> {
   const id = endpointId();
@@ -99,6 +133,7 @@ export async function gpuHealth(): Promise<GpuHealth> {
   }
   let pendingJobId: string | undefined;
   try {
+    await ensureGpuAutoShutdown();
     const result = await runpod<{
       id?: string;
       status?: string;
@@ -123,9 +158,16 @@ export async function gpuHealth(): Promise<GpuHealth> {
         reason: String(output["error"] ?? result.error ?? result.status ?? "worker sem resposta"),
       };
     }
+    const revision = String(output["pipeline_revision"] ?? "");
+    if (revision !== CLEANER_PIPELINE_REVISION) {
+      return { configured: true, online: false, pipelineRevision: revision,
+        reason: "Motor GPU precisa ser atualizado para o processamento refinado" };
+    }
     return {
       configured: true,
       online: true,
+      pipelineRevision: revision,
+      ...(typeof output["gpu_name"] === "string" ? { gpuName: output["gpu_name"] } : {}),
       ...(typeof output["worker_version"] === "string"
         ? { workerVersion: output["worker_version"] }
         : {}),
@@ -144,6 +186,8 @@ export async function gpuHealth(): Promise<GpuHealth> {
     // runsync can return a queued job: leaving it behind starts a paid worker
     // even though the UI already reported a failed diagnostic. TTL also covers
     // a lost HTTP response for which we never received the provider job ID.
+    // A cancellation failure must be visible, not presented as a successful
+    // shutdown. The provider TTL remains an independent final limit.
     if (pendingJobId) await cancelChunk(pendingJobId);
   }
 }
@@ -164,11 +208,13 @@ export type ChunkPayload = {
 };
 
 export async function submitChunk(payload: ChunkPayload): Promise<string> {
+  await ensureGpuAutoShutdown();
   const body = {
     // Provider-enforced deadlines remain effective when the browser/ticker is
     // closed. Align total lifetime with the orchestrator's 30-minute deadline.
     policy: { executionTimeout: 600_000, ttl: 1_800_000 },
     input: {
+      expected_revision: CLEANER_PIPELINE_REVISION,
       chunk_index: payload.chunkIndex,
       source_url: payload.sourceUrl,
       source_is_chunk: payload.sourceIsChunk ?? false,
@@ -197,6 +243,9 @@ export type ChunkStatus = {
   residualText?: number;
   outputUrl?: string | null;
   seconds?: number;
+  providerExecutionSeconds?: number;
+  gpuName?: string;
+  pipelineRevision?: string;
   checksum?: string | null;
   bytes?: number | null;
   error?: string | null;
@@ -215,7 +264,9 @@ export async function chunkStatus(providerJobId: string): Promise<ChunkStatus> {
   if (raw === "COMPLETED") {
     const output = (result.output ?? {}) as Record<string, unknown>;
     if (output["ok"] !== true) {
-      return { state: "failed", error: String(output["error"] ?? "falha no chunk").slice(0, 400) };
+      return { state: "failed", error: String(output["error"] ?? "falha no chunk").slice(0, 400),
+        providerExecutionSeconds: Number(result.executionTime ?? 0) / 1000,
+        seconds: Number(output["seconds"] ?? 0) || 0 };
     }
     return {
       state: "completed",
@@ -225,26 +276,26 @@ export async function chunkStatus(providerJobId: string): Promise<ChunkStatus> {
       residualText: Number(output["residual_text"] ?? 0) || 0,
       outputUrl: (output["output_url"] as string | undefined) ?? null,
       seconds: Number(output["seconds"] ?? (result.executionTime ?? 0) / 1000) || 0,
+      providerExecutionSeconds: Number(result.executionTime ?? 0) / 1000,
+      ...(typeof output["gpu_name"] === "string" ? { gpuName: output["gpu_name"] } : {}),
+      ...(typeof output["pipeline_revision"] === "string" ? { pipelineRevision: output["pipeline_revision"] } : {}),
       checksum: typeof output["checksum"] === "string" ? (output["checksum"] as string) : null,
       bytes: Number(output["bytes"] ?? 0) || null,
     };
   }
   return {
     state: "failed",
+    providerExecutionSeconds: Number(result.executionTime ?? 0) / 1000,
     error: String((result.error ?? raw) || "falha desconhecida na GPU").slice(0, 400),
 
   };
 }
 
 export async function cancelChunk(providerJobId: string): Promise<void> {
-  try {
-    await runpod(`/cancel/${encodeURIComponent(providerJobId)}`, {
-      method: "POST",
-      signal: AbortSignal.timeout(15_000),
-    });
-  } catch {
-    // cancelamento é best-effort
-  }
+  await runpod(`/cancel/${encodeURIComponent(providerJobId)}`, {
+    method: "POST",
+    signal: AbortSignal.timeout(15_000),
+  });
 }
 
 /** URL assinada (HMAC do worker) do vídeo original — consumida pela GPU. */

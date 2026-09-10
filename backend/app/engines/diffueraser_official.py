@@ -201,9 +201,11 @@ def run_diffueraser(
                     process.wait(timeout=10)
                 except subprocess.TimeoutExpired:
                     process.kill()
+                    process.wait(timeout=10)
                 raise RuntimeError("job cancelado")
             if time.monotonic() >= deadline:
                 process.kill()
+                process.wait(timeout=10)
                 raise TimeoutError("DiffuEraser excedeu o tempo limite")
             time.sleep(1)
         returncode = process.returncode

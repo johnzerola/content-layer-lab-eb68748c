@@ -74,6 +74,11 @@ def run_scenes(input_path, output_path, job_dir, regions, info, cuts, run_one, e
             aggregate["alternative_failed"] = True
         if metrics.get("selected_engine"):
             aggregate["selected_engine"] = "mixed-scene-engines"
+        if metrics.get("subtitle_policy"):
+            aggregate.setdefault("scene_policies", []).append({
+                "scene": index, "from_frame": start, "to_frame": end,
+                **metrics["subtitle_policy"],
+            })
         parts.append(str(result))
     merged = concat_videos(parts, str(scene_root / "merged.mp4"), str(scene_root))
     mux_audio(merged, input_path, output_path, info.has_audio)

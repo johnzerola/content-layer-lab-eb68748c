@@ -14,7 +14,7 @@ describe("CleanerIA defaults", () => {
     expect(CLEANER_DEFAULT_PRESET).toBe("quality");
     expect(CLEANER_DEFAULT_STRATEGY).toBe("inpaint");
     expect(CLEANER_DEFAULT_CROP).toBe(false);
-    expect(CLEANER_DEFAULT_ENHANCE).toBe(true);
+    expect(CLEANER_DEFAULT_ENHANCE).toBe(false);
     expect(MODE_LABEL[CLEANER_DEFAULT_MODE]).toBe("Legenda");
   });
 });

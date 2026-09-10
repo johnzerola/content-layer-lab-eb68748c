@@ -52,6 +52,31 @@ class ProPainterAdapterTests(unittest.TestCase):
                 self.assertEqual(command[command.index("--neighbor_length") + 1], "6")
                 self.assertEqual(command[command.index("--ref_stride") + 1], "12")
 
+    def test_scene_references_do_not_change_global_environment_or_spatial_size(self):
+        with patch.dict(os.environ, {"PROPAINTER_REF_STRIDE": "10", "PROPAINTER_MAX_SIDE": "960"}), \
+             patch("app.engines.propainter_official._propainter_cuda_available", return_value=True):
+            dense = build_propainter_command("input", "masks", "output", 816, 288,
+                                            30, "quality", reference_stride=2)
+            ordinary = build_propainter_command("input", "masks", "output", 816, 288, 30, "quality")
+            self.assertEqual(dense[dense.index("--ref_stride") + 1], "2")
+            self.assertEqual(ordinary[ordinary.index("--ref_stride") + 1], "10")
+            self.assertEqual(dense[dense.index("--width") + 1], "816")
+            self.assertEqual(os.environ["PROPAINTER_REF_STRIDE"], "10")
+
+    def test_whole_scene_window_keeps_donors_and_respects_memory_cap(self):
+        with patch.dict(os.environ, {"PROPAINTER_SUBVIDEO_LENGTH": "80"}), \
+             patch("app.engines.propainter_official._propainter_cuda_available", return_value=True):
+            regular = build_propainter_command("input", "masks", "output", 816, 288,
+                30, "quality", reference_stride=10, temporal_window=80)
+            retry = build_propainter_command("input", "masks", "output", 816, 288,
+                30, "quality", scale_factor=.72, reference_stride=10, temporal_window=80)
+            self.assertEqual(regular[regular.index("--subvideo_length") + 1], "80")
+            self.assertEqual(retry[retry.index("--subvideo_length") + 1], "40")
+            with patch.dict(os.environ, {"PROPAINTER_SUBVIDEO_LENGTH": "24"}):
+                capped = build_propainter_command("input", "masks", "output", 816, 288,
+                    30, "quality", reference_stride=10, temporal_window=80)
+                self.assertEqual(capped[capped.index("--subvideo_length") + 1], "24")
+
 
 if __name__ == "__main__":
     unittest.main()

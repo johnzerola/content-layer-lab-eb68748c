@@ -17,7 +17,8 @@ export const CLEANER_DEFAULT_MODE: CleanerMode = "subtitle";
 export const CLEANER_DEFAULT_PRESET: CleanerPreset = "quality";
 export const CLEANER_DEFAULT_STRATEGY: CleanerStrategy = "inpaint";
 export const CLEANER_DEFAULT_CROP = false;
-export const CLEANER_DEFAULT_ENHANCE = true;
+export const CLEANER_DEFAULT_ENHANCE = false;
+export const CLEANER_DEFAULT_GPU = true;
 
 export type CleanerStatus =
   | "queued"
@@ -165,6 +166,7 @@ export interface CleanerMetrics {
   quality_issues?: string[];
   selected_engine?: string;
   alternative_attempts?: number;
+  cleanup_pending?: boolean;
 }
 
 export interface CleanerJob {

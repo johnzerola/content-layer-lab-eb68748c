@@ -1,0 +1,6 @@
+# Same reviewed runtime/pipeline; ProPainter weights travel with the image.
+# Build context needs models/ with the three verified .pth files.
+ARG BASE_IMAGE=docker.io/nivaldo12/leaneria-runpod@sha256:7be698717599c0d07c1e83538138812d6599fc76f600a06d2b12e37cf7356939
+FROM ${BASE_IMAGE}
+COPY models/ /opt/ProPainter/weights/
+ENV PROPAINTER_WEIGHTS_DIR=/opt/ProPainter/weights

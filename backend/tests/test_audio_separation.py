@@ -144,7 +144,7 @@ def test_parent_cleanup_keeps_audio_namespace(service):
     manager, _ = service
     directory = manager.root / str(uuid.uuid4())
     write_state(directory, {"status": "processing"})
-    cleanup_expired(manager.settings.storage_dir, -1, ("audio-stems",))
+    cleanup_expired(manager.settings.storage_dir, 1, ("audio-stems",))
     assert directory.exists()
     manager.recover()
     assert read_state(directory)["status"] == "failed"

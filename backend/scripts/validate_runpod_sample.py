@@ -35,14 +35,22 @@ def probe(path):
 
 
 def main():
+    global ENDPOINT, API
     parser = argparse.ArgumentParser()
     parser.add_argument("source", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--reuse-template", help="Explicit existing template ID after configuration review")
     parser.add_argument("--prepared-report", type=Path, help="Reuse this exact sample's verified Hostear upload/masks")
-    parser.add_argument("--expected-revision", default="scene-roi-v1", help="Required revision before any inpainting job")
+    parser.add_argument("--expected-revision", default="scene-roi-v3", help="Required revision before any inpainting job")
     parser.add_argument("--image", required=True, help="Reviewed GPU image containing this revision, pinned by sha256 digest")
+    parser.add_argument("--mode", choices=("subtitle", "smart", "karaoke"), default="subtitle")
+    parser.add_argument("--regions", type=Path, help="Reviewed normalized regions; avoids an unrelated automatic full-screen selection")
+    parser.add_argument("--endpoint", default=ENDPOINT, help="Explicit reviewed endpoint; must match RUNPOD_ENDPOINT_ID")
     args = parser.parse_args()
+    if not re.fullmatch(r"[a-z0-9]{8,32}", args.endpoint):
+        raise ValueError("Invalid endpoint ID")
+    ENDPOINT = args.endpoint
+    API = f"https://api.runpod.ai/v2/{ENDPOINT}"
     if not re.fullmatch(r"[^\s]+@sha256:[0-9a-f]{64}", args.image):
         raise ValueError("GPU image must use an immutable sha256 digest")
     info = probe(args.source)
@@ -54,12 +62,14 @@ def main():
     if os.environ.get("RUNPOD_ENDPOINT_ID") != ENDPOINT:
         raise ValueError("Unexpected endpoint")
     args.output.mkdir(parents=True, exist_ok=False)
-    report = {"input": str(args.source), "duration": duration, "jobs": []}
+    report = {"input": str(args.source), "duration": duration, "endpoint_id": ENDPOINT,
+              "image": args.image, "jobs": []}
     report_file = args.output / "report.json"
     session = requests.Session()
     session.headers["Authorization"] = f"Bearer {key}"
     pending = set()
     managed = False
+    owned_jobs = []
 
     def save():
         report_file.write_text(json.dumps(report, indent=2), encoding="utf-8")
@@ -104,6 +114,8 @@ def main():
                 last = time.monotonic()
             if state == "COMPLETED":
                 pending.remove(job)
+                report["jobs"][-1].update({"provider_execution_ms": status.get("executionTime"),
+                                           "provider_delay_ms": status.get("delayTime")})
                 output = status.get("output", {})
                 if not isinstance(output, dict) or output.get("ok") is not True:
                     # Don't expose arbitrary upstream errors that can contain signed URLs.
@@ -117,11 +129,22 @@ def main():
             time.sleep(3)
         raise RuntimeError("Bounded sample deadline reached")
 
+    def billing_snapshot():
+        try:
+            data = api("POST", "https://api.runpod.io/graphql", json={
+                "query": "query { myself { clientBalance currentSpendPerHr } }"})
+            account = (data.get("data") or {}).get("myself") or {}
+            return {"unix_time": time.time(), "client_balance_usd": account.get("clientBalance"),
+                    "current_usd_per_hour": account.get("currentSpendPerHr")}
+        except Exception:
+            return {"unavailable": True}
+
     try:
         health = api("GET", API + "/health")
         if health["jobs"].get("inProgress", 0) or health["jobs"].get("inQueue", 0):
             raise RuntimeError("Other jobs exist; not changing their endpoint")
         old = api("GET", REST + f"/endpoints/{ENDPOINT}")
+        report["billing_before"] = billing_snapshot()
         report["previous"] = {k: old.get(k) for k in ("templateId", "workersMin", "workersMax", "idleTimeout")}
         query = "query { myself { endpoints { id template { id name imageName containerDiskInGb volumeInGb dockerArgs containerRegistryAuthId env { key value } } } } }"
         data = api("POST", "https://api.runpod.io/graphql", json={"query": query})
@@ -149,11 +172,13 @@ def main():
             log("Reusing verified identical Hostear source and detected masks")
         else:
             job = str(uuid.uuid4())
+            owned_jobs.append(job)
             with args.source.open("rb") as media:
                 cpu("POST", job, "upload", data=media, headers={"content-type": "video/mp4",
                     "x-file-name": "sample.mp4", "x-file-size": str(args.source.stat().st_size)})
             log("Hostear upload validated; detecting masks")
-            regions = cpu("POST", job, "detect", json={"mode": "smart"})["regions"]
+            regions = (json.loads(args.regions.read_text(encoding="utf-8")) if args.regions
+                       else cpu("POST", job, "detect", json={"mode": args.mode})["regions"])
         report["hostear_job"] = job
         if not regions:
             raise RuntimeError("No masks found; refusing crop/fake removal")
@@ -191,10 +216,11 @@ def main():
         save()
         if capability.get("pipeline_revision") != args.expected_revision or not capability.get("ai_ready"):
             raise RuntimeError("Updated worker/model not ready; refusing an expensive run")
-        log("Corrected ProPainter worker ready; submitting ONE 5s sample")
+        log(f"Corrected ProPainter worker ready; submitting ONE {duration:.2f}s sample")
         output = run({"chunk_index": 0, "source_url": signed(job, "chunks/0/source"),
             "source_is_chunk": True, "start": 0, "end": duration, "overlap": 0,
-            "mode": "smart", "preset": "quality", "masks": regions,
+            "expected_revision": args.expected_revision,
+            "mode": args.mode, "preset": "quality", "masks": regions,
             "options": {"dynamic": True, "key_step": 1, "verify": True, "selective_second_pass": False,
                         "protect_subject": False, "enhance": False, "strategy": "inpaint"}}, 600)
         encoded = output.pop("output_b64", None)
@@ -216,6 +242,7 @@ def main():
             raise RuntimeError("Output duration changed")
         # Send the GPU artifact to Hostear, then use its assembly route to restore audio.
         part = str(uuid.uuid4())
+        owned_jobs.append(part)
         report["hostear_part_job"] = part
         with candidate.open("rb") as media:
             cpu("POST", part, "upload", data=media, headers={"content-type": "video/mp4",
@@ -239,7 +266,16 @@ def main():
                 api("POST", API + f"/cancel/{job}", json={})
                 log(f"Cancellation requested for test job {job}")
             except Exception:
-                report["cancellation_failed"] = True
+                # TTL can remove a queued diagnostic before /cancel arrives.
+                # Even a second network failure must not skip capacity shutdown.
+                try:
+                    check = session.get(API + f"/status/{job}", timeout=(15, 40))
+                    if check.status_code == 404:
+                        report.setdefault("expired_provider_jobs", []).append(job)
+                    else:
+                        report["cancellation_failed"] = True
+                except Exception:
+                    report["cancellation_failed"] = True
         if managed:
             try:
                 api("PATCH", REST + f"/endpoints/{ENDPOINT}", json={"workersMin": 0, "workersMax": 0})
@@ -252,6 +288,19 @@ def main():
             report["final_health"] = api("GET", API + "/health")
         except Exception:
             report["final_health"] = "unavailable"
+        report["billing_after"] = billing_snapshot()
+        report["billing_note"] = "Account balance delta includes storage and may be delayed; not a per-video invoice"
+        report["temporary_projects_deleted"] = []
+        for owned_job in owned_jobs:
+            try:
+                response = requests.delete(f"{HOST}/v1/jobs/{owned_job}",
+                    headers={"x-job-token": token(owned_job, "control")}, timeout=(15, 40))
+                if response.ok:
+                    report["temporary_projects_deleted"].append(owned_job)
+                else:
+                    report.setdefault("project_cleanup_pending", []).append(owned_job)
+            except Exception:
+                report.setdefault("project_cleanup_pending", []).append(owned_job)
         save()
 
 

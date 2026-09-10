@@ -89,19 +89,32 @@ def _upload(url: str, path: Path) -> None:
 
 
 WORKER_VERSION = "v3"
+PIPELINE_REVISION = "scene-roi-v3"
+
+
+def _gpu_name():
+    try:
+        import torch
+        return torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
+    except Exception:
+        return None
 
 
 def handler(event: dict) -> dict:
     payload = (event or {}).get("input") or {}
     started = time.monotonic()
     index = int(payload.get("chunk_index", 0))
+    if payload.get("expected_revision") not in (None, PIPELINE_REVISION):
+        return {"ok": False, "error": "revisao de processamento incompativel",
+                "pipeline_revision": PIPELINE_REVISION}
     if str(payload.get("action") or "") == "health":
         propainter = propainter_status(require_cuda=True)
         diffueraser = diffueraser_status()
         return {
             "ok": True,
             "worker_version": WORKER_VERSION,
-            "pipeline_revision": "scene-roi-v1",
+            "pipeline_revision": PIPELINE_REVISION,
+            "gpu_name": _gpu_name(),
             "inference_roi": os.getenv("CLEANER_INFERENCE_ROI", "1") == "1",
             "gpu_vram_gb": _gpu_vram_gb(),
             "ai_ready": propainter.ready,
@@ -192,7 +205,10 @@ def handler(event: dict) -> dict:
         response = {
             "ok": True,
             "chunk_index": index,
-            "seconds": round(time.monotonic() - started, 2),
+            "processing_seconds": round(time.monotonic() - started, 2),
+            "pipeline_revision": PIPELINE_REVISION,
+            "gpu_name": _gpu_name(),
+            "timing_scope": "handler_download_process_upload_excludes_worker_start_and_idle",
             "frames": info.frames,
             "residual_text": float(metrics.get("residual_text", 0.0) or 0.0),
             "quality_status": metrics.get("quality_status", "unverified"),
@@ -210,6 +226,7 @@ def handler(event: dict) -> dict:
             response["output_url"] = str(payload.get("output_url") or upload_url).split("?")[0]
         else:
             response["output_b64"] = base64.b64encode(final_path.read_bytes()).decode("ascii")
+        response["seconds"] = round(time.monotonic() - started, 2)
         return response
     except Exception as exc:  # pragma: no cover - caminho de erro do provedor
         return {

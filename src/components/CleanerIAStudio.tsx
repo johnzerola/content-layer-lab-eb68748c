@@ -35,6 +35,10 @@ import {
   saveCleanerMasks,
 } from "@/lib/cleaner.functions";
 import {
+  CLEANER_DEFAULT_MODE,
+  CLEANER_DEFAULT_PRESET,
+  CLEANER_DEFAULT_ENHANCE,
+  CLEANER_DEFAULT_GPU,
   PRESET_HINT,
   PRESET_LABEL,
   STAGE_LABEL,
@@ -158,17 +162,17 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [pipelineBusy, setPipelineBusy] = useState(false);
   const [pipelineStep, setPipelineStep] = useState<string | null>(null);
   const [pipelineError, setPipelineError] = useState<string | null>(null);
-  const [mode, setMode] = useState<CleanerMode>("smart");
-  const [preset, setPreset] = useState<CleanerPreset>("quality");
+  const [mode, setMode] = useState<CleanerMode>(CLEANER_DEFAULT_MODE);
+  const [preset, setPreset] = useState<CleanerPreset>(CLEANER_DEFAULT_PRESET);
   const [dynamicMask, setDynamicMask] = useState(true);
   const [protectSubject, setProtectSubject] = useState(true);
   const [verifyPass, setVerifyPass] = useState(true);
   // Recortar muda o enquadramento e não remove a legenda. Deve ser uma escolha
   // explícita do usuário, nunca o fallback quando a detecção não encontra texto.
   const [cropClean, setCropClean] = useState(false);
-  const [enhanceOutput, setEnhanceOutput] = useState(true);
-  // Turbo GPU: o vídeo é dividido em partes que rodam em paralelo na nuvem.
-  const [turboGpu, setTurboGpu] = useState(false);
+  const [enhanceOutput, setEnhanceOutput] = useState(CLEANER_DEFAULT_ENHANCE);
+  // GPU sob demanda: capacidade e desligamento são conferidos antes do envio.
+  const [turboGpu, setTurboGpu] = useState(CLEANER_DEFAULT_GPU);
   const [chunks, setChunks] = useState<
     { idx: number; status: string; residual_text: number | null; attempts: number }[]
   >([]);
@@ -249,7 +253,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       const headers = await cloudAuthHeaders();
       const result = (await getGpuHealth({ headers })) as NonNullable<typeof gpuHealthState>;
       setGpuHealthState(result);
-      if (result.maxReady) toast.success("RunPod pronto para Máxima qualidade.");
+      if (result.aiReady && preset !== "max") toast.success("GPU pronta para remover legendas com ProPainter.");
+      else if (result.maxReady) toast.success("RunPod pronto para Máxima qualidade.");
       else if (result.online) toast.warning("RunPod respondeu, mas o DiffuEraser ainda não está pronto.");
       else toast.error(result.reason || "RunPod indisponível.");
       return result;
@@ -271,7 +276,11 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       const row = (await cancelJobFn({ data: { id: job.id }, headers })) as CleanerJob;
       setPolling(false);
       setJob((prev) => ({ ...(prev as CleanerJob), ...row }));
-      toast.info("Processamento cancelado e arquivos temporários removidos.");
+      toast.info(row.status === "completed"
+        ? "O processamento já terminou. Seu resultado foi preservado."
+        : row.metrics?.["cleanup_pending"]
+          ? "Processamento cancelado. A limpeza automática ainda está pendente."
+          : "Processamento cancelado e arquivos temporários removidos.");
     } catch (e) {
       toast.error((e as Error)?.message || "Não foi possível cancelar agora.");
     } finally {
@@ -1394,7 +1403,6 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                           : "Qualidade selecionada. Turbo GPU ativado para usar o ProPainter no RunPod.",
                       );
                     }
-                    if (p === "max") void checkRunPod();
                   }}
                   disabled={settingsLocked}
                   className={`group w-full rounded-xl border p-3 text-left text-xs transition ${
@@ -1440,8 +1448,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           >
             <span className="block font-semibold">Turbo GPU {turboGpu ? "· ligado" : "· desligado"}</span>
             <span className="block text-[10px] text-muted-foreground">
-              Divide o vídeo em partes e processa em paralelo na nuvem — muito mais rápido em
-              vídeos longos. Continua mesmo se você fechar a página.
+              Processa na nuvem sob demanda e desliga a GPU quando a fila termina.
+              Os temporários são removidos; o resultado continua disponível para download.
             </span>
           </button>
 
@@ -1454,9 +1462,11 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                       ? "RunPod ainda não verificado"
                       : gpuHealthState.maxReady
                         ? "RunPod pronto para qualidade máxima"
-                        : gpuHealthState.online
-                          ? "RunPod online · DiffuEraser incompleto"
-                          : "RunPod indisponível"}
+                        : gpuHealthState.aiReady
+                          ? "GPU pronta para remover legendas"
+                          : gpuHealthState.online
+                            ? "GPU online · motor ainda não está pronto"
+                            : "RunPod indisponível"}
                   </p>
                   <p className="mt-0.5 text-muted-foreground">
                     {gpuHealthState?.gpuVramGb
@@ -1476,7 +1486,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                   {checkingGpu ? "Verificando" : "Testar GPU"}
                 </Button>
               </div>
-              {gpuHealthState?.online && !gpuHealthState.maxReady && (
+              <p className="mt-2 text-muted-foreground">
+                Testar GPU inicia uma verificação na nuvem e pode gerar cobrança.
+              </p>
+              {preset === "max" && gpuHealthState?.online && !gpuHealthState.maxReady && (
                 <p className="mt-2 border-t border-sky-500/15 pt-2 text-amber-400">
                   Faltando: {(gpuHealthState.engines?.["diffueraser"]?.missing ?? ["pesos do DiffuEraser"]).slice(0, 3).join(", ")}
                 </p>

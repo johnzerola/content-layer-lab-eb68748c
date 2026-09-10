@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "crypto";
-import { pumpCleanerJob } from "@/lib/cleaner-chunks.server";
+import { CLEANER_TERMINAL_STATUSES, pumpCleanerJob } from "@/lib/cleaner-chunks.server";
 
 /** Quantos jobs GPU avançam por batida — mantém a execução curta e previsível. */
 const MAX_JOBS_PER_TICK = 5;
@@ -22,17 +22,25 @@ export const Route = createFileRoute("/api/public/cleaner-chunk-tick")({
       POST: async ({ request }) => {
         if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { data } = await supabaseAdmin
+        const { data, error } = await supabaseAdmin
           .from("cleaner_jobs")
           .select("id")
           .eq("engine", "gpu")
           .is("paused_reason", null)
-          .in("status", ["queued", "analyzing", "processing"])
+          .in("status", ["queued", "analyzing", "processing", "assembling", "cleaning"])
           .order("updated_at", { ascending: true })
           .limit(MAX_JOBS_PER_TICK);
+        if (error) return Response.json({ ok: false, error: "Falha ao consultar a fila." }, { status: 503 });
+
+        // Terminal jobs can retry cleanup even when GPU capacity is disabled or the job was paused.
+        const { data: cleanup, error: cleanupError } = await supabaseAdmin.from("cleaner_jobs")
+          .select("id").in("status", CLEANER_TERMINAL_STATUSES)
+          .contains("metrics", { cleanup_pending: true })
+          .order("updated_at", { ascending: true }).limit(MAX_JOBS_PER_TICK);
+        if (cleanupError) return Response.json({ ok: false, error: "Falha ao consultar limpezas pendentes." }, { status: 503 });
 
         const results: Record<string, unknown>[] = [];
-        for (const job of (data ?? []) as { id: string }[]) {
+        for (const job of [...(data ?? []), ...(cleanup ?? [])] as { id: string }[]) {
           try {
             results.push({ id: job.id, ...(await pumpCleanerJob(job.id)) });
           } catch (error) {

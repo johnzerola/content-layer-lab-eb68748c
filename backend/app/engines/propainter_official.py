@@ -118,6 +118,8 @@ def build_propainter_command(
     fps: float,
     preset: str,
     scale_factor: float = 1.0,
+    reference_stride: Optional[int] = None,
+    temporal_window: Optional[int] = None,
 ) -> List[str]:
     root = propainter_root()
     proc_w, proc_h = _processing_size(width, height, preset, scale_factor)
@@ -134,12 +136,26 @@ def build_propainter_command(
         subvideo = "40" if tight else ("80" if preset == "max" else "64")
         neighbor = "8" if tight else ("12" if preset == "max" else "10")
         ref_stride = "10" if tight else ("5" if preset == "max" else "10")
+    if temporal_window is not None:
+        if not 4 <= temporal_window <= 80:
+            raise ValueError("temporal_window precisa estar entre 4 e 80")
+        if has_cuda:
+            subvideo = str(min(temporal_window, 40) if tight else temporal_window)
     # Permit small GPUs to keep spatial detail by reducing temporal memory
     # first. OOM retries must never increase a user-specified temporal budget.
     subvideo = str(max(4, min(int(subvideo), int(os.getenv("PROPAINTER_SUBVIDEO_LENGTH", subvideo)))))
     neighbor_limit = max(2, min(int(neighbor), int(os.getenv("PROPAINTER_NEIGHBOR_LENGTH", neighbor))))
     neighbor = str(min(int(subvideo), neighbor_limit) // 2 * 2)
     ref_stride = str(max(1, int(os.getenv("PROPAINTER_REF_STRIDE", ref_stride))))
+    if reference_stride is not None and has_cuda:
+        if not 1 <= reference_stride <= 30:
+            raise ValueError("reference_stride precisa estar entre 1 e 30")
+        # Per-scene choice; never mutate process-wide env while other jobs run.
+        ref_stride = str(reference_stride)
+        # Dense references must have a bounded temporal memory budget. These
+        # are also the settings exercised by the automatic local comparison.
+        subvideo = str(min(int(subvideo), temporal_window or 32))
+        neighbor = str(min(int(neighbor), 6))
     command = [
         os.getenv("PROPAINTER_PYTHON", sys.executable),
         str(root / "inference_propainter.py"),
@@ -152,7 +168,7 @@ def build_propainter_command(
         "--subvideo_length", subvideo,
         "--neighbor_length", neighbor,
         "--ref_stride", ref_stride,
-        "--mask_dilation", "2" if preset == "max" else "1",
+        "--mask_dilation", "2" if preset == "max" or reference_stride is not None else "1",
     ]
     if has_cuda and os.getenv("PROPAINTER_FP16", "1") == "1":
         command.append("--fp16")
@@ -170,6 +186,8 @@ def run_propainter(
     preset: str,
     on_stage: Optional[Callable[[str], None]] = None,
     cancel_file: Optional[str] = None,
+    reference_stride: Optional[int] = None,
+    temporal_window: Optional[int] = None,
 ) -> str:
     status = propainter_status(require_cuda=os.getenv("PROPAINTER_ALLOW_CPU", "0") != "1")
     if not status.ready:
@@ -206,13 +224,18 @@ def run_propainter(
     # processamento e a janela temporal, em vez de falhar o chunk inteiro.
     scales = [1.0, 0.72, 0.55, 0.42]
     last_error = ""
+    deadline = time.monotonic() + timeout
     for attempt, scale_factor in enumerate(scales):
+        if time.monotonic() >= deadline:
+            raise TimeoutError("ProPainter excedeu o tempo total, incluindo tentativas")
         if target.exists():
             shutil.rmtree(target)
         target.mkdir(parents=True, exist_ok=True)
         log_path = target / "propainter.log"
         command = build_propainter_command(
-            input_video, mask_dir, output_dir, width, height, fps, preset, scale_factor
+            input_video, mask_dir, output_dir, width, height, fps, preset, scale_factor,
+            reference_stride=reference_stride,
+            temporal_window=temporal_window,
         )
         if on_stage:
             size = f"{command[command.index('--width') + 1]}x{command[command.index('--height') + 1]}"
@@ -225,7 +248,6 @@ def run_propainter(
                 stdout=log,
                 stderr=subprocess.STDOUT,
             )
-            deadline = time.monotonic() + timeout
             while process.poll() is None:
                 if cancel_file and Path(cancel_file).exists():
                     process.terminate()
@@ -233,9 +255,11 @@ def run_propainter(
                         process.wait(timeout=10)
                     except subprocess.TimeoutExpired:
                         process.kill()
+                        process.wait(timeout=10)
                     raise RuntimeError("job cancelado")
                 if time.monotonic() >= deadline:
                     process.kill()
+                    process.wait(timeout=10)
                     raise TimeoutError("ProPainter excedeu o tempo limite")
                 time.sleep(1)
             returncode = process.returncode

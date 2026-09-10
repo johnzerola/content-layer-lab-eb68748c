@@ -1,0 +1,50 @@
+{
+  "checked_at": "2026-09-10T01:45:01.774701+00:00",
+  "read_only": true,
+  "endpoint": {
+    "id": "km860ju9ded2e0",
+    "name": "cleaneria-gpu",
+    "workersMin": 0,
+    "workersMax": 0,
+    "gpuCount": 1,
+    "gpuTypeIds": [
+      "NVIDIA RTX A5000",
+      "NVIDIA L4",
+      "NVIDIA GeForce RTX 3090",
+      "NVIDIA GeForce RTX 4090",
+      "NVIDIA GeForce RTX 5090"
+    ],
+    "idleTimeout": 5,
+    "executionTimeoutMs": 600000,
+    "networkVolumeId": "qn57kpxk5y",
+    "templateId": "gi3jlnv69u"
+  },
+  "workers": {
+    "idle": 0,
+    "initializing": 0,
+    "ready": 0,
+    "running": 0,
+    "throttled": 0,
+    "unhealthy": 0
+  },
+  "jobs": {
+    "completed": 49,
+    "failed": 20,
+    "inProgress": 0,
+    "inQueue": 0,
+    "retried": 0
+  },
+  "pods": [],
+  "volumes": [
+    {
+      "id": "qn57kpxk5y",
+      "name": "cleaneria-models",
+      "size": 50,
+      "dataCenterId": "EU-RO-1"
+    }
+  ],
+  "account_current_usd_per_hour": 0.005,
+  "billing_scope": "current account rate, not historical invoice or cost of one video",
+  "public_serverless_pricing": "https://www.runpod.io/pricing",
+  "billing_rules": "https://docs.runpod.io/serverless/pricing"
+}

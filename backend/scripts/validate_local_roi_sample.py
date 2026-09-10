@@ -77,7 +77,7 @@ def sha256(path: Path) -> str:
 def implementation_fingerprint(runtime: Path) -> dict:
     backend = Path(__file__).resolve().parents[1]
     names = ["scripts/validate_local_roi_sample.py", "app/workers/tasks.py",
-             "app/services/inference_region.py", "app/services/text_detect.py",
+             "app/services/inference_region.py", "app/services/subtitle_policy.py", "app/services/text_detect.py",
              "app/services/scene.py", "app/services/scene_pipeline.py",
              "app/utils/video.py", "app/engines/propainter_official.py"]
     files = {name: sha256(backend / name) for name in names}
@@ -129,7 +129,7 @@ def configure_runtime(runtime: Path, max_side: int, directory: Path) -> dict:
     os.environ.update(values)
     values["CLEANER_SUBTITLE_SHADOW_PX"] = os.getenv("CLEANER_SUBTITLE_SHADOW_PX", "auto")
     for name, default in {"CLEANER_INFERENCE_ROI": "1", "CLEANER_INFERENCE_ROI_MARGIN": "96",
-                          "PROPAINTER_SUBVIDEO_LENGTH": "32", "PROPAINTER_NEIGHBOR_LENGTH": "6",
+                          "PROPAINTER_SUBVIDEO_LENGTH": "80", "PROPAINTER_NEIGHBOR_LENGTH": "6",
                           "PROPAINTER_REF_STRIDE": "10"}.items():
         os.environ.setdefault(name, default)
         values[name] = os.environ[name]

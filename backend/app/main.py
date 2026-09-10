@@ -29,7 +29,8 @@ from .security import TokenError, validate_callback_url, validate_job_token, val
 from .services.chunking import concat_videos, plan_chunks, slice_video
 from .services.media_resolver import MediaResolveError, resolve_public_media
 from .services.text_detect import detector_status
-from .storage import cleanup_expired, directory_size, job_dir, read_state, write_state
+from .storage import (JobStillActive, TERMINAL_JOB_STATUSES, cleanup_expired, cleanup_intermediates,
+                      directory_size, job_dir, read_state, recover_stale_processing, write_state)
 from .render_queue import RenderManager
 from .utils.video import mux_audio, probe
 
@@ -59,16 +60,41 @@ VIDEO_TYPES = {
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi"}
 
 
+def _cleanup_expired_jobs() -> None:
+    # Hold the admission lock while checking/deleting: a completed job must not
+    # begin reprocessing after retention checked its state but before deletion.
+    with ACTIVE_LOCK:
+        excluded = ("audio-stems", *ACTIVE_JOBS)
+        recover_stale_processing(SETTINGS.storage_dir, excluded)
+        for directory in SETTINGS.storage_dir.iterdir():
+            if directory.name in excluded or not directory.is_dir() or directory.is_symlink():
+                continue
+            state = read_state(directory)
+            if state.get("cleanup_pending") is True and state.get("status") in TERMINAL_JOB_STATUSES:
+                try:
+                    report = cleanup_intermediates(SETTINGS.storage_dir, directory.name, active_job_ids=ACTIVE_JOBS)
+                    write_state(directory, {**state, "cleanup": report,
+                        "cleanup_pending": bool(report["failed_paths"] or report["skipped_links"])})
+                except (OSError, ValueError, JobStillActive):
+                    pass
+        cleanup_expired(SETTINGS.storage_dir, SETTINGS.retention_seconds, excluded)
+
+
+def _cleanup_stopped_job(job_id: str) -> dict:
+    with ACTIVE_LOCK:
+        return cleanup_intermediates(SETTINGS.storage_dir, job_id, active_job_ids=ACTIVE_JOBS)
+
+
 async def _cleanup_loop() -> None:
     while True:
-        await asyncio.sleep(3600)
-        await asyncio.to_thread(cleanup_expired, SETTINGS.storage_dir, SETTINGS.retention_seconds, ("audio-stems",))
+        await asyncio.sleep(300)
+        await asyncio.to_thread(_cleanup_expired_jobs)
         await asyncio.to_thread(AUDIO.cleanup)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    cleanup_expired(SETTINGS.storage_dir, SETTINGS.retention_seconds, ("audio-stems",))
+    _cleanup_expired_jobs()
     RENDER.start()
     AUDIO.recover()
     AUDIO.cleanup()
@@ -255,7 +281,7 @@ async def health():
         "detectors": {"text": detector_status()},
         "features": {"batch_render": True, "scene_isolated_inpainting": True,
                      "conservative_karaoke_masks": True, "quality_review_signals": True},
-        "pipeline_revision": "scene-roi-v1",
+        "pipeline_revision": "scene-roi-v3",
         "inference_roi": os.getenv("CLEANER_INFERENCE_ROI", "1") == "1",
         "limits": {
             "max_upload_bytes": SETTINGS.max_upload_bytes,
@@ -410,7 +436,7 @@ async def upload_video(
     if suffix not in VIDEO_SUFFIXES or content_type not in VIDEO_TYPES:
         raise HTTPException(415, "formato de video nao permitido")
 
-    cleanup_expired(SETTINGS.storage_dir, SETTINGS.retention_seconds)
+    await asyncio.to_thread(_cleanup_expired_jobs)
     existing = directory_size(SETTINGS.storage_dir)
     disk = shutil.disk_usage(SETTINGS.storage_dir)
     expected = x_file_size or SETTINGS.max_upload_bytes
@@ -510,10 +536,12 @@ async def start_process(
     if not (job_dir(SETTINGS.storage_dir, job_id) / "input.mp4").is_file():
         raise HTTPException(409, "video ainda nao foi enviado")
     with ACTIVE_LOCK:
-        if job_id in ACTIVE_JOBS:
+        directory = job_dir(SETTINGS.storage_dir, job_id)
+        if job_id in ACTIVE_JOBS or (directory / ".processing").exists():
             raise HTTPException(409, "job ja esta em processamento")
         if len(ACTIVE_JOBS) >= SETTINGS.max_concurrent_jobs:
             raise HTTPException(429, "capacidade de processamento ocupada; tente novamente")
+        (directory / ".cancel").unlink(missing_ok=True)
         ACTIVE_JOBS.add(job_id)
     _set_state(job_id, {"status": "queued", "progress": 0, "stage": "na fila"})
 
@@ -706,7 +734,9 @@ async def delete_job(job_id: str, x_job_token: Optional[str] = Header(None)):
     verify_token(job_id, x_job_token, "control")
     directory = job_dir(SETTINGS.storage_dir, job_id)
     with ACTIVE_LOCK:
-        if job_id in ACTIVE_JOBS:
+        status = read_state(directory).get("status")
+        if (job_id in ACTIVE_JOBS or (directory / ".processing").exists()
+                or (status and status not in TERMINAL_JOB_STATUSES | {"uploaded"})):
             raise HTTPException(409, "cancele o processamento antes de excluir")
         JOBS.pop(job_id, None)
     await asyncio.to_thread(shutil.rmtree, directory, True)
@@ -715,19 +745,16 @@ async def delete_job(job_id: str, x_job_token: Optional[str] = Header(None)):
 
 @app.post("/v1/jobs/{job_id}/cleanup")
 async def cleanup_job_files(job_id: str, x_job_token: Optional[str] = Header(None)):
-    """Remove entrada/intermediários, preservando o resultado e o estado do job."""
+    """Remove intermediarios; original, resultado e previa continuam disponiveis."""
     verify_token(job_id, x_job_token, "control")
     directory = job_dir(SETTINGS.storage_dir, job_id)
-    with ACTIVE_LOCK:
-        if job_id in ACTIVE_JOBS:
-            raise HTTPException(409, "job ainda esta em processamento")
-
-    for name in ("input.mp4", "preview.mp4", "gpu-plan.json"):
-        (directory / name).unlink(missing_ok=True)
-    for name in ("gpu-sources", "chunks"):
-        await asyncio.to_thread(shutil.rmtree, directory / name, True)
-    _set_state(job_id, {"stage": "resultado entregue; temporarios removidos"})
-    return {"ok": True, "result_preserved": (directory / "output.mp4").is_file()}
+    try:
+        cleaned = await asyncio.to_thread(_cleanup_stopped_job, job_id)
+    except JobStillActive as exc:
+        raise HTTPException(409, str(exc)) from None
+    return {"ok": not cleaned["failed_paths"] and not cleaned["skipped_links"], **cleaned,
+            "result_preserved": (directory / "output.mp4").is_file(),
+            "input_preserved": (directory / "input.mp4").is_file()}
 
 
 @app.get("/v1/jobs/{job_id}/result")

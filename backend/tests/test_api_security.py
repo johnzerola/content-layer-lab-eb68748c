@@ -223,8 +223,8 @@ class ApiSecurityTests(unittest.TestCase):
 
         self.assertEqual(cleaned.status_code, 200)
         self.assertTrue(cleaned.json()["result_preserved"])
-        self.assertFalse((directory / "input.mp4").exists())
-        self.assertFalse((directory / "preview.mp4").exists())
+        self.assertTrue((directory / "input.mp4").exists())
+        self.assertTrue((directory / "preview.mp4").exists())
         self.assertFalse((directory / "gpu-plan.json").exists())
         self.assertFalse((directory / "chunks").exists())
         self.assertFalse((directory / "gpu-sources").exists())
