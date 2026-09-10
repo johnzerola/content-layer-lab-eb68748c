@@ -22,6 +22,7 @@ INTERMEDIATE_FILES = frozenset({
     "video_only.preview.mp4", "composited.mp4", "propainter-native.mp4",
     "propainter-delivery.mp4", "diffueraser-native.mp4", "diffueraser-delivery.mp4",
     "output.enhanced.mp4", "preview.enhanced.mp4", "output.post.mp4", ".input.upload",
+    "subtitle-finished.mp4", "subtitle-finished.json",
 })
 
 

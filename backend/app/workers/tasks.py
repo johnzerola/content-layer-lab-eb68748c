@@ -47,6 +47,7 @@ from ..services.scene import detect_scenes
 from ..services.scene_pipeline import frame_spans, run_scenes
 from ..services.inference_region import prepare_inference_region, restore_inference_region
 from ..services.subtitle_policy import prepare_subtitle_policy
+from ..services.subtitle_finishing import finish_subtitle_video
 from ..services.quality_policy import review_issues, should_try_alternative, prefer_alternative
 from ..services.text_detect import detect_text_boxes, frame_text_mask
 from ..services.watermark import detect_watermarks, frame_watermark_mask
@@ -533,6 +534,15 @@ def _run_official_pipeline(
         os.path.join(job_dir, "propainter-native.mp4"), info,
         cancel_file=cancel_file,
     )
+    finish_report = None
+    if (composite_on and policy and os.getenv("CLEANER_SUBTITLE_FINISH", "0") == "1"):
+        emit(87, "ajustando textura e acabamento da legenda", "refining")
+        finished_video = os.path.join(job_dir, "subtitle-finished.mp4")
+        finish_report = finish_subtitle_video(
+            input_path, normalized_video, composite_masks, finished_video, info,
+            cancel_file=cancel_file, strength=0.3,
+        )
+        normalized_video = finished_video
     if composite_on:
         normalized_video = _composite_step(
             input_path, normalized_video, composite_masks, info.fps, job_dir, emit
@@ -556,6 +566,8 @@ def _run_official_pipeline(
     # pipeline. Never stack hallucinated pixels from one candidate onto another.
     if policy:
         metrics["subtitle_policy"] = policy.report
+    if finish_report:
+        metrics["subtitle_finish"] = finish_report
     if (not policy and refinement_budget and refinement_budget[0] > 0 and verify_on
             and info.duration <= 5.001 and should_try_alternative(metrics)
             and diffueraser_status().ready):
