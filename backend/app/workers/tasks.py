@@ -48,6 +48,7 @@ from ..services.scene_pipeline import frame_spans, run_scenes
 from ..services.inference_region import prepare_inference_region, restore_inference_region
 from ..services.subtitle_policy import prepare_subtitle_policy
 from ..services.subtitle_finishing import finish_subtitle_video
+from ..services.subtitle_junctions import refine_subtitle_scene
 from ..services.quality_policy import review_issues, should_try_alternative, prefer_alternative
 from ..services.text_detect import detect_text_boxes, frame_text_mask
 from ..services.watermark import detect_watermarks, frame_watermark_mask
@@ -208,6 +209,18 @@ def auto_detect(job_id: str, mode: str, samples: int = 12) -> List[Dict]:
             x, y, bw, bh = cv2.boundingRect(c)
             if bw * bh < w * h * 0.0008:
                 continue
+            if mode in ("subtitle", "karaoke"):
+                # OCR follows the currently visible glyphs. Karaoke captions
+                # can reveal a wider word or a thick outline on the next frame,
+                # so the reviewed region must describe the subtitle lane rather
+                # than the tight glyph box. Dynamic masks still decide which
+                # pixels inside this lane are reconstructed on each frame.
+                target_w = max(bw, round(w * 0.58))
+                target_h = max(bh, round(h * 0.052))
+                center_x, center_y = x + bw / 2, y + bh / 2
+                x = max(0, min(w - target_w, round(center_x - target_w / 2)))
+                y = max(0, min(h - target_h, round(center_y - target_h / 2)))
+                bw, bh = target_w, target_h
             regions.append({
                 "id": f"det_{i}",
                 "kind": "rect",
@@ -547,10 +560,23 @@ def _run_official_pipeline(
             cancel_file=cancel_file, strength=0.3,
         )
         normalized_video = finished_video
-    if composite_on:
-        normalized_video = _composite_step(
-            input_path, normalized_video, composite_masks, info.fps, job_dir, emit
+    junction_report = None
+    junction_composited = False
+    if (composite_on and policy and refined_policy
+            and os.getenv("CLEANER_SUBTITLE_JUNCTIONS", "1") == "1"):
+        emit(89, "recuperando fundo verificado entre quadros", "refining")
+        junction_dir = os.path.join(job_dir, "subtitle-junctions")
+        junction_report = refine_subtitle_scene(
+            input_path, normalized_video, mask_dir, composite_masks,
+            junction_dir, info, regions, cancel_file=cancel_file,
         )
+        normalized_video = os.path.join(junction_dir, "reference-master.mp4")
+        junction_composited = True
+    if composite_on:
+        if not junction_composited:
+            normalized_video = _composite_step(
+                input_path, normalized_video, composite_masks, info.fps, job_dir, emit
+            )
     else:
         # RGB-lossless restoration is an intermediate, not a browser delivery.
         normalized_video = ffmpeg_filter(
@@ -572,6 +598,8 @@ def _run_official_pipeline(
         metrics["subtitle_policy"] = policy.report
     if finish_report:
         metrics["subtitle_finish"] = finish_report
+    if junction_report:
+        metrics["subtitle_junctions"] = junction_report
     if (not policy and refinement_budget and refinement_budget[0] > 0 and verify_on
             and info.duration <= 5.001 and should_try_alternative(metrics)
             and diffueraser_status().ready):
@@ -669,10 +697,23 @@ def _run_diffusion_pipeline(
         os.path.join(job_dir, "diffueraser-native.mp4"), info,
         cancel_file=cancel_file,
     )
-    if composite_on:
-        normalized_video = _composite_step(
-            input_path, normalized_video, composite_masks, info.fps, job_dir, emit
+    junction_report = None
+    junction_composited = False
+    if (composite_on and policy
+            and os.getenv("CLEANER_SUBTITLE_JUNCTIONS", "1") == "1"):
+        emit(89, "recuperando fundo verificado entre quadros", "refining")
+        junction_dir = os.path.join(job_dir, "subtitle-junctions")
+        junction_report = refine_subtitle_scene(
+            input_path, normalized_video, mask_dir, composite_masks,
+            junction_dir, info, regions, cancel_file=cancel_file,
         )
+        normalized_video = os.path.join(junction_dir, "reference-master.mp4")
+        junction_composited = True
+    if composite_on:
+        if not junction_composited:
+            normalized_video = _composite_step(
+                input_path, normalized_video, composite_masks, info.fps, job_dir, emit
+            )
     else:
         normalized_video = ffmpeg_filter(
             normalized_video, os.path.join(job_dir, "diffueraser-delivery.mp4"),
@@ -688,6 +729,8 @@ def _run_diffusion_pipeline(
     mux_audio(normalized_video, input_path, output_path, info.has_audio)
     if policy:
         metrics["subtitle_policy"] = policy.report
+    if junction_report:
+        metrics["subtitle_junctions"] = junction_report
     return segments, metrics, frames
 
 

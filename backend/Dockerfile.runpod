@@ -21,6 +21,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     CLEANER_STORAGE=/app/storage \
     USE_CELERY=0 \
     CLEANER_SUBTITLE_POLICY=1 \
+    CLEANER_SUBTITLE_JUNCTIONS=1 \
     CLEANER_SUBTITLE_FINISH=0 \
     PROPAINTER_ROOT=/opt/ProPainter \
     PROPAINTER_WEIGHTS_DIR=/runpod-volume/models \

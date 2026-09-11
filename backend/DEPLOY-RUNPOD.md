@@ -76,6 +76,12 @@ cena. O perfil trata legendas e karaokê. Logo, título e demais marcas precisam
 de regiões próprias ou do modo Smart; não são incluídos silenciosamente na
 faixa da legenda.
 
+Depois da reconstrução neural, `legacy_refined` também executa
+`subtitle-junctions-v1` separadamente em cada cena. O estágio transfere pixels
+de frames originais somente quando pelo menos dois doadores locais, alinhados e
+sem texto, concordam. `CLEANER_SUBTITLE_JUNCTIONS=0` fica reservado para uma
+ablação controlada.
+
 `quality_status=checks_passed` indica apenas que as heurísticas passaram, não
 garantia visual. `needs_review` acompanha os motivos em `quality_issues` até a
 montagem final. Falha de composição seletiva ou sequência incompleta aborta.

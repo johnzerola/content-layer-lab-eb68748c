@@ -13,7 +13,7 @@ from app.services.tracking import stabilize
 from app.services.scene_pipeline import frame_spans, run_scenes
 from app.services.quality_policy import review_issues, should_try_alternative, prefer_alternative
 from app.utils.video import RawWriter, probe, read_frames
-from app.workers.tasks import _run_official_pipeline, _run_diffusion_pipeline, _window_masks
+from app.workers.tasks import auto_detect, _run_official_pipeline, _run_diffusion_pipeline, _window_masks
 from app.services.watermark import _graphic_on_flat_border
 
 
@@ -96,6 +96,19 @@ def test_subtitle_shadow_halo_respects_timed_protection_and_empty_frames():
     assert not masks[1].any()
 
 
+def test_auto_subtitle_region_covers_caption_lane_not_only_current_glyphs():
+    frames = [np.zeros((1920, 1080, 3), np.uint8) for _ in range(4)]
+    info = SimpleNamespace(frames=4)
+    with patch("app.workers.tasks.probe", return_value=info), \
+         patch("app.workers.tasks.read_frames", return_value=iter(frames)), \
+         patch("app.workers.tasks.detect_text_boxes", return_value=[(385, 1411, 306, 52)]):
+        regions = auto_detect("job", "subtitle", samples=4)
+    assert len(regions) == 1
+    assert regions[0]["w"] >= .579
+    assert regions[0]["h"] >= .051
+    assert regions[0]["x"] < .22
+
+
 def test_short_video_still_splits_at_each_scene_cut():
     chunks = plan_chunks(5, target_seconds=15, overlap=0.6, cuts=[0, 1, 2.5, 4])
     assert [(c.start, c.end) for c in chunks] == [(0, 1), (1, 2.5), (2.5, 4), (4, 5)]
@@ -156,10 +169,16 @@ def test_legacy_refined_diffusion_uses_wide_inference_and_tight_composite(tmp_pa
         captured["composite"] = mask_dir
         return reconstructed
 
+    def junctions(_source, _native, _raw_masks, composite_masks, destination, *_args, **_kwargs):
+        captured["composite"] = composite_masks
+        Path(destination).mkdir(parents=True)
+        return {"revision": "subtitle-junctions-v1"}
+
     with patch("app.workers.tasks._prepare_official_region", side_effect=prepare_region), \
          patch("app.workers.tasks.masks_to_video"), \
          patch("app.workers.tasks.run_diffueraser", return_value=str(source)), \
          patch("app.workers.tasks.restore_inference_region", return_value=str(source)), \
+         patch("app.workers.tasks.refine_subtitle_scene", side_effect=junctions), \
          patch("app.workers.tasks._composite_step", side_effect=composite), \
          patch("app.workers.tasks._audit_video", return_value=([], {"residual_text": 0,
                "sharpness_ratio": 1, "temporal_consistency": 1})), \
@@ -173,6 +192,7 @@ def test_legacy_refined_diffusion_uses_wide_inference_and_tight_composite(tmp_pa
     assert captured["inference"].endswith("inference-masks")
     assert captured["composite"].endswith("composite-masks")
     assert metrics["subtitle_policy"]["policy"] == "scene-local-dual-subtitle-masks-v1"
+    assert metrics["subtitle_junctions"]["revision"] == "subtitle-junctions-v1"
 
 
 def test_quality_policy_does_not_treat_missing_ocr_or_nan_as_success():
