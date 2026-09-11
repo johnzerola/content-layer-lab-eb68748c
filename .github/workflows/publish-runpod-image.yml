@@ -28,7 +28,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: registry-1.docker.io
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: nivaldo12
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push
