@@ -1,10 +1,13 @@
 # Fase 6 — auditoria do pipeline e plano do benchmark definitivo
 
-Data: 11/09/2026  
-Estado: **AUDITORIA E PLANO CONCLUÍDOS; BENCHMARK AINDA NÃO EXECUTADO**  
+Data: 11/09/2026
+
+Estado: **AUDITORIA E PLANO CONCLUÍDOS; BENCHMARK AINDA NÃO EXECUTADO**
+
 Escopo: remoção de legendas, títulos e marcas d'água. Nenhuma decisão de produção é autorizada por este documento.
 
-Revisão auditada: `e719bda13b8c2d87c5c1b7fb7ec5a6ca149536d6`.  
+Revisão auditada: `e719bda13b8c2d87c5c1b7fb7ec5a6ca149536d6`.
+
 Imagem candidata mais recente: `docker.io/nivaldo12/leaneria-runpod@sha256:44639b431b939ec8638852f574048ae97895fa4fbc418b7381e1cf89086c409d`.
 
 ## 1. Conclusão da auditoria
