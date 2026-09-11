@@ -6,7 +6,7 @@ on:
       tag:
         description: Docker image tag
         required: false
-        default: scene-roi-v3-20260911
+        default: scene-roi-v4-legacy-refined-20260911
 
 permissions:
   contents: read

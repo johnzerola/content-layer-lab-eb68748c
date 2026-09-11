@@ -4,6 +4,7 @@ import {
   CLEANER_DEFAULT_ENHANCE,
   CLEANER_DEFAULT_MODE,
   CLEANER_DEFAULT_PRESET,
+  CLEANER_DEFAULT_QUALITY_PROFILE,
   CLEANER_DEFAULT_STRATEGY,
   MODE_LABEL,
 } from "../cleaner";
@@ -15,6 +16,7 @@ describe("CleanerIA defaults", () => {
     expect(CLEANER_DEFAULT_STRATEGY).toBe("inpaint");
     expect(CLEANER_DEFAULT_CROP).toBe(false);
     expect(CLEANER_DEFAULT_ENHANCE).toBe(false);
+    expect(CLEANER_DEFAULT_QUALITY_PROFILE).toBe("legacy_refined");
     expect(MODE_LABEL[CLEANER_DEFAULT_MODE]).toBe("Legenda");
   });
 });

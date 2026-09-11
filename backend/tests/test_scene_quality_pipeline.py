@@ -132,6 +132,49 @@ def test_both_official_engines_dispatch_by_scene_before_inference(engine):
     assert dispatch.call_args.args[5] == [30]
 
 
+def test_legacy_refined_diffusion_uses_wide_inference_and_tight_composite(tmp_path):
+    info = SimpleNamespace(width=100, height=60, fps=10, frames=3, duration=.3, has_audio=False)
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"video")
+    masks = tmp_path / "reviewed"
+    masks.mkdir()
+    for index, box in enumerate((None, (10, 40, 30, 48), (20, 40, 50, 48))):
+        mask = np.zeros((60, 100), np.uint8)
+        if box:
+            x0, y0, x1, y1 = box
+            mask[y0:y1, x0:x1] = 255
+        assert cv2.imwrite(str(masks / f"{index:06d}.png"), mask)
+    regions = [{"kind": "rect", "role": "remove", "x": 0, "y": 0, "w": 1, "h": 1}]
+    captured = {}
+
+    def prepare_region(_source, mask_dir, *_args, **_kwargs):
+        captured["inference"] = mask_dir
+        return SimpleNamespace(active=True, source_path=str(source), mask_dir=mask_dir,
+                               width=100, height=60)
+
+    def composite(_source, reconstructed, mask_dir, *_args):
+        captured["composite"] = mask_dir
+        return reconstructed
+
+    with patch("app.workers.tasks._prepare_official_region", side_effect=prepare_region), \
+         patch("app.workers.tasks.masks_to_video"), \
+         patch("app.workers.tasks.run_diffueraser", return_value=str(source)), \
+         patch("app.workers.tasks.restore_inference_region", return_value=str(source)), \
+         patch("app.workers.tasks._composite_step", side_effect=composite), \
+         patch("app.workers.tasks._audit_video", return_value=([], {"residual_text": 0,
+               "sharpness_ratio": 1, "temporal_consistency": 1})), \
+         patch("app.workers.tasks.mux_audio"):
+        _, metrics, frames = _run_diffusion_pipeline(
+            str(source), str(tmp_path / "output.mp4"), str(tmp_path / "job"), regions,
+            info, "subtitle", True, 1, False, True, lambda *_: None,
+            prepared_mask_dir=str(masks), quality_profile="legacy_refined")
+
+    assert frames == 3
+    assert captured["inference"].endswith("inference-masks")
+    assert captured["composite"].endswith("composite-masks")
+    assert metrics["subtitle_policy"]["policy"] == "scene-local-dual-subtitle-masks-v1"
+
+
 def test_quality_policy_does_not_treat_missing_ocr_or_nan_as_success():
     good = {"residual_text": 0, "sharpness_ratio": 1, "temporal_consistency": 1}
     assert review_issues(good) == []

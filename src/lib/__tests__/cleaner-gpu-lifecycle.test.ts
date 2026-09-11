@@ -28,7 +28,7 @@ describe("RunPod lifecycle cost guards", () => {
   it("does not cancel a completed diagnostic", async () => {
     fetchMock.mockResolvedValueOnce(Response.json(safeConfig));
     fetchMock.mockResolvedValueOnce(Response.json({
-      id: "health-2", status: "COMPLETED", output: { ok: true, ai_ready: true, pipeline_revision: "scene-roi-v3" },
+      id: "health-2", status: "COMPLETED", output: { ok: true, ai_ready: true, pipeline_revision: "scene-roi-v4" },
     }));
     expect((await gpuHealth()).online).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -44,7 +44,7 @@ describe("RunPod lifecycle cost guards", () => {
     const body = JSON.parse(fetchMock.mock.calls[1]?.[1].body);
     expect(body.policy).toEqual({ executionTimeout: 600_000, ttl: 1_800_000 });
     expect(body.input.source_is_chunk).toBe(true);
-    expect(body.input.expected_revision).toBe("scene-roi-v3");
+    expect(body.input.expected_revision).toBe("scene-roi-v4");
   });
 
   it.each([
@@ -78,10 +78,10 @@ describe("RunPod lifecycle cost guards", () => {
 
   it("separates handler duration from provider duration and records the GPU", async () => {
     fetchMock.mockResolvedValueOnce(Response.json({ status: "COMPLETED", executionTime: 12_500, output: {
-      ok: true, seconds: 10.2, gpu_name: "NVIDIA RTX A5000", pipeline_revision: "scene-roi-v3",
+      ok: true, seconds: 10.2, gpu_name: "NVIDIA RTX A5000", pipeline_revision: "scene-roi-v4",
     } }));
     expect(await chunkStatus("timed")).toMatchObject({ seconds: 10.2,
-      providerExecutionSeconds: 12.5, gpuName: "NVIDIA RTX A5000", pipelineRevision: "scene-roi-v3" });
+      providerExecutionSeconds: 12.5, gpuName: "NVIDIA RTX A5000", pipelineRevision: "scene-roi-v4" });
   });
 
   it("rejects completed provider responses that contain no successful pipeline result", async () => {

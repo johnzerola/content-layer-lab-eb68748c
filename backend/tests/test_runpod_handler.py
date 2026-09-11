@@ -43,7 +43,7 @@ def test_handler_records_upload_time_and_removes_its_project(tmp_path, monkeypat
     monkeypatch.setattr(module, "_upload", lambda url, path: uploaded.append(path.read_bytes()))
     result = module.handler({"input": {"source_url": "https://source.invalid", "source_is_chunk": True,
         "start": 0, "end": 1, "overlap": 0, "upload_url": "https://storage.invalid/part",
-        "expected_revision": "scene-roi-v3"}})
+        "expected_revision": "scene-roi-v4"}})
     assert result["ok"] is True
     assert result["seconds"] == 5 and result["processing_seconds"] == 1
     assert result["gpu_name"] == "NVIDIA RTX A5000"

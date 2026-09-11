@@ -88,8 +88,8 @@ def _upload(url: str, path: Path) -> None:
     response.raise_for_status()
 
 
-WORKER_VERSION = "v3"
-PIPELINE_REVISION = "scene-roi-v3"
+WORKER_VERSION = "v4"
+PIPELINE_REVISION = "scene-roi-v4"
 
 
 def _gpu_name():
@@ -216,6 +216,8 @@ def handler(event: dict) -> dict:
             "alternative_attempts": metrics.get("alternative_attempts", 0),
             "selected_engine": metrics.get("selected_engine"),
             "engine": metrics.get("engine"),
+            "quality_profile": metrics.get("quality_profile"),
+            "profile_contract": metrics.get("profile_contract"),
             "device": metrics.get("device"),
             "checksum": _sha256(final_path),
             "bytes": final_path.stat().st_size,

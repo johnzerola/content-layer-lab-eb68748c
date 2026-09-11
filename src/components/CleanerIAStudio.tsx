@@ -39,6 +39,7 @@ import {
   CLEANER_DEFAULT_PRESET,
   CLEANER_DEFAULT_ENHANCE,
   CLEANER_DEFAULT_GPU,
+  CLEANER_DEFAULT_QUALITY_PROFILE,
   PRESET_HINT,
   PRESET_LABEL,
   STAGE_LABEL,
@@ -824,6 +825,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           preset: preview ? "fast" : preset,
           masks: sendMasks,
           options: {
+            quality_profile: CLEANER_DEFAULT_QUALITY_PROFILE,
             dynamic: dynamicMask,
             protect_subject: keepProtect,
             verify: verifyPass,

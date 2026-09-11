@@ -12,6 +12,7 @@ export type CleanerMode =
   "smart" | "subtitle" | "text" | "watermark" | "logo" | "object" | "passerby";
 export type CleanerPreset = "fast" | "quality" | "max";
 export type CleanerStrategy = "inpaint" | "crop-clean";
+export type CleanerQualityProfile = "standard" | "legacy_refined";
 
 export const CLEANER_DEFAULT_MODE: CleanerMode = "subtitle";
 export const CLEANER_DEFAULT_PRESET: CleanerPreset = "quality";
@@ -19,6 +20,7 @@ export const CLEANER_DEFAULT_STRATEGY: CleanerStrategy = "inpaint";
 export const CLEANER_DEFAULT_CROP = false;
 export const CLEANER_DEFAULT_ENHANCE = false;
 export const CLEANER_DEFAULT_GPU = true;
+export const CLEANER_DEFAULT_QUALITY_PROFILE: CleanerQualityProfile = "legacy_refined";
 
 export type CleanerStatus =
   | "queued"

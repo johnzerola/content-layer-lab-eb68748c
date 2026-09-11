@@ -8,12 +8,12 @@ GPU.
 
 - Endpoint Queue RunPod: `km860ju9ded2e0`
 - API: `https://api.runpod.ai/v2/km860ju9ded2e0`
-- Handler esperado: `backend/runpod_handler.py`, `worker_version=v3`
+- Handler esperado: `backend/runpod_handler.py`, `worker_version=v4`
 - Imagem vista anteriormente no endpoint: `docker.io/nivaldo12/leaneria-runpod:6bba537`
 
 O ID fica no secret `RUNPOD_ENDPOINT_ID`; não deve ser fixado no bundle do
 navegador. Depois de publicar uma nova imagem, o diagnóstico da tela deve
-responder `worker_version=v3`. Se responder outra versão, o endpoint ainda está
+responder `worker_version=v4`. Se responder outra versão, o endpoint ainda está
 usando uma imagem antiga.
 
 ## Fluxo de dados
@@ -59,6 +59,23 @@ se retornarem ainda pendentes, o app solicita cancelamento.
 
 ### Qualidade: revisão e segunda tentativa controlada
 
+O produto envia `options.quality_profile=legacy_refined` por padrão. Esse perfil
+reaplica, cena a cena, o contrato que produziu a melhor amostra anterior:
+
+- a máscara de inferência mantém contexto temporal amplo e estável;
+- a máscara de composição permanece apertada ao texto detectado;
+- frames sem máscara continuam disponíveis como candidatos a referência;
+- pixels externos à composição vêm do vídeo original;
+- enhancement global permanece desligado.
+
+O contrato é igual para os dois motores oficiais. O preset **Qualidade** usa
+ProPainter e o preset **Máxima** usa DiffuEraser; `options.engine` aceita
+`propainter` ou `diffueraser` em ensaios controlados. A resposta registra
+`quality_profile`, `profile_contract`, `selected_engine` e os relatórios por
+cena. O perfil trata legendas e karaokê. Logo, título e demais marcas precisam
+de regiões próprias ou do modo Smart; não são incluídos silenciosamente na
+faixa da legenda.
+
 `quality_status=checks_passed` indica apenas que as heurísticas passaram, não
 garantia visual. `needs_review` acompanha os motivos em `quality_issues` até a
 montagem final. Falha de composição seletiva ou sequência incompleta aborta.
@@ -89,7 +106,7 @@ confirme os pesos nos caminhos configurados por `PROPAINTER_*` e
 ## Verificação antes de publicar o app
 
 1. No CleanerIA, clique em **Verificar RunPod**. O retorno precisa ter
-   `online=true`, `worker_version=v3`, `ai_ready=true` e, para o modo Máxima,
+   `online=true`, `worker_version=v4`, `ai_ready=true` e, para o modo Máxima,
    `max_ready=true`.
 2. Envie um vídeo autorizado de 5–10 s com legenda fixa e gere a prévia grátis.
 3. Processe em Qualidade/Turbo e confirme no banco que todos os chunks chegaram

@@ -12,6 +12,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -197,6 +198,10 @@ def run_propainter(
 
     root = Path(status.root)
     target = Path(output_dir)
+    preserve_pixels = os.getenv("PROPAINTER_PRESERVE_PIXELS", "0") == "1"
+    if preserve_pixels:
+        # Never erase a caller's existing directory or a source on this route.
+        target.mkdir(parents=True, exist_ok=False)
     env = os.environ.copy()
     env["PYTHONPATH"] = os.pathsep.join(
         part for part in (str(root), env.get("PYTHONPATH", "")) if part
@@ -228,7 +233,7 @@ def run_propainter(
     for attempt, scale_factor in enumerate(scales):
         if time.monotonic() >= deadline:
             raise TimeoutError("ProPainter excedeu o tempo total, incluindo tentativas")
-        if target.exists():
+        if target.exists() and not preserve_pixels:
             shutil.rmtree(target)
         target.mkdir(parents=True, exist_ok=True)
         log_path = target / "propainter.log"
@@ -237,32 +242,15 @@ def run_propainter(
             reference_stride=reference_stride,
             temporal_window=temporal_window,
         )
-        if on_stage:
-            size = f"{command[command.index('--width') + 1]}x{command[command.index('--height') + 1]}"
-            on_stage(f"ProPainter oficial {size}" + (" (memória reduzida)" if attempt else ""))
-        with log_path.open("w", encoding="utf-8") as log:
-            process = subprocess.Popen(
-                command,
-                cwd=root,
-                env=env,
-                stdout=log,
-                stderr=subprocess.STDOUT,
+        if preserve_pixels:
+            returncode, pixel_output = _run_pixel_attempt(
+                command, input_video, mask_dir, target, width, height, fps,
+                preset, scale_factor, attempt, root, env, deadline, cancel_file, on_stage,
             )
-            while process.poll() is None:
-                if cancel_file and Path(cancel_file).exists():
-                    process.terminate()
-                    try:
-                        process.wait(timeout=10)
-                    except subprocess.TimeoutExpired:
-                        process.kill()
-                        process.wait(timeout=10)
-                    raise RuntimeError("job cancelado")
-                if time.monotonic() >= deadline:
-                    process.kill()
-                    process.wait(timeout=10)
-                    raise TimeoutError("ProPainter excedeu o tempo limite")
-                time.sleep(1)
-            returncode = process.returncode
+            if pixel_output:
+                return pixel_output
+        else:
+            returncode = _invoke(command, root, env, log_path, deadline, cancel_file, on_stage)
 
         if returncode == 0:
             candidates = sorted(target.rglob("inpaint_out.mp4"))
@@ -280,8 +268,6 @@ def run_propainter(
         except OSError:
             pass
         last_error = f"ProPainter falhou (codigo {returncode}).\n{tail}"
-        # returncode -9/137 = processo morto pelo kernel/cgroup por falta de RAM
-        # (CPU). Tratado como OOM para acionar a retentativa em escala menor.
         out_of_memory = (
             "OutOfMemoryError" in tail
             or "out of memory" in tail.lower()
@@ -291,4 +277,63 @@ def run_propainter(
             raise RuntimeError(last_error)
 
     raise RuntimeError(last_error or "ProPainter falhou")
+
+
+def _run_pixel_attempt(command, source, masks, target, width, height, fps, preset,
+                       scale_factor, attempt, root, env, deadline, cancel_file, on_stage):
+    from .propainter_pixels import pixel_geometry, prepare_pixels, pack_pixels, write_pixel_report
+
+    max_side = max(320, int(os.getenv("PROPAINTER_MAX_SIDE", "1280" if preset == "max" else "960")))
+    geometry = pixel_geometry(width, height, max(320, int(max_side * scale_factor)))
+    # TemporaryDirectory owns only this attempt's new files; all are removed
+    # on success, cancellation, failure or OOM before any next attempt starts.
+    with tempfile.TemporaryDirectory(prefix="pixels-", dir=target) as temporary:
+        scratch = Path(temporary)
+        count = prepare_pixels(source, masks, scratch, geometry,
+                               cancel_file=cancel_file, deadline=deadline,
+                               max_bytes=int(os.getenv("PROPAINTER_PIXEL_WORKSPACE_BYTES", str(2 * 1024**3))))
+        overrides = {"--video": scratch / "input", "--mask": scratch / "masks",
+                     "--output": scratch / "model", "--width": geometry.padded_width,
+                     "--height": geometry.padded_height}
+        for key, value in overrides.items():
+            command[command.index(key) + 1] = str(value)
+        command.append("--save_frames")
+        code = _invoke(command, root, env, target / "propainter.log", deadline, cancel_file, on_stage)
+        if code:
+            return code, None
+        output = pack_pixels(scratch / "model/input/frames", target / "inpaint-lossless.mp4",
+                             geometry, count, fps, cancel_file=cancel_file, deadline=deadline)
+        write_pixel_report(target / "pixels.json", geometry, count, fps, attempt)
+        return 0, output
+
+
+def _invoke(command, root, env, log_path, deadline, cancel_file, on_stage):
+    if on_stage:
+        size = f"{command[command.index('--width') + 1]}x{command[command.index('--height') + 1]}"
+        on_stage(f"ProPainter oficial {size}")
+    with log_path.open("w", encoding="utf-8") as log:
+        process = subprocess.Popen(
+            command, cwd=root, env=env, stdout=log, stderr=subprocess.STDOUT,
+        )
+        try:
+            while process.poll() is None:
+                if cancel_file and Path(cancel_file).exists():
+                    process.terminate()
+                    try:
+                        process.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait(timeout=10)
+                    raise RuntimeError("job cancelado")
+                if time.monotonic() >= deadline:
+                    process.kill()
+                    process.wait(timeout=10)
+                    raise TimeoutError("ProPainter excedeu o tempo limite")
+                time.sleep(1)
+            return process.returncode
+        finally:
+            # Also release GPU on Ctrl-C or an unexpected polling exception.
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=10)
 

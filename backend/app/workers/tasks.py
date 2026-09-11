@@ -482,6 +482,7 @@ def _run_official_pipeline(
     scene_cuts=(),
     refinement_budget=None,
     prepared_mask_dir: Optional[str] = None,
+    quality_profile: str = "standard",
 ) -> tuple[List[Dict], dict, int]:
     if prepared_mask_dir and len(frame_spans(info.frames, scene_cuts)) > 1:
         raise ValueError("mascaras revisadas devem ser fornecidas separadamente por cena")
@@ -491,7 +492,8 @@ def _run_official_pipeline(
                 _run_official_pipeline(source, output, directory, masks, part_info,
                     mode, preset, dynamic, key_step, auto_protect, verify_on,
                     progress, cancel_file, composite_on,
-                    refinement_budget=refinement_budget), emit, cancel_file)
+                    refinement_budget=refinement_budget,
+                    quality_profile=quality_profile), emit, cancel_file)
     mask_dir = prepared_mask_dir or os.path.join(job_dir, "masks")
     run_dir = os.path.join(job_dir, "propainter-run")
     emit(18, "gerando mascaras temporais", "tracking")
@@ -507,8 +509,10 @@ def _run_official_pipeline(
         lambda ratio: emit(18 + ratio * 14, "gerando mascaras temporais", "tracking"),
     )
     policy = None
-    if (not prepared_mask_dir and dynamic and mode in ("subtitle", "karaoke")
-            and os.getenv("CLEANER_SUBTITLE_POLICY", "1") == "1"):
+    refined_policy = quality_profile == "legacy_refined"
+    if (dynamic and mode in ("subtitle", "karaoke")
+            and (refined_policy or (not prepared_mask_dir
+                                    and os.getenv("CLEANER_SUBTITLE_POLICY", "1") == "1"))):
         policy = prepare_subtitle_policy(mask_dir, job_dir, regions, info, cancel_file)
     inference_masks = policy.inference_mask_dir if policy else mask_dir
     composite_masks = policy.composite_mask_dir if policy else mask_dir
@@ -580,7 +584,7 @@ def _run_official_pipeline(
             alt_segments, alt_metrics, alt_frames = _run_diffusion_pipeline(
                 input_path, alternate_path, alternate_dir, regions, info, mode,
                 dynamic, key_step, auto_protect, True, emit, cancel_file, composite_on,
-                prepared_mask_dir=mask_dir)
+                prepared_mask_dir=mask_dir, quality_profile=quality_profile)
             alt_info = probe(alternate_path)
             valid = (alt_frames == frames and alt_info.frames == frames
                      and (alt_info.width, alt_info.height) == (info.width, info.height))
@@ -615,6 +619,7 @@ def _run_diffusion_pipeline(
     composite_on: bool = True,
     scene_cuts=(),
     prepared_mask_dir: Optional[str] = None,
+    quality_profile: str = "standard",
 ) -> tuple[List[Dict], dict, int]:
     if prepared_mask_dir and len(frame_spans(info.frames, scene_cuts)) > 1:
         raise ValueError("mascaras revisadas devem ser fornecidas separadamente por cena")
@@ -623,7 +628,8 @@ def _run_diffusion_pipeline(
             lambda source, output, directory, masks, part_info, progress:
                 _run_diffusion_pipeline(source, output, directory, masks, part_info,
                     mode, dynamic, key_step, auto_protect, verify_on,
-                    progress, cancel_file, composite_on), emit, cancel_file)
+                    progress, cancel_file, composite_on,
+                    quality_profile=quality_profile), emit, cancel_file)
     mask_dir = prepared_mask_dir or os.path.join(job_dir, "masks")
     mask_video = os.path.join(job_dir, "masks.mp4")
     run_dir = os.path.join(job_dir, "diffueraser-run")
@@ -639,7 +645,13 @@ def _run_diffusion_pipeline(
         auto_protect,
         lambda ratio: emit(18 + ratio * 12, "gerando mascaras temporais", "tracking"),
     )
-    region = _prepare_official_region(input_path, mask_dir, job_dir, info, emit, cancel_file)
+    policy = None
+    if (quality_profile == "legacy_refined" and dynamic
+            and mode in ("subtitle", "karaoke")):
+        policy = prepare_subtitle_policy(mask_dir, job_dir, regions, info, cancel_file)
+    inference_masks = policy.inference_mask_dir if policy else mask_dir
+    composite_masks = policy.composite_mask_dir if policy else mask_dir
+    region = _prepare_official_region(input_path, inference_masks, job_dir, info, emit, cancel_file)
     if not region.active:
         return _copy_unmasked_scene(input_path, output_path, frames)
     masks_to_video(region.mask_dir, mask_video, info.fps)
@@ -659,7 +671,7 @@ def _run_diffusion_pipeline(
     )
     if composite_on:
         normalized_video = _composite_step(
-            input_path, normalized_video, mask_dir, info.fps, job_dir, emit
+            input_path, normalized_video, composite_masks, info.fps, job_dir, emit
         )
     else:
         normalized_video = ffmpeg_filter(
@@ -668,12 +680,14 @@ def _run_diffusion_pipeline(
         )
     emit(92, "validando resultado", "refining")
     if verify_on:
-        segments, metrics = _audit_video(normalized_video, mask_dir, info.fps)
+        segments, metrics = _audit_video(normalized_video, composite_masks, info.fps)
     else:
         segments = []
         metrics = {"residual_text": 0.0, "sharpness_ratio": 1.0, "temporal_consistency": 1.0}
     emit(96, "remontando audio", "encoding")
     mux_audio(normalized_video, input_path, output_path, info.has_audio)
+    if policy:
+        metrics["subtitle_policy"] = policy.report
     return segments, metrics, frames
 
 
@@ -778,7 +792,22 @@ def run_pipeline(
     progress_cb=None,
     options: Optional[Dict] = None,
 ) -> Dict:
-    opts = options or {}
+    opts = dict(options or {})
+    quality_profile = str(opts.get("quality_profile", "standard")).strip().lower()
+    if quality_profile not in ("standard", "legacy_refined"):
+        raise ValueError("quality_profile deve ser standard ou legacy_refined")
+    engine_preference = str(opts.get("engine", "auto")).strip().lower()
+    if engine_preference not in ("auto", "diffueraser", "propainter"):
+        raise ValueError("engine deve ser auto, diffueraser ou propainter")
+    if quality_profile == "legacy_refined":
+        # The approved old sample used scene-local context, a wide inference
+        # mask and a tight final composite. Keep those fidelity constraints
+        # deterministic across both official neural engines.
+        opts["dynamic"] = True
+        opts["protect_subject"] = True
+        opts["verify"] = True
+        opts["composite"] = True
+        opts["enhance"] = False
     dynamic = bool(opts.get("dynamic", True))
     auto_protect = bool(opts.get("protect_subject", True))
     key_step = int(opts.get("key_step", 4))
@@ -890,7 +919,13 @@ def run_pipeline(
         official = propainter_status(require_cuda=os.getenv("PROPAINTER_ALLOW_CPU", "0") != "1")
         diffusion = diffueraser_status()
         allow_fallback = os.getenv("CLEANER_ALLOW_CLASSIC_FALLBACK", "0") == "1"
-        if preset == "max" and diffusion.ready:
+        use_diffusion = engine_preference == "diffueraser" or (
+            engine_preference == "auto" and preset == "max"
+        )
+        use_propainter = engine_preference == "propainter" or (
+            engine_preference == "auto" and preset in ("quality", "max") and not use_diffusion
+        )
+        if use_diffusion and diffusion.ready:
             segments, aggregate, written = _run_diffusion_pipeline(
                 input_path,
                 output_path,
@@ -906,15 +941,16 @@ def run_pipeline(
                 str(cancel_path),
                 composite_on,
                 scene_cuts=cuts,
+                quality_profile=quality_profile,
             )
             engine_name = "diffueraser-official"
             pass_count = 2
-        elif preset == "max" and not allow_fallback:
+        elif use_diffusion and not allow_fallback:
             raise DiffuEraserUnavailable(
                 "preset max solicitado, mas DiffuEraser oficial nao esta pronto: "
                 + ", ".join(diffusion.missing)
             )
-        elif preset in ("quality", "max") and official.ready:
+        elif use_propainter and official.ready:
             segments, aggregate, written = _run_official_pipeline(
                 input_path,
                 output_path,
@@ -932,11 +968,12 @@ def run_pipeline(
                 composite_on,
                 scene_cuts=cuts,
                 refinement_budget=[1 if opts.get("selective_second_pass") is True else 0],
+                quality_profile=quality_profile,
             )
             engine_name = "propainter-official"
             pass_count = 1
         else:
-            if preset == "quality" and not allow_fallback:
+            if use_propainter and not allow_fallback:
                 raise ProPainterUnavailable(
                     "preset de IA solicitado, mas ProPainter oficial nao esta pronto: "
                     + ", ".join(official.missing)
@@ -990,6 +1027,11 @@ def run_pipeline(
                 "subject_protection": auto_protect,
                 "composite": composite_on,
                 "preview": is_preview,
+                "quality_profile": quality_profile,
+                "profile_contract": (
+                    "scene_local_dual_masks_preserve_pixels"
+                    if quality_profile == "legacy_refined" else "standard"
+                ),
                 "subtitle_policy": aggregate.get("subtitle_policy"),
                 "scene_policies": aggregate.get("scene_policies", []),
             },

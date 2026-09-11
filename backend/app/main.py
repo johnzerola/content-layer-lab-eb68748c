@@ -281,7 +281,7 @@ async def health():
         "detectors": {"text": detector_status()},
         "features": {"batch_render": True, "scene_isolated_inpainting": True,
                      "conservative_karaoke_masks": True, "quality_review_signals": True},
-        "pipeline_revision": "scene-roi-v3",
+        "pipeline_revision": "scene-roi-v4",
         "inference_roi": os.getenv("CLEANER_INFERENCE_ROI", "1") == "1",
         "limits": {
             "max_upload_bytes": SETTINGS.max_upload_bytes,

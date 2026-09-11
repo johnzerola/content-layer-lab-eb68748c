@@ -9,7 +9,7 @@ import { jobToken, workerPublicBase } from "@/lib/cleaner.server";
 
 const RUNPOD_BASE = "https://api.runpod.ai/v2";
 const RUNPOD_CONTROL_BASE = "https://rest.runpod.io/v1";
-export const CLEANER_PIPELINE_REVISION = "scene-roi-v3";
+export const CLEANER_PIPELINE_REVISION = "scene-roi-v4";
 
 export type GpuDenied = { denied: true; status: number; message: string; requires?: string };
 
