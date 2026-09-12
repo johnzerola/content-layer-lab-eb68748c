@@ -814,7 +814,54 @@ export function ChatSceneStudio() {
             clips={clips}
           />
 
-          <div className="mt-4">
+          <div className="mt-4 flex gap-3">
+            <nav className="flex shrink-0 flex-col gap-1.5" aria-label="Painéis do ChatScene">
+              {PANEL_TABS.map((t) => {
+                const Icon = t.icon;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    title={t.label}
+                    aria-label={t.label}
+                    aria-pressed={panel === t.id}
+                    onClick={() => setPanel(t.id)}
+                    className={`flex size-9 items-center justify-center rounded-lg border transition ${
+                      panel === t.id
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border text-muted-foreground hover:border-primary/50"
+                    }`}
+                  >
+                    <Icon className="size-4" />
+                  </button>
+                );
+              })}
+            </nav>
+            <div className="min-w-0 flex-1">
+            {panel === "vozes" && (
+              <VoicePanel
+                project={project}
+                patch={patch}
+                clipCount={clips.size}
+                castState={castState}
+                castProgress={castProgress}
+                onGenerate={() => void handleGenerateVoices()}
+                previewing={previewingVoice}
+                onPreview={(id, profile) => void handlePreviewVoice(id, profile)}
+              />
+            )}
+            {panel === "marca" && (
+              <BrandPanel
+                project={project}
+                patch={patch}
+                uploading={uploading}
+                onLogo={(file) => void handleLogo(file)}
+                onHeaderLogo={(file) => void handleHeaderImage(file, "logo")}
+                onHeaderBackground={(file) => void handleHeaderImage(file, "background")}
+              />
+            )}
+            {panel === "visual" && (
+              <>
             <p className="mono-label mb-2 text-muted-foreground">Visual</p>
             <div className="grid grid-cols-2 gap-1.5">
               {CHAT_THEMES.map((t) => (
