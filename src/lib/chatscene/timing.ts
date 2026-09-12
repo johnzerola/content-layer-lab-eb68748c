@@ -92,6 +92,8 @@ export function readingMs(message: ChatMessage, project: ChatSceneProject): numb
   const t = project.timing;
   const words = message.text.trim() ? message.text.trim().split(/\s+/).length : 0;
   const base = Math.max(message.text.length * t.msPerChar, words * 220);
+  // cartão de cena (“Momentos antes”): fica mais tempo na tela, é um corte
+  if (message.kind === "card") return Math.round(clamp(base * 1.15 + 700, 1500, Math.max(t.maxReadMs, 3200)));
   const mediaBonus = message.kind === "text" || message.kind === "system" ? 0 : 900;
   const emphasis = message.emphasis ? 1.18 : 1;
   return Math.round(clamp((base + mediaBonus) * emphasis, t.minReadMs, t.maxReadMs));
@@ -101,7 +103,7 @@ export function readingMs(message: ChatMessage, project: ChatSceneProject): numb
 export function typingMsOf(message: ChatMessage, project: ChatSceneProject): number {
   if (typeof message.typingMs === "number") return Math.max(0, message.typingMs);
   if (!project.timing.typing) return 0;
-  if (message.kind === "system") return 0;
+  if (message.kind === "system" || message.kind === "card") return 0;
   const author = participantOf(project, message.participantId);
   // quem escreve a história não "digita" na tela: a bolha dele entra direto
   if (author.isSelf) return 0;
@@ -172,7 +174,7 @@ export function computeMessageTimings(project: ChatSceneProject): MessageTiming[
     });
 
     cursor = endMs;
-    previousAuthor = message.kind === "system" ? "" : author.id;
+    previousAuthor = message.kind === "system" || message.kind === "card" ? "" : author.id;
   });
 
   return out;
