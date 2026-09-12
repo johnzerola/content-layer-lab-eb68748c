@@ -1290,6 +1290,9 @@ export function ChatSceneStudio() {
                 aria-label="Velocidade da conversa"
               />
             </div>
+              </>
+            )}
+            </div>
           </div>
         </section>
 
