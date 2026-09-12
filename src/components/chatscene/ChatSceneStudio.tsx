@@ -371,6 +371,26 @@ export function ChatSceneStudio() {
                 >
                   eu
                 </button>
+                <label
+                  className="cursor-pointer text-muted-foreground hover:text-primary"
+                  title={`Foto de ${p.name}`}
+                >
+                  {uploading === p.id ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <ImageIcon className="size-3.5" />
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) void handleAvatarUpload(p.id, file);
+                    }}
+                  />
+                </label>
                 {project.participants.length > 2 && (
                   <button
                     type="button"
