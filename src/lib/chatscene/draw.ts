@@ -704,6 +704,7 @@ function paintConversation(
       ctx.fillText(label, width / 2, y + h / 2);
       ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
+      if (scaling) ctx.restore();
       continue;
     }
 
