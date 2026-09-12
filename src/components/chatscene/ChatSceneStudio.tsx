@@ -860,6 +860,32 @@ export function ChatSceneStudio() {
             <Plus className="mr-1.5 size-4" />
             Nova mensagem
           </Button>
+
+          {/* colar a conversa inteira de uma vez */}
+          <div className="mt-3 rounded-xl border border-border p-3">
+            <label className="text-xs font-medium text-muted-foreground" htmlFor="chatscene-script">
+              Colar conversa pronta
+            </label>
+            <textarea
+              id="chatscene-script"
+              value={script}
+              onChange={(e) => setScript(e.target.value)}
+              rows={4}
+              placeholder={"Ana: oi, tudo bem?\nBruno: tudo! e você?\n* Ana entrou no grupo"}
+              className="mt-2 w-full resize-y rounded-lg border border-border bg-background p-2 text-sm"
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-2 w-full"
+              disabled={!script.trim()}
+              onClick={importScript}
+            >
+              <Plus className="mr-1.5 size-4" />
+              Adicionar à conversa
+            </Button>
+          </div>
+
         </section>
 
         {/* ----------------------------------------------------------- prévia */}
