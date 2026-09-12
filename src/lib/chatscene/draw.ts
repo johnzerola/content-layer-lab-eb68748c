@@ -211,6 +211,35 @@ export function layoutMessages(
       return;
     }
 
+    // cartão de cena: faixa larga com texto grande, marcando o corte
+    if (message.kind === "card") {
+      const cardSize = Math.round(m.fontSize * 1.5);
+      ctx.font = `800 ${cardSize}px ${theme.fontFamily}`;
+      const lines = wrapText(ctx, message.text, width - m.pad * 4);
+      const h = lines.length * Math.round(cardSize * 1.25) + Math.round(m.gap * 4);
+      items.push({
+        message,
+        lines,
+        x: m.pad,
+        y,
+        width: width - m.pad * 2,
+        height: h,
+        isSelf: false,
+        showName: false,
+        showAvatar: false,
+        name: "",
+        nameColor: theme.systemText,
+        avatarUrl: null,
+        mediaH: 0,
+        mediaW: 0,
+        bare: false,
+        clock: "",
+      });
+      y += h + m.gap * 1.5;
+      lastAuthor = "";
+      return;
+    }
+
     const padX = Math.round(24 * m.scale);
     const padY = Math.round(18 * m.scale);
     const avatarLane = isGroup && !isSelf ? m.avatar + Math.round(14 * m.scale) : 0;
@@ -999,6 +1028,27 @@ function paintConversation(
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(label, width / 2, y + h / 2);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+      if (scaling) ctx.restore();
+      continue;
+    }
+
+    // cartão de cena: faixa escura translúcida com texto grande branco,
+    // como os cortes “Momentos antes” / “Enquanto isso” dos canais de referência
+    if (item.message.kind === "card") {
+      const cardSize = Math.round(m.fontSize * 1.5);
+      ctx.fillStyle = "rgba(10,10,16,0.62)";
+      roundRect(ctx, m.pad / 2, y, width - m.pad, item.height, Math.round(28 * m.scale));
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `800 ${cardSize}px ${theme.fontFamily}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const lh = Math.round(cardSize * 1.25);
+      item.lines.forEach((l, i) =>
+        ctx.fillText(l, width / 2, y + item.height / 2 + (i - (item.lines.length - 1) / 2) * lh),
+      );
       ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
       if (scaling) ctx.restore();
