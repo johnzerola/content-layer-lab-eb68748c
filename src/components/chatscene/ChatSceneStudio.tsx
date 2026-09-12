@@ -110,6 +110,7 @@ function slugify(text: string): string {
 export function ChatSceneStudio() {
   const [project, setProject] = useState<ChatSceneProject>(() => createChatSceneProject());
   const [recordId, setRecordId] = useState<string | null>(null);
+  const [script, setScript] = useState("");
   const [studio, setStudio] = useState(false);
   const [frame, setFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
