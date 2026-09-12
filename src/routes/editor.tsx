@@ -13,6 +13,7 @@ import { createEditorProjectRecord } from "@/lib/editor/project.service";
 import { createAudioClip, defaultEditorAudio, type AudioClip } from "@/lib/editor/audio";
 import { EXPORT_QUALITIES, loadExportQuality, saveExportQuality, type ExportQuality } from "@/lib/editor/export-quality";
 import { NARRATION_VOICES, generateNarration } from "@/lib/tts.functions";
+import { uploadMediaBlob } from "@/lib/media-store";
 
 export const Route = createFileRoute("/editor")({
   head: () => ({
@@ -57,7 +58,10 @@ async function probe(file: File): Promise<{ duration: number; width: number; hei
   }
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
+/** Guarda a gravação no armazenamento da conta; se não der, embute como antes. */
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  const ref = await uploadMediaBlob("editor-recording", blob);
+  if (ref) return ref;
   return new Promise((res, rej) => {
     const fr = new FileReader();
     fr.onload = () => res(String(fr.result));

@@ -2,6 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { migrate, registerQuotaFallback, type Template } from "@/lib/template";
+import { externalizeDataUrls, isDataUrl, uploadDataUrl } from "@/lib/media-store";
 
 export type CloudUser = { id: string; email: string | null };
 
@@ -69,7 +70,9 @@ export async function resetPassword(email: string) {
 export async function pushTemplates(list: Template[]) {
   const user = await currentUser();
   if (!user) throw new Error("Faça login para sincronizar.");
-  const rows = list.map((t) => ({
+  // imagens coladas dentro do template vão para o armazenamento antes de salvar
+  const clean = await Promise.all(list.map((t) => externalizeDataUrls("template", t)));
+  const rows = clean.map((t) => ({
     user_id: user.id,
     local_id: t.id,
     name: t.name,
@@ -247,6 +250,12 @@ export async function logExports(list: ExportLog[]) {
   if (!list.length) return;
   const user = await currentUser();
   if (!user) return;
+  // miniaturas vão para o armazenamento; o registro guarda só a referência
+  list = await Promise.all(
+    list.map(async (e) =>
+      isDataUrl(e.thumbUrl) ? { ...e, thumbUrl: await uploadDataUrl("thumbs", e.thumbUrl) } : e,
+    ),
+  );
   await supabase.from("exports").insert(
     list.map((e) => ({
       user_id: user.id,

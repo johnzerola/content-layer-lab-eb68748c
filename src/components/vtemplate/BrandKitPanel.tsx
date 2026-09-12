@@ -4,6 +4,8 @@ import { Button, Input } from "@/components/ui/base";
 import { Label } from "@/components/ui/label";
 import { BRAND_FONTS, extractBrandFromLogo, loadBrandKit, saveBrandKit, type BrandKit } from "@/lib/brand-kit";
 import type { TemplateDoc, TemplateLayer } from "@/lib/video-template/types";
+import { resolveMediaUrl, uploadFileOrInline } from "@/lib/media-store";
+import { useMediaUrl } from "@/hooks/useMediaUrl";
 
 function ColorRow({
   label,
@@ -50,6 +52,7 @@ export function BrandKitPanel({
   const [genError, setGenError] = useState<string | null>(null);
   const [palette, setPalette] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const logoPreview = useMediaUrl(kit.logoUrl);
 
   useEffect(() => {
     saveBrandKit(kit);
@@ -87,13 +90,10 @@ export function BrandKitPanel({
   };
 
   const pickLogo = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const src = String(reader.result);
+    void uploadFileOrInline("brand", file).then(async (src) => {
       patch({ logoUrl: src });
-      void generateFromLogo(src);
-    };
-    reader.readAsDataURL(file);
+      await generateFromLogo(await resolveMediaUrl(src));
+    });
   };
 
 
@@ -127,8 +127,8 @@ export function BrandKitPanel({
 
       <div className="flex items-center gap-2">
         <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg border border-border/70 bg-card/60">
-          {kit.logoUrl ? (
-            <img src={kit.logoUrl} alt="Logo da marca" className="h-full w-full object-contain" />
+          {logoPreview ? (
+            <img src={logoPreview} alt="Logo da marca" className="h-full w-full object-contain" />
           ) : (
             <span className="text-[10px] text-muted-foreground">logo</span>
           )}

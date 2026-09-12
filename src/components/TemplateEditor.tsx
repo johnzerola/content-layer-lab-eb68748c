@@ -32,6 +32,8 @@ import {
 import { BUILTIN_FONTS, fileToFont, registerFonts } from "@/lib/fonts";
 import { defaultAntiDup, makeVariation, describeVariation } from "@/lib/variation";
 import { TemplateTimeline } from './TemplateTimeline';
+import { uploadFileOrInline } from "@/lib/media-store";
+import { useMediaUrl } from "@/hooks/useMediaUrl";
 
 
 const KEY_OF: Record<LayerId, keyof Template> = {
@@ -91,12 +93,16 @@ function Slider({
   );
 }
 
+/** Envia a imagem para o armazenamento da conta (cai para data URL se falhar). */
 async function fileToDataUrl(file: File) {
-  return new Promise<string>((res) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result as string);
-    r.readAsDataURL(file);
-  });
+  return uploadFileOrInline("template", file);
+}
+
+/** Miniatura que entende tanto link direto quanto arquivo guardado na conta. */
+function MediaThumb({ src, className }: { src: string; className?: string }) {
+  const url = useMediaUrl(src);
+  if (!url) return null;
+  return <img src={url} alt="" className={className} />;
 }
 
 function DebugPanel({
@@ -797,7 +803,7 @@ export function TemplateEditor({
                         <>
                           <div className="flex items-center gap-2">
                             {imgLayer(id).src && (
-                              <img src={imgLayer(id).src!} alt="" className="size-10 rounded-md object-cover" />
+                              <MediaThumb src={imgLayer(id).src!} className="size-10 rounded-md object-cover" />
                             )}
                             <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:border-primary">
                               <Upload className="size-3.5" /> Trocar imagem

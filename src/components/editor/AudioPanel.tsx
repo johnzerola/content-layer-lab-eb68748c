@@ -11,6 +11,8 @@ import {
 import { NARRATION_VOICES, generateNarration } from "@/lib/tts.functions";
 import { SoundLibrary } from "@/components/editor/SoundLibrary";
 import { separateStems } from "@/lib/editor/stems";
+import { uploadMediaBlob } from "@/lib/media-store";
+import { useMediaUrl } from "@/hooks/useMediaUrl";
 
 const NARRATION_TONES: { id: string; label: string; prompt: string }[] = [
   { id: "viral", label: "Viral / energia alta", prompt: "Narre em português do Brasil com energia alta de vídeo curto, ritmo acelerado e ênfase nas primeiras palavras." },
@@ -30,15 +32,18 @@ interface Props {
   getSourceFile?: () => Promise<File | null>;
 }
 
-/** Limite de segurança para embutir o áudio no documento do projeto (~20 MB). */
+/** Limite de segurança quando o áudio precisa ficar embutido no projeto (~20 MB). */
 const MAX_INLINE_AUDIO = 20 * 1024 * 1024;
 
-/** Converte o arquivo/gravação em data URL para persistir no projeto salvo. */
-function toPersistentUrl(blob: Blob): Promise<string> {
+/**
+ * Guarda o arquivo/gravação no armazenamento da conta e devolve a referência.
+ * Sem conta ou com falha de envio, mantém o comportamento antigo (data URL).
+ */
+async function toPersistentUrl(blob: Blob): Promise<string> {
+  const ref = await uploadMediaBlob("editor-audio", blob);
+  if (ref) return ref;
   if (blob.size > MAX_INLINE_AUDIO) {
-    return Promise.reject(
-      new Error("Áudio muito grande para salvar no projeto (máx. 20 MB). Comprima o arquivo."),
-    );
+    throw new Error("Áudio muito grande para salvar no projeto (máx. 20 MB). Comprima o arquivo.");
   }
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -46,6 +51,22 @@ function toPersistentUrl(blob: Blob): Promise<string> {
     reader.onerror = () => reject(new Error("Não foi possível ler o áudio."));
     reader.readAsDataURL(blob);
   });
+}
+
+/** Player que resolve arquivos guardados na conta antes de tocar. */
+function ClipPlayer({ url, stemRole }: { url: string; stemRole?: string | undefined }) {
+  const src = useMediaUrl(url);
+  if (!src) return null;
+  return (
+    <>
+      <audio src={src} controls className="mt-1.5 h-8 w-full" />
+      {stemRole && (
+        <a href={src} download={`${stemRole}.mp3`} className="mt-1 inline-block text-xs underline">
+          Baixar esta trilha
+        </a>
+      )}
+    </>
+  );
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -441,8 +462,7 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime, getS
                 <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
               </button>
             </div>
-            <audio src={c.url} controls className="mt-1.5 h-8 w-full" />
-            {c.stemRole && <a href={c.url} download={`${c.stemRole}.mp3`} className="mt-1 inline-block text-xs underline">Baixar esta trilha</a>}
+            <ClipPlayer url={c.url} stemRole={c.stemRole} />
             <Row label="Mudo">
               <input type="checkbox" checked={c.muted} onChange={(e) => updateClip(c.id, { muted: e.target.checked })} />
             </Row>

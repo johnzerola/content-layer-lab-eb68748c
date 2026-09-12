@@ -10,6 +10,7 @@ import { useRef, useState } from "react";
 import { Mic, Play, Plus, Sparkles, Square, Trash2 } from "lucide-react";
 import { createAudioClip, defaultEditorAudio, type AudioClip, type EditorAudio } from "@/lib/editor/audio";
 import { NARRATION_VOICES, generateNarration } from "@/lib/tts.functions";
+import { uploadMediaBlob } from "@/lib/media-store";
 
 interface Props {
   audio: EditorAudio | undefined;
@@ -35,9 +36,12 @@ const PITCHES: { id: string; label: string; prompt: string }[] = [
 
 const MAX_INLINE_AUDIO = 20 * 1024 * 1024;
 
-function toDataUrl(blob: Blob): Promise<string> {
+/** Guarda a gravação no armazenamento da conta; se não der, embute como antes. */
+async function toDataUrl(blob: Blob): Promise<string> {
+  const ref = await uploadMediaBlob("editor-voice", blob);
+  if (ref) return ref;
   if (blob.size > MAX_INLINE_AUDIO) {
-    return Promise.reject(new Error("Áudio muito grande para salvar no projeto (máx. 20 MB)."));
+    throw new Error("Áudio muito grande para salvar no projeto (máx. 20 MB).");
   }
   return new Promise((resolve, reject) => {
     const fr = new FileReader();
