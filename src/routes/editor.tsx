@@ -13,6 +13,7 @@ import { createEditorProjectRecord } from "@/lib/editor/project.service";
 import { createAudioClip, defaultEditorAudio, type AudioClip } from "@/lib/editor/audio";
 import { EXPORT_QUALITIES, loadExportQuality, saveExportQuality, type ExportQuality } from "@/lib/editor/export-quality";
 import { NARRATION_VOICES, generateNarration } from "@/lib/tts.functions";
+import { uploadMediaBlob } from "@/lib/media-store";
 
 export const Route = createFileRoute("/editor")({
   head: () => ({
