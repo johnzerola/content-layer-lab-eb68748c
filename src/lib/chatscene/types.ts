@@ -167,7 +167,18 @@ export function createMessage(participantId: string, init: Partial<ChatMessage> 
     delayMs: init.delayMs ?? null,
     typingMs: init.typingMs ?? null,
     replyToId: init.replyToId ?? null,
+    time: init.time ?? null,
+    reaction: init.reaction ?? null,
   };
+}
+
+/** Hora mostrada na bolha: a informada pelo usuário ou o relógio da cena. */
+export function messageClock(project: ChatSceneProject, index: number, message: ChatMessage): string {
+  if (message.time) return message.time;
+  const [h, min] = (project.startClock ?? "21:14").split(":");
+  const base = (Number(h) || 21) * 60 + (Number(min) || 14) + Math.floor(index / 3);
+  const total = ((base % 1440) + 1440) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
 /** Projeto novo já com dois participantes e uma conversa de exemplo curta. */
