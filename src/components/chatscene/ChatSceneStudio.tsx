@@ -562,7 +562,7 @@ export function ChatSceneStudio() {
       // trilha: falas no tempo de cada bolha + música opcional por baixo
       let audio: AudioBuffer | null = null;
       const mix = project.voiceMix ?? DEFAULT_VOICE_MIX;
-      if (clips.size || mix.musicUrl) {
+      if (clips.size || mix.musicUrl || project.sound?.enabled) {
         try {
           const music = mix.musicUrl ? await loadMusic(mix.musicUrl) : null;
           audio = await mixConversationAudio({ project, plan, clips, settings: mix, music });
