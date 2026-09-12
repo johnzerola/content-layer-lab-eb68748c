@@ -301,7 +301,42 @@ function drawAvatarCircle(
 }
 
 /** Papel de parede com um desenho discreto repetido, como nos apps reais. */
-function drawWallpaper(ctx: Ctx2D, theme: ChatTheme, width: number, height: number, m: Metrics) {
+function drawWallpaper(
+  ctx: Ctx2D,
+  theme: ChatTheme,
+  width: number,
+  height: number,
+  m: Metrics,
+  background?: ChatSceneBackground,
+  media?: Map<string, LoadedMedia>,
+) {
+  const bg = background ?? { kind: "theme" as const };
+  if (bg.kind === "solid" && bg.color) {
+    ctx.fillStyle = bg.color;
+    ctx.fillRect(0, 0, width, height);
+    return;
+  }
+  if (bg.kind === "gradient" && bg.color) {
+    const grad = ctx.createLinearGradient(0, 0, width, height);
+    grad.addColorStop(0, bg.color);
+    grad.addColorStop(1, bg.colorB || bg.color);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, width, height);
+    return;
+  }
+  if (bg.kind === "image" && bg.imageUrl) {
+    const item = media?.get(bg.imageUrl);
+    ctx.fillStyle = theme.wallpaper;
+    ctx.fillRect(0, 0, width, height);
+    if (item) {
+      const frame = item.frames[0]!;
+      const scale = Math.max(width / item.width, height / item.height);
+      const w = item.width * scale;
+      const h = item.height * scale;
+      ctx.drawImage(frame, (width - w) / 2, (height - h) / 2, w, h);
+    }
+    return;
+  }
   ctx.fillStyle = theme.wallpaper;
   ctx.fillRect(0, 0, width, height);
   const step = Math.round(150 * m.scale);
