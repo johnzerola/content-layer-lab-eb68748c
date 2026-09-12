@@ -450,6 +450,39 @@ export function ChatSceneStudio() {
         </div>
       </header>
 
+      {exportUrl && (
+        <section className="mb-5 rounded-xl border border-border bg-background/40 p-4">
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <p className="mono-label text-muted-foreground">Vídeo pronto</p>
+            <a
+              href={exportUrl}
+              download={exportName}
+              className="ml-auto text-sm text-primary underline-offset-4 hover:underline"
+            >
+              Baixar de novo
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                URL.revokeObjectURL(exportUrl);
+                setExportUrl(null);
+              }}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Fechar
+            </button>
+          </div>
+          <video
+            src={exportUrl}
+            controls
+            playsInline
+            aria-label="Vídeo exportado"
+            className="mx-auto max-h-[70vh] w-auto rounded-lg border border-border bg-black"
+          />
+        </section>
+      )}
+
+
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_400px_300px]">
         {/* ---------------------------------------------------------- roteiro */}
         <section className="glass rounded-2xl border border-border p-4">
