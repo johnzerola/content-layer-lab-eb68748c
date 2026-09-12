@@ -859,6 +859,9 @@ export function ChatSceneStudio() {
                             <option value="neutral">Neutra</option><option value="happy">Feliz</option><option value="excited">Empolgada</option><option value="serious">Séria</option><option value="nervous">Nervosa</option><option value="annoyed">Incomodada</option><option value="angry-theatrical">Brava teatral</option><option value="sad">Triste</option><option value="sarcastic">Sarcástica</option><option value="surprised">Surpresa</option><option value="whisper-like">Como segredo</option>
                           </select>
                           <Range label="Velocidade da fala" value={selectedMessage.voiceDirection.speedMultiplier ?? 1} min={0.7} max={1.3} step={0.05} suffix="×" onChange={(v) => updateMessage(selectedMessage.id, { voiceDirection: { ...selectedMessage.voiceDirection, speedMultiplier: v } })} />
+                          <Range label="Energia da fala" value={selectedMessage.voiceDirection.energyMultiplier ?? 1} min={0.6} max={1.4} step={0.05} suffix="×" onChange={(v) => updateMessage(selectedMessage.id, { voiceDirection: { ...selectedMessage.voiceDirection, energyMultiplier: v } })} />
+                          <Range label="Pausa da voz antes" value={selectedMessage.voiceDirection.pauseBeforeMs ?? 0} min={0} max={3000} step={100} suffix="ms" onChange={(v) => updateMessage(selectedMessage.id, { voiceDirection: { ...selectedMessage.voiceDirection, pauseBeforeMs: v } })} />
+                          <Range label="Pausa da voz depois" value={selectedMessage.voiceDirection.pauseAfterMs ?? 0} min={0} max={3000} step={100} suffix="ms" onChange={(v) => updateMessage(selectedMessage.id, { voiceDirection: { ...selectedMessage.voiceDirection, pauseAfterMs: v } })} />
                         </div>
                       ) : null}
                     </div>

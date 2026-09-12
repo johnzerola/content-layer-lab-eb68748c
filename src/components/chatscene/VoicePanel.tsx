@@ -2,6 +2,7 @@ import { ChevronDown, Loader2, Play, RotateCcw, SlidersHorizontal, Volume2 } fro
 import { Button } from "@/components/ui/base";
 import { attachPreset, voiceProfileOf } from "@/lib/chatscene/voice-resolution";
 import { PROVIDER_CAPABILITIES } from "@/lib/chatscene/voice-providers";
+import { missingSpeakingMessages } from "@/lib/chatscene/voice-cast";
 import {
   DEFAULT_VOICE_MIX,
   PITCH_MAX,
@@ -36,15 +37,16 @@ export function VoicePanel(props: VoicePanelProps) {
       messages: project.messages.map((message) => participantIds.has(message.participantId) ? { ...message, voiceMs: null } : message),
     });
   };
-  const missing = project.messages.filter((m) => !m.voiceMs && Boolean(voiceProfileOf(project, project.participants.find((p) => p.id === m.participantId) ?? project.participants[0]!))).length;
-  const characters = project.messages.filter((m) => !m.voiceMs).reduce((sum, m) => sum + m.text.length, 0);
+  const missingItems = missingSpeakingMessages(project);
+  const missing = missingItems.length;
+  const characters = missingItems.reduce((sum, item) => sum + item.text.length, 0);
 
   return (
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="mono-label text-muted-foreground">Voice Cast</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">Uma identidade sintética por personagem. A prévia local não consome créditos.</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">Uma identidade sintética por personagem. A prévia real é reaproveitada quando os ajustes não mudam.</p>
         </div>
         <span className="rounded-md border border-border bg-background/60 px-2 py-1 text-[10px] uppercase text-muted-foreground">PT-BR</span>
       </div>

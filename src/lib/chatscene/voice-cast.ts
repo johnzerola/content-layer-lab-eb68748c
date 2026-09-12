@@ -63,6 +63,10 @@ export function cacheSize(): number {
   return cache.size;
 }
 
+export function hasCachedClip(key: string): boolean {
+  return cache.has(key);
+}
+
 export function clearVoiceCache() {
   cache.clear();
 }
@@ -131,7 +135,7 @@ export function createGatewayVoiceProvider(
       const preset = voicePreset(profile.presetId);
       const { audio, mime } = await call({
         text,
-        voice: preset.providerVoice,
+        voice: profile.providerVoiceId ?? preset.providerVoice,
         direction: voiceDirection(profile.style, direction?.emotion),
         speed: Math.max(0.7, Math.min(1.3, profile.speed * (direction?.speedMultiplier ?? 1))),
       });
@@ -168,6 +172,14 @@ export function speakingMessages(project: ChatSceneProject) {
     .filter((m) => m.text.length > 0);
 }
 
+/** Falas cuja versão exata ainda não está em cache. */
+export function missingSpeakingMessages(project: ChatSceneProject) {
+  return speakingMessages(project).filter(({ message, text }) => {
+    const resolved = effectiveVoice(project, message);
+    return resolved ? !hasCachedClip(voiceKey(text, resolved.profile, resolved.direction)) : false;
+  });
+}
+
 /**
  * Gera (ou reaproveita) a fala de todas as mensagens. Em lotes pequenos, para
  * não sobrecarregar o provedor nem travar a interface.
@@ -177,7 +189,7 @@ export async function generateCast(
   provider: VoiceProvider,
   options: { batch?: number; onProgress?: (p: CastProgress) => void; signal?: AbortSignal } = {},
 ): Promise<CastResult> {
-  const items = speakingMessages(project);
+  const items = missingSpeakingMessages(project);
   const batch = Math.max(1, options.batch ?? 3);
   const result: CastResult = {
     clips: new Map(),

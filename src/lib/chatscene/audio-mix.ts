@@ -63,16 +63,20 @@ export function voiceSchedule(
 export function duckingCurve(
   schedule: { startSec: number; durationSec?: number; clip: { durationSec: number } }[],
   ducking: boolean,
+  options: { amount?: number; attackMs?: number; releaseMs?: number } = {},
 ): { time: number; value: number }[] {
   if (!ducking || !schedule.length) return [{ time: 0, value: 1 }];
-  const fade = 0.18;
+  const amount = Math.max(0, Math.min(1, options.amount ?? 0.78));
+  const floor = 1 - amount;
+  const attack = Math.max(0, (options.attackMs ?? 180) / 1000);
+  const release = Math.max(0, (options.releaseMs ?? 240) / 1000);
   const points: { time: number; value: number }[] = [{ time: 0, value: 1 }];
   for (const s of schedule) {
     const dur = s.durationSec ?? s.clip.durationSec;
-    const start = Math.max(0, s.startSec - fade);
-    const end = s.startSec + dur + fade;
-    points.push({ time: start, value: 1 }, { time: s.startSec, value: 0.22 });
-    points.push({ time: s.startSec + dur, value: 0.22 }, { time: end, value: 1 });
+    const start = Math.max(0, s.startSec - attack);
+    const end = s.startSec + dur + release;
+    points.push({ time: start, value: 1 }, { time: s.startSec, value: floor });
+    points.push({ time: s.startSec + dur, value: floor }, { time: end, value: 1 });
   }
   return points.sort((a, b) => a.time - b.time);
 }
@@ -130,7 +134,11 @@ export async function mixConversationAudio(input: MixInput): Promise<AudioBuffer
     source.loop = true;
     const gain = ctx.createGain();
     const base = Math.max(0, Math.min(1, input.settings.musicGain ?? 0.25));
-    const curve = duckingCurve(schedule, input.settings.ducking !== false);
+    const curve = duckingCurve(schedule, input.settings.ducking !== false, {
+      amount: input.settings.duckingAmount,
+      attackMs: input.settings.duckingAttackMs,
+      releaseMs: input.settings.duckingReleaseMs,
+    });
     gain.gain.setValueAtTime(base * (curve[0]?.value ?? 1), 0);
     for (const point of curve) {
       gain.gain.linearRampToValueAtTime(base * point.value, Math.min(point.time, seconds));

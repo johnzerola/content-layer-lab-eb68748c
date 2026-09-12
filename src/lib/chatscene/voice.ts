@@ -131,7 +131,7 @@ export const VOICE_STYLES: { id: VoiceStyle; label: string; direction: string }[
   { id:"comedy",label:"Cômica",direction:"Fale em português do Brasil, com timing cômico e expressão estilizada." },
 ];
 
-export const DEFAULT_VOICE: VoiceProfile = { presetId:"adult-female-casual",provider:"mock",providerVoiceId:"nova",language:"pt",locale:"pt-BR",ageStyle:"adulta",genderStyle:"feminina",style:"natural",speed:1,gain:1,pitch:0,energy:.55,expressiveness:.5,roughness:.08,warmth:.55,brightness:.62 };
+export const DEFAULT_VOICE: VoiceProfile = { presetId:"adult-female-casual",provider:"lovable-ai",providerVoiceId:"nova",language:"pt",locale:"pt-BR",ageStyle:"adulta",genderStyle:"feminina",style:"natural",speed:1,gain:1,pitch:0,energy:.55,expressiveness:.5,roughness:.08,warmth:.55,brightness:.62 };
 export const DEFAULT_MESSAGE_VOICE_DIRECTION: MessageVoiceDirection = { emotion:"neutral",speedMultiplier:1,energyMultiplier:1,pauseBeforeMs:0,pauseAfterMs:0 };
 
 export function voicePreset(id: string | undefined): VoicePreset { return VOICE_PRESETS.find(v=>v.id===id) ?? VOICE_PRESETS.find(v=>v.id==="adult-female-casual") ?? VOICE_PRESETS[0]!; }
