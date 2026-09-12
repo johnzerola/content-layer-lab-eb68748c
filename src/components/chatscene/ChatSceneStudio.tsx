@@ -179,10 +179,8 @@ export function ChatSceneStudio() {
     setProject((prev) => {
       const idx = prev.messages.findIndex((m) => m.id === id);
       if (idx < 0) return prev;
-      const copy = createMessage(prev.messages[idx]!.participantId, {
-        ...prev.messages[idx]!,
-        id: undefined,
-      });
+      const { id: _omit, ...rest } = prev.messages[idx]!;
+      const copy = createMessage(rest.participantId, rest);
       const messages = [...prev.messages];
       messages.splice(idx + 1, 0, copy);
       setSelected(copy.id);
