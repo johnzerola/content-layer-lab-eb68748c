@@ -829,6 +829,65 @@ function paintConversation(
 
     let cursorY = y + padY;
 
+    // trecho respondido, com a barrinha colorida do autor citado
+    if (item.reply) {
+      const rw = item.width - padX * 2;
+      const rh = item.reply.height;
+      ctx.save();
+      ctx.globalAlpha = ctx.globalAlpha * 0.92;
+      ctx.fillStyle = item.isSelf ? theme.peerBubble : theme.systemBubble;
+      roundRect(ctx, item.x + padX, cursorY, rw, rh, Math.round(10 * m.scale));
+      ctx.fill();
+      ctx.fillStyle = item.reply.color;
+      ctx.fillRect(item.x + padX, cursorY, Math.round(6 * m.scale), rh);
+      ctx.font = `600 ${Math.round(m.fontSize * 0.62)}px ${theme.fontFamily}`;
+      ctx.fillText(item.reply.name, item.x + padX + Math.round(18 * m.scale), cursorY + rh * 0.42);
+      ctx.font = `400 ${Math.round(m.fontSize * 0.62)}px ${theme.fontFamily}`;
+      ctx.fillStyle = theme.meta;
+      ctx.fillText(item.reply.text, item.x + padX + Math.round(18 * m.scale), cursorY + rh * 0.85);
+      ctx.restore();
+      cursorY += rh + Math.round(10 * m.scale);
+    }
+
+    // recado de voz: play, onda e duração
+    if (item.voiceH) {
+      const vh = item.voiceH;
+      const vw = item.width - padX * 2;
+      const r = Math.round(vh * 0.36);
+      const cx = item.x + padX + r;
+      const cy = cursorY + vh / 2;
+      ctx.fillStyle = item.isSelf ? theme.selfText : theme.peerText;
+      ctx.globalAlpha = ctx.globalAlpha * 0.85;
+      ctx.beginPath();
+      ctx.moveTo(cx - r * 0.3, cy - r * 0.45);
+      ctx.lineTo(cx + r * 0.5, cy);
+      ctx.lineTo(cx - r * 0.3, cy + r * 0.45);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = anim.alpha;
+
+      const seconds = voiceSeconds(item.message);
+      const label = durationLabel(seconds);
+      ctx.font = `400 ${m.metaSize}px ${theme.fontFamily}`;
+      const labelW = ctx.measureText(label).width + Math.round(12 * m.scale);
+      const waveX = cx + r + Math.round(16 * m.scale);
+      const waveW = Math.max(Math.round(40 * m.scale), item.x + padX + vw - labelW - waveX);
+      const bars = Math.max(10, Math.min(34, Math.round(waveW / Math.max(6, 10 * m.scale))));
+      const wave = voiceWave(item.message.id, bars);
+      const barW = Math.max(2, Math.round(waveW / (bars * 1.9)));
+      const played = Math.max(0, Math.min(1, (age / plan.fps) / Math.max(0.5, seconds)));
+      for (let i = 0; i < bars; i += 1) {
+        const bh = Math.max(barW, wave[i]! * vh * 0.52);
+        const bx = waveX + i * (waveW / bars);
+        ctx.fillStyle = i / bars <= played ? theme.check : item.isSelf ? theme.metaSelf : theme.meta;
+        roundRect(ctx, bx, cy - bh / 2, barW, bh, barW / 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = item.isSelf ? theme.metaSelf : theme.meta;
+      ctx.fillText(label, item.x + padX + vw - labelW + Math.round(6 * m.scale), cy + m.metaSize * 0.35);
+      cursorY += vh;
+    }
+
     if (item.mediaH) {
       const mw = item.width - padX * 2;
       const mh = Math.round(mw / (loaded?.aspect || item.message.mediaAspect || 1.4));
