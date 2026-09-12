@@ -33,6 +33,16 @@ export interface ChatTheme {
   fontFamily: string;
   /** raio da bolha em proporção da altura da linha */
   radius: number;
+  /** hora dentro da bolha */
+  meta: string;
+  metaSelf: string;
+  /** cor dos tiques de "lido" */
+  check: string;
+  /** papel de parede da conversa e cor do desenho repetido por cima */
+  wallpaper: string;
+  doodle: string;
+  /** bolha com "rabinho" apontando para o autor */
+  tail: boolean;
 }
 
 type ThemeFamily = { id: string; label: string; description: string; dark: ChatTheme; light: ChatTheme };
