@@ -1,0 +1,14 @@
+{
+  "schema_version": "token-efficiency-baseline-v1",
+  "status": "NOT_STARTED",
+  "created_at": "2026-09-11T00:00:00Z",
+  "checkpoint": "51870c8d3408e7a5bf7eb289df0afa825d832368",
+  "records": [],
+  "unavailable_metrics": [
+    "input_tokens",
+    "cached_input_tokens",
+    "output_tokens",
+    "actual_cost_usd"
+  ],
+  "notes": "No task has been measured yet. Do not interpret empty records as zero usage or zero cost."
+}
