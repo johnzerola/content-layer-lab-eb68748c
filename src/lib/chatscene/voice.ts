@@ -154,4 +154,4 @@ export function voiceKey(text:string, profile:VoiceProfile, direction?:Partial<M
   const raw=JSON.stringify({text:text.trim(),provider:profile.provider??"mock",voice:profile.providerVoiceId??voicePreset(profile.presetId).providerVoice,preset:profile.presetId,locale:profile.locale??"pt-BR",style:profile.style,speed:Number(profile.speed.toFixed(3)),pitch:profile.pitch??0,energy:profile.energy??.5,expression:profile.expressiveness??.5,emotion:direction?.emotion??"neutral",speedMultiplier:direction?.speedMultiplier??1,energyMultiplier:direction?.energyMultiplier??1,settings:profile.providerSettings??{}});
   let h1=2166136261,h2=5381; for(let i=0;i<raw.length;i++){h1=Math.imul(h1^raw.charCodeAt(i),16777619)>>>0;h2=((h2<<5)+h2+raw.charCodeAt(i))>>>0;} return `${h1.toString(36)}${h2.toString(36)}`;
 }
-export function speakableText(kind:string,text:string):string { if(kind==="system"||kind==="sticker")return ""; return text.replace(/\s+/g," ").trim(); }
+export function speakableText(kind:string,text:string):string { if(kind==="system"||kind==="sticker"||kind==="card")return ""; return text.replace(/\s+/g," ").trim(); }

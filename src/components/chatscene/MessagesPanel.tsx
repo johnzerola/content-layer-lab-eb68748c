@@ -167,7 +167,7 @@ export function MessagesPanel({
                 value={m.text}
                 onChange={(e) => updateMessage(m.id, { text: e.target.value })}
                 rows={Math.min(5, Math.max(2, Math.ceil(m.text.length / 34)))}
-                placeholder={m.kind === "system" ? "Aviso na conversa" : "Escreva a mensagem"}
+                placeholder={m.kind === "system" ? "Aviso na conversa" : m.kind === "card" ? "Texto do cartão de cena" : "Escreva a mensagem"}
                 className="w-full resize-none rounded-lg border border-border bg-background/60 px-2.5 py-2 text-sm outline-none focus:border-primary"
                 aria-label="Texto da mensagem"
               />
