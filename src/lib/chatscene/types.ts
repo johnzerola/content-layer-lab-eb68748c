@@ -106,7 +106,9 @@ export interface ChatMessage {
   emphasis?: boolean;
   /** duração da fala quando houver voz (preenchido na fase de vozes) */
   voiceMs?: number | null;
-  /** id da mensagem citada (reservado para a próxima fase) */
+  /** duração mostrada no áudio/recado de voz, em segundos */
+  durationSec?: number | null;
+  /** id da mensagem citada: desenha o trecho respondido dentro da bolha */
   replyToId?: string | null;
   /** hora mostrada dentro da bolha; null usa o relógio automático da cena */
   time?: string | null;
