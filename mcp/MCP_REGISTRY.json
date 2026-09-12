@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "updated_at": "2026-09-11",
+  "servers": [
+    {"name": "serena", "classification": "ALWAYS_AVAILABLE", "version": "serena-agent==1.7.0", "purpose": "symbol-aware internal-code navigation", "status": "SMOKE_PASSED", "credential_required": false},
+    {"name": "playwright", "classification": "ON_DEMAND", "purpose": "browser validation", "status": "EXISTING", "credential_required": false},
+    {"name": "chrome-devtools", "classification": "ON_DEMAND", "purpose": "browser diagnostics", "status": "EXISTING", "credential_required": false},
+    {"name": "cleaner-research", "classification": "ON_DEMAND", "purpose": "isolated Cleaner research", "status": "EXISTING", "credential_required": false},
+    {"name": "editor-development", "classification": "ON_DEMAND", "purpose": "editor research", "status": "EXISTING", "credential_required": false},
+    {"name": "context7", "classification": "ON_DEMAND", "purpose": "current external-library documentation", "status": "BLOCKED_NO_CREDENTIAL", "credential_required": true},
+    {"name": "github", "classification": "ON_DEMAND", "purpose": "issues, pull requests and repository metadata", "status": "BLOCKED_NO_CREDENTIAL", "credential_required": true}
+  ]
+}

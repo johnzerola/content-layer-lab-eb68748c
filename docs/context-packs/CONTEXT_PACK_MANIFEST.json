@@ -1,0 +1,15 @@
+{
+  "updated_at": "2026-09-11",
+  "policy": "Load one relevant pack first; expand only when an explicit dependency requires it.",
+  "packs": [
+    {"name": "cleaner", "when_to_use": "Cleaner or video restoration tasks", "status": "TO_BE_CURATED", "source_of_truth": "research/"},
+    {"name": "editor", "when_to_use": "video editor, timeline, canvas tasks", "status": "TO_BE_CURATED", "source_of_truth": "editor-research/"},
+    {"name": "frontend", "when_to_use": "product frontend tasks", "status": "TO_BE_CURATED", "source_of_truth": "src/"},
+    {"name": "backend", "when_to_use": "API or worker tasks", "status": "TO_BE_CURATED", "source_of_truth": "backend/"},
+    {"name": "audio", "when_to_use": "audio editor tasks", "status": "TO_BE_CURATED", "source_of_truth": "docs/editor-research/"},
+    {"name": "gpu", "when_to_use": "GPU/CUDA/video performance tasks", "status": "TO_BE_CURATED", "source_of_truth": "research/"},
+    {"name": "infrastructure", "when_to_use": "development tooling and deployment tasks", "status": "ACTIVE_MINIMAL", "source_of_truth": "docs/agent-stack/"},
+    {"name": "design", "when_to_use": "design system and UX tasks", "status": "TO_BE_CURATED", "source_of_truth": "docs/design-research/"},
+    {"name": "deployment", "when_to_use": "deployment tasks", "status": "TO_BE_CURATED", "source_of_truth": "repository configuration"}
+  ]
+}

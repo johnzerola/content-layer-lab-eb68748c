@@ -1,0 +1,8 @@
+{
+  "updated_at": "2026-09-11",
+  "policy": "Use existing domain skills; do not duplicate them with token-efficiency skills before benchmarks prove a missing responsibility.",
+  "existing_roots": [".agents/skills", "C:/Users/DINO/.codex/skills"],
+  "proposed": [
+    {"name": "token-efficiency-director", "status": "DEFERRED", "reason": "Needs measured baseline and explicit non-overlap review."}
+  ]
+}

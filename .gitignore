@@ -43,3 +43,4 @@ backend/storage/
 output/playwright/
 output/audio-separation/
 .playwright-mcp/
+.serena/
