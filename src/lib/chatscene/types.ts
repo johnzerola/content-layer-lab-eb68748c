@@ -629,7 +629,7 @@ export function createDemoChatSceneProject(): ChatSceneProject {
       { ...importVoicePreset("mother-warm"), id: "voice_mae" },
     ],
     // ritmo de short: cortes rápidos, como nos canais de conversa animada
-    timing: { speed: 1.12, gapMs: 380, senderSwitchMs: 140 },
+    timing: { ...DEFAULT_TIMING, speed: 1.12, gapMs: 380, senderSwitchMs: 140 },
     messages: [
       createMessage(chefe.id, { kind: "card", text: "Primeiro dia do Pedro" }),
       createMessage(chefe.id, { kind: "system", text: "Pedro entrou na equipe" }),
