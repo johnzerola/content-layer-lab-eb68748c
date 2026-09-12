@@ -298,7 +298,7 @@ export function ChatSceneStudio() {
               onClick={() =>
                 patch({
                   chatKind: isGroup ? "direct" : "group",
-                  groupName: isGroup ? project.groupName : project.groupName || "Grupo da treta",
+                  groupName: isGroup ? project.groupName ?? null : project.groupName || "Grupo da treta",
                 })
               }
             >
