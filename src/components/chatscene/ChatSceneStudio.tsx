@@ -8,24 +8,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  ArrowDown,
-  ArrowUp,
-  BadgeCheck,
+  Clock,
   Mic,
+  MessageSquare,
   Palette,
-  Paintbrush,
   Download,
   Image as ImageIcon,
   Loader2,
-  Plus,
   Save,
-  Sliders,
-  Volume2,
-  Copy,
-  Sparkle,
-  Trash2,
   Upload,
-  UserPlus,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -34,9 +25,13 @@ import { ChatScenePreview } from "@/components/chatscene/ChatScenePreview";
 import { ChatSceneTimeline } from "@/components/chatscene/ChatSceneTimeline";
 import { CreatorLayouts } from "@/components/chatscene/CreatorLayouts";
 import { VoicePanel } from "@/components/chatscene/VoicePanel";
+import { VoiceUploadPanel } from "@/components/chatscene/VoiceUploadPanel";
+import { MessagesPanel } from "@/components/chatscene/MessagesPanel";
+import { ParticipantsPanel } from "@/components/chatscene/ParticipantsPanel";
 import { BrandPanel } from "@/components/chatscene/BrandPanel";
 import { ThemePanel } from "@/components/chatscene/ThemePanel";
 import { MusicPanel } from "@/components/chatscene/MusicPanel";
+
 import { buildPlan } from "@/lib/chatscene/clock";
 import { encodeFrameSequence, frameEncoderSupported } from "@/lib/chatscene/encode-frames";
 import { CanvasConversationRenderer } from "@/lib/chatscene/renderer";
@@ -47,12 +42,16 @@ import { MESSAGE_KINDS, messageKind, voiceSeconds } from "@/lib/chatscene/messag
 import { synthesizeVoice } from "@/lib/chatscene/voice.functions";
 import {
   applyVoiceDurations,
+  clipDurationMs,
   createGatewayVoiceProvider,
+  decodeClip,
   generateCast,
+  playClip,
   previewVoice,
   speakingMessages,
   type VoiceClip,
 } from "@/lib/chatscene/voice-cast";
+
 import { loadMusic, mixConversationAudio } from "@/lib/chatscene/audio-mix";
 import { CAMERA_MODES, DEFAULT_CAMERA } from "@/lib/chatscene/camera";
 import {
@@ -88,15 +87,26 @@ import {
 
 const PALETTE = ["#7c5cff", "#ff5c8a", "#22c08a", "#f2b705", "#4ec3ff", "#ff8a4c"];
 
-type StudioPanel = "visual" | "tema" | "vozes" | "marca";
+type StudioTab =
+  | "participantes"
+  | "mensagens"
+  | "tempo"
+  | "fundo"
+  | "vozes"
+  | "estilo"
+  | "exportar";
 
-/** Barra lateral do estúdio: visual, vozes e marca, sem abrir outra tela. */
-const PANEL_TABS: { id: StudioPanel; label: string; icon: typeof Palette }[] = [
-  { id: "visual", label: "Visual", icon: Palette },
-  { id: "tema", label: "Tema", icon: Paintbrush },
+/** Abas do editor: cada assunto em uma tela, com a prévia sempre ao lado. */
+const STUDIO_TABS: { id: StudioTab; label: string; icon: typeof Palette }[] = [
+  { id: "participantes", label: "Participantes", icon: Users },
+  { id: "mensagens", label: "Mensagens", icon: MessageSquare },
+  { id: "tempo", label: "Linha do tempo", icon: Clock },
+  { id: "fundo", label: "Fundo", icon: ImageIcon },
   { id: "vozes", label: "Vozes", icon: Mic },
-  { id: "marca", label: "Marca do criador", icon: BadgeCheck },
+  { id: "estilo", label: "Estilo", icon: Palette },
+  { id: "exportar", label: "Exportar", icon: Download },
 ];
+
 
 function slugify(text: string): string {
   return (
@@ -113,7 +123,7 @@ export function ChatSceneStudio() {
   const [project, setProject] = useState<ChatSceneProject>(() => createChatSceneProject());
   const [recordId, setRecordId] = useState<string | null>(null);
   const [script, setScript] = useState("");
-  const [studio, setStudio] = useState(false);
+  const [tab, setTab] = useState<StudioTab>("mensagens");
   const [frame, setFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -127,7 +137,9 @@ export function ChatSceneStudio() {
   const [clips, setClips] = useState<Map<string, VoiceClip>>(new Map());
   const [castState, setCastState] = useState<"idle" | "running">("idle");
   const [castProgress, setCastProgress] = useState({ done: 0, total: 0 });
-  const [panel, setPanel] = useState<StudioPanel>("visual");
+  /** fala tocando agora no painel de vozes */
+  const [playingClip, setPlayingClip] = useState<string | null>(null);
+
   useEffect(() => {
     setLibrary(readLibrary());
   }, []);
@@ -330,6 +342,21 @@ export function ChatSceneStudio() {
     });
   }, []);
 
+  /** Arrastar e soltar: leva a mensagem para a posição solta. */
+  const reorderMessage = useCallback((from: number, to: number) => {
+    setProject((prev) => {
+      if (from === to || from < 0 || to < 0 || from >= prev.messages.length || to >= prev.messages.length) {
+        return prev;
+      }
+      const messages = [...prev.messages];
+      const [item] = messages.splice(from, 1);
+      messages.splice(to, 0, item!);
+      return { ...prev, messages };
+    });
+  }, []);
+
+
+
   const duplicateMessage = useCallback((id: string) => {
     setProject((prev) => {
       const idx = prev.messages.findIndex((m) => m.id === id);
@@ -452,6 +479,67 @@ export function ChatSceneStudio() {
     }
   }, [project, voiceProvider]);
 
+  /** Áudio próprio: entra no lugar da voz gerada e manda no tempo da mensagem. */
+  const handleVoiceFile = useCallback(
+    async (messageId: string, file: File) => {
+      setUploading(`voice-${messageId}`);
+      try {
+        const clip = await decodeClip(`upload:${messageId}:${file.name}:${file.size}`, file);
+        setClips((prev) => {
+          const next = new Map(prev);
+          next.set(messageId, clip);
+          return next;
+        });
+        setProject((prev) => {
+          const message = prev.messages.find((m) => m.id === messageId);
+          const author = message ? participantOf(prev, message.participantId) : null;
+          return applyVoiceDurations(prev, {
+            [messageId]: clipDurationMs(clip, author?.voice ?? null),
+          });
+        });
+        toast.success("Áudio aplicado — o tempo da mensagem já acompanha a fala.");
+      } catch {
+        toast.error("Não foi possível ler este áudio. Use MP3, M4A, WAV ou OGG.");
+      } finally {
+        setUploading(null);
+      }
+    },
+    [],
+  );
+
+  const handleRemoveVoiceClip = useCallback((messageId: string) => {
+    setClips((prev) => {
+      const next = new Map(prev);
+      next.delete(messageId);
+      return next;
+    });
+    updateMessage(messageId, { voiceMs: null });
+  }, [updateMessage]);
+
+  const handlePlayClip = useCallback(
+    (messageId: string) => {
+      const clip = clips.get(messageId);
+      if (!clip) return;
+      stopPreviewRef.current?.();
+      const message = project.messages.find((m) => m.id === messageId);
+      const author = message ? participantOf(project, message.participantId) : null;
+      const stop = playClip(clip, author?.voice ?? null);
+      setPlayingClip(messageId);
+      stopPreviewRef.current = () => {
+        stop();
+        setPlayingClip(null);
+      };
+    },
+    [clips, project],
+  );
+
+  const handleStopClip = useCallback(() => {
+    stopPreviewRef.current?.();
+    stopPreviewRef.current = null;
+    setPlayingClip(null);
+  }, []);
+
+
   const handleExport = useCallback(async () => {
     if (!frameEncoderSupported()) {
       toast.error("Este navegador não exporta vídeo. Use o Chrome ou o Edge no computador.");
@@ -533,14 +621,6 @@ export function ChatSceneStudio() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant={studio ? "default" : "secondary"}
-            size="sm"
-            onClick={() => setStudio((v) => !v)}
-          >
-            <Sliders className="mr-1.5 size-4" />
-            {studio ? "Modo estúdio" : "Modo simples"}
-          </Button>
           <Button variant="secondary" size="sm" onClick={() => void handleSave()} disabled={saving}>
             {saving ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : <Save className="mr-1.5 size-4" />}
             Salvar
@@ -557,481 +637,315 @@ export function ChatSceneStudio() {
         </div>
       </header>
 
-      {exportUrl && (
-        <section className="mb-5 rounded-xl border border-border bg-background/40 p-4">
-          <div className="mb-3 flex flex-wrap items-center gap-3">
-            <p className="mono-label text-muted-foreground">Vídeo pronto</p>
-            <a
-              href={exportUrl}
-              download={exportName}
-              className="ml-auto text-sm text-primary underline-offset-4 hover:underline"
-            >
-              Baixar de novo
-            </a>
-            <button
-              type="button"
-              onClick={() => {
-                URL.revokeObjectURL(exportUrl);
-                setExportUrl(null);
-              }}
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              Fechar
-            </button>
-          </div>
-          <video
-            src={exportUrl}
-            controls
-            playsInline
-            aria-label="Vídeo exportado"
-            className="mx-auto max-h-[70vh] w-auto rounded-lg border border-border bg-black"
-          />
-        </section>
-      )}
-
-
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_400px_300px]">
-        {/* ---------------------------------------------------------- roteiro */}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
+        {/* --------------------------------------------------- editor em abas */}
         <section className="glass rounded-2xl border border-border p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold">Conversa</h2>
-            <Button variant="ghost" size="sm" onClick={addParticipant}>
-              <UserPlus className="mr-1.5 size-4" />
-              Participante
-            </Button>
-          </div>
-
-          {/* grupo */}
-          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-background/30 p-2">
-            <Button
-              variant={isGroup ? "default" : "secondary"}
-              size="sm"
-              onClick={() =>
-                patch({
-                  chatKind: isGroup ? "direct" : "group",
-                  groupName: isGroup ? project.groupName ?? null : project.groupName || "Grupo da treta",
-                })
-              }
-            >
-              <Users className="mr-1.5 size-4" />
-              {isGroup ? "É um grupo" : "Conversa de duas pessoas"}
-            </Button>
-            {isGroup && (
-              <>
-                <input
-                  value={project.groupName ?? ""}
-                  onChange={(e) => patch({ groupName: e.target.value })}
-                  placeholder="Nome do grupo"
-                  className="min-w-[140px] flex-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none"
-                  aria-label="Nome do grupo"
-                />
-                <label className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:border-primary">
-                  {uploading === "group" ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Upload className="size-3.5" />
-                  )}
-                  Foto do grupo
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      e.target.value = "";
-                      if (file) void handleAvatarUpload("group", file);
-                    }}
-                  />
-                </label>
-              </>
-            )}
-          </div>
-
-          <div className="mb-4 flex flex-wrap gap-2">
-            {project.participants.map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center gap-1.5 rounded-lg border border-border bg-background/40 px-2 py-1.5"
-              >
-                <span className="size-2.5 shrink-0 rounded-full" style={{ background: p.color }} />
-                <input
-                  value={p.name}
-                  onChange={(e) =>
-                    patch({
-                      participants: project.participants.map((x) =>
-                        x.id === p.id ? { ...x, name: e.target.value } : x,
-                      ),
-                    })
-                  }
-                  className="w-24 bg-transparent text-xs outline-none"
-                  aria-label={`Nome de ${p.name}`}
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    patch({
-                      participants: project.participants.map((x) => ({
-                        ...x,
-                        isSelf: x.id === p.id,
-                      })),
-                    })
-                  }
-                  className={`rounded px-1.5 py-0.5 text-[10px] ${
-                    p.isSelf ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-                  }`}
-                  title="Marcar como quem escreve a história"
-                >
-                  eu
-                </button>
-                <label
-                  className="cursor-pointer text-muted-foreground hover:text-primary"
-                  title={`Foto de ${p.name}`}
-                >
-                  {uploading === p.id ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <ImageIcon className="size-3.5" />
-                  )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      e.target.value = "";
-                      if (file) void handleAvatarUpload(p.id, file);
-                    }}
-                  />
-                </label>
-                {project.participants.length > 2 && (
-                  <button
-                    type="button"
-                    onClick={() => removeParticipant(p.id)}
-                    className="text-muted-foreground hover:text-destructive"
-                    aria-label={`Remover ${p.name}`}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <ul className="flex max-h-[52vh] flex-col gap-2 overflow-y-auto pr-1">
-            {project.messages.map((m, i) => {
-              const author = participantOf(project, m.participantId);
-              const active = m.id === selected;
+          <nav className="mb-4 flex flex-wrap gap-1.5" aria-label="Abas do editor">
+            {STUDIO_TABS.map((t) => {
+              const Icon = t.icon;
               return (
-                <li
-                  key={m.id}
-                  className={`rounded-xl border p-2.5 transition ${
-                    active ? "border-primary/70 bg-primary/5" : "border-border bg-background/30"
-                  }`}
-                  onFocus={() => setSelected(m.id)}
-                  onClick={() => setSelected(m.id)}
-                >
-                  <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                    <select
-                      value={m.participantId}
-                      onChange={(e) => updateMessage(m.id, { participantId: e.target.value })}
-                      className="min-w-0 max-w-[7.5rem] flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs"
-                      aria-label="Quem envia"
-                      style={{ color: author.color }}
-                    >
-                      {project.participants.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      value={m.kind}
-                      onChange={(e) => updateMessage(m.id, { kind: e.target.value as ChatMessage["kind"] })}
-                      className="min-w-0 max-w-[7.5rem] flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs text-muted-foreground"
-                      aria-label="Tipo de mensagem"
-                    >
-                      {MESSAGE_KINDS.map((k) => (
-                        <option key={k.id} value={k.id}>
-                          {k.label}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="ml-auto flex shrink-0 items-center gap-0.5">
-
-                      <button
-                        type="button"
-                        onClick={() => moveMessage(m.id, -1)}
-                        disabled={i === 0}
-                        className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"
-                        aria-label="Mover para cima"
-                      >
-                        <ArrowUp className="size-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moveMessage(m.id, 1)}
-                        disabled={i === project.messages.length - 1}
-                        className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"
-                        aria-label="Mover para baixo"
-                      >
-                        <ArrowDown className="size-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => duplicateMessage(m.id)}
-                        className="rounded p-1 text-muted-foreground hover:bg-muted"
-                        aria-label="Duplicar mensagem"
-                      >
-                        <Copy className="size-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeMessage(m.id)}
-                        className="rounded p-1 text-muted-foreground hover:text-destructive"
-                        aria-label="Apagar mensagem"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </span>
-                  </div>
-
-                  <textarea
-                    value={m.text}
-                    onChange={(e) => updateMessage(m.id, { text: e.target.value })}
-                    rows={Math.min(5, Math.max(2, Math.ceil(m.text.length / 34)))}
-                    placeholder={m.kind === "system" ? "Aviso na conversa" : "Escreva a mensagem"}
-                    className="w-full resize-none rounded-lg border border-border bg-background/60 px-2.5 py-2 text-sm outline-none focus:border-primary"
-                    aria-label="Texto da mensagem"
-                  />
-
-                  {messageKind(m.kind).needsMedia && (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      <label className="flex cursor-pointer items-center gap-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs hover:border-primary">
-                        {uploading === m.id ? (
-                          <Loader2 className="size-3.5 animate-spin" />
-                        ) : (
-                          <Upload className="size-3.5" />
-                        )}
-                        Enviar {messageKind(m.kind).label.toLowerCase()}
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept={messageKind(m.kind).accept ?? "image/*"}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            e.target.value = "";
-                            if (file) void handleUpload(m.id, file);
-                          }}
-                        />
-                      </label>
-                      {library.length > 0 && (
-                        <select
-                          value=""
-                          onChange={(e) => {
-                            const asset = library.find((a) => a.hash === e.target.value);
-                            if (asset) updateMessage(m.id, { mediaUrl: asset.url, mediaAspect: asset.aspect });
-                          }}
-                          className="rounded-md border border-border bg-background px-1.5 py-1 text-xs text-muted-foreground"
-                          aria-label="Reaproveitar da biblioteca"
-                        >
-                          <option value="">da biblioteca…</option>
-                          {library.map((a) => (
-                            <option key={a.hash} value={a.hash}>
-                              {a.name.slice(0, 24)}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                      <ImageIcon className="size-3.5 text-muted-foreground" />
-                      <input
-                        value={m.mediaUrl?.startsWith("blob:") ? "arquivo do computador" : m.mediaUrl ?? ""}
-                        onChange={(e) => updateMessage(m.id, { mediaUrl: e.target.value || null })}
-                        placeholder="ou cole um endereço (https://…)"
-                        className="min-w-[140px] flex-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none"
-                        aria-label="Endereço da mídia"
-                      />
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-
-          {project.messages.length === 0 && (
-            <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-              <p className="mb-2">Nenhuma mensagem ainda.</p>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setProject(createDemoChatSceneProject());
-                  setSelected(null);
-                  setFrame(0);
-                }}
-              >
-                <Sparkle className="mr-1.5 size-4" />
-                Carregar conversa de exemplo
-              </Button>
-            </div>
-          )}
-
-          <Button variant="secondary" size="sm" className="mt-3 w-full" onClick={addMessage}>
-            <Plus className="mr-1.5 size-4" />
-            Nova mensagem
-          </Button>
-
-          {/* colar a conversa inteira de uma vez */}
-          <div className="mt-3 rounded-xl border border-border p-3">
-            <label className="text-xs font-medium text-muted-foreground" htmlFor="chatscene-script">
-              Colar conversa pronta
-            </label>
-            <textarea
-              id="chatscene-script"
-              value={script}
-              onChange={(e) => setScript(e.target.value)}
-              rows={4}
-              placeholder={"Ana: oi, tudo bem?\nBruno: tudo! e você?\n* Ana entrou no grupo"}
-              className="mt-2 w-full resize-y rounded-lg border border-border bg-background p-2 text-sm"
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              className="mt-2 w-full"
-              disabled={!script.trim()}
-              onClick={importScript}
-            >
-              <Plus className="mr-1.5 size-4" />
-              Adicionar à conversa
-            </Button>
-          </div>
-
-        </section>
-
-        {/* ----------------------------------------------------------- prévia */}
-        <section className="glass rounded-2xl border border-border p-4">
-          <ChatScenePreview
-            project={project}
-            plan={plan}
-            frame={frame}
-            playing={playing}
-            onFrame={setFrame}
-            onPlaying={setPlaying}
-            clips={clips}
-          />
-
-          <div className="mt-4 flex gap-3">
-            <nav className="flex shrink-0 flex-col gap-1.5" aria-label="Painéis do ChatScene">
-              {PANEL_TABS.map((t) => {
-                const Icon = t.icon;
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    title={t.label}
-                    aria-label={t.label}
-                    aria-pressed={panel === t.id}
-                    onClick={() => setPanel(t.id)}
-                    className={`flex size-9 items-center justify-center rounded-lg border transition ${
-                      panel === t.id
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border text-muted-foreground hover:border-primary/50"
-                    }`}
-                  >
-                    <Icon className="size-4" />
-                  </button>
-                );
-              })}
-            </nav>
-            <div className="min-w-0 flex-1">
-            {panel === "vozes" && (
-              <VoicePanel
-                project={project}
-                patch={patch}
-                clipCount={clips.size}
-                castState={castState}
-                castProgress={castProgress}
-                onGenerate={() => void handleGenerateVoices()}
-                previewing={previewingVoice}
-                onPreview={(id, profile) => void handlePreviewVoice(id, profile)}
-              />
-            )}
-            {panel === "tema" && <ThemePanel project={project} patch={patch} />}
-            {panel === "marca" && (
-              <BrandPanel
-                project={project}
-                patch={patch}
-                uploading={uploading}
-                onLogo={(file) => void handleLogo(file)}
-                onHeaderLogo={(file) => void handleHeaderImage(file, "logo")}
-                onHeaderBackground={(file) => void handleHeaderImage(file, "background")}
-              />
-            )}
-            {panel === "visual" && (
-              <>
-            <p className="mono-label mb-2 text-muted-foreground">Visual</p>
-            <div className="grid grid-cols-2 gap-1.5">
-              {CHAT_THEMES.map((t) => (
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => patch({ themeId: t.id })}
-                  title={t.description}
-                  className={`rounded-lg border px-2.5 py-2 text-left text-xs transition ${
-                    project.themeId === t.id
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:border-primary/50"
+                  onClick={() => setTab(t.id)}
+                  aria-pressed={tab === t.id}
+                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition ${
+                    tab === t.id
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/50"
                   }`}
                 >
-                  <span className="font-medium">{t.label}</span>
-                  <span className="block truncate text-[10px] text-muted-foreground">{t.description}</span>
+                  <Icon className="size-3.5" />
+                  {t.label}
                 </button>
-              ))}
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-              <label className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={project.dark}
-                  onChange={(e) => patch({ dark: e.target.checked })}
-                />
-                modo escuro
-              </label>
-              <label className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={project.render.safeZones}
-                  onChange={(e) =>
-                    patch({ render: { ...project.render, safeZones: e.target.checked } })
-                  }
-                />
-                margens seguras
-              </label>
-              <span className="mono-label ml-auto text-muted-foreground">
-                {width}×{height}
-              </span>
-            </div>
+              );
+            })}
+          </nav>
 
-            <div className="mt-3">
-              <p className="mono-label mb-1.5 text-muted-foreground">Formato</p>
-              <div className="grid grid-cols-3 gap-1.5">
-                {(["9:16", "16:9", "1:1"] as ChatSceneAspect[]).map((a) => (
-                  <button
-                    key={a}
-                    type="button"
-                    onClick={() => patch({ render: { ...project.render, aspect: a } })}
-                    className={`rounded-lg border px-2 py-1.5 text-xs transition ${
-                      project.render.aspect === a
-                        ? "border-primary bg-primary/10"
-                        : "border-border hover:border-primary/50"
-                    }`}
-                  >
-                    {a}
-                  </button>
-                ))}
+          {tab === "participantes" && (
+            <ParticipantsPanel
+              project={project}
+              patch={patch}
+              uploading={uploading}
+              onAvatar={(target, file) => void handleAvatarUpload(target, file)}
+              onAdd={addParticipant}
+              onRemove={removeParticipant}
+            />
+          )}
+
+          {tab === "mensagens" && (
+            <MessagesPanel
+              project={project}
+              selected={selected}
+              onSelect={setSelected}
+              updateMessage={updateMessage}
+              removeMessage={removeMessage}
+              moveMessage={moveMessage}
+              duplicateMessage={duplicateMessage}
+              reorderMessage={reorderMessage}
+              addMessage={addMessage}
+              loadDemo={() => {
+                setProject(createDemoChatSceneProject());
+                setSelected(null);
+                setFrame(0);
+              }}
+              uploading={uploading}
+              library={library}
+              onUpload={(id, file) => void handleUpload(id, file)}
+              script={script}
+              onScript={setScript}
+              onImportScript={importScript}
+            />
+          )}
+
+          {tab === "tempo" && (
+            <div className="flex flex-col gap-4">
+              <ChatSceneTimeline
+                project={project}
+                plan={plan}
+                frame={frame}
+                selected={selected}
+                onSeek={(f) => {
+                  setPlaying(false);
+                  setFrame(f);
+                }}
+                onSelect={setSelected}
+              />
+
+              <div className="flex flex-col gap-3 text-xs">
+                <p className="mono-label text-muted-foreground">Ritmo da conversa</p>
+                <div>
+                  <label className="mb-1 flex items-center justify-between text-muted-foreground">
+                    Velocidade
+                    <span className="mono-label">{project.timing.speed.toFixed(1)}×</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={2}
+                    step={0.1}
+                    value={project.timing.speed}
+                    onChange={(e) => patch({ timing: { ...project.timing, speed: Number(e.target.value) } })}
+                    className="h-1.5 w-full accent-primary"
+                    aria-label="Velocidade da conversa"
+                  />
+                </div>
+                <Range
+                  label="Pausa entre mensagens"
+                  value={project.timing.gapMs}
+                  min={0}
+                  max={2000}
+                  step={50}
+                  suffix="ms"
+                  onChange={(v) => patch({ timing: { ...project.timing, gapMs: v } })}
+                />
+                <Range
+                  label="Leitura por caractere"
+                  value={project.timing.msPerChar}
+                  min={10}
+                  max={120}
+                  step={2}
+                  suffix="ms"
+                  onChange={(v) => patch({ timing: { ...project.timing, msPerChar: v } })}
+                />
+                <Range
+                  label="Tempo de “digitando…”"
+                  value={project.timing.typingMs}
+                  min={0}
+                  max={3000}
+                  step={100}
+                  suffix="ms"
+                  onChange={(v) => patch({ timing: { ...project.timing, typingMs: v } })}
+                />
+                <Range
+                  label="Sobra no final"
+                  value={project.timing.tailMs}
+                  min={0}
+                  max={5000}
+                  step={100}
+                  suffix="ms"
+                  onChange={(v) => patch({ timing: { ...project.timing, tailMs: v } })}
+                />
+                <Range
+                  label="Respiro ao trocar de pessoa"
+                  value={project.timing.senderSwitchMs ?? 180}
+                  min={0}
+                  max={1500}
+                  step={20}
+                  suffix="ms"
+                  onChange={(v) => patch({ timing: { ...project.timing, senderSwitchMs: v } })}
+                />
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={project.timing.typing}
+                    onChange={(e) => patch({ timing: { ...project.timing, typing: e.target.checked } })}
+                  />
+                  mostrar “digitando…”
+                </label>
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={project.timing.humanTyping ?? true}
+                    onChange={(e) =>
+                      patch({ timing: { ...project.timing, humanTyping: e.target.checked } })
+                    }
+                  />
+                  ritmo humano (calcula pelo texto)
+                </label>
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={project.receipts ?? true}
+                    onChange={(e) => patch({ receipts: e.target.checked })}
+                  />
+                  tiques de mensagem lida
+                </label>
+                <div>
+                  <p className="mb-1 text-muted-foreground">Hora inicial da conversa</p>
+                  <input
+                    value={project.startClock ?? "21:14"}
+                    onChange={(e) => patch({ startClock: e.target.value })}
+                    placeholder="21:14"
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5"
+                    aria-label="Hora inicial da conversa"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-2 text-sm font-semibold">Mensagem selecionada</h3>
+                {selectedMessage ? (
+                  <div className="flex flex-col gap-3 text-xs">
+                    <p className="line-clamp-2 text-muted-foreground">
+                      {selectedMessage.text || "(sem texto)"}
+                    </p>
+                    <Range
+                      label="Pausa antes desta mensagem"
+                      value={selectedMessage.delayMs ?? 0}
+                      min={0}
+                      max={5000}
+                      step={100}
+                      suffix="ms"
+                      onChange={(v) => updateMessage(selectedMessage.id, { delayMs: v || null })}
+                    />
+                    <Range
+                      label="“Digitando…” só desta mensagem"
+                      value={selectedMessage.typingMs ?? project.timing.typingMs}
+                      min={0}
+                      max={4000}
+                      step={100}
+                      suffix="ms"
+                      onChange={(v) => updateMessage(selectedMessage.id, { typingMs: v })}
+                    />
+                    <Range
+                      label="Respiro depois desta mensagem"
+                      value={selectedMessage.pauseAfterMs ?? project.timing.gapMs}
+                      min={0}
+                      max={6000}
+                      step={100}
+                      suffix="ms"
+                      onChange={(v) => updateMessage(selectedMessage.id, { pauseAfterMs: v })}
+                    />
+                    {messageKind(selectedMessage.kind).canReply && (
+                      <div>
+                        <p className="mb-1 text-muted-foreground">Responder a</p>
+                        <select
+                          value={selectedMessage.replyToId ?? ""}
+                          onChange={(e) =>
+                            updateMessage(selectedMessage.id, { replyToId: e.target.value || null })
+                          }
+                          className="w-full rounded-md border border-border bg-background px-2 py-1.5"
+                          aria-label="Responder a outra mensagem"
+                        >
+                          <option value="">nenhuma</option>
+                          {project.messages
+                            .filter((q) => q.id !== selectedMessage.id && q.kind !== "system")
+                            .map((q) => (
+                              <option key={q.id} value={q.id}>
+                                {(q.text || messageKind(q.kind).label).slice(0, 40)}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    )}
+                    {selectedMessage.kind === "voice" && (
+                      <Range
+                        label="Duração do recado de voz"
+                        value={Math.round(voiceSeconds(selectedMessage))}
+                        min={1}
+                        max={120}
+                        step={1}
+                        suffix="s"
+                        onChange={(v) => updateMessage(selectedMessage.id, { durationSec: v })}
+                      />
+                    )}
+                    <label className="flex items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        checked={selectedMessage.emphasis ?? false}
+                        onChange={(e) => updateMessage(selectedMessage.id, { emphasis: e.target.checked })}
+                      />
+                      momento de peso (segura mais na tela)
+                    </label>
+                    <div>
+                      <p className="mb-1 text-muted-foreground">Reação nesta mensagem</p>
+                      <div className="flex flex-wrap gap-1">
+                        {["", "❤️", "😂", "😮", "😢", "👍", "🔥"].map((emoji) => (
+                          <button
+                            key={emoji || "none"}
+                            type="button"
+                            onClick={() => updateMessage(selectedMessage.id, { reaction: emoji || null })}
+                            className={`rounded-md border px-2 py-1 ${
+                              (selectedMessage.reaction ?? "") === emoji
+                                ? "border-primary bg-primary/10"
+                                : "border-border"
+                            }`}
+                          >
+                            {emoji || "nenhuma"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-muted-foreground">Hora desta mensagem</p>
+                      <input
+                        value={selectedMessage.time ?? ""}
+                        onChange={(e) => updateMessage(selectedMessage.id, { time: e.target.value || null })}
+                        placeholder="automática"
+                        className="w-full rounded-md border border-border bg-background px-2 py-1.5"
+                        aria-label="Hora desta mensagem"
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => updateMessage(selectedMessage.id, { delayMs: null, typingMs: null })}
+                    >
+                      Voltar ao ritmo automático
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setPlaying(false);
+                        setFrame(plan.byId[selectedMessage.id]?.appearFrame ?? 0);
+                      }}
+                    >
+                      Ver na prévia
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Clique em uma barra da linha do tempo para ajustar o tempo daquela mensagem.
+                  </p>
+                )}
               </div>
             </div>
+          )}
 
-            <div className="mt-3">
+          {tab === "fundo" && (
+            <div>
               <p className="mono-label mb-1.5 text-muted-foreground">Fundo</p>
               <div className="grid grid-cols-3 gap-1.5">
                 {BACKGROUND_PRESETS.map((b) => {
@@ -1102,7 +1016,6 @@ export function ChatSceneStudio() {
                 Use apenas vídeos seus ou com permissão de uso.
               </p>
 
-              {/* ajuste fino do fundo: aproximar, subir/descer e desfocar */}
               <div className="mt-2 space-y-2">
                 <label className="block text-[11px] text-muted-foreground">
                   Aproximar fundo
@@ -1165,260 +1078,256 @@ export function ChatSceneStudio() {
                   />
                 </label>
               </div>
-            </div>
 
-            {/* sons curtos de envio e recebimento */}
-            <div className="mt-3">
-              <p className="mono-label mb-1.5 text-muted-foreground">Sons da conversa</p>
-              <label className="flex items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
-                  checked={project.sound?.enabled ?? false}
-                  onChange={(e) =>
-                    patch({
-                      sound: {
-                        enabled: e.target.checked,
-                        volume: project.sound?.volume ?? 0.5,
-                      },
-                    })
-                  }
-                />
-                Tocar som quando a mensagem chega
-              </label>
-              {project.sound?.enabled ? (
-                <label className="mt-1.5 block text-[11px] text-muted-foreground">
-                  Volume dos sons
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    value={project.sound?.volume ?? 0.5}
-                    onChange={(e) =>
-                      patch({
-                        sound: { enabled: true, volume: Number(e.target.value) },
-                      })
-                    }
-                    className="mt-1 w-full"
-                    aria-label="Volume dos sons"
-                  />
-                </label>
-              ) : null}
-            </div>
-
-
-
-
-
-            <div className="mt-3">
-              <p className="mono-label mb-1.5 text-muted-foreground">Enquadramento</p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {LAYOUT_PRESETS.map((l) => (
-                  <button
-                    key={l.id}
-                    type="button"
-                    onClick={() => patch({ layout: { ...l.value, preset: l.id } })}
-                    className={`rounded-lg border px-2 py-1.5 text-xs transition ${
-                      (project.layout?.preset ?? "full-chat") === l.id
-                        ? "border-primary bg-primary/10"
-                        : "border-border hover:border-primary/50"
-                    }`}
-                  >
-                    {l.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-3">
-              <p className="mono-label mb-1.5 text-muted-foreground">Câmera</p>
-              <div className="grid grid-cols-3 gap-1.5">
-                {CAMERA_MODES.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    title={c.hint}
-                    onClick={() =>
-                      patch({ camera: { ...DEFAULT_CAMERA, ...project.camera, mode: c.id } })
-                    }
-                    className={`rounded-lg border px-2 py-1.5 text-xs transition ${
-                      (project.camera?.mode ?? "off") === c.id
-                        ? "border-primary bg-primary/10"
-                        : "border-border hover:border-primary/50"
-                    }`}
-                  >
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-              {(project.camera?.mode ?? "off") !== "off" && (
-                <div className="mt-1.5 flex items-center gap-1.5">
-                  <span className="mono-label shrink-0 text-[10px] text-muted-foreground">força</span>
-                  <input
-                    type="range"
-                    min={0.2}
-                    max={1}
-                    step={0.05}
-                    value={project.camera?.intensity ?? DEFAULT_CAMERA.intensity}
-                    onChange={(e) =>
-                      patch({
-                        camera: {
-                          ...DEFAULT_CAMERA,
-                          ...project.camera,
-                          intensity: Number(e.target.value),
-                        },
-                      })
-                    }
-                    className="flex-1"
-                    aria-label="Força do movimento de câmera"
-                  />
-                  <span className="w-10 text-right text-[11px] text-muted-foreground">
-                    {Math.round((project.camera?.intensity ?? DEFAULT_CAMERA.intensity) * 100)}%
-                  </span>
-                </div>
-              )}
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                "Com cortes" alterna meia tela e tela cheia a cada fala.
-              </p>
-            </div>
-
-            <div className="mt-3">
-              <p className="mono-label mb-1.5 text-muted-foreground">Entrada das bolhas</p>
-              <div className="grid grid-cols-3 gap-1.5">
-                {ANIMATION_PRESETS.map((a) => (
-                  <button
-                    key={a.id}
-                    type="button"
-                    onClick={() => patch({ animation: a.id })}
-                    className={`rounded-lg border px-2 py-1.5 text-xs transition ${
-                      (project.animation ?? "soft-spring") === a.id
-                        ? "border-primary bg-primary/10"
-                        : "border-border hover:border-primary/50"
-                    }`}
-                  >
-                    {a.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-
-            <div className="mt-3">
-              <label className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                Velocidade
-                <span className="mono-label">{project.timing.speed.toFixed(1)}×</span>
-              </label>
-              <input
-                type="range"
-                min={0.5}
-                max={2}
-                step={0.1}
-                value={project.timing.speed}
-                onChange={(e) => patch({ timing: { ...project.timing, speed: Number(e.target.value) } })}
-                className="h-1.5 w-full accent-primary"
-                aria-label="Velocidade da conversa"
-              />
-            </div>
-              </>
-            )}
-            </div>
-          </div>
-        </section>
-
-        {/* ---------------------------------------------------------- estúdio */}
-        {studio && (
-          <section className="glass rounded-2xl border border-border p-4 xl:max-h-[80vh] xl:overflow-y-auto">
-            <h2 className="mb-3 text-sm font-semibold">Ajuste fino</h2>
-
-            <div className="flex flex-col gap-3 text-xs">
-              <Range
-                label="Pausa entre mensagens"
-                value={project.timing.gapMs}
-                min={0}
-                max={2000}
-                step={50}
-                suffix="ms"
-                onChange={(v) => patch({ timing: { ...project.timing, gapMs: v } })}
-              />
-              <Range
-                label="Leitura por caractere"
-                value={project.timing.msPerChar}
-                min={10}
-                max={120}
-                step={2}
-                suffix="ms"
-                onChange={(v) => patch({ timing: { ...project.timing, msPerChar: v } })}
-              />
-              <Range
-                label="Tempo de “digitando…”"
-                value={project.timing.typingMs}
-                min={0}
-                max={3000}
-                step={100}
-                suffix="ms"
-                onChange={(v) => patch({ timing: { ...project.timing, typingMs: v } })}
-              />
-              <Range
-                label="Sobra no final"
-                value={project.timing.tailMs}
-                min={0}
-                max={5000}
-                step={100}
-                suffix="ms"
-                onChange={(v) => patch({ timing: { ...project.timing, tailMs: v } })}
-              />
-              <label className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={project.timing.typing}
-                  onChange={(e) => patch({ timing: { ...project.timing, typing: e.target.checked } })}
-                />
-                mostrar “digitando…”
-              </label>
-              <label className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={project.timing.humanTyping ?? true}
-                  onChange={(e) =>
-                    patch({ timing: { ...project.timing, humanTyping: e.target.checked } })
-                  }
-                />
-                ritmo humano (calcula pelo texto)
-              </label>
-              <Range
-                label="Respiro ao trocar de pessoa"
-                value={project.timing.senderSwitchMs ?? 180}
-                min={0}
-                max={1500}
-                step={20}
-                suffix="ms"
-                onChange={(v) => patch({ timing: { ...project.timing, senderSwitchMs: v } })}
-              />
-
-              <label className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={project.receipts ?? true}
-                  onChange={(e) => patch({ receipts: e.target.checked })}
-                />
-                tiques de mensagem lida
-              </label>
-              <div>
-                <p className="mb-1 text-muted-foreground">Hora inicial da conversa</p>
-                <input
-                  value={project.startClock ?? "21:14"}
-                  onChange={(e) => patch({ startClock: e.target.value })}
-                  placeholder="21:14"
-                  className="w-full rounded-md border border-border bg-background px-2 py-1.5"
-                  aria-label="Hora inicial da conversa"
+              <div className="mt-4">
+                <CreatorLayouts
+                  project={project}
+                  plan={plan}
+                  frame={frame}
+                  onSelect={(preset) => {
+                    const option = CREATOR_LAYOUTS.find((l) => l.id === preset);
+                    if (option) patch({ ...(option.apply ?? {}), layout: { ...option.value, preset } });
+                  }}
                 />
               </div>
-              <MusicPanel
+            </div>
+          )}
+
+          {tab === "vozes" && (
+            <div>
+              <VoicePanel
                 project={project}
                 patch={patch}
-                uploading={uploading}
-                onUpload={(file) => void handleMusic(file)}
+                clipCount={clips.size}
+                castState={castState}
+                castProgress={castProgress}
+                onGenerate={() => void handleGenerateVoices()}
+                previewing={previewingVoice}
+                onPreview={(id, profile) => void handlePreviewVoice(id, profile)}
               />
+              <VoiceUploadPanel
+                project={project}
+                clips={clips}
+                uploading={uploading}
+                playingId={playingClip}
+                onUpload={(id, file) => void handleVoiceFile(id, file)}
+                onRemove={handleRemoveVoiceClip}
+                onPlay={handlePlayClip}
+                onStop={handleStopClip}
+              />
+              <div className="mt-4 border-t border-border pt-3 text-xs">
+                <MusicPanel
+                  project={project}
+                  patch={patch}
+                  uploading={uploading}
+                  onUpload={(file) => void handleMusic(file)}
+                />
+              </div>
+            </div>
+          )}
+
+          {tab === "estilo" && (
+            <div>
+              <p className="mono-label mb-2 text-muted-foreground">Visual</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {CHAT_THEMES.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => patch({ themeId: t.id })}
+                    title={t.description}
+                    className={`rounded-lg border px-2.5 py-2 text-left text-xs transition ${
+                      project.themeId === t.id
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <span className="font-medium">{t.label}</span>
+                    <span className="block truncate text-[10px] text-muted-foreground">{t.description}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={project.dark}
+                    onChange={(e) => patch({ dark: e.target.checked })}
+                  />
+                  modo escuro
+                </label>
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={project.render.safeZones}
+                    onChange={(e) => patch({ render: { ...project.render, safeZones: e.target.checked } })}
+                  />
+                  margens seguras
+                </label>
+                <span className="mono-label ml-auto text-muted-foreground">
+                  {width}×{height}
+                </span>
+              </div>
+
+              <div className="mt-3">
+                <p className="mono-label mb-1.5 text-muted-foreground">Formato</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(["9:16", "16:9", "1:1"] as ChatSceneAspect[]).map((a) => (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => patch({ render: { ...project.render, aspect: a } })}
+                      className={`rounded-lg border px-2 py-1.5 text-xs transition ${
+                        project.render.aspect === a
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      {a}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <p className="mono-label mb-1.5 text-muted-foreground">Enquadramento</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {LAYOUT_PRESETS.map((l) => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      onClick={() => patch({ layout: { ...l.value, preset: l.id } })}
+                      className={`rounded-lg border px-2 py-1.5 text-xs transition ${
+                        (project.layout?.preset ?? "full-chat") === l.id
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      {l.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <p className="mono-label mb-1.5 text-muted-foreground">Câmera</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {CAMERA_MODES.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      title={c.hint}
+                      onClick={() => patch({ camera: { ...DEFAULT_CAMERA, ...project.camera, mode: c.id } })}
+                      className={`rounded-lg border px-2 py-1.5 text-xs transition ${
+                        (project.camera?.mode ?? "off") === c.id
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+                {(project.camera?.mode ?? "off") !== "off" && (
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <span className="mono-label shrink-0 text-[10px] text-muted-foreground">força</span>
+                    <input
+                      type="range"
+                      min={0.2}
+                      max={1}
+                      step={0.05}
+                      value={project.camera?.intensity ?? DEFAULT_CAMERA.intensity}
+                      onChange={(e) =>
+                        patch({
+                          camera: {
+                            ...DEFAULT_CAMERA,
+                            ...project.camera,
+                            intensity: Number(e.target.value),
+                          },
+                        })
+                      }
+                      className="flex-1"
+                      aria-label="Força do movimento de câmera"
+                    />
+                    <span className="w-10 text-right text-[11px] text-muted-foreground">
+                      {Math.round((project.camera?.intensity ?? DEFAULT_CAMERA.intensity) * 100)}%
+                    </span>
+                  </div>
+                )}
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  "Com cortes" alterna meia tela e tela cheia a cada fala.
+                </p>
+              </div>
+
+              <div className="mt-3">
+                <p className="mono-label mb-1.5 text-muted-foreground">Entrada das bolhas</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {ANIMATION_PRESETS.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => patch({ animation: a.id })}
+                      className={`rounded-lg border px-2 py-1.5 text-xs transition ${
+                        (project.animation ?? "soft-spring") === a.id
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <p className="mono-label mb-1.5 text-muted-foreground">Sons da conversa</p>
+                <label className="flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={project.sound?.enabled ?? false}
+                    onChange={(e) =>
+                      patch({
+                        sound: { enabled: e.target.checked, volume: project.sound?.volume ?? 0.5 },
+                      })
+                    }
+                  />
+                  Tocar som quando a mensagem chega
+                </label>
+                {project.sound?.enabled ? (
+                  <label className="mt-1.5 block text-[11px] text-muted-foreground">
+                    Volume dos sons
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={project.sound?.volume ?? 0.5}
+                      onChange={(e) => patch({ sound: { enabled: true, volume: Number(e.target.value) } })}
+                      className="mt-1 w-full"
+                      aria-label="Volume dos sons"
+                    />
+                  </label>
+                ) : null}
+              </div>
+
+              <div className="mt-4 border-t border-border pt-3">
+                <ThemePanel project={project} patch={patch} />
+              </div>
+              <div className="mt-4 border-t border-border pt-3">
+                <BrandPanel
+                  project={project}
+                  patch={patch}
+                  uploading={uploading}
+                  onLogo={(file) => void handleLogo(file)}
+                  onHeaderLogo={(file) => void handleHeaderImage(file, "logo")}
+                  onHeaderBackground={(file) => void handleHeaderImage(file, "background")}
+                />
+              </div>
+            </div>
+          )}
+
+          {tab === "exportar" && (
+            <div className="flex flex-col gap-3 text-xs">
               <div>
                 <p className="mb-1 text-muted-foreground">Qualidade do vídeo</p>
                 <select
@@ -1435,169 +1344,66 @@ export function ChatSceneStudio() {
                   <option value="1920x60">1080p 60 — movimento mais suave</option>
                 </select>
               </div>
-            </div>
-
-            <hr className="my-4 border-border" />
-
-            <h3 className="mb-2 text-sm font-semibold">Mensagem selecionada</h3>
-            {selectedMessage ? (
-              <div className="flex flex-col gap-3 text-xs">
-                <p className="line-clamp-2 text-muted-foreground">
-                  {selectedMessage.text || "(sem texto)"}
-                </p>
-                <Range
-                  label="Pausa antes desta mensagem"
-                  value={selectedMessage.delayMs ?? 0}
-                  min={0}
-                  max={5000}
-                  step={100}
-                  suffix="ms"
-                  onChange={(v) => updateMessage(selectedMessage.id, { delayMs: v || null })}
-                />
-                <Range
-                  label="“Digitando…” só desta mensagem"
-                  value={selectedMessage.typingMs ?? project.timing.typingMs}
-                  min={0}
-                  max={4000}
-                  step={100}
-                  suffix="ms"
-                  onChange={(v) => updateMessage(selectedMessage.id, { typingMs: v })}
-                />
-                <Range
-                  label="Respiro depois desta mensagem"
-                  value={selectedMessage.pauseAfterMs ?? project.timing.gapMs}
-                  min={0}
-                  max={6000}
-                  step={100}
-                  suffix="ms"
-                  onChange={(v) => updateMessage(selectedMessage.id, { pauseAfterMs: v })}
-                />
-                {messageKind(selectedMessage.kind).canReply && (
-                  <div>
-                    <p className="mb-1 text-muted-foreground">Responder a</p>
-                    <select
-                      value={selectedMessage.replyToId ?? ""}
-                      onChange={(e) =>
-                        updateMessage(selectedMessage.id, { replyToId: e.target.value || null })
-                      }
-                      className="w-full rounded-md border border-border bg-background px-2 py-1.5"
-                      aria-label="Responder a outra mensagem"
-                    >
-                      <option value="">nenhuma</option>
-                      {project.messages
-                        .filter((q) => q.id !== selectedMessage.id && q.kind !== "system")
-                        .map((q) => (
-                          <option key={q.id} value={q.id}>
-                            {(q.text || messageKind(q.kind).label).slice(0, 40)}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                )}
-                {selectedMessage.kind === "voice" && (
-                  <Range
-                    label="Duração do recado de voz"
-                    value={Math.round(voiceSeconds(selectedMessage))}
-                    min={1}
-                    max={120}
-                    step={1}
-                    suffix="s"
-                    onChange={(v) => updateMessage(selectedMessage.id, { durationSec: v })}
-                  />
-                )}
-                <label className="flex items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    checked={selectedMessage.emphasis ?? false}
-                    onChange={(e) => updateMessage(selectedMessage.id, { emphasis: e.target.checked })}
-                  />
-                  momento de peso (segura mais na tela)
-                </label>
-                <div>
-                  <p className="mb-1 text-muted-foreground">Reação nesta mensagem</p>
-                  <div className="flex flex-wrap gap-1">
-                    {["", "❤️", "😂", "😮", "😢", "👍", "🔥"].map((emoji) => (
-                      <button
-                        key={emoji || "none"}
-                        type="button"
-                        onClick={() => updateMessage(selectedMessage.id, { reaction: emoji || null })}
-                        className={`rounded-md border px-2 py-1 ${
-                          (selectedMessage.reaction ?? "") === emoji
-                            ? "border-primary bg-primary/10"
-                            : "border-border"
-                        }`}
-                      >
-                        {emoji || "nenhuma"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <p className="mb-1 text-muted-foreground">Hora desta mensagem</p>
-                  <input
-                    value={selectedMessage.time ?? ""}
-                    onChange={(e) => updateMessage(selectedMessage.id, { time: e.target.value || null })}
-                    placeholder="automática"
-                    className="w-full rounded-md border border-border bg-background px-2 py-1.5"
-                    aria-label="Hora desta mensagem"
-                  />
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => updateMessage(selectedMessage.id, { delayMs: null, typingMs: null })}
-                >
-                  Voltar ao ritmo automático
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    setPlaying(false);
-                    setFrame(plan.byId[selectedMessage.id]?.appearFrame ?? 0);
-                  }}
-                >
-                  Ver na prévia
-                </Button>
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Clique em uma mensagem à esquerda para ajustar o tempo dela.
+              <p className="text-muted-foreground">
+                Duração final: {(plan.durationMs / 1000).toFixed(1)}s · {width}×{height} · {plan.fps} quadros
+                por segundo.
               </p>
-            )}
-          </section>
-        )}
+              <Button onClick={() => void handleExport()} disabled={exporting}>
+                {exporting ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : <Download className="mr-1.5 size-4" />}
+                {exporting ? `Exportando ${Math.round(progress * 100)}%` : "Exportar MP4"}
+              </Button>
 
-        {/* ------------------------------------------ layouts de criador */}
-        <div className="lg:col-span-2 xl:col-span-3">
-          <CreatorLayouts
+              {exportUrl && (
+                <div className="rounded-xl border border-border bg-background/40 p-3">
+                  <div className="mb-2 flex flex-wrap items-center gap-3">
+                    <p className="mono-label text-muted-foreground">Vídeo pronto</p>
+                    <a
+                      href={exportUrl}
+                      download={exportName}
+                      className="ml-auto text-primary underline-offset-4 hover:underline"
+                    >
+                      Baixar de novo
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        URL.revokeObjectURL(exportUrl);
+                        setExportUrl(null);
+                      }}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                  <video
+                    src={exportUrl}
+                    controls
+                    playsInline
+                    aria-label="Vídeo exportado"
+                    className="mx-auto max-h-[60vh] w-auto rounded-lg border border-border bg-black"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* ----------------------------------------------------------- prévia */}
+        <section className="glass h-fit rounded-2xl border border-border p-4 lg:sticky lg:top-4">
+          <ChatScenePreview
             project={project}
             plan={plan}
             frame={frame}
-            onSelect={(preset) => {
-              const option = CREATOR_LAYOUTS.find((l) => l.id === preset);
-              if (option) patch({ ...(option.apply ?? {}), layout: { ...option.value, preset } });
-            }}
+            playing={playing}
+            onFrame={setFrame}
+            onPlaying={setPlaying}
+            clips={clips}
           />
-        </div>
-
-        {/* ------------------------------------------------ linha do tempo */}
-        <div className="lg:col-span-2 xl:col-span-3">
-          <ChatSceneTimeline
-            project={project}
-            plan={plan}
-            frame={frame}
-            selected={selected}
-            onSeek={(f) => {
-              setPlaying(false);
-              setFrame(f);
-            }}
-            onSelect={setSelected}
-          />
-        </div>
+        </section>
       </div>
     </div>
   );
+
 }
 
 function Range({
