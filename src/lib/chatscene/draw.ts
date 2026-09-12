@@ -839,7 +839,7 @@ function paintConversation(
   let offsetY = targetNow;
   const last = appeared[appeared.length - 1];
   const lastEntry = last ? plan.byId[last.id] : undefined;
-  if (lastEntry) {
+  if (lastEntry && !fit) {
     const scrollFrames = Math.max(1, Math.round(plan.fps * 0.28));
     const p = Math.max(0, Math.min(1, (frame - lastEntry.appearFrame) / scrollFrames));
     if (p < 1) {
