@@ -115,13 +115,13 @@ export function cameraAt(
   return frame_(1 + (maxZoom - 1) * p, cx, wideY + (closeY - wideY) * p);
 }
 
-/** Mantém o enquadramento dentro da tela: nada de mostrar fora do vídeo. */
-function frame_(scale: number, focusX: number, focusY: number): CameraShot {
+/**
+ * Converte "quero este ponto no meio da tela" no ponto fixo usado pelo
+ * desenho, sem nunca deixar aparecer nada fora do vídeo.
+ */
+function frame_(scale: number, centerX: number, centerY: number): CameraShot {
   const s = Math.max(1, scale);
-  const half = 0.5 / s;
-  return {
-    scale: s,
-    focusX: clamp(focusX, half, 1 - half),
-    focusY: clamp(focusY, half, 1 - half),
-  };
+  if (s <= 1.0001) return { scale: s, focusX: 0.5, focusY: 0.5 };
+  const anchor = (c: number) => clamp((c - 0.5 / s) / (1 - 1 / s), 0, 1);
+  return { scale: s, focusX: anchor(centerX), focusY: anchor(centerY) };
 }
