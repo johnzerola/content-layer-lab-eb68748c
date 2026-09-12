@@ -1,0 +1,14 @@
+{
+  "id": "cleaner-golden-v4-final-technical-validation-19c066477d8f",
+  "title": "CLEANER_GOLDEN_V4 final technical validation",
+  "body": "CONFIRMED: The combined scene-roi-v4, legacy_refined, DiffuEraser and subtitle-junctions-v1 candidate passed the approved Pedro 150-frame smoke and one additional 147-frame real clip covering background/window, person/motion/lines, fabric/face and temporal continuity scenarios. The second job 408d5b00-1cb0-43b1-a327-92204987a0ef-u2 returned ok=true on RTX 4090 with zero retries. Its lossless master changed zero decoded pixels outside the two frozen corrected selections; delivery retained 147 frames at 1080x1920 30 FPS, decoded successfully, copied AAC packets exactly, and had zero neon-green descriptor pixels. Approximate second-job cost was USD 0.132859 and the endpoint was restored to workers 0/0. LIMIT: scenarios span two independent clips, four scenarios share one clip, real covered pixels have no GT, and pure DiffuEraser versus junctions causal attribution remains unavailable. ProPainter prior commercial-license review remains a separate production gate.",
+  "sources": [
+    "G:/dowloand/teste/regression-fix-smoke-20260912/pedro-01/run-report.json",
+    "G:/dowloand/teste/phase6-final-validation-20260912/real-147f/run-report.json",
+    "G:/dowloand/teste/phase6-final-validation-20260912/real-147f/metrics.json",
+    "docs/PHASE-6-FINAL-REPORT.md"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-12T05:17:43.242348+00:00",
+  "category": "experiments"
+}

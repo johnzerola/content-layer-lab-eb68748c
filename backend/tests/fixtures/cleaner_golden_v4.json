@@ -1,0 +1,16 @@
+{
+  "name": "CLEANER_GOLDEN_V4",
+  "input_sha256": "ac3220aa3b4bcf92332a06cb42412477df1f438fbcb22127db17137deb1fe9b9",
+  "output_sha256": "1c43367d61626f79066c0c4f3b0088e49b69ce83edb16d8be3194241d8249f51",
+  "frames": 150,
+  "width": 1080,
+  "height": 1920,
+  "fps": "30/1",
+  "old_neon_green_pixels": 159607,
+  "old_neon_green_frames": 26,
+  "golden_neon_green_pixels": 0,
+  "golden_neon_green_frames": 0,
+  "outside_selection_altered_pixels": 0,
+  "outside_selection_max_channel_delta": 0,
+  "provider_job": "5b95c01e-38ea-4df4-a75f-f655ed53b7ce-u1"
+}
