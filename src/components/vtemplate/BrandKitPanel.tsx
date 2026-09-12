@@ -52,6 +52,7 @@ export function BrandKitPanel({
   const [genError, setGenError] = useState<string | null>(null);
   const [palette, setPalette] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const logoPreview = useMediaUrl(kit.logoUrl);
 
   useEffect(() => {
     saveBrandKit(kit);
