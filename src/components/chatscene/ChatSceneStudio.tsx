@@ -13,6 +13,7 @@ import {
   BadgeCheck,
   Mic,
   Palette,
+  Paintbrush,
   Download,
   Image as ImageIcon,
   Loader2,
@@ -34,6 +35,7 @@ import { ChatSceneTimeline } from "@/components/chatscene/ChatSceneTimeline";
 import { CreatorLayouts } from "@/components/chatscene/CreatorLayouts";
 import { VoicePanel } from "@/components/chatscene/VoicePanel";
 import { BrandPanel } from "@/components/chatscene/BrandPanel";
+import { ThemePanel } from "@/components/chatscene/ThemePanel";
 import { MusicPanel } from "@/components/chatscene/MusicPanel";
 import { buildPlan } from "@/lib/chatscene/clock";
 import { encodeFrameSequence, frameEncoderSupported } from "@/lib/chatscene/encode-frames";
@@ -84,11 +86,12 @@ import {
 
 const PALETTE = ["#7c5cff", "#ff5c8a", "#22c08a", "#f2b705", "#4ec3ff", "#ff8a4c"];
 
-type StudioPanel = "visual" | "vozes" | "marca";
+type StudioPanel = "visual" | "tema" | "vozes" | "marca";
 
 /** Barra lateral do estúdio: visual, vozes e marca, sem abrir outra tela. */
 const PANEL_TABS: { id: StudioPanel; label: string; icon: typeof Palette }[] = [
   { id: "visual", label: "Visual", icon: Palette },
+  { id: "tema", label: "Tema", icon: Paintbrush },
   { id: "vozes", label: "Vozes", icon: Mic },
   { id: "marca", label: "Marca do criador", icon: BadgeCheck },
 ];
@@ -907,6 +910,7 @@ export function ChatSceneStudio() {
                 onPreview={(id, profile) => void handlePreviewVoice(id, profile)}
               />
             )}
+            {panel === "tema" && <ThemePanel project={project} patch={patch} />}
             {panel === "marca" && (
               <BrandPanel
                 project={project}
