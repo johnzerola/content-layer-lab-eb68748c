@@ -6,7 +6,7 @@
  * que o motor de ritmo usa para segurar a bolha na tela, nunca uma estimativa.
  */
 import type { ChatSceneProject } from "./types";
-import { participantOf } from "./types";
+import { effectiveVoice } from "./voice-resolution";
 import {
   pitchRate,
   speakableText,
@@ -14,7 +14,9 @@ import {
   voiceKey,
   voicePreset,
   VOICE_SAMPLE_TEXT,
+  type MessageVoiceDirection,
   type VoiceProfile,
+  type VoiceProviderCapabilities,
 } from "./voice";
 
 export interface VoiceClip {
@@ -27,7 +29,11 @@ export interface VoiceClip {
 
 export interface VoiceProvider {
   readonly id: string;
-  synthesize(text: string, profile: VoiceProfile, signal?: AbortSignal): Promise<VoiceClip>;
+  listVoices(): Promise<{ id: string; label: string }[]>;
+  getCapabilities(): VoiceProviderCapabilities;
+  previewVoice(profile: VoiceProfile, text: string, signal?: AbortSignal): Promise<VoiceClip>;
+  synthesize(text: string, profile: VoiceProfile, direction?: MessageVoiceDirection, signal?: AbortSignal): Promise<VoiceClip>;
+  estimateCost?(characters: number): number | null;
 }
 
 const cache = new Map<string, VoiceClip>();
@@ -108,8 +114,17 @@ export function createGatewayVoiceProvider(
 ): VoiceProvider {
   return {
     id: "lovable-ai",
-    async synthesize(text, profile) {
-      const key = voiceKey(text, profile);
+    async listVoices() {
+      return [];
+    },
+    getCapabilities() {
+      return { languages: ["pt-BR"], maxCharacters: 600, controls: { speed: true, pitch: false, energy: false, expressiveness: true, roughness: false, warmth: false, brightness: false, emotion: true }, costEstimate: false, local: false };
+    },
+    previewVoice(profile, text, signal) {
+      return this.synthesize(text, profile, undefined, signal);
+    },
+    async synthesize(text, profile, direction) {
+      const key = voiceKey(text, profile, direction);
       const hit = cache.get(key);
       if (hit) return hit;
 
@@ -117,8 +132,8 @@ export function createGatewayVoiceProvider(
       const { audio, mime } = await call({
         text,
         voice: preset.providerVoice,
-        direction: voiceDirection(profile.style),
-        speed: profile.speed,
+        direction: voiceDirection(profile.style, direction?.emotion),
+        speed: Math.max(0.7, Math.min(1.3, profile.speed * (direction?.speedMultiplier ?? 1))),
       });
       const bytes = Uint8Array.from(atob(audio), (c) => c.charCodeAt(0));
       const blob = new Blob([bytes], { type: mime || "audio/mpeg" });
@@ -178,14 +193,14 @@ export async function generateCast(
     const slice = items.slice(i, i + batch);
     await Promise.all(
       slice.map(async ({ message, text }) => {
-        const author = participantOf(project, message.participantId);
-        const profile = author.voice ?? undefined;
-        if (!profile) return;
-        const key = voiceKey(text, profile);
+        const resolved = effectiveVoice(project, message);
+        if (!resolved) return;
+        const { profile, direction } = resolved;
+        const key = voiceKey(text, profile, direction);
         const hit = cachedClip(key);
         options.onProgress?.({ done, total: items.length, current: message.id });
         try {
-          const clip = hit ?? (await provider.synthesize(text, profile, options.signal));
+          const clip = hit ?? (await provider.synthesize(text, profile, direction, options.signal));
           if (hit) result.reused += 1;
           else result.generated += 1;
           result.clips.set(message.id, clip);

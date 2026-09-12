@@ -140,12 +140,17 @@ export function computeMessageTimings(project: ChatSceneProject): MessageTiming[
     const author = participantOf(project, message.participantId);
     const switched = previousAuthor && previousAuthor !== author.id;
     const leadIn =
-      Math.max(0, message.delayMs ?? 0) + (switched ? Math.max(0, t.senderSwitchMs ?? 180) : 0);
+      Math.max(0, message.delayMs ?? 0) +
+      Math.max(0, message.voiceDirection?.pauseBeforeMs ?? 0) +
+      (switched ? Math.max(0, t.senderSwitchMs ?? 180) : 0);
     const typing = typingMsOf(message, project);
     const entrance = entranceMsOf(project);
     const reading = readingMs(message, project);
     const voice = Math.max(0, message.voiceMs ?? 0);
-    const pauseAfter = Math.max(0, message.pauseAfterMs ?? t.gapMs);
+    const pauseAfter = Math.max(
+      0,
+      (message.pauseAfterMs ?? t.gapMs) + Math.max(0, message.voiceDirection?.pauseAfterMs ?? 0),
+    );
 
     const typingStartMs = cursor + leadIn;
     const appearMs = typingStartMs + typing;
