@@ -51,7 +51,6 @@ import {
   speakingMessages,
   type VoiceClip,
 } from "@/lib/chatscene/voice-cast";
-import { createMockVoiceProvider } from "@/lib/chatscene/voice-providers";
 import { effectiveVoice, voiceProfileOf } from "@/lib/chatscene/voice-resolution";
 
 import { loadMusic, mixConversationAudio } from "@/lib/chatscene/audio-mix";
@@ -63,6 +62,8 @@ import {
   PITCH_MIN,
   VOICE_PRESETS,
   VOICE_STYLES,
+  speakableText,
+  voiceKey,
   type VoiceProfile,
 } from "@/lib/chatscene/voice";
 import { CHAT_THEMES } from "@/lib/chatscene/theme";
@@ -419,7 +420,21 @@ export function ChatSceneStudio() {
     () => createGatewayVoiceProvider((input) => speakFn({ data: input })),
     [speakFn],
   );
-  const mockVoiceProvider = useMemo(() => createMockVoiceProvider(), []);
+  const effectiveClips = useMemo(() => {
+    const next = new Map<string, VoiceClip>();
+    for (const message of project.messages) {
+      const clip = clips.get(message.id);
+      if (!clip) continue;
+      if (clip.key.startsWith("upload:")) {
+        next.set(message.id, clip);
+        continue;
+      }
+      const voice = effectiveVoice(project, message);
+      const text = speakableText(message.kind, message.text);
+      if (voice && clip.key === voiceKey(text, voice.profile, voice.direction)) next.set(message.id, clip);
+    }
+    return next;
+  }, [clips, project]);
 
   /** Ouve uma frase curta com a voz, o jeito de falar e o tom escolhidos. */
   const stopPreviewRef = useRef<(() => void) | null>(null);
@@ -430,14 +445,14 @@ export function ChatSceneStudio() {
       stopPreviewRef.current = null;
       setPreviewingVoice(participantId);
       try {
-        stopPreviewRef.current = await previewVoice(mockVoiceProvider, profile);
+        stopPreviewRef.current = await previewVoice(voiceProvider, profile);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Não foi possível ouvir esta voz.");
       } finally {
         setPreviewingVoice(null);
       }
     },
-    [mockVoiceProvider],
+    [voiceProvider],
   );
   useEffect(() => () => stopPreviewRef.current?.(), []);
 
@@ -568,10 +583,10 @@ export function ChatSceneStudio() {
       // trilha: falas no tempo de cada bolha + música opcional por baixo
       let audio: AudioBuffer | null = null;
       const mix = project.voiceMix ?? DEFAULT_VOICE_MIX;
-      if (clips.size || mix.musicUrl || project.sound?.enabled) {
+      if (effectiveClips.size || mix.musicUrl || project.sound?.enabled) {
         try {
           const music = mix.musicUrl ? await loadMusic(mix.musicUrl) : null;
-          audio = await mixConversationAudio({ project, plan, clips, settings: mix, music });
+          audio = await mixConversationAudio({ project, plan, clips: effectiveClips, settings: mix, music });
         } catch {
           toast.warning("O vídeo sai sem som: não foi possível montar a trilha.");
         }
@@ -608,7 +623,7 @@ export function ChatSceneStudio() {
       setExporting(false);
       setProgress(0);
     }
-  }, [project, plan, clips]);
+  }, [project, plan, effectiveClips]);
 
   const selectedMessage = project.messages.find((m) => m.id === selected) ?? null;
   const { width, height } = renderSize(project.render);
@@ -1131,7 +1146,7 @@ export function ChatSceneStudio() {
               <VoicePanel
                 project={project}
                 patch={patch}
-                clipCount={clips.size}
+                clipCount={effectiveClips.size}
                 castState={castState}
                 castProgress={castProgress}
                 onGenerate={() => void handleGenerateVoices()}
@@ -1430,7 +1445,7 @@ export function ChatSceneStudio() {
             playing={playing}
             onFrame={setFrame}
             onPlaying={setPlaying}
-            clips={clips}
+            clips={effectiveClips}
           />
         </section>
       </div>

@@ -29,9 +29,11 @@ export function VoicePanel(props: VoicePanelProps) {
   const setProject = (next: ChatSceneProject) => patch(next);
   const updateProfile = (id: string, changes: Partial<VoiceProfile>) => {
     const profiles = (project.voiceProfiles ?? []).map((profile) => profile.id === id ? { ...profile, ...changes } : profile);
+    const participantIds = new Set(project.participants.filter((p) => p.voiceProfileId === id).map((p) => p.id));
     patch({
       voiceProfiles: profiles,
       participants: project.participants.map((p) => p.voiceProfileId === id ? { ...p, voice: { ...voiceProfileOf({ ...project, voiceProfiles: profiles }, p), ...changes } as VoiceProfile } : p),
+      messages: project.messages.map((message) => participantIds.has(message.participantId) ? { ...message, voiceMs: null } : message),
     });
   };
   const missing = project.messages.filter((m) => !m.voiceMs && Boolean(voiceProfileOf(project, project.participants.find((p) => p.id === m.participantId) ?? project.participants[0]!))).length;
@@ -51,7 +53,7 @@ export function VoicePanel(props: VoicePanelProps) {
         {project.participants.map((participant) => {
           const voice = voiceProfileOf(project, participant);
           const selectedPreset = voice ? voicePreset(voice.presetId) : null;
-          const caps = PROVIDER_CAPABILITIES[voice?.provider ?? "mock"] ?? PROVIDER_CAPABILITIES["mock"]!;
+          const caps = PROVIDER_CAPABILITIES["lovable-ai"] ?? PROVIDER_CAPABILITIES["mock"];
           return (
             <article key={participant.id} className="rounded-lg border border-border bg-background/45 p-3">
               <div className="flex items-center gap-2">
@@ -91,13 +93,13 @@ export function VoicePanel(props: VoicePanelProps) {
                       <summary className="flex h-8 cursor-pointer list-none items-center justify-center gap-1.5 rounded-md border border-border bg-secondary px-3 text-xs font-medium"><SlidersHorizontal className="size-3.5" /> Editar</summary>
                       <div className="mt-2 space-y-2 border-t border-border pt-2">
                         <VoiceRange label="Velocidade" value={voice.speed} min={.7} max={1.3} step={.05} suffix="×" onChange={(speed) => updateProfile(voice.id!, { speed })} />
-                        {caps.controls.energy ? <VoiceRange label="Energia" value={voice.energy ?? .5} min={0} max={1} step={.05} onChange={(energy) => updateProfile(voice.id!, { energy })} /> : null}
-                        {caps.controls.pitch ? <VoiceRange label="Tom" value={voice.pitch ?? 0} min={PITCH_MIN} max={PITCH_MAX} step={.5} onChange={(pitch) => updateProfile(voice.id!, { pitch })} /> : null}
+                        {caps?.controls.energy ? <VoiceRange label="Energia" value={voice.energy ?? .5} min={0} max={1} step={.05} onChange={(energy) => voice.id && updateProfile(voice.id, { energy })} /> : null}
+                        {caps?.controls.pitch ? <VoiceRange label="Tom" value={voice.pitch ?? 0} min={PITCH_MIN} max={PITCH_MAX} step={.5} onChange={(pitch) => voice.id && updateProfile(voice.id, { pitch })} /> : null}
                         <Button size="sm" variant="ghost" className="h-7 w-full gap-1 text-[11px]" onClick={() => updateProfile(voice.id ?? `voice_${participant.id}`, profileFromPreset(voice.presetId, { id: voice.id ?? `voice_${participant.id}` }))}><RotateCcw className="size-3" /> Restaurar preset</Button>
                       </div>
                     </details>
                   </div>
-                  <p className="mt-2 text-[10px] text-muted-foreground">Provedor: {voice.provider === "lovable-ai" ? "Voz real" : "Mock local"} · controles exibidos conforme suporte</p>
+                  <p className="mt-2 text-[10px] text-muted-foreground">Voz real · velocidade na geração · pitch na reprodução e no vídeo</p>
                 </>
               ) : null}
             </article>

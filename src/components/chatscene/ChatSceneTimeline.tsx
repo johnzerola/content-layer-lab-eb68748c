@@ -4,6 +4,7 @@
  * aquele instante — a fonte do tempo é sempre o ConversationClock (plan).
  */
 import { useCallback, useRef } from "react";
+import { Mic } from "lucide-react";
 import type { ConversationPlan } from "@/lib/chatscene/clock";
 import type { ChatSceneProject } from "@/lib/chatscene/types";
 
@@ -146,8 +147,18 @@ export function ChatSceneTimeline({
                     opacity: active ? 1 : 0.75,
                   }}
                 />
+                {message.voiceMs ? (
+                  <span
+                    className="absolute bottom-0.5 h-1 rounded-full bg-foreground/80"
+                    style={{
+                      left: pct(entry.appearFrame),
+                      width: pct(Math.max(1, Math.min(entry.endFrame - entry.appearFrame, (message.voiceMs / 1000) * plan.fps))),
+                    }}
+                    title={`Fala sincronizada: ${(message.voiceMs / 1000).toFixed(1)}s`}
+                  />
+                ) : null}
                 <span className="absolute left-1 top-0 z-10 max-w-[40%] truncate text-[10px] leading-6 text-foreground/80">
-                  {author?.name ?? "Sistema"}
+                  {message.voiceMs ? <Mic className="mr-1 inline size-2.5" aria-hidden="true" /> : null}{author?.name ?? "Sistema"}
                 </span>
                 <span className="absolute right-1 top-0 z-10 text-[9px] leading-6 text-muted-foreground">
                   {fmt(startSec)}–{fmt(endSec)}
@@ -166,7 +177,7 @@ export function ChatSceneTimeline({
 
       <p className="mt-2 text-[11px] text-muted-foreground">
         Clique em uma barra para pular a prévia para aquela mensagem; o trecho listrado é o
-        “digitando…”. Use as setas do teclado para andar de 1 em 1 segundo.
+        “digitando…” e a linha clara mostra a fala real sincronizada. Use as setas do teclado para andar de 1 em 1 segundo.
       </p>
     </section>
   );
