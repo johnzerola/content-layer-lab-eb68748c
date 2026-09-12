@@ -285,13 +285,32 @@ export const LAYOUT_PRESETS: { id: ChatLayoutPreset; label: string; value: Omit<
   },
 ];
 
-/** Os três layouts principais de criador, mostrados com prévia no estúdio. */
+/** Layouts principais de criador, mostrados com prévia no estúdio. */
 export const CREATOR_LAYOUTS: {
   id: ChatLayoutPreset;
   label: string;
   hint: string;
   value: Omit<ChatSceneLayout, "preset">;
+  /** ajustes de apresentação aplicados junto com o enquadramento */
+  apply?: {
+    themeId?: string;
+    dark?: boolean;
+    animation?: MessageAnimation;
+    camera?: { mode: "off" | "smooth" | "cuts"; intensity: number };
+  };
 }[] = [
+  {
+    id: "canal-viral",
+    label: "Conversa sobre gameplay",
+    hint: "Painel de conversa em cima que cresce a cada mensagem, gameplay atrás e cortes de câmera.",
+    value: LAYOUT_PRESETS.find((l) => l.id === "canal-viral")!.value,
+    apply: {
+      themeId: "zap",
+      dark: true,
+      animation: "bubble-pop",
+      camera: { mode: "cuts", intensity: 0.6 },
+    },
+  },
   {
     id: "chat-gameplay",
     label: "Chat + Gameplay",
