@@ -118,7 +118,7 @@ export function createGatewayVoiceProvider(
       return [];
     },
     getCapabilities() {
-      return { languages: ["pt-BR"], maxCharacters: 600, controls: { speed: true, pitch: false, energy: false, expressiveness: true, roughness: false, warmth: false, brightness: false, emotion: true }, costEstimate: false, local: false };
+      return { languages: ["pt-BR"], maxCharacters: 600, controls: { speed: true, pitch: true, energy: false, expressiveness: true, roughness: false, warmth: false, brightness: false, emotion: true }, costEstimate: false, local: false };
     },
     previewVoice(profile, text, signal) {
       return this.synthesize(text, profile, undefined, signal);

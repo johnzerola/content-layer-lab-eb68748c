@@ -29,9 +29,11 @@ export function VoicePanel(props: VoicePanelProps) {
   const setProject = (next: ChatSceneProject) => patch(next);
   const updateProfile = (id: string, changes: Partial<VoiceProfile>) => {
     const profiles = (project.voiceProfiles ?? []).map((profile) => profile.id === id ? { ...profile, ...changes } : profile);
+    const participantIds = new Set(project.participants.filter((p) => p.voiceProfileId === id).map((p) => p.id));
     patch({
       voiceProfiles: profiles,
       participants: project.participants.map((p) => p.voiceProfileId === id ? { ...p, voice: { ...voiceProfileOf({ ...project, voiceProfiles: profiles }, p), ...changes } as VoiceProfile } : p),
+      messages: project.messages.map((message) => participantIds.has(message.participantId) ? { ...message, voiceMs: null } : message),
     });
   };
   const missing = project.messages.filter((m) => !m.voiceMs && Boolean(voiceProfileOf(project, project.participants.find((p) => p.id === m.participantId) ?? project.participants[0]!))).length;
@@ -51,7 +53,7 @@ export function VoicePanel(props: VoicePanelProps) {
         {project.participants.map((participant) => {
           const voice = voiceProfileOf(project, participant);
           const selectedPreset = voice ? voicePreset(voice.presetId) : null;
-          const caps = PROVIDER_CAPABILITIES[voice?.provider ?? "mock"] ?? PROVIDER_CAPABILITIES["mock"]!;
+          const caps = PROVIDER_CAPABILITIES["lovable-ai"];
           return (
             <article key={participant.id} className="rounded-lg border border-border bg-background/45 p-3">
               <div className="flex items-center gap-2">
@@ -97,7 +99,7 @@ export function VoicePanel(props: VoicePanelProps) {
                       </div>
                     </details>
                   </div>
-                  <p className="mt-2 text-[10px] text-muted-foreground">Provedor: {voice.provider === "lovable-ai" ? "Voz real" : "Mock local"} · controles exibidos conforme suporte</p>
+                  <p className="mt-2 text-[10px] text-muted-foreground">Voz real · velocidade na geração · pitch na reprodução e no vídeo</p>
                 </>
               ) : null}
             </article>
