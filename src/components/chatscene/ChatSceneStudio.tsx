@@ -16,6 +16,7 @@ import {
   Plus,
   Save,
   Sliders,
+  Volume2,
   Copy,
   Sparkle,
   Trash2,
@@ -39,13 +40,17 @@ import {
   applyVoiceDurations,
   createGatewayVoiceProvider,
   generateCast,
+  previewVoice,
   speakingMessages,
   type VoiceClip,
 } from "@/lib/chatscene/voice-cast";
 import { loadMusic, mixConversationAudio } from "@/lib/chatscene/audio-mix";
+import { CAMERA_MODES, DEFAULT_CAMERA } from "@/lib/chatscene/camera";
 import {
   DEFAULT_VOICE,
   DEFAULT_VOICE_MIX,
+  PITCH_MAX,
+  PITCH_MIN,
   VOICE_PRESETS,
   VOICE_STYLES,
   type VoiceProfile,
@@ -304,6 +309,26 @@ export function ChatSceneStudio() {
     () => createGatewayVoiceProvider((input) => speakFn({ data: input })),
     [speakFn],
   );
+
+  /** Ouve uma frase curta com a voz, o jeito de falar e o tom escolhidos. */
+  const stopPreviewRef = useRef<(() => void) | null>(null);
+  const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
+  const handlePreviewVoice = useCallback(
+    async (participantId: string, profile: VoiceProfile) => {
+      stopPreviewRef.current?.();
+      stopPreviewRef.current = null;
+      setPreviewingVoice(participantId);
+      try {
+        stopPreviewRef.current = await previewVoice(voiceProvider, profile);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Não foi possível ouvir esta voz.");
+      } finally {
+        setPreviewingVoice(null);
+      }
+    },
+    [voiceProvider],
+  );
+  useEffect(() => () => stopPreviewRef.current?.(), []);
 
   /** Gera (ou reaproveita) a fala de todas as mensagens com voz escolhida. */
   const handleGenerateVoices = useCallback(async () => {
@@ -784,6 +809,7 @@ export function ChatSceneStudio() {
             playing={playing}
             onFrame={setFrame}
             onPlaying={setPlaying}
+            clips={clips}
           />
 
           <div className="mt-4">
@@ -986,6 +1012,41 @@ export function ChatSceneStudio() {
                           </span>
                         </div>
                       )}
+                      {voice && (
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                          <span className="mono-label shrink-0 text-[10px] text-muted-foreground">tom</span>
+                          <input
+                            type="range"
+                            min={PITCH_MIN}
+                            max={PITCH_MAX}
+                            step={0.5}
+                            value={voice.pitch ?? 0}
+                            onChange={(e) => setVoice({ pitch: Number(e.target.value) })}
+                            className="flex-1"
+                            aria-label={`Tom da voz de ${p.name}`}
+                          />
+                          <span className="w-14 text-right text-[11px] text-muted-foreground">
+                            {(voice.pitch ?? 0) > 0 ? "+" : ""}
+                            {(voice.pitch ?? 0).toFixed(1)}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2"
+                            disabled={previewingVoice === p.id}
+                            onClick={() =>
+                              void handlePreviewVoice(p.id, { ...DEFAULT_VOICE, ...voice })
+                            }
+                            aria-label={`Ouvir a voz de ${p.name}`}
+                          >
+                            {previewingVoice === p.id ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <Volume2 className="size-3.5" />
+                            )}
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -1136,6 +1197,58 @@ export function ChatSceneStudio() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="mt-3">
+              <p className="mono-label mb-1.5 text-muted-foreground">Câmera</p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {CAMERA_MODES.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    title={c.hint}
+                    onClick={() =>
+                      patch({ camera: { ...DEFAULT_CAMERA, ...project.camera, mode: c.id } })
+                    }
+                    className={`rounded-lg border px-2 py-1.5 text-xs transition ${
+                      (project.camera?.mode ?? "off") === c.id
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+              {(project.camera?.mode ?? "off") !== "off" && (
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <span className="mono-label shrink-0 text-[10px] text-muted-foreground">força</span>
+                  <input
+                    type="range"
+                    min={0.2}
+                    max={1}
+                    step={0.05}
+                    value={project.camera?.intensity ?? DEFAULT_CAMERA.intensity}
+                    onChange={(e) =>
+                      patch({
+                        camera: {
+                          ...DEFAULT_CAMERA,
+                          ...project.camera,
+                          intensity: Number(e.target.value),
+                        },
+                      })
+                    }
+                    className="flex-1"
+                    aria-label="Força do movimento de câmera"
+                  />
+                  <span className="w-10 text-right text-[11px] text-muted-foreground">
+                    {Math.round((project.camera?.intensity ?? DEFAULT_CAMERA.intensity) * 100)}%
+                  </span>
+                </div>
+              )}
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                "Com cortes" alterna meia tela e tela cheia a cada fala.
+              </p>
             </div>
 
             <div className="mt-3">

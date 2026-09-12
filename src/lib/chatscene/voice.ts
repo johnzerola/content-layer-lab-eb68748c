@@ -30,7 +30,26 @@ export interface VoiceProfile {
   speed: number;
   /** volume relativo da fala desta pessoa (0.2 a 1.5) */
   gain: number;
+  /** tom da voz em semitons: negativo = mais grave, positivo = mais agudo */
+  pitch?: number;
 }
+
+/** Limites do controle de tom, em semitons. */
+export const PITCH_MIN = -6;
+export const PITCH_MAX = 6;
+
+/**
+ * Quanto o áudio precisa correr para soar no tom pedido. Como o tom é obtido
+ * mudando a velocidade de reprodução, a fala também fica um pouco mais curta
+ * (agudo) ou mais longa (grave) — e o ritmo da cena usa essa duração real.
+ */
+export function pitchRate(pitch: number | undefined): number {
+  const semitones = Math.max(PITCH_MIN, Math.min(PITCH_MAX, pitch ?? 0));
+  return 2 ** (semitones / 12);
+}
+
+/** Frase curta usada para ouvir a voz antes de gerar a conversa inteira. */
+export const VOICE_SAMPLE_TEXT = "Oi! É assim que eu vou falar nesse vídeo.";
 
 export interface VoicePreset {
   id: string;
@@ -67,6 +86,7 @@ export const DEFAULT_VOICE: VoiceProfile = {
   style: "natural",
   speed: 1,
   gain: 1,
+  pitch: 0,
 };
 
 export function voicePreset(id: string | undefined): VoicePreset {

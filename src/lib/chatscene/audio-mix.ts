@@ -7,7 +7,7 @@
  */
 import type { ConversationPlan } from "./clock";
 import type { VoiceClip } from "./voice-cast";
-import type { VoiceMixSettings } from "./voice";
+import { pitchRate, type VoiceMixSettings } from "./voice";
 import type { ChatSceneProject } from "./types";
 import { participantOf } from "./types";
 
@@ -23,22 +23,36 @@ export interface MixInput {
 }
 
 /** Momento, em segundos, em que cada fala começa. */
+export interface ScheduledVoice {
+  id: string;
+  startSec: number;
+  clip: VoiceClip;
+  gain: number;
+  /** velocidade de reprodução que dá o tom escolhido */
+  rate: number;
+  /** duração já com o tom aplicado */
+  durationSec: number;
+}
+
 export function voiceSchedule(
   project: ChatSceneProject,
   plan: ConversationPlan,
   clips: Map<string, VoiceClip>,
-): { id: string; startSec: number; clip: VoiceClip; gain: number }[] {
-  const out: { id: string; startSec: number; clip: VoiceClip; gain: number }[] = [];
+): ScheduledVoice[] {
+  const out: ScheduledVoice[] = [];
   for (const message of project.messages) {
     const clip = clips.get(message.id);
     const entry = plan.byId[message.id];
     if (!clip || !entry) continue;
     const author = participantOf(project, message.participantId);
+    const rate = pitchRate(author.voice?.pitch);
     out.push({
       id: message.id,
       startSec: entry.appearFrame / plan.fps,
       clip,
       gain: Math.max(0.2, Math.min(1.5, author.voice?.gain ?? 1)),
+      rate,
+      durationSec: clip.durationSec / rate,
     });
   }
   return out.sort((a, b) => a.startSec - b.startSec);
@@ -46,17 +60,18 @@ export function voiceSchedule(
 
 /** Fator de volume da música em cada instante (1 = cheia, menor = abaixada). */
 export function duckingCurve(
-  schedule: { startSec: number; clip: { durationSec: number } }[],
+  schedule: { startSec: number; durationSec?: number; clip: { durationSec: number } }[],
   ducking: boolean,
 ): { time: number; value: number }[] {
   if (!ducking || !schedule.length) return [{ time: 0, value: 1 }];
   const fade = 0.18;
   const points: { time: number; value: number }[] = [{ time: 0, value: 1 }];
   for (const s of schedule) {
+    const dur = s.durationSec ?? s.clip.durationSec;
     const start = Math.max(0, s.startSec - fade);
-    const end = s.startSec + s.clip.durationSec + fade;
+    const end = s.startSec + dur + fade;
     points.push({ time: start, value: 1 }, { time: s.startSec, value: 0.22 });
-    points.push({ time: s.startSec + s.clip.durationSec, value: 0.22 }, { time: end, value: 1 });
+    points.push({ time: s.startSec + dur, value: 0.22 }, { time: end, value: 1 });
   }
   return points.sort((a, b) => a.time - b.time);
 }
@@ -82,6 +97,7 @@ export async function mixConversationAudio(input: MixInput): Promise<AudioBuffer
   for (const item of schedule) {
     const source = ctx.createBufferSource();
     source.buffer = item.clip.buffer;
+    source.playbackRate.value = item.rate;
     const gain = ctx.createGain();
     gain.gain.value = item.gain;
     source.connect(gain).connect(master);

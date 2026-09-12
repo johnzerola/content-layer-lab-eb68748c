@@ -12,6 +12,7 @@
  */
 
 import { DEFAULT_VOICE_MIX } from "./voice";
+import { DEFAULT_CAMERA } from "./camera";
 
 export const CHATSCENE_PROJECT_MODE = "chatscene";
 export const CHATSCENE_PROJECT_VERSION = 1;
@@ -266,6 +267,8 @@ export interface ChatSceneProject {
   branding?: ChatSceneBranding;
   /** falas, música e mixagem */
   voiceMix?: import("./voice").VoiceMixSettings;
+  /** movimento de câmera (meia tela, cortes) */
+  camera?: import("./camera").ChatSceneCamera;
 }
 
 export const DEFAULT_TIMING: ChatSceneTiming = {
@@ -372,6 +375,7 @@ export function createChatSceneProject(init: Partial<ChatSceneProject> = {}): Ch
     sound: init.sound ?? { enabled: false, volume: 0.5 },
     branding: init.branding ?? { ...DEFAULT_BRANDING },
     voiceMix: init.voiceMix ?? { ...DEFAULT_VOICE_MIX },
+    camera: init.camera ?? { ...DEFAULT_CAMERA },
     participants: init.participants ?? [me, other],
     messages:
       init.messages ??
@@ -425,6 +429,7 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
     sound: { enabled: false, volume: 0.5, ...(raw.sound ?? {}) },
     branding: { ...DEFAULT_BRANDING, ...(raw.branding ?? {}) },
     voiceMix: { ...DEFAULT_VOICE_MIX, ...(raw.voiceMix ?? {}) },
+    camera: { ...DEFAULT_CAMERA, ...(raw.camera ?? {}) },
   };
 }
 

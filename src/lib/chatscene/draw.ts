@@ -5,6 +5,7 @@
  * React: a mesma função serve para a prévia e para a exportação, o que garante
  * que o arquivo final é idêntico ao que o usuário viu.
  */
+import { cameraAt } from "./camera";
 import type { ConversationPlan } from "./clock";
 import { typingAt } from "./clock";
 import { mediaFrameAt, type LoadedMedia } from "./media";
@@ -632,6 +633,18 @@ export function paintFrame(
   const rect = chatRect(project.layout, width, height);
   const inset = rect.w < width || rect.h < height;
 
+  // câmera: aproxima na fala nova e alterna com a tela cheia
+  const shot = cameraAt(project.camera, plan, frame);
+  const moving = Math.abs(shot.scale - 1) > 0.001;
+  if (moving) {
+    ctx.save();
+    const fx = shot.focusX * width;
+    const fy = shot.focusY * height;
+    ctx.translate(fx, fy);
+    ctx.scale(shot.scale, shot.scale);
+    ctx.translate(-fx, -fy);
+  }
+
   // fundo do vídeo (atrás da conversa)
   if (inset) {
     const l = project.layout ?? DEFAULT_LAYOUT;
@@ -661,6 +674,8 @@ export function paintFrame(
   paintConversation(ctx, project, theme, plan, frame, rect.w, rect.h, rect.header, options);
   ctx.globalAlpha = 1;
   ctx.restore();
+
+  if (moving) ctx.restore();
 
   drawBranding(ctx, project, width, height, media);
 

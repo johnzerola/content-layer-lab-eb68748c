@@ -6,6 +6,8 @@ import type { ConversationPlan } from "@/lib/chatscene/clock";
 import { CanvasConversationRenderer, paintPreview } from "@/lib/chatscene/renderer";
 import type { ChatSceneProject } from "@/lib/chatscene/types";
 import { renderSize } from "@/lib/chatscene/types";
+import { voiceSchedule } from "@/lib/chatscene/audio-mix";
+import type { VoiceClip } from "@/lib/chatscene/voice-cast";
 
 interface Props {
   project: ChatSceneProject;
@@ -14,9 +16,11 @@ interface Props {
   playing: boolean;
   onFrame: (frame: number) => void;
   onPlaying: (playing: boolean) => void;
+  /** falas já geradas, para ouvir a conversa na própria prévia */
+  clips?: Map<string, VoiceClip>;
 }
 
-export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPlaying }: Props) {
+export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPlaying, clips }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [ready, setReady] = useState(false);
   const frameRef = useRef(frame);
@@ -66,6 +70,45 @@ export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPla
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [playing, plan, onFrame, onPlaying]);
+
+  // som da prévia: as falas tocam no mesmo instante em que a bolha aparece
+  useEffect(() => {
+    if (!playing || !clips?.size) return;
+    const Ctor =
+      (globalThis as unknown as { AudioContext?: typeof AudioContext }).AudioContext ??
+      (globalThis as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctor) return;
+    const ctx = new Ctor();
+    void ctx.resume().catch(() => {});
+    const fromSec = frameRef.current / plan.fps;
+    const sources: AudioBufferSourceNode[] = [];
+    for (const item of voiceSchedule(project, plan, clips)) {
+      const delay = item.startSec - fromSec;
+      if (delay + item.durationSec <= 0) continue;
+      const source = ctx.createBufferSource();
+      source.buffer = item.clip.buffer;
+      source.playbackRate.value = item.rate;
+      const gain = ctx.createGain();
+      gain.gain.value = item.gain;
+      source.connect(gain).connect(ctx.destination);
+      if (delay >= 0) source.start(ctx.currentTime + delay);
+      else source.start(ctx.currentTime, -delay * item.rate);
+      sources.push(source);
+    }
+    return () => {
+      for (const s of sources) {
+        try {
+          s.stop();
+        } catch {
+          /* já parou */
+        }
+      }
+      void ctx.close().catch(() => {});
+    };
+    // a lista de falas só muda quando o documento ou o plano muda
+  }, [playing, clips, project, plan]);
+
+
 
 
   const { width, height } = renderSize(project.render);
