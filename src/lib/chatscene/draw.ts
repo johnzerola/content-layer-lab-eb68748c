@@ -730,7 +730,18 @@ export function paintFrame(
     ctx.clip();
   }
   ctx.globalAlpha = rect.opacity;
-  paintConversation(ctx, project, theme, plan, frame, rect.w, rect.h, rect.header, options);
+  paintConversation(
+    ctx,
+    project,
+    theme,
+    plan,
+    frame,
+    rect.w,
+    rect.h,
+    rect.header,
+    options,
+    auto != null ? { metricsH: base.h } : undefined,
+  );
   ctx.globalAlpha = 1;
   ctx.restore();
 
