@@ -10,6 +10,7 @@
 - [x] Corrigir navegação travada em Integrações e padronizar o menu nas ferramentas internas
 
 ## Analogue ChatScene — fundação
+- [ ] UI Fidelity + Conversation Engine + Voice Cast System (plano em revisão)
 - [x] Auditoria de skills e ferramentas do workspace
 - [x] Ativação do pacote Remotion oficial (best-practices, captions, multimedia, saas, interactivity)
 - [x] Criação das 11 skills ChatScene
