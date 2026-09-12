@@ -16,7 +16,12 @@ export const CHATSCENE_PROJECT_VERSION = 1;
 
 export type ChatSceneAspect = "9:16" | "1:1" | "16:9";
 
-export type MessageKind = "text" | "image" | "emoji" | "system";
+export type MessageKind = "text" | "image" | "emoji" | "system" | "sticker" | "video";
+
+/** Confirmação de entrega mostrada ao lado da hora, como em um app real. */
+export type MessageStatus = "sent" | "delivered" | "read";
+
+export type ChatKind = "direct" | "group";
 
 export interface ChatParticipant {
   id: string;
