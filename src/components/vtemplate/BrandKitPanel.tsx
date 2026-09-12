@@ -87,13 +87,10 @@ export function BrandKitPanel({
   };
 
   const pickLogo = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const src = String(reader.result);
+    void uploadFileOrInline("brand", file).then(async (src) => {
       patch({ logoUrl: src });
-      void generateFromLogo(src);
-    };
-    reader.readAsDataURL(file);
+      await generateFromLogo(await resolveMediaUrl(src));
+    });
   };
 
 
