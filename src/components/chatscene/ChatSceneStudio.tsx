@@ -77,6 +77,15 @@ import {
 
 const PALETTE = ["#7c5cff", "#ff5c8a", "#22c08a", "#f2b705", "#4ec3ff", "#ff8a4c"];
 
+type StudioPanel = "visual" | "vozes" | "marca";
+
+/** Barra lateral do estúdio: visual, vozes e marca, sem abrir outra tela. */
+const PANEL_TABS: { id: StudioPanel; label: string; icon: typeof Palette }[] = [
+  { id: "visual", label: "Visual", icon: Palette },
+  { id: "vozes", label: "Vozes", icon: Mic },
+  { id: "marca", label: "Marca do criador", icon: BadgeCheck },
+];
+
 function slugify(text: string): string {
   return (
     text
