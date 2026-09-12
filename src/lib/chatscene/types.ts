@@ -11,6 +11,8 @@
  *   RENDER   render                  (./renderer)
  */
 
+import { DEFAULT_VOICE_MIX } from "./voice";
+
 export const CHATSCENE_PROJECT_MODE = "chatscene";
 export const CHATSCENE_PROJECT_VERSION = 1;
 
@@ -84,6 +86,8 @@ export interface ChatParticipant {
   color: string;
   /** URL pública do avatar; nunca base64 */
   avatarUrl?: string | null;
+  /** voz genérica desta pessoa (elenco de vozes) */
+  voice?: import("./voice").VoiceProfile | null;
 }
 
 export interface ChatMessage {
@@ -260,6 +264,8 @@ export interface ChatSceneProject {
   sound?: { enabled: boolean; volume: number };
   /** marca do criador sobre a cena */
   branding?: ChatSceneBranding;
+  /** falas, música e mixagem */
+  voiceMix?: import("./voice").VoiceMixSettings;
 }
 
 export const DEFAULT_TIMING: ChatSceneTiming = {
@@ -312,6 +318,7 @@ export function createParticipant(init: Partial<ChatParticipant> = {}): ChatPart
     isSelf: init.isSelf ?? false,
     color: init.color ?? "#7c5cff",
     avatarUrl: init.avatarUrl ?? null,
+    voice: init.voice ?? null,
   };
 }
 
@@ -364,6 +371,7 @@ export function createChatSceneProject(init: Partial<ChatSceneProject> = {}): Ch
     layout: init.layout ?? { ...DEFAULT_LAYOUT },
     sound: init.sound ?? { enabled: false, volume: 0.5 },
     branding: init.branding ?? { ...DEFAULT_BRANDING },
+    voiceMix: init.voiceMix ?? { ...DEFAULT_VOICE_MIX },
     participants: init.participants ?? [me, other],
     messages:
       init.messages ??
@@ -416,6 +424,7 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
     layout: { ...DEFAULT_LAYOUT, ...(raw.layout ?? {}) },
     sound: { enabled: false, volume: 0.5, ...(raw.sound ?? {}) },
     branding: { ...DEFAULT_BRANDING, ...(raw.branding ?? {}) },
+    voiceMix: { ...DEFAULT_VOICE_MIX, ...(raw.voiceMix ?? {}) },
   };
 }
 

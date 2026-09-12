@@ -6,6 +6,7 @@
  * Todo estado vive no documento `ChatSceneProject`; nenhuma cópia paralela.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowDown,
   ArrowUp,
@@ -32,6 +33,22 @@ import { saveChatSceneProject } from "@/lib/chatscene/project.service";
 import { uploadChatSceneMedia } from "@/lib/chatscene/upload";
 import { addFileToLibrary, readLibrary, type LibraryAsset } from "@/lib/chatscene/assets";
 import { MESSAGE_KINDS, messageKind, voiceSeconds } from "@/lib/chatscene/message-kinds";
+import { synthesizeVoice } from "@/lib/chatscene/voice.functions";
+import {
+  applyVoiceDurations,
+  createGatewayVoiceProvider,
+  generateCast,
+  speakingMessages,
+  type VoiceClip,
+} from "@/lib/chatscene/voice-cast";
+import { loadMusic, mixConversationAudio } from "@/lib/chatscene/audio-mix";
+import {
+  DEFAULT_VOICE,
+  DEFAULT_VOICE_MIX,
+  VOICE_PRESETS,
+  VOICE_STYLES,
+  type VoiceProfile,
+} from "@/lib/chatscene/voice";
 import { CHAT_THEMES } from "@/lib/chatscene/theme";
 import { loadLocalDraft, saveLocalDraft } from "@/lib/chatscene/serialize";
 import {
@@ -76,6 +93,10 @@ export function ChatSceneStudio() {
   const [uploading, setUploading] = useState<string | null>(null);
   /** mídia já enviada nesta conversa, para reaproveitar sem subir de novo */
   const [library, setLibrary] = useState<LibraryAsset[]>([]);
+  /** falas geradas, por mensagem */
+  const [clips, setClips] = useState<Map<string, VoiceClip>>(new Map());
+  const [castState, setCastState] = useState<"idle" | "running">("idle");
+  const [castProgress, setCastProgress] = useState({ done: 0, total: 0 });
   useEffect(() => {
     setLibrary(readLibrary());
   }, []);
@@ -274,6 +295,53 @@ export function ChatSceneStudio() {
     }
   }, [project, recordId]);
 
+  const speakFn = useServerFn(synthesizeVoice);
+  const voiceProvider = useMemo(
+    () => createGatewayVoiceProvider((input) => speakFn({ data: input })),
+    [speakFn],
+  );
+
+  /** Gera (ou reaproveita) a fala de todas as mensagens com voz escolhida. */
+  const handleGenerateVoices = useCallback(async () => {
+    const withVoice = speakingMessages(project).filter(
+      (m) => project.participants.find((p) => p.id === m.message.participantId)?.voice,
+    );
+    if (!withVoice.length) {
+      toast.error("Escolha uma voz para pelo menos uma pessoa da conversa.");
+      return;
+    }
+    setPlaying(false);
+    setCastState("running");
+    setCastProgress({ done: 0, total: withVoice.length });
+    try {
+      const result = await generateCast(project, voiceProvider, {
+        batch: 3,
+        onProgress: (p) => setCastProgress({ done: p.done, total: p.total }),
+      });
+      setClips((prev) => {
+        const next = new Map(prev);
+        for (const [id, clip] of result.clips) next.set(id, clip);
+        return next;
+      });
+      setProject((prev) => applyVoiceDurations(prev, result.durations));
+      if (result.failures.length) {
+        toast.warning(
+          `${result.generated} falas prontas, ${result.failures.length} não saíram: ${result.failures[0]!.reason}`,
+        );
+      } else {
+        toast.success(
+          result.reused
+            ? `${result.generated} falas novas e ${result.reused} reaproveitadas.`
+            : `${result.generated} falas prontas. O ritmo já acompanha a duração real.`,
+        );
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível gerar as vozes.");
+    } finally {
+      setCastState("idle");
+    }
+  }, [project, voiceProvider]);
+
   const handleExport = useCallback(async () => {
     if (!frameEncoderSupported()) {
       toast.error("Este navegador não exporta vídeo. Use o Chrome ou o Edge no computador.");
@@ -292,6 +360,19 @@ export function ChatSceneStudio() {
       const renderer = new CanvasConversationRenderer({ safeZones: false });
       await renderer.prepare(project);
       const { width, height } = renderSize(project.render);
+
+      // trilha: falas no tempo de cada bolha + música opcional por baixo
+      let audio: AudioBuffer | null = null;
+      const mix = project.voiceMix ?? DEFAULT_VOICE_MIX;
+      if (clips.size || mix.musicUrl) {
+        try {
+          const music = mix.musicUrl ? await loadMusic(mix.musicUrl) : null;
+          audio = await mixConversationAudio({ project, plan, clips, settings: mix, music });
+        } catch {
+          toast.warning("O vídeo sai sem som: não foi possível montar a trilha.");
+        }
+      }
+
       const blob = await encodeFrameSequence({
         width,
         height,
@@ -299,6 +380,7 @@ export function ChatSceneStudio() {
         totalFrames: plan.totalFrames,
         signal: controller.signal,
         onProgress: setProgress,
+        audio,
         draw: (ctx, index) => renderer.drawFrame(ctx, { width, height, frame: index, plan }),
       });
       const url = URL.createObjectURL(blob);
@@ -316,7 +398,7 @@ export function ChatSceneStudio() {
       setExporting(false);
       setProgress(0);
     }
-  }, [project, plan]);
+  }, [project, plan, clips]);
 
   const selectedMessage = project.messages.find((m) => m.id === selected) ?? null;
   const { width, height } = renderSize(project.render);
@@ -797,6 +879,136 @@ export function ChatSceneStudio() {
             </div>
 
             <div className="mt-3">
+              <p className="mono-label mb-1.5 text-muted-foreground">Vozes</p>
+              <p className="mb-2 text-[11px] text-muted-foreground">
+                Vozes sintéticas genéricas. Nada de imitar a voz de pessoas reais.
+              </p>
+              <div className="space-y-2">
+                {project.participants.map((p) => {
+                  const voice = p.voice ?? null;
+                  const setVoice = (changes: Partial<VoiceProfile> | null) =>
+                    patch({
+                      participants: project.participants.map((x) =>
+                        x.id === p.id
+                          ? { ...x, voice: changes ? { ...DEFAULT_VOICE, ...x.voice, ...changes } : null }
+                          : x,
+                      ),
+                    });
+                  return (
+                    <div key={p.id} className="rounded-lg border border-border bg-background/40 p-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="size-2.5 shrink-0 rounded-full" style={{ background: p.color }} />
+                        <span className="text-xs font-medium">{p.name}</span>
+                        <select
+                          value={voice?.presetId ?? ""}
+                          onChange={(e) => setVoice(e.target.value ? { presetId: e.target.value } : null)}
+                          className="ml-auto rounded-md border border-border bg-background px-1.5 py-1 text-xs"
+                          aria-label={`Voz de ${p.name}`}
+                        >
+                          <option value="">sem voz</option>
+                          {VOICE_PRESETS.map((v) => (
+                            <option key={v.id} value={v.id}>
+                              {v.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {voice && (
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                          <select
+                            value={voice.style}
+                            onChange={(e) => setVoice({ style: e.target.value as VoiceProfile["style"] })}
+                            className="flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs"
+                            aria-label={`Jeito de falar de ${p.name}`}
+                          >
+                            {VOICE_STYLES.map((v) => (
+                              <option key={v.id} value={v.id}>
+                                {v.label}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="range"
+                            min={0.8}
+                            max={1.2}
+                            step={0.05}
+                            value={voice.speed}
+                            onChange={(e) => setVoice({ speed: Number(e.target.value) })}
+                            className="w-20"
+                            aria-label={`Velocidade da fala de ${p.name}`}
+                          />
+                          <span className="w-10 text-right text-[11px] text-muted-foreground">
+                            {voice.speed.toFixed(2)}x
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <Button
+                size="sm"
+                variant="secondary"
+                className="mt-2 w-full"
+                disabled={castState === "running"}
+                onClick={() => void handleGenerateVoices()}
+              >
+                {castState === "running" ? (
+                  <>
+                    <Loader2 className="mr-1.5 size-4 animate-spin" />
+                    Gerando {castProgress.done}/{castProgress.total}
+                  </>
+                ) : (
+                  "Gerar as falas"
+                )}
+              </Button>
+              {clips.size > 0 && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {clips.size} falas prontas — elas entram no vídeo exportado.
+                </p>
+              )}
+
+              <div className="mt-2 space-y-1.5 text-xs">
+                <input
+                  value={project.voiceMix?.musicUrl ?? ""}
+                  onChange={(e) =>
+                    patch({
+                      voiceMix: { ...DEFAULT_VOICE_MIX, ...project.voiceMix, musicUrl: e.target.value || null },
+                    })
+                  }
+                  placeholder="música de fundo (endereço, uso permitido)"
+                  className="w-full rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none focus:border-primary"
+                  aria-label="Música de fundo"
+                />
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={project.voiceMix?.ducking ?? true}
+                    onChange={(e) =>
+                      patch({
+                        voiceMix: { ...DEFAULT_VOICE_MIX, ...project.voiceMix, ducking: e.target.checked },
+                      })
+                    }
+                  />
+                  abaixar a música enquanto alguém fala
+                </label>
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={project.voiceMix?.normalize ?? true}
+                    onChange={(e) =>
+                      patch({
+                        voiceMix: { ...DEFAULT_VOICE_MIX, ...project.voiceMix, normalize: e.target.checked },
+                      })
+                    }
+                  />
+                  deixar tudo no mesmo volume
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-3">
               <p className="mono-label mb-1.5 text-muted-foreground">Sua marca</p>
               <label className="flex items-center gap-1.5 text-xs">
                 <input
@@ -1013,15 +1225,17 @@ export function ChatSceneStudio() {
               <div>
                 <p className="mb-1 text-muted-foreground">Qualidade do vídeo</p>
                 <select
-                  value={project.render.height}
-                  onChange={(e) =>
-                    patch({ render: { ...project.render, height: Number(e.target.value) } })
-                  }
+                  value={`${project.render.height}x${project.render.fps}`}
+                  onChange={(e) => {
+                    const [h, f] = e.target.value.split("x").map(Number);
+                    patch({ render: { ...project.render, height: h!, fps: f! } });
+                  }}
                   className="w-full rounded-md border border-border bg-background px-2 py-1.5"
                   aria-label="Qualidade do vídeo"
                 >
-                  <option value={1280}>720p — rápido</option>
-                  <option value={1920}>1080p — recomendado</option>
+                  <option value="1280x30">720p 30 — mais rápido</option>
+                  <option value="1920x30">1080p 30 — recomendado</option>
+                  <option value="1920x60">1080p 60 — movimento mais suave</option>
                 </select>
               </div>
             </div>
