@@ -258,6 +258,8 @@ export interface ChatSceneProject {
   layout?: ChatSceneLayout;
   /** sons curtos de envio/recebimento na prévia */
   sound?: { enabled: boolean; volume: number };
+  /** marca do criador sobre a cena */
+  branding?: ChatSceneBranding;
 }
 
 export const DEFAULT_TIMING: ChatSceneTiming = {
