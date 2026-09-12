@@ -19,6 +19,8 @@ interface Props {
 export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPlaying }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [ready, setReady] = useState(false);
+  const frameRef = useRef(frame);
+  frameRef.current = frame;
   const renderer = useMemo(
     () => new CanvasConversationRenderer({ safeZones: project.render.safeZones }),
     [project.render.safeZones],
@@ -43,13 +45,13 @@ export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPla
     paintPreview(canvas, renderer, project, plan, frame);
   }, [renderer, project, plan, frame, ready]);
 
-  // relógio da reprodução: sempre derivado do tempo real, nunca acumulado
+  // relógio da reprodução: o quadro vem sempre do tempo real decorrido, nunca
+  // de um contador acumulado — assim a prévia não "escorrega" do vídeo final
   useEffect(() => {
     if (!playing) return;
     const startedAt = performance.now();
-    const startFrame = frame >= plan.totalFrames - 1 ? 0 : frame;
-    let raf = 0;
-    const tick = () => {
+    const startFrame = frameRef.current >= plan.totalFrames - 1 ? 0 : frameRef.current;
+    const id = setInterval(() => {
       const elapsed = (performance.now() - startedAt) / 1000;
       const next = startFrame + Math.round(elapsed * plan.fps);
       if (next >= plan.totalFrames - 1) {
@@ -58,12 +60,8 @@ export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPla
         return;
       }
       onFrame(next);
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-    // `frame` fora das dependências de propósito: ele muda a cada quadro
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, Math.max(16, Math.round(1000 / plan.fps)));
+    return () => clearInterval(id);
   }, [playing, plan, onFrame, onPlaying]);
 
   const { width, height } = renderSize(project.render);
