@@ -51,6 +51,8 @@ import {
   speakingMessages,
   type VoiceClip,
 } from "@/lib/chatscene/voice-cast";
+import { createMockVoiceProvider } from "@/lib/chatscene/voice-providers";
+import { effectiveVoice, voiceProfileOf } from "@/lib/chatscene/voice-resolution";
 
 import { loadMusic, mixConversationAudio } from "@/lib/chatscene/audio-mix";
 import { CAMERA_MODES, DEFAULT_CAMERA } from "@/lib/chatscene/camera";
@@ -102,7 +104,7 @@ const STUDIO_TABS: { id: StudioTab; label: string; icon: typeof Palette }[] = [
   { id: "mensagens", label: "Mensagens", icon: MessageSquare },
   { id: "tempo", label: "Linha do tempo", icon: Clock },
   { id: "fundo", label: "Fundo", icon: ImageIcon },
-  { id: "vozes", label: "Vozes", icon: Mic },
+  { id: "vozes", label: "Voice Cast", icon: Mic },
   { id: "estilo", label: "Estilo", icon: Palette },
   { id: "exportar", label: "Exportar", icon: Download },
 ];
@@ -417,6 +419,7 @@ export function ChatSceneStudio() {
     () => createGatewayVoiceProvider((input) => speakFn({ data: input })),
     [speakFn],
   );
+  const mockVoiceProvider = useMemo(() => createMockVoiceProvider(), []);
 
   /** Ouve uma frase curta com a voz, o jeito de falar e o tom escolhidos. */
   const stopPreviewRef = useRef<(() => void) | null>(null);
@@ -427,21 +430,24 @@ export function ChatSceneStudio() {
       stopPreviewRef.current = null;
       setPreviewingVoice(participantId);
       try {
-        stopPreviewRef.current = await previewVoice(voiceProvider, profile);
+        stopPreviewRef.current = await previewVoice(mockVoiceProvider, profile);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Não foi possível ouvir esta voz.");
       } finally {
         setPreviewingVoice(null);
       }
     },
-    [voiceProvider],
+    [mockVoiceProvider],
   );
   useEffect(() => () => stopPreviewRef.current?.(), []);
 
   /** Gera (ou reaproveita) a fala de todas as mensagens com voz escolhida. */
   const handleGenerateVoices = useCallback(async () => {
     const withVoice = speakingMessages(project).filter(
-      (m) => project.participants.find((p) => p.id === m.message.participantId)?.voice,
+      (m) => {
+        const participant = project.participants.find((p) => p.id === m.message.participantId);
+        return participant ? voiceProfileOf(project, participant) : null;
+      },
     );
     if (!withVoice.length) {
       toast.error("Escolha uma voz para pelo menos uma pessoa da conversa.");
@@ -492,9 +498,9 @@ export function ChatSceneStudio() {
         });
         setProject((prev) => {
           const message = prev.messages.find((m) => m.id === messageId);
-          const author = message ? participantOf(prev, message.participantId) : null;
+          const voice = message ? effectiveVoice(prev, message) : null;
           return applyVoiceDurations(prev, {
-            [messageId]: clipDurationMs(clip, author?.voice ?? null),
+            [messageId]: clipDurationMs(clip, voice?.profile ?? null),
           });
         });
         toast.success("Áudio aplicado — o tempo da mensagem já acompanha a fala.");
@@ -522,8 +528,8 @@ export function ChatSceneStudio() {
       if (!clip) return;
       stopPreviewRef.current?.();
       const message = project.messages.find((m) => m.id === messageId);
-      const author = message ? participantOf(project, message.participantId) : null;
-      const stop = playClip(clip, author?.voice ?? null);
+      const voice = message ? effectiveVoice(project, message) : null;
+      const stop = playClip(clip, voice?.profile ?? null);
       setPlayingClip(messageId);
       stopPreviewRef.current = () => {
         stop();
@@ -829,6 +835,33 @@ export function ChatSceneStudio() {
                       suffix="ms"
                       onChange={(v) => updateMessage(selectedMessage.id, { delayMs: v || null })}
                     />
+                    <div className="rounded-lg border border-border bg-background/35 p-2.5">
+                      <label className="flex items-center gap-2 font-medium">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(selectedMessage.voiceDirection)}
+                          onChange={(e) => updateMessage(selectedMessage.id, {
+                            voiceDirection: e.target.checked
+                              ? { emotion: "neutral", speedMultiplier: 1, energyMultiplier: 1, pauseBeforeMs: 0, pauseAfterMs: 0 }
+                              : null,
+                          })}
+                        />
+                        Direção de voz desta mensagem
+                      </label>
+                      {selectedMessage.voiceDirection ? (
+                        <div className="mt-2 space-y-2">
+                          <select
+                            value={selectedMessage.voiceDirection.emotion ?? "neutral"}
+                            onChange={(e) => updateMessage(selectedMessage.id, { voiceDirection: { ...selectedMessage.voiceDirection, emotion: e.target.value as import("@/lib/chatscene/voice").VoiceEmotion } })}
+                            className="w-full rounded-md border border-border bg-background px-2 py-1.5"
+                            aria-label="Emoção desta mensagem"
+                          >
+                            <option value="neutral">Neutra</option><option value="happy">Feliz</option><option value="excited">Empolgada</option><option value="serious">Séria</option><option value="nervous">Nervosa</option><option value="annoyed">Incomodada</option><option value="angry-theatrical">Brava teatral</option><option value="sad">Triste</option><option value="sarcastic">Sarcástica</option><option value="surprised">Surpresa</option><option value="whisper-like">Como segredo</option>
+                          </select>
+                          <Range label="Velocidade da fala" value={selectedMessage.voiceDirection.speedMultiplier ?? 1} min={0.7} max={1.3} step={0.05} suffix="×" onChange={(v) => updateMessage(selectedMessage.id, { voiceDirection: { ...selectedMessage.voiceDirection, speedMultiplier: v } })} />
+                        </div>
+                      ) : null}
+                    </div>
                     <Range
                       label="“Digitando…” só desta mensagem"
                       value={selectedMessage.typingMs ?? project.timing.typingMs}
