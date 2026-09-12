@@ -1414,6 +1414,21 @@ export function ChatSceneStudio() {
             )}
           </section>
         )}
+
+        {/* ------------------------------------------------ linha do tempo */}
+        <div className="lg:col-span-2 xl:col-span-3">
+          <ChatSceneTimeline
+            project={project}
+            plan={plan}
+            frame={frame}
+            selected={selected}
+            onSeek={(f) => {
+              setPlaying(false);
+              setFrame(f);
+            }}
+            onSelect={setSelected}
+          />
+        </div>
       </div>
     </div>
   );
