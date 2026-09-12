@@ -1381,6 +1381,12 @@ export function ChatSceneStudio() {
                   aria-label="Hora inicial da conversa"
                 />
               </div>
+              <MusicPanel
+                project={project}
+                patch={patch}
+                uploading={uploading}
+                onUpload={(file) => void handleMusic(file)}
+              />
               <div>
                 <p className="mb-1 text-muted-foreground">Qualidade do vídeo</p>
                 <select
