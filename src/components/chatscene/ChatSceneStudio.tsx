@@ -74,6 +74,23 @@ export function ChatSceneStudio() {
   const plan = useMemo(() => buildPlan(project), [project]);
   const isGroup = (project.chatKind ?? "direct") === "group";
 
+  // rascunho no próprio navegador: atualizar a página não perde o trabalho
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    const draft = loadLocalDraft();
+    if (draft) {
+      setProject(draft.project);
+      setRecordId(draft.recordId);
+    }
+  }, []);
+  useEffect(() => {
+    if (!restored.current) return;
+    const id = setTimeout(() => saveLocalDraft(project, recordId), 600);
+    return () => clearTimeout(id);
+  }, [project, recordId]);
+
   useEffect(() => {
     if (frame > plan.totalFrames - 1) setFrame(plan.totalFrames - 1);
   }, [plan.totalFrames, frame]);
