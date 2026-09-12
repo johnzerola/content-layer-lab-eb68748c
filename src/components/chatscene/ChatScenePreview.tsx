@@ -51,7 +51,8 @@ export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPla
     if (!playing) return;
     const startedAt = performance.now();
     const startFrame = frameRef.current >= plan.totalFrames - 1 ? 0 : frameRef.current;
-    const id = setInterval(() => {
+    let raf = 0;
+    const tick = () => {
       const elapsed = (performance.now() - startedAt) / 1000;
       const next = startFrame + Math.round(elapsed * plan.fps);
       if (next >= plan.totalFrames - 1) {
@@ -60,9 +61,12 @@ export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPla
         return;
       }
       onFrame(next);
-    }, Math.max(16, Math.round(1000 / plan.fps)));
-    return () => clearInterval(id);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, [playing, plan, onFrame, onPlaying]);
+
 
   const { width, height } = renderSize(project.render);
   const seconds = (frame / plan.fps).toFixed(1);
