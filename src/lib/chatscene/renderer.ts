@@ -77,7 +77,7 @@ export class CanvasConversationRenderer implements ConversationRenderer {
     if (!project) return;
     const theme = resolveTheme(project.themeId, project.dark);
     paintFrame(target, project, theme, ctx.plan, ctx.frame, ctx.width, ctx.height, {
-      images: this.images,
+      media: this.media,
       safeZones: this.options.safeZones ?? false,
     });
   }
