@@ -26,6 +26,7 @@ import {
 import { toast } from "sonner";
 import { Button, Input } from "@/components/ui/base";
 import { ChatScenePreview } from "@/components/chatscene/ChatScenePreview";
+import { ChatSceneTimeline } from "@/components/chatscene/ChatSceneTimeline";
 import { buildPlan } from "@/lib/chatscene/clock";
 import { encodeFrameSequence, frameEncoderSupported } from "@/lib/chatscene/encode-frames";
 import { CanvasConversationRenderer } from "@/lib/chatscene/renderer";

@@ -89,7 +89,7 @@ export function ChatSceneTimeline({
             <span
               key={s}
               className="absolute top-0 h-full border-l border-border/70 pl-1 text-[9px] text-muted-foreground"
-              style={{ left: pct((s * plan.fps * 1000) / (plan.durationMs || 1) / plan.fps * plan.totalFrames) }}
+              style={{ left: pct(s * plan.fps) }}
             >
               {fmt(s)}
             </span>
