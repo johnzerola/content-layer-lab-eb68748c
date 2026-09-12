@@ -463,6 +463,8 @@ function drawHeader(
   width: number,
   m: Metrics,
   media?: Map<string, LoadedMedia>,
+  /** nome de quem está digitando neste quadro; troca o status do topo */
+  typingName?: string | null,
 ) {
   const custom = project.header;
   const style = custom?.style ?? "messenger";
@@ -489,12 +491,17 @@ function drawHeader(
     (isGroup
       ? project.groupName || project.title || "Grupo"
       : peers[0]?.name ?? project.participants[0]?.name ?? "Conversa");
-  const subtitle =
+  const baseSubtitle =
     custom?.subtitle != null
       ? custom.subtitle
       : isGroup
         ? peers.map((p) => p.name).join(", ") || "conversa em grupo"
         : "online";
+  const subtitle = typingName
+    ? isGroup
+      ? `${typingName} está digitando…`
+      : "digitando…"
+    : baseSubtitle;
 
   const textColor = custom?.textColor || theme.headerText;
   const mutedColor = custom?.textColor || theme.headerMuted;
@@ -761,6 +768,18 @@ export function paintFrame(
     ctx.restore();
   }
 
+  // sombra suave e borda fina: separa o cartão do vídeo de fundo
+  if (inset) {
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = Math.round(width * 0.035);
+    ctx.shadowOffsetY = Math.round(width * 0.012);
+    ctx.fillStyle = theme.wallpaper;
+    roundRect(ctx, rect.x, rect.y, rect.w, rect.h, rect.radius);
+    ctx.fill();
+    ctx.restore();
+  }
+
   ctx.save();
   ctx.translate(rect.x, rect.y);
   if (rect.radius > 0) {
@@ -786,6 +805,16 @@ export function paintFrame(
   );
   ctx.globalAlpha = 1;
   ctx.restore();
+
+  if (inset) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.lineWidth = Math.max(1, Math.round(width * 0.0018));
+    roundRect(ctx, rect.x, rect.y, rect.w, rect.h, rect.radius);
+    ctx.stroke();
+    ctx.restore();
+  }
+
 
   if (moving) ctx.restore();
 
@@ -912,6 +941,10 @@ function paintConversation(
   ctx.rect(0, headerH, width, height - headerH);
   ctx.clip();
 
+  // destaque: quando a mensagem recém-chegada é um momento de peso, ela cresce
+  // um pouco e as anteriores escurecem, como nos vídeos virais
+  const spotlight = last?.emphasis === true ? last : null;
+
   for (const item of layout.items) {
     const entry = plan.byId[item.message.id];
     const age = entry ? frame - entry.appearFrame : 0;
@@ -920,8 +953,10 @@ function paintConversation(
     const rise = anim.dy * Math.round(34 * m.scale);
     const y = offsetY + item.y + rise;
     const seconds = Math.max(0, age) / plan.fps;
-    ctx.globalAlpha = anim.alpha;
-    const scale = anim.scale;
+    const isSpot = spotlight != null && item.message.id === spotlight.id;
+    const spotT = spotlight ? Math.max(0, Math.min(1, t)) : 0;
+    ctx.globalAlpha = anim.alpha * (spotlight && !isSpot ? 1 - 0.55 * spotT : 1);
+    const scale = anim.scale * (isSpot ? 1 + 0.06 * spotT : 1);
     const scaling = Math.abs(scale - 1) > 0.001;
     if (scaling) {
       ctx.save();
@@ -931,6 +966,7 @@ function paintConversation(
       ctx.scale(scale, scale);
       ctx.translate(-px, -py);
     }
+
 
 
 
@@ -997,11 +1033,17 @@ function paintConversation(
       ctx.fillText(item.name, item.x + Math.round(8 * m.scale), y - Math.round(8 * m.scale));
     }
 
-    // bolha com rabinho apontando para o autor
+    // bolha com rabinho apontando para o autor, com sombra suave
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.28)";
+    ctx.shadowBlur = Math.round(10 * m.scale);
+    ctx.shadowOffsetY = Math.round(3 * m.scale);
     ctx.fillStyle = item.isSelf ? theme.selfBubble : theme.peerBubble;
     const radius = Math.min(item.height, Math.round(70 * m.scale)) * theme.radius * 1.6;
     roundRect(ctx, item.x, y, item.width, item.height, radius);
     ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = item.isSelf ? theme.selfBubble : theme.peerBubble;
     if (theme.tail) {
       const tw = Math.round(16 * m.scale);
       ctx.beginPath();
@@ -1170,6 +1212,9 @@ function paintConversation(
 
   ctx.restore();
 
-  if (headerVisible) drawHeader(ctx, project, theme, width, m, media);
+  if (headerVisible) {
+    const typingName = typing ? participantOf(project, typing.participantId).name : null;
+    drawHeader(ctx, project, theme, width, m, media, typingName);
+  }
 }
 

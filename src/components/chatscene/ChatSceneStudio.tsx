@@ -66,10 +66,12 @@ import {
 } from "@/lib/chatscene/voice";
 import { CHAT_THEMES } from "@/lib/chatscene/theme";
 import { loadLocalDraft, saveLocalDraft } from "@/lib/chatscene/serialize";
+import { parseConversationScript } from "@/lib/chatscene/import-script";
 import {
   ANIMATION_PRESETS,
   BACKGROUND_PRESETS,
   DEFAULT_BRANDING,
+  DEFAULT_LAYOUT,
   DEFAULT_HEADER,
   CREATOR_LAYOUTS,
   LAYOUT_PRESETS,
@@ -110,6 +112,7 @@ function slugify(text: string): string {
 export function ChatSceneStudio() {
   const [project, setProject] = useState<ChatSceneProject>(() => createChatSceneProject());
   const [recordId, setRecordId] = useState<string | null>(null);
+  const [script, setScript] = useState("");
   const [studio, setStudio] = useState(false);
   const [frame, setFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -294,6 +297,22 @@ export function ChatSceneStudio() {
       return { ...prev, messages: [...prev.messages, message] };
     });
   }, []);
+
+  const importScript = useCallback(() => {
+    const text = script;
+    if (!text.trim()) return;
+    setProject((prev) => {
+      const parsed = parseConversationScript(text, prev);
+      if (!parsed.messages.length) return prev;
+      return {
+        ...prev,
+        participants: parsed.participants,
+        messages: [...prev.messages, ...parsed.messages],
+      };
+    });
+    setScript("");
+    toast.success("Conversa adicionada.");
+  }, [script]);
 
   const removeMessage = useCallback((id: string) => {
     setProject((prev) => ({ ...prev, messages: prev.messages.filter((m) => m.id !== id) }));
@@ -860,6 +879,32 @@ export function ChatSceneStudio() {
             <Plus className="mr-1.5 size-4" />
             Nova mensagem
           </Button>
+
+          {/* colar a conversa inteira de uma vez */}
+          <div className="mt-3 rounded-xl border border-border p-3">
+            <label className="text-xs font-medium text-muted-foreground" htmlFor="chatscene-script">
+              Colar conversa pronta
+            </label>
+            <textarea
+              id="chatscene-script"
+              value={script}
+              onChange={(e) => setScript(e.target.value)}
+              rows={4}
+              placeholder={"Ana: oi, tudo bem?\nBruno: tudo! e você?\n* Ana entrou no grupo"}
+              className="mt-2 w-full resize-y rounded-lg border border-border bg-background p-2 text-sm"
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-2 w-full"
+              disabled={!script.trim()}
+              onClick={importScript}
+            >
+              <Plus className="mr-1.5 size-4" />
+              Adicionar à conversa
+            </Button>
+          </div>
+
         </section>
 
         {/* ----------------------------------------------------------- prévia */}
@@ -1056,7 +1101,72 @@ export function ChatSceneStudio() {
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Use apenas vídeos seus ou com permissão de uso.
               </p>
+
+              {/* ajuste fino do fundo: aproximar, subir/descer e desfocar */}
+              <div className="mt-2 space-y-2">
+                <label className="block text-[11px] text-muted-foreground">
+                  Aproximar fundo
+                  <input
+                    type="range"
+                    min={1}
+                    max={2}
+                    step={0.01}
+                    value={project.layout?.backgroundScale ?? 1}
+                    onChange={(e) =>
+                      patch({
+                        layout: {
+                          ...(project.layout ?? DEFAULT_LAYOUT),
+                          backgroundScale: Number(e.target.value),
+                        },
+                      })
+                    }
+                    className="mt-1 w-full"
+                    aria-label="Aproximar fundo"
+                  />
+                </label>
+                <label className="block text-[11px] text-muted-foreground">
+                  Subir ou descer fundo
+                  <input
+                    type="range"
+                    min={-0.3}
+                    max={0.3}
+                    step={0.01}
+                    value={project.layout?.backgroundOffsetY ?? 0}
+                    onChange={(e) =>
+                      patch({
+                        layout: {
+                          ...(project.layout ?? DEFAULT_LAYOUT),
+                          backgroundOffsetY: Number(e.target.value),
+                        },
+                      })
+                    }
+                    className="mt-1 w-full"
+                    aria-label="Subir ou descer fundo"
+                  />
+                </label>
+                <label className="block text-[11px] text-muted-foreground">
+                  Desfoque do fundo
+                  <input
+                    type="range"
+                    min={0}
+                    max={30}
+                    step={1}
+                    value={project.layout?.backgroundBlur ?? 0}
+                    onChange={(e) =>
+                      patch({
+                        layout: {
+                          ...(project.layout ?? DEFAULT_LAYOUT),
+                          backgroundBlur: Number(e.target.value),
+                        },
+                      })
+                    }
+                    className="mt-1 w-full"
+                    aria-label="Desfoque do fundo"
+                  />
+                </label>
+              </div>
             </div>
+
 
 
             <div className="mt-3">
