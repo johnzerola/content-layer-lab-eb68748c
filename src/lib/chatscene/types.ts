@@ -101,6 +101,10 @@ export const DEFAULT_BACKGROUND: ChatSceneBackground = { kind: "theme" };
 /** Fundos prontos, para escolher com um clique. */
 export const BACKGROUND_PRESETS: { id: string; label: string; value: ChatSceneBackground }[] = [
   { id: "theme", label: "Do tema", value: { kind: "theme" } },
+  { id: "neon-city", label: "Cidade Neon", value: { kind: "video", videoUrl: "/chatscene/backgrounds/neon-city.mp4", loop: true } },
+  { id: "forest-run", label: "Floresta", value: { kind: "video", videoUrl: "/chatscene/backgrounds/forest-run.mp4", loop: true } },
+  { id: "lava-cave", label: "Caverna Lava", value: { kind: "video", videoUrl: "/chatscene/backgrounds/lava-cave.mp4", loop: true } },
+  { id: "ocean-drift", label: "Oceano", value: { kind: "video", videoUrl: "/chatscene/backgrounds/ocean-drift.mp4", loop: true } },
   { id: "noite", label: "Noite", value: { kind: "gradient", color: "#141428", colorB: "#2b1b4d" } },
   { id: "aurora", label: "Aurora", value: { kind: "gradient", color: "#0d2b3e", colorB: "#1f6f6b" } },
   { id: "pessego", label: "Pêssego", value: { kind: "gradient", color: "#ffd9c0", colorB: "#ff9db0" } },
