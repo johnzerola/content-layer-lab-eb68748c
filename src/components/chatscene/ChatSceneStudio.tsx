@@ -726,6 +726,108 @@ export function ChatSceneStudio() {
                 className="mt-1.5 w-full rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none focus:border-primary"
                 aria-label="Foto de fundo"
               />
+              <div className="mt-1.5 flex items-center gap-1.5">
+                <label className="flex cursor-pointer items-center gap-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs hover:border-primary">
+                  {uploading === "background" ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="size-3.5" />
+                  )}
+                  Vídeo de fundo
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="video/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) void handleBackgroundVideo(file);
+                    }}
+                  />
+                </label>
+                <input
+                  value={project.background?.kind === "video" ? project.background.videoUrl ?? "" : ""}
+                  onChange={(e) =>
+                    patch({
+                      background: e.target.value
+                        ? { kind: "video", videoUrl: e.target.value, loop: true }
+                        : { kind: "theme" },
+                    })
+                  }
+                  placeholder="ou endereço do vídeo em laço"
+                  className="min-w-[120px] flex-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none focus:border-primary"
+                  aria-label="Vídeo de fundo"
+                />
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Use apenas vídeos seus ou com permissão de uso.
+              </p>
+            </div>
+
+            <div className="mt-3">
+              <p className="mono-label mb-1.5 text-muted-foreground">Sua marca</p>
+              <label className="flex items-center gap-1.5 text-xs">
+                <input
+                  type="checkbox"
+                  checked={project.branding?.enabled ?? false}
+                  onChange={(e) =>
+                    patch({ branding: { ...DEFAULT_BRANDING, ...project.branding, enabled: e.target.checked } })
+                  }
+                />
+                mostrar meu @ e logo no vídeo
+              </label>
+              {project.branding?.enabled && (
+                <div className="mt-1.5 space-y-1.5">
+                  <input
+                    value={project.branding.handle}
+                    onChange={(e) =>
+                      patch({ branding: { ...DEFAULT_BRANDING, ...project.branding, handle: e.target.value } })
+                    }
+                    placeholder="@seuperfil"
+                    className="w-full rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none focus:border-primary"
+                    aria-label="Seu @"
+                  />
+                  <div className="flex items-center gap-1.5">
+                    <label className="flex cursor-pointer items-center gap-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs hover:border-primary">
+                      {uploading === "logo" ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="size-3.5" />
+                      )}
+                      Logo
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = "";
+                          if (file) void handleLogo(file);
+                        }}
+                      />
+                    </label>
+                    <select
+                      value={project.branding.position}
+                      onChange={(e) =>
+                        patch({
+                          branding: {
+                            ...DEFAULT_BRANDING,
+                            ...project.branding,
+                            position: e.target.value as NonNullable<typeof project.branding>["position"],
+                          },
+                        })
+                      }
+                      className="flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs"
+                      aria-label="Posição da marca"
+                    >
+                      <option value="bottom-right">canto inferior direito</option>
+                      <option value="bottom-left">canto inferior esquerdo</option>
+                      <option value="top-right">canto superior direito</option>
+                      <option value="top-left">canto superior esquerdo</option>
+                    </select>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="mt-3">
@@ -927,6 +1029,39 @@ export function ChatSceneStudio() {
                   suffix="ms"
                   onChange={(v) => updateMessage(selectedMessage.id, { pauseAfterMs: v })}
                 />
+                {messageKind(selectedMessage.kind).canReply && (
+                  <div>
+                    <p className="mb-1 text-muted-foreground">Responder a</p>
+                    <select
+                      value={selectedMessage.replyToId ?? ""}
+                      onChange={(e) =>
+                        updateMessage(selectedMessage.id, { replyToId: e.target.value || null })
+                      }
+                      className="w-full rounded-md border border-border bg-background px-2 py-1.5"
+                      aria-label="Responder a outra mensagem"
+                    >
+                      <option value="">nenhuma</option>
+                      {project.messages
+                        .filter((q) => q.id !== selectedMessage.id && q.kind !== "system")
+                        .map((q) => (
+                          <option key={q.id} value={q.id}>
+                            {(q.text || messageKind(q.kind).label).slice(0, 40)}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
+                {selectedMessage.kind === "voice" && (
+                  <Range
+                    label="Duração do recado de voz"
+                    value={Math.round(voiceSeconds(selectedMessage))}
+                    min={1}
+                    max={120}
+                    step={1}
+                    suffix="s"
+                    onChange={(v) => updateMessage(selectedMessage.id, { durationSec: v })}
+                  />
+                )}
                 <label className="flex items-center gap-1.5">
                   <input
                     type="checkbox"
