@@ -994,75 +994,63 @@ export function ChatSceneStudio() {
 
           {tab === "fundo" && (
             <div>
-              <p className="mono-label mb-1.5 text-muted-foreground">Fundo</p>
-              <div className="grid grid-cols-3 gap-1.5">
+              <p className="mono-label mb-1.5 text-muted-foreground">Galeria de fundos</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {BACKGROUND_PRESETS.map((b) => {
                   const active =
                     (project.background?.kind ?? "theme") === b.value.kind &&
-                    (project.background?.color ?? null) === (b.value.color ?? null);
+                    (project.background?.color ?? null) === (b.value.color ?? null) &&
+                    (project.background?.videoUrl ?? null) === (b.value.videoUrl ?? null);
                   return (
                     <button
                       key={b.id}
                       type="button"
                       onClick={() => patch({ background: { ...b.value } })}
-                      className={`rounded-lg border px-2 py-1.5 text-xs transition ${
+                      className={`group overflow-hidden rounded-lg border text-left text-xs transition ${
                         active ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
                       }`}
                     >
-                      {b.label}
+                      <span className="relative block aspect-[9/12] overflow-hidden bg-muted">
+                        {b.value.kind === "video" && b.value.videoUrl ? (
+                          <video src={b.value.videoUrl} muted loop autoPlay playsInline preload="metadata" className="size-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                        ) : b.value.kind === "gradient" ? (
+                          <span className="block size-full" style={{ background: `linear-gradient(145deg, ${b.value.color}, ${b.value.colorB})` }} />
+                        ) : b.value.kind === "solid" ? (
+                          <span className="block size-full" style={{ backgroundColor: b.value.color ?? undefined }} />
+                        ) : (
+                          <span className="grid size-full place-items-center bg-secondary text-muted-foreground">Tema</span>
+                        )}
+                        {active ? <span className="absolute right-1.5 top-1.5 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold text-primary-foreground">ATIVO</span> : null}
+                      </span>
+                      <span className="block px-2 py-1.5 font-medium">{b.label}</span>
                     </button>
                   );
                 })}
               </div>
-              <input
-                value={project.background?.kind === "image" ? project.background.imageUrl ?? "" : ""}
-                onChange={(e) =>
-                  patch({
-                    background: e.target.value
-                      ? { kind: "image", imageUrl: e.target.value }
-                      : { kind: "theme" },
-                  })
-                }
-                placeholder="ou cole a foto de fundo (https://…)"
-                className="mt-1.5 w-full rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none focus:border-primary"
-                aria-label="Foto de fundo"
-              />
-              <div className="mt-1.5 flex items-center gap-1.5">
-                <label className="flex cursor-pointer items-center gap-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs hover:border-primary">
-                  {uploading === "background" ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Upload className="size-3.5" />
-                  )}
-                  Vídeo de fundo
+              <div className="mt-3 grid gap-3 rounded-lg border border-border bg-background/35 p-3 sm:grid-cols-2">
+                <label className="flex items-center justify-between gap-3 text-xs">
+                  Repetir vídeo
                   <input
-                    type="file"
-                    className="hidden"
-                    accept="video/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      e.target.value = "";
-                      if (file) void handleBackgroundVideo(file);
-                    }}
+                    type="checkbox"
+                    checked={project.background?.kind === "video" ? project.background.loop !== false : false}
+                    disabled={project.background?.kind !== "video"}
+                    onChange={(e) => project.background?.kind === "video" && patch({ background: { ...project.background, loop: e.target.checked } })}
                   />
                 </label>
-                <input
-                  value={project.background?.kind === "video" ? project.background.videoUrl ?? "" : ""}
-                  onChange={(e) =>
-                    patch({
-                      background: e.target.value
-                        ? { kind: "video", videoUrl: e.target.value, loop: true }
-                        : { kind: "theme" },
-                    })
-                  }
-                  placeholder="ou endereço do vídeo em laço"
-                  className="min-w-[120px] flex-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none focus:border-primary"
-                  aria-label="Vídeo de fundo"
-                />
+                <label className="text-xs text-muted-foreground">
+                  <span className="mb-1 flex justify-between"><span>Desfoque</span><span>{project.layout?.backgroundBlur ?? 0}px</span></span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={32}
+                    step={1}
+                    value={project.layout?.backgroundBlur ?? 0}
+                    onChange={(e) => patch({ layout: { ...(project.layout ?? DEFAULT_LAYOUT), backgroundBlur: Number(e.target.value) } })}
+                    className="w-full accent-primary"
+                    aria-label="Desfoque do fundo"
+                  />
+                </label>
               </div>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Use apenas vídeos seus ou com permissão de uso.
-              </p>
 
               <div className="mt-2 space-y-2">
                 <label className="block text-[11px] text-muted-foreground">
