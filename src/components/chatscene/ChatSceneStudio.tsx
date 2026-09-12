@@ -30,7 +30,7 @@ import { encodeFrameSequence, frameEncoderSupported } from "@/lib/chatscene/enco
 import { CanvasConversationRenderer } from "@/lib/chatscene/renderer";
 import { saveChatSceneProject } from "@/lib/chatscene/project.service";
 import { uploadChatSceneMedia } from "@/lib/chatscene/upload";
-import { addFileToLibrary, readLibrary, removeAsset, type LibraryAsset } from "@/lib/chatscene/assets";
+import { addFileToLibrary, readLibrary, type LibraryAsset } from "@/lib/chatscene/assets";
 import { MESSAGE_KINDS, messageKind, voiceSeconds } from "@/lib/chatscene/message-kinds";
 import { CHAT_THEMES } from "@/lib/chatscene/theme";
 import { loadLocalDraft, saveLocalDraft } from "@/lib/chatscene/serialize";
