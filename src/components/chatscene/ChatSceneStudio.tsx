@@ -295,6 +295,22 @@ export function ChatSceneStudio() {
     });
   }, []);
 
+  const importScript = useCallback(() => {
+    const text = script;
+    if (!text.trim()) return;
+    setProject((prev) => {
+      const parsed = parseConversationScript(text, prev);
+      if (!parsed.messages.length) return prev;
+      return {
+        ...prev,
+        participants: parsed.participants,
+        messages: [...prev.messages, ...parsed.messages],
+      };
+    });
+    setScript("");
+    toast.success("Conversa adicionada.");
+  }, [script]);
+
   const removeMessage = useCallback((id: string) => {
     setProject((prev) => ({ ...prev, messages: prev.messages.filter((m) => m.id !== id) }));
   }, []);
