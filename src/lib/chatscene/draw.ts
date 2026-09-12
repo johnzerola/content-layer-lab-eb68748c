@@ -10,6 +10,7 @@ import { typingAt } from "./clock";
 import { mediaFrameAt, type LoadedMedia } from "./media";
 import type { ChatTheme } from "./theme";
 import {
+  DEFAULT_LAYOUT,
   messageClock,
   participantOf,
   type ChatMessage,
