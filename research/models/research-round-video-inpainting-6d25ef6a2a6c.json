@@ -1,0 +1,11 @@
+{
+  "id": "research-round-video-inpainting-6d25ef6a2a6c",
+  "title": "Research round: video-inpainting",
+  "body": "{\"source\": {\"url\": \"https://huggingface.co/api/models?search=video-inpainting&limit=5&full=true\", \"retrieved_at\": \"2026-09-10T15:45:57.168638+00:00\", \"sha256\": \"bc892deeba7114c896f359c22104e3a267e0513a65cb0de8ab9db340674d6664\", \"cached\": false}, \"models\": [{\"id\": \"yeates/DMT-VideoInpainting\", \"sha\": \"24a52126acd3058e5be039c3189a676073d6b25b\", \"pipeline_tag\": null, \"tags\": [\"license:apache-2.0\", \"region:us\"], \"library_name\": null, \"cardData\": null, \"gated\": false}, {\"id\": \"ahmedghani/video-inpainting-checkpoints\", \"sha\": \"f173f558d43647f71040e14ec5cf8df9ea6658c6\", \"pipeline_tag\": null, \"tags\": [\"region:us\"], \"library_name\": null, \"cardData\": null, \"gated\": false}, {\"id\": \"ilmj8426/general-video-inpainting-gan\", \"sha\": \"66c41d060de9921702cc59956b7397fd1cf0572c\", \"pipeline_tag\": \"video-to-video\", \"tags\": [\"video-inpainting\", \"gan\", \"deep-learning\", \"computer-vision\", \"spatiotemporal-consistency\", \"pytorch\", \"video-to-video\", \"license:apache-2.0\", \"region:us\"], \"library_name\": null, \"cardData\": null, \"gated\": false}], \"measurement_fields\": {\"vram\": null, \"speed\": null, \"quality\": null}, \"coverage\": \"Hugging Face metadata; ModelScope and benchmark requirements need separate review\"}",
+  "sources": [
+    "https://huggingface.co/api/models?search=video-inpainting&limit=5&full=true"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-10T15:45:57.173858+00:00",
+  "category": "models"
+}

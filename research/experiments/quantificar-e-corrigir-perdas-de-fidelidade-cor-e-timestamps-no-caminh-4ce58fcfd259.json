@@ -1,0 +1,12 @@
+{
+  "id": "quantificar-e-corrigir-perdas-de-fidelidade-cor-e-timestamps-no-caminh-4ce58fcfd259",
+  "title": "Quantificar e corrigir perdas de fidelidade, cor e timestamps no caminho SOURCE -> backend-equivalent -> delivery sem IA, sem alterar reconstrução.",
+  "body": "{\"problem\": \"Quantificar e corrigir perdas de fidelidade, cor e timestamps no caminho SOURCE -> backend-equivalent -> delivery sem IA, sem alterar reconstrução.\", \"hypothesis\": \"Um contrato colorimétrico explícito e a remoção isolada de uma recodificação intermediária reduzem em pelo menos 15% o MAE externo, mantêm |Y' bias| <= 0.25 no roundtrip controlado e preservam SSIM, gradiente, grade e PTS.\", \"baseline\": \"Helpers reais atuais: slice_video CRF16 yuv420p; scene cut CRF0 yuv420p; compositor maskedmerge CRF16 yuv420p; trim_edges CRF16 yuv420p.\", \"change\": \"Harness isolado com decode/encode simétrico, metadados completos e braços que eliminam exatamente uma recodificação por vez. Nenhuma mudança no backend de produção.\", \"dataset\": \"Clipe atual + duas fontes independentes curtas, incluindo baixa luz + rampas/barras conhecidas determinísticas.\", \"metrics\": [\"YUV plane MAE\", \"RGB MAE\", \"PSNR\", \"SSIM luma\", \"luma bias\", \"gradient preservation\", \"edge preservation\", \"approximate DeltaE76\", \"histograms\", \"PTS/timebase\", \"encode count\", \"file size\", \"runtime\"], \"status\": \"DESIGNED\", \"result\": null, \"production_changes\": false}",
+  "sources": [
+    "Helpers reais atuais: slice_video CRF16 yuv420p; scene cut CRF0 yuv420p; compositor maskedmerge CRF16 yuv420p; trim_edges CRF16 yuv420p.",
+    "Clipe atual + duas fontes independentes curtas, incluindo baixa luz + rampas/barras conhecidas determinísticas."
+  ],
+  "evidence": "HYPOTHESIS",
+  "recorded_at": "2026-09-11T04:41:24.085802+00:00",
+  "category": "experiments"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "experiment-2-expanded-temporal-context-does-not-pass-texture-recovery--46f894f376d6",
+  "title": "Experiment 2 expanded temporal context does not pass texture recovery gate",
+  "body": "B2 finish OFF stayed frozen. Fixed-parameter donor expansion added every frame 147-198 and raised accepted coverage from 3.948% to 4.372% (+0.424 pp), but clean-sweater synthetic GT masked MAE improved only 0.499% versus required 10%, SSIM did not improve, and flow-compensated temporal MAE worsened 0.738%; donor candidate rejected. ProPainter D2 received 95 same-scene frames with the 43 C2 targets/masks byte-exact, native 824x296, fp16, stride2, neighbor6, subvideo43, no donor blend/downscale/retry. It completed locally in 485.50s at sampled peak 5824MiB. Only 6/15 target centers got direct post-146 refs (32 refs total, latest source164). D2 vs C2 texture RMS changed +0.063%; temporal proxy improved 0.391%; no clear visual texture recovery, so rejected. Short FP32 vs FP16 completed; masked difference 0.516 level did not establish quality gain, while FP32 sampled 5755MiB. All final gates passed: exact outside mask, prefix frames 0-103, zero green residual, protected face/hair/buckle/window/edges/geometry. Cloud cost USD0, no production integration, Vmake visual-only.",
+  "sources": [
+    "research/experiments/EXPERIMENT_2_TEMPORAL_CONTEXT_REPORT.md",
+    "research/experiments/experiment2_temporal_context.py",
+    "research/experiments/experiment2_propainter_context.py",
+    "research/experiments/experiment2_precision_control.py",
+    "research/experiments/experiment2_evaluate.py",
+    "G:/dowloand/teste/experiment-2-temporal-context-20260911/donors-expanded/report.json",
+    "G:/dowloand/teste/experiment-2-temporal-context-20260911/model/D2-context95/report.json",
+    "G:/dowloand/teste/experiment-2-temporal-context-20260911/evaluation.json"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-11T12:56:49.560265+00:00",
+  "category": "experiments"
+}

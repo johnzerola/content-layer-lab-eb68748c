@@ -1,0 +1,13 @@
+{
+  "id": "runpod-endpoint-accepts-configuration-but-rejects-processing-as-paused-3961c1b7ddcf",
+  "title": "RunPod endpoint accepts configuration but rejects processing as paused",
+  "body": "CONFIRMED: REST and GraphQL reported workersMax=1 for existing endpoint, but POST /run returned 409 ENDPOINT_PAUSED after 60 seconds. No job accepted. Capacity restored 0/0, original template restored, owned templates and Hostear uploads deleted. Health still reported throttled=1, all execution states and jobs zero. Root cause unknown. Eight phase4 local tests pass; real GPU restoration and quality verdict remain pending.",
+  "sources": [
+    "research/experiments/RUNPOD-PRE-FASE5-20260910.md",
+    "research/benchmarks/runs/phase3-existing-graphql-named-20260910/report.json",
+    "https://docs.runpod.io/sdks/graphql/manage-endpoints"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-10T19:18:29.581169+00:00",
+  "category": "failures"
+}

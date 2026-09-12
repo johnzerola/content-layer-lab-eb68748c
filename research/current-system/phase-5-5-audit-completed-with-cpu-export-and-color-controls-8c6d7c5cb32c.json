@@ -1,0 +1,14 @@
+{
+  "id": "phase-5-5-audit-completed-with-cpu-export-and-color-controls-8c6d7c5cb32c",
+  "title": "Phase 5.5 audit completed with CPU export and color controls",
+  "body": "Audit report SHA256 1a30bb2f784a500a5f68ea4b655709609fb6640b04c71162a8eed537e67b5682. Sampled protected B2 master regions equal canonical source. Identity export controls reproduce delivery errors. Color roundtrip without lossy codec demonstrates a conversion contribution. Limited phase-3 temporal context does not establish a model or donor-information limit. Report separates measurements, hypotheses and recommendations. Recommendation: DO NOT START PHASE 6 YET; calibrated symmetric color/export experiment first, expanded temporal context next, conditional alternative inpainting last. No production/pipeline changes or paid cloud inference. CPU audit scripts and evidence retained.",
+  "sources": [
+    "research/reviews/PHASE_5_5_INDEPENDENT_TECHNICAL_REVIEW.md",
+    "G:/dowloand/teste/phase-5-5-independent-review-20260911/outside-fidelity.json",
+    "G:/dowloand/teste/phase-5-5-independent-review-20260911/color-conversion-forensics.json",
+    "G:/dowloand/teste/phase-5-5-independent-review-20260911/code-hashes.json"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-11T04:34:23.336936+00:00",
+  "category": "current-system"
+}

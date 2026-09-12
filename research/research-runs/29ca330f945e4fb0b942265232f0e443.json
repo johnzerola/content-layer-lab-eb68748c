@@ -1,0 +1,24 @@
+{
+  "at": "2026-09-10T15:45:57.788645+00:00",
+  "results": [
+    {
+      "query": "papers:all:\"video inpainting\"",
+      "status": "COLLECTED_METADATA",
+      "id": "research-round-all-video-inpainting-6362f36306bb",
+      "path": "research/papers/research-round-all-video-inpainting-6362f36306bb.json"
+    },
+    {
+      "query": "models:video-inpainting",
+      "status": "COLLECTED_METADATA",
+      "id": "research-round-video-inpainting-6d25ef6a2a6c",
+      "path": "research/models/research-round-video-inpainting-6d25ef6a2a6c.json"
+    },
+    {
+      "query": "projects:video inpainting",
+      "status": "COLLECTED_METADATA",
+      "id": "research-round-video-inpainting-1e98d4eab6eb",
+      "path": "research/projects/research-round-video-inpainting-1e98d4eab6eb.json"
+    }
+  ],
+  "scope": "Metadata observation; semantic conclusions and experiments require skill review"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "phase-3-local-diffueraser-stopped-under-ram-pressure-4de5d76b0ca5",
+  "title": "Phase 3 local DiffuEraser stopped under RAM pressure",
+  "body": "CONFIRMED: one 43-frame original cloth scene prepared and model initialization attempted on RTX 2060 6 GiB / about 16 GiB system RAM. Operator cancelled at 964600 KiB free system RAM. Child process exited; temporary PCM copy and ROI removed. No candidate output, no visual verdict, no observed CUDA OOM. No RunPod calls. Runtime and failure log retained. More-memory execution remains pending.",
+  "sources": [
+    "C:\\Users\\DINO\\content-layer-lab\\research\\benchmarks\\runs\\phase3-tecido-20260910\\report.json",
+    "research/experiments/phase3_diffueraser.py"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-10T16:12:22.615147+00:00",
+  "category": "failures"
+}

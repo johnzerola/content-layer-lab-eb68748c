@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "nodes": ["Cleaner IA", "ProPainter Adapter", "ProPainter", "RAFT", "Flow Completion", "Image Propagation", "Feature Propagation", "Sparse Transformer", "DiffuEraser", "BrushNet", "SD1.5", "PCM", "Masks", "SAM2", "Cutie", "Farneback", "Composition", "Encoding"],
+  "edges": [
+    {"from":"Cleaner IA","to":"ProPainter Adapter","relation":"conditional local path","source":"../current-system/architecture.md"},
+    {"from":"ProPainter Adapter","to":"ProPainter","relation":"subprocess integration","source":"../projects/propainter.md"},
+    {"from":"ProPainter","to":"RAFT","relation":"estimates bidirectional flow","source":"../projects/propainter.md"},
+    {"from":"ProPainter","to":"Flow Completion","relation":"fills flow holes","source":"../projects/propainter.md"},
+    {"from":"ProPainter","to":"Image Propagation","relation":"recovers real pixels","source":"../projects/propainter.md"},
+    {"from":"ProPainter","to":"Feature Propagation","relation":"learned alignment","source":"../projects/propainter.md"},
+    {"from":"ProPainter","to":"Sparse Transformer","relation":"masked token reconstruction","source":"../projects/propainter.md"},
+    {"from":"DiffuEraser","to":"ProPainter","relation":"upstream prior; separate license","source":"../projects/diffueraser.md"},
+    {"from":"DiffuEraser","to":"BrushNet","relation":"conditioning","source":"../projects/diffueraser.md"},
+    {"from":"DiffuEraser","to":"SD1.5","relation":"base model family","source":"../projects/diffueraser.md"},
+    {"from":"DiffuEraser","to":"PCM","relation":"few-step sampling","source":"../projects/diffueraser.md"},
+    {"from":"SAM2","to":"Masks","relation":"candidate promptable segmentation; not proven for subtitles","source":"../projects/sam2.md"},
+    {"from":"Cutie","to":"Masks","relation":"candidate temporal propagation","source":"../projects/cutie.md"},
+    {"from":"Farneback","to":"Masks","relation":"local tracking","source":"../current-system/architecture.md"},
+    {"from":"Masks","to":"Composition","relation":"controls changed area","source":"../benchmarks/README.md"},
+    {"from":"Composition","to":"Encoding","relation":"measure separately from codec losses","source":"../benchmarks/README.md"}
+  ]
+}

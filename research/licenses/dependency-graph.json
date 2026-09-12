@@ -1,0 +1,41 @@
+{
+  "method": "Each edge names a separately licensed artifact or dependency. UNKNOWN and restricted edges remain blockers until the exact artifact and intended use are reviewed.",
+  "projects": [
+    {
+      "id": "DiffuEraser",
+      "nodes": [
+        {"id": "DiffuEraser-code", "license": "Apache-2.0", "scope": "repository code"},
+        {"id": "DiffuEraser-weights", "license": "REVIEW_REQUIRED", "scope": "exact checkpoint"},
+        {"id": "ProPainter-prior", "license": "S-Lab-1.0", "scope": "prior and its weights"},
+        {"id": "SD-VAE-PCM-BrushNet", "license": "REVIEW_REQUIRED", "scope": "separate models"}
+      ],
+      "edges": [
+        ["DiffuEraser-code", "DiffuEraser-weights"],
+        ["DiffuEraser-code", "ProPainter-prior"],
+        ["DiffuEraser-code", "SD-VAE-PCM-BrushNet"]
+      ],
+      "commercial_status": "BLOCKED_PENDING_ARTIFACT_REVIEW"
+    },
+    {
+      "id": "ProPainter",
+      "nodes": [
+        {"id": "ProPainter-code", "license": "S-Lab-1.0", "scope": "repository code"},
+        {"id": "ProPainter-weights", "license": "REVIEW_REQUIRED", "scope": "checkpoint"},
+        {"id": "RAFT", "license": "BSD-3-Clause-code; weights separate", "scope": "flow prior"}
+      ],
+      "edges": [["ProPainter-code", "ProPainter-weights"], ["ProPainter-code", "RAFT"]],
+      "commercial_status": "AUTHORIZATION_OR_ALTERNATIVE_REQUIRED"
+    },
+    {
+      "id": "Cleaner-candidates",
+      "nodes": [
+        {"id": "LaMa-code", "license": "Apache-2.0", "scope": "repository code"},
+        {"id": "LaMa-export", "license": "REVIEW_REQUIRED", "scope": "exact ONNX/model artifact"},
+        {"id": "SAM2", "license": "Apache-2.0; data/third parties separate", "scope": "code/checkpoints according to upstream README"},
+        {"id": "Cutie", "license": "MIT core; checkpoint/demo dependencies separate", "scope": "tracker"}
+      ],
+      "edges": [["LaMa-code", "LaMa-export"]],
+      "commercial_status": "PER_ARTIFACT_REVIEW_REQUIRED"
+    }
+  ]
+}

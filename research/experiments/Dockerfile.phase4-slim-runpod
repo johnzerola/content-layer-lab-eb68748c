@@ -1,0 +1,33 @@
+# Smaller serverless runtime for the isolated RealBasicVSR experiment.
+# Build from the isolated staging directory containing the three scripts and
+# checkpoints/realbasicvsr.pth. It does not replace the production worker.
+FROM nvidia/cuda:11.6.2-cudnn8-runtime-ubuntu20.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    RUNPOD_INIT_TIMEOUT=800
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates ffmpeg libgl1 libglib2.0-0 python3 python3-pip \
+    && rm -rf /var/lib/apt/lists/* \
+    && python3 -m pip install --upgrade pip
+
+RUN python3 -m pip install \
+      torch==1.13.1+cu116 torchvision==0.14.1+cu116 \
+      --extra-index-url https://download.pytorch.org/whl/cu116
+RUN python3 -m pip install \
+      numpy==1.23.5 opencv-python-headless==4.8.1.78 mmcv-full==1.7.1 \
+      -f https://download.openmmlab.com/mmcv/dist/cu116/torch1.13.0/index.html
+RUN python3 -m pip install --only-binary=av \
+      lmdb==1.4.1 mmedit==0.16.0 av==12.3.0 runpod==1.7.7 requests==2.32.4
+
+WORKDIR /opt/phase4
+COPY phase4_restore.py /opt/phase4/phase4_restore.py
+COPY phase4_handler.py /opt/phase4/phase4_handler.py
+COPY checkpoints/realbasicvsr.pth /opt/phase4/realbasicvsr.pth
+
+RUN python3 -c "from mmedit.models import build_backbone; import cv2, torch; print(torch.__version__, cv2.__version__)"
+
+ENTRYPOINT []
+CMD ["python3", "-u", "/opt/phase4/phase4_handler.py"]

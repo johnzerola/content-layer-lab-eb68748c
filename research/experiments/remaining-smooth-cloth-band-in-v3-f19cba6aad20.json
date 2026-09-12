@@ -1,0 +1,12 @@
+{
+  "id": "remaining-smooth-cloth-band-in-v3-f19cba6aad20",
+  "title": "Remaining smooth cloth band in v3",
+  "body": "{\"problem\": \"Remaining smooth cloth band in v3\", \"hypothesis\": \"DiffuEraser may reconstruct plausible cloth texture on a complete short scene\", \"baseline\": \"Reviewed v3 scene 2, 43 original frames\", \"change\": \"One DiffuEraser attempt using original source and v3 composition masks; upstream dilation 4\", \"dataset\": \"Real user-provided 4.9-second example, scene 2; no ground truth or Vmake pixels supplied\", \"metrics\": [\"complete_frames\", \"geometry\", \"outside_mask_preservation\", \"elapsed_seconds\", \"OOM\", \"visual_review_pending\"], \"status\": \"DESIGNED\", \"result\": null, \"production_changes\": false}",
+  "sources": [
+    "Reviewed v3 scene 2, 43 original frames",
+    "Real user-provided 4.9-second example, scene 2; no ground truth or Vmake pixels supplied"
+  ],
+  "evidence": "HYPOTHESIS",
+  "recorded_at": "2026-09-10T16:09:00.633645+00:00",
+  "category": "experiments"
+}

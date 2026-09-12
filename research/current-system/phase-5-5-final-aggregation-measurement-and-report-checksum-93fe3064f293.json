@@ -1,0 +1,12 @@
+{
+  "id": "phase-5-5-final-aggregation-measurement-and-report-checksum-93fe3064f293",
+  "title": "Phase 5.5 final aggregation measurement and report checksum",
+  "body": "Final report SHA256 532a2be17195d8c18ea611ddb1184a66d69f25e48b5fa2774e1b3525818484b5 supersedes checksum in phase-5-5-audit-completed-with-cpu-export-and-color-controls-8c6d7c5cb32c. Recomputed frame120 two-window aggregation with explicit input mask cropped 294x820: masked MAE 0.7331367731, max 1.484375, prediction std mean 1.2684285641. Exact mask scope and NPZ filenames saved. Conclusions unchanged; repository report and user artifact synchronized.",
+  "sources": [
+    "research/reviews/PHASE_5_5_INDEPENDENT_TECHNICAL_REVIEW.md",
+    "G:/dowloand/teste/phase-5-5-independent-review-20260911/aggregation-frame120.json"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-11T04:35:18.869950+00:00",
+  "category": "current-system"
+}

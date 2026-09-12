@@ -1,0 +1,8 @@
+# syntax=docker/dockerfile:1
+# Experimental FP16-weight image. Build with models=/opt/cleaneria-max-models-fp16-full.
+FROM nivaldo12/leaneria-runpod@sha256:3916f8e5a671fec9a416b2577b369d6bd13448748556d1f920ce53ea88c5ac02
+COPY --from=models / /opt/cleaneria-max-models/
+ENV DIFFUERASER_MODELS_ROOT=/opt/cleaneria-max-models \
+    PROPAINTER_WEIGHTS_DIR=/opt/ProPainter/weights \
+    RUNPOD_INIT_TIMEOUT=800
+RUN python3.10 -c "from pathlib import Path; from app.engines.diffueraser_official import REQUIRED_MODEL_FILES, PROPAINTER_WEIGHTS; p=Path('/opt/cleaneria-max-models'); assert all((p/f).is_file() and (p/f).stat().st_size>100 for f in REQUIRED_MODEL_FILES); assert all((p/'propainter'/f).stat().st_size>1048576 for f in PROPAINTER_WEIGHTS)"

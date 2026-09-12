@@ -1,0 +1,14 @@
+{
+  "id": "phase-4-realbasicvsr-runpod-cold-start-blocked-before-inference-e0985e7f2fa6",
+  "title": "Phase 4 RealBasicVSR RunPod cold-start blocked before inference",
+  "body": "A disposable RunPod endpoint was created with one-worker maximum using image nivaldo12/leaneria-runpod@sha256:e5aa232402ea76c0ea433acdd72985ac50172933e8a8d322b52ffc1f7743c53c. The 1.433333-second, 1080x1920 approved scene and ROI [250,1300,600,300] were prepared. The health job remained queued while one worker stayed initializing until the bounded deadline. No RealBasicVSR inference ran and no visual candidate was produced. Cleanup confirmed zero capacity, endpoint deletion, template deletion, and Hostear temporary project deletion. This establishes a cold-start/deployment problem for the current 5.7 GB image; it does not establish RealBasicVSR visual quality.",
+  "sources": [
+    "research/experiments/phase4_handler.py",
+    "research/experiments/Dockerfile.phase4-runpod",
+    "research/experiments/phase4_isolated_sample.py",
+    "research/benchmarks/runs/phase4-isolated-1789075181672413400/report.json"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-10T21:37:23.901135+00:00",
+  "category": "benchmarks"
+}

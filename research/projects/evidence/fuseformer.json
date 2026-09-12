@@ -1,0 +1,228 @@
+{
+  "repository": "ruiliu-ai/FuseFormer",
+  "revision": "e7e461ff0a59aa71bb01654e7e67183872796c78",
+  "source": {
+    "url": "https://api.github.com/repos/ruiliu-ai/FuseFormer",
+    "retrieved_at": "2026-09-10T15:41:08.950162+00:00",
+    "sha256": "e3fa4b5d4b5c4d82f53ef882605a64e094a268152301deb872c03e3502e69eef",
+    "cached": false
+  },
+  "commit_source": {
+    "url": "https://api.github.com/repos/ruiliu-ai/FuseFormer/commits/master",
+    "retrieved_at": "2026-09-10T15:41:09.459482+00:00",
+    "sha256": "5cad8e49c4b885d59c64964aa6efdbfac635070981e7de40bd73de8a1fc84e1c",
+    "cached": false
+  },
+  "tree_source": {
+    "url": "https://api.github.com/repos/ruiliu-ai/FuseFormer/git/trees/e7e461ff0a59aa71bb01654e7e67183872796c78?recursive=1",
+    "retrieved_at": "2026-09-10T15:41:09.876234+00:00",
+    "sha256": "e15e0c588d1cec6f40942e406a388aaaa3bdd5d3aaf6e296c060510cccd79c33",
+    "cached": false
+  },
+  "files_in_tree": [
+    "README.md",
+    "configs/youtube-vos.json",
+    "core/dataset.py",
+    "core/dist.py",
+    "core/loss.py",
+    "core/spectral_norm.py",
+    "core/trainer.py",
+    "core/utils.py",
+    "evaluate.py",
+    "imgs/pipeline.png",
+    "model/fuseformer.py",
+    "model/i3d.py",
+    "requirements.txt",
+    "test.py",
+    "train.py"
+  ],
+  "tree_truncated": false,
+  "files": [
+    {
+      "path": "requirements.txt",
+      "source": {
+        "url": "https://raw.githubusercontent.com/ruiliu-ai/FuseFormer/e7e461ff0a59aa71bb01654e7e67183872796c78/requirements.txt",
+        "retrieved_at": "2026-09-10T15:41:10.231600+00:00",
+        "sha256": "8eae0d649e4a9e277b5072f59d470d5b207c1fafdbeb457bc1031d44627fb688",
+        "cached": false
+      },
+      "content": "opencv-python\ntqdm\ntensorboardX\nscipy\nscikit-image==0.15.0\npillow==7.2.0\n",
+      "truncated": false
+    },
+    {
+      "path": "README.md",
+      "source": {
+        "url": "https://raw.githubusercontent.com/ruiliu-ai/FuseFormer/e7e461ff0a59aa71bb01654e7e67183872796c78/README.md",
+        "retrieved_at": "2026-09-10T15:41:54.072369+00:00",
+        "sha256": "ace3bf50df073b4eaec25854b7e64965fdfa6090ee22bc9715048b83ed18d0d7",
+        "cached": false
+      },
+      "content": "# FuseFormer: Fusing Fine-Grained Information in Transformers for Video Inpainting\n\nBy [Rui Liu](https://ruiliu-ai.github.io), Hanming Deng, Yangyi Huang, Xiaoyu Shi, [Lewei Lu](https://dblp.org/pid/247/6438.html), [Wenxiu Sun](http://wenxiusun.com/), [Xiaogang Wang](https://www.ee.cuhk.edu.hk/~xgwang/), [Jifeng Dai](https://jifengdai.org/), [Hongsheng Li](https://www.ee.cuhk.edu.hk/~hsli/). \n\nThis repo is the official Pytorch implementation of [FuseFormer: Fusing Fine-Grained Information in Transformers for Video Inpainting](https://arxiv.org/abs/2109.02974).\n\n## Introduction\n<img src='imgs/pipeline.png' width=\"900px\">\n\n## Usage\n\n### Prerequisites\n- Python >= 3.6\n- Pytorch >= 1.0 and corresponding torchvision (https://pytorch.org/)\n\n### Install\n- Clone this repo:\n```\ngit clone https://github.com/ruiliu-ai/FuseFormer.git\n```\n- Install other packages:\n```\ncd FuseFormer\npip install -r requirements.txt\n```\n\n## Training\n\n### Dataset preparation\nDownload datasets ([YouTube-VOS](https://competitions.codalab.org/competitions/20127) and [DAVIS](https://davischallenge.org/davis2017/code.html)) into the data folder.\n\n```\nmkdir data\n```\nNote: We use [YouTube Video Object Segmentation dataset **2019** version](https://youtube-vos.org/dataset/).\n\n### Training script\n```\npython train.py -c configs/youtube-vos.json\n```\n\n## Test\nDownload [pre-trained model](https://drive.google.com/file/d/1BuSE42QAAUoQAJawbr5mMRXcqRRKeELc/view?usp=sharing) into checkpoints folder.\n```\nmkdir checkpoints\n```\n\n### Test script\n```\npython test.py -c checkpoints/fuseformer.pth -v data/DAVIS/JPEGImages/blackswan -m data/DAVIS/Annotations/blackswan\n```\n\n## Evaluation\nYou can follow [free-form mask generation scheme](https://github.com/JiahuiYu/generative_inpainting) for synthesizing random masks.\n\nOr just download [our prepared stationary masks](https://drive.google.com/file/d/1wihArvScAFT9hs3KDGSoCEjsEjXpfEOL/view?usp=sharing) and unzip it to data folder. \n```\nmv random_mask_stationary_w432_h240 data/\nmv random_mask_stationary_youtube_w432_h240 data/\n```\n\nThen you need to download [pre-trained model](https://drive.google.com/file/d/1A-ilDsXZCVhWh2_erApyL7C0jXhaeTjR/view?usp=sharing) for evaluating [VFID](https://github.com/deepmind/kinetics-i3d). \n```\nmv i3d_rgb_imagenet.pt checkpoints/\n```\n\n### Evaluation script\n```\npython evaluate.py --model fuseformer --ckpt checkpoints/fuseformer.pth --dataset davis --width 432 --height 240\npython evaluate.py --model fuseformer --ckpt checkpoints/fuseformer.pth --dataset youtubevos --width 432 --height 240\n```\nFor evaluating warping error, please refer to https://github.com/phoenix104104/fast_blind_video_consistency\n\n## Citing FuseFormer\nIf you find FuseFormer useful in your research, please consider citing:\n```\n@InProceedings{Liu_2021_FuseFormer,\n  title={FuseFormer: Fusing Fine-Grained Information in Transformers for Video Inpainting},\n  author={Liu, Rui and Deng, Hanming and Huang, Yangyi and Shi, Xiaoyu and Lu, Lewei and Sun, Wenxiu and Wang, Xiaogang and Dai, Jifeng and Li, Hongsheng},\n  booktitle = {International Conference on Computer Vision (ICCV)},\n  year={2021}\n}\n```\n\n## Acknowledement\nThis code borrows heavily from the video inpainting framework [spatial-temporal transformer net](https://github.com/researchmm/STTN). \n",
+      "truncated": false
+    },
+    {
+      "path": "test.py",
+      "source": {
+        "url": "https://raw.githubusercontent.com/ruiliu-ai/FuseFormer/e7e461ff0a59aa71bb01654e7e67183872796c78/test.py",
+        "retrieved_at": "2026-09-10T15:41:54.404709+00:00",
+        "sha256": "6ebaa76213d1ac4bc17d26007449200802df5228acb2bbcb99b64a1c88d48aef",
+        "cached": false
+      },
+      "content": "# -*- coding: utf-8 -*-\nimport cv2\nfrom PIL import Image\nimport numpy as np\nimport importlib\nimport os\nimport argparse\nimport torch\nimport torch.nn as nn\nfrom torchvision import transforms\n\nfrom core.utils import Stack, ToTorchFormatTensor\n\nparser = argparse.ArgumentParser(description=\"FuseFormer\")\nparser.add_argument(\"-v\", \"--video\", type=str, required=True)\nparser.add_argument(\"-m\", \"--mask\",   type=str, required=True)\nparser.add_argument(\"-c\", \"--ckpt\",   type=str, required=True)\nparser.add_argument(\"--model\", type=str, default='fuseformer')\nparser.add_argument(\"--width\", type=int, default=432)\nparser.add_argument(\"--height\", type=int, default=240)\nparser.add_argument(\"--outw\", type=int, default=432)\nparser.add_argument(\"--outh\", type=int, default=240)\nparser.add_argument(\"--step\", type=int, default=10)\nparser.add_argument(\"--num_ref\", type=int, default=-1)\nparser.add_argument(\"--neighbor_stride\", type=int, default=5)\nparser.add_argument(\"--savefps\", type=int, default=24)\nparser.add_argument(\"--use_mp4\", action='store_true')\nargs = parser.parse_args()\n\n\nw, h = args.width, args.height\nref_length = args.step  # ref_step\nnum_ref = args.num_ref\nneighbor_stride = args.neighbor_stride\ndefault_fps = args.savefps\n\n_to_tensors = transforms.Compose([\n    Stack(),\n    ToTorchFormatTensor()])\n\n\n# sample reference frames from the whole video \ndef get_ref_index(f, neighbor_ids, length):\n    ref_index = []\n    if num_ref == -1:\n        for i in range(0, length, ref_length):\n            if not i in neighbor_ids:\n                ref_index.append(i)\n    else:\n        start_idx = max(0, f - ref_length * (num_ref//2))\n        end_idx = min(length, f + ref_length * (num_ref//2))\n        for i in range(start_idx, end_idx+1, ref_length):\n            if not i in neighbor_ids:\n                if len(ref_index) > num_ref:\n                #if len(ref_index) >= 5-len(neighbor_ids):\n                    break\n                ref_index.append(i)\n    return ref_index\n\n\n# read frame-wise masks \ndef read_mask(mpath):\n    masks = []\n    mnames = os.listdir(mpath)\n    mnames.sort()\n    for m in mnames: \n        m = Image.open(os.path.join(mpath, m))\n        m = m.resize((w, h), Image.NEAREST)\n        m = np.array(m.convert('L'))\n        m = np.array(m > 0).astype(np.uint8)\n        m = cv2.dilate(m, cv2.getStructuringElement(\n            cv2.MORPH_CROSS, (3, 3)), iterations=4)\n        masks.append(Image.fromarray(m*255))\n    return masks\n\n\n#  read frames from video \ndef read_frame_from_videos(args):\n    vname = args.video\n    frames = []\n    if args.use_mp4:\n        vidcap = cv2.VideoCapture(vname)\n        success, image = vidcap.read()\n        count = 0\n        while success:\n            image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))\n            frames.append(image.resize((w,h)))\n            success, image = vidcap.read()\n            count += 1\n    else:\n        lst = os.listdir(vname)\n        lst.sort()\n        fr_lst = [vname+'/'+name for name in lst]\n        for fr in fr_lst:\n            image = cv2.imread(fr)\n            image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))\n            frames.append(image.resize((w,h)))\n    return frames       \n\n\ndef main_worker():\n    # set up models \n    device = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\n    net = importlib.import_module('model.' + args.model)\n    model = net.InpaintGenerator().to(device)\n    model_path = args.ckpt\n    data = torch.load(args.ckpt, map_location=device)\n    model.load_state_dict(data)\n    print('loading from: {}'.format(args.ckpt))\n    model.eval()\n\n    # prepare datset, encode all frames into deep space \n    frames = read_frame_from_videos(args)\n    video_length = len(frames)\n    imgs = _to_tensors(frames).unsqueeze(0)*2-1\n    frames = [np.array(f).astype(np.uint8) for f in frames]\n\n    masks = read_mask(args.mask)\n    binary_masks = [np.expand_dims((np.array(m) != 0).astype(np.uint8), 2) for m in masks]\n    masks = _to_tensors(masks).unsqueeze(0)\n    imgs, masks = imgs.to(device), masks.to(device)\n    comp_frames = [None]*video_length\n    print('loading videos and masks from: {}'.format(args.video))\n\n    # completing holes by spatial-temporal transformers\n    for f in range(0, video_length, neighbor_stride):\n        neighbor_ids = [i for i in range(max(0, f-neighbor_stride), min(video_length, f+neighbor_stride+1))]\n        ref_ids = get_ref_index(f, neighbor_ids, video_length)\n        print(f, len(neighbor_ids), len(ref_ids))\n        len_temp = len(neighbor_ids) + len(ref_ids)\n        selected_imgs = imgs[:1, neighbor_ids+ref_ids, :, :, :]\n        selected_masks = masks[:1, neighbor_ids+ref_ids, :, :, :]\n        with torch.no_grad():\n            masked_imgs = selected_imgs*(1-selected_masks)\n            pred_img = model(masked_imgs)\n            pred_img = (pred_img + 1) / 2\n            pred_img = pred_img.cpu().permute(0, 2, 3, 1).numpy()*255\n            for i in range(len(neighbor_ids)):\n                idx = neighbor_ids[i]\n                img = np.array(pred_img[i]).astype(\n                    np.uint8)*binary_masks[idx] + frames[idx] * (1-binary_masks[idx])\n                if comp_frames[idx] is None:\n                    comp_frames[idx] = img\n                else:\n                    comp_frames[idx] = comp_frames[idx].astype(\n                        np.float32)*0.5 + img.astype(np.float32)*0.5\n    name = args.video.strip().split('/')[-1]\n    writer = cv2.VideoWriter(f\"{name}_result.mp4\", cv2.VideoWriter_fourcc(*\"mp4v\"), default_fps, (args.outw, args.outh))\n    for f in range(video_length):\n        comp = np.array(comp_frames[f]).astype(\n            np.uint8)*binary_masks[f] + frames[f] * (1-binary_masks[f])\n        if w != args.outw:\n            comp = cv2.resize(comp, (args.outw, args.outh), interpolation=cv2.INTER_LINEAR)\n        writer.write(cv2.cvtColor(np.array(comp).astype(np.uint8), cv2.COLOR_BGR2RGB))\n    writer.release()\n    print('Finish in {}'.format(f\"{name}_result.mp4\"))\n\n\nif __name__ == '__main__':\n    main_worker()\n",
+      "truncated": false
+    },
+    {
+      "path": "model/fuseformer.py",
+      "source": {
+        "url": "https://raw.githubusercontent.com/ruiliu-ai/FuseFormer/e7e461ff0a59aa71bb01654e7e67183872796c78/model/fuseformer.py",
+        "retrieved_at": "2026-09-10T15:41:54.928880+00:00",
+        "sha256": "49b9c3edd7050bf0cdf50aa72ce227eafe0ed69f12e9823303b3a4fdf5b88402",
+        "cached": false
+      },
+      "content": "''' Fuseformer for Video Inpainting\n'''\nimport numpy as np\nimport time\nimport math\nfrom functools import reduce\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nimport torchvision.models as models\nfrom core.spectral_norm import spectral_norm as _spectral_norm\n\n\nclass BaseNetwork(nn.Module):\n    def __init__(self):\n        super(BaseNetwork, self).__init__()\n\n    def print_network(self):\n        if isinstance(self, list):\n            self = self[0]\n        num_params = 0\n        for param in self.parameters():\n            num_params += param.numel()\n        print('Network [%s] was created. Total number of parameters: %.1f million. '\n              'To see the architecture, do print(network).' % (type(self).__name__, num_params / 1000000))\n\n    def init_weights(self, init_type='normal', gain=0.02):\n        '''\n        initialize network's weights\n        init_type: normal | xavier | kaiming | orthogonal\n        https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/9451e70673400885567d08a9e97ade2524c700d0/models/networks.py#L39\n        '''\n\n        def init_func(m):\n            classname = m.__class__.__name__\n            if classname.find('InstanceNorm2d') != -1:\n                if hasattr(m, 'weight') and m.weight is not None:\n                    nn.init.constant_(m.weight.data, 1.0)\n                if hasattr(m, 'bias') and m.bias is not None:\n                    nn.init.constant_(m.bias.data, 0.0)\n            elif hasattr(m, 'weight') and (classname.find('Conv') != -1 or classname.find('Linear') != -1):\n                if init_type == 'normal':\n                    nn.init.normal_(m.weight.data, 0.0, gain)\n                elif init_type == 'xavier':\n                    nn.init.xavier_normal_(m.weight.data, gain=gain)\n                elif init_type == 'xavier_uniform':\n                    nn.init.xavier_uniform_(m.weight.data, gain=1.0)\n                elif init_type == 'kaiming':\n                    nn.init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')\n                elif init_type == 'orthogonal':\n                    nn.init.orthogonal_(m.weight.data, gain=gain)\n                elif init_type == 'none':  # uses pytorch's default init method\n                    m.reset_parameters()\n                else:\n                    raise NotImplementedError(\n                        'initialization method [%s] is not implemented' % init_type)\n                if hasattr(m, 'bias') and m.bias is not None:\n                    nn.init.constant_(m.bias.data, 0.0)\n\n        self.apply(init_func)\n\n        # propagate to children\n        for m in self.children():\n            if hasattr(m, 'init_weights'):\n                m.init_weights(init_type, gain)\n\n\nclass Encoder(nn.Module):\n    def __init__(self):\n        super(Encoder, self).__init__()\n        self.group = [1, 2, 4, 8, 1]\n        self.layers = nn.ModuleList([\n            nn.Conv2d(3, 64, kernel_size=3, stride=2, padding=1),\n            nn.LeakyReLU(0.2, inplace=True),\n            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),\n            nn.LeakyReLU(0.2, inplace=True),\n            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),\n            nn.LeakyReLU(0.2, inplace=True),\n            nn.Conv2d(128, 256 , kernel_size=3, stride=1, padding=1),\n            nn.LeakyReLU(0.2, inplace=True),\n            nn.Conv2d(256, 384, kernel_size=3, stride=1, padding=1, groups=1),\n            nn.LeakyReLU(0.2, inplace=True),\n            nn.Conv2d(640, 512, kernel_size=3, stride=1, padding=1, groups=2),\n            nn.LeakyReLU(0.2, inplace=True),\n            nn.Conv2d(768, 384, kernel_size=3, stride=1, padding=1, groups=4),\n            nn.LeakyReLU(0.2, inplace=True),\n            nn.Conv2d(640, 256, kernel_size=3, stride=1, padding=1, groups=8),\n            nn.LeakyReLU(0.2, inplace=True),\n            nn.Conv2d(512, 128, kernel_size=3, stride=1, padding=1, groups=1),\n            nn.LeakyReLU(0.2, inplace=True)\n        ])\n\n    def forward(self, x):\n        bt, c, h, w = x.size()\n        h, w = h//4, w//4\n        out = x\n        for i, layer in enumerate(self.layers):\n            if i == 8:\n                x0 = out\n            if i > 8 and i % 2 == 0:\n                g = self.group[(i - 8) // 2]\n                x = x0.view(bt, g, -1, h, w)\n                o = out.view(bt, g, -1, h, w)\n                out = torch.cat([x, o], 2).view(bt, -1, h, w)\n            out = layer(out)\n        return out\n\n\nclass InpaintGenerator(BaseNetwork):\n    def __init__(self, init_weights=True):\n        super(InpaintGenerator, self).__init__()\n        channel = 256\n        hidden = 512\n        stack_num = 8\n        num_head = 4\n        kernel_size = (7, 7)\n        padding = (3, 3)\n        stride = (3, 3)\n        output_size = (60, 108)\n        blocks = []\n        dropout = 0.\n        t2t_params = {'kernel_size': kernel_size, 'stride': stride, 'padding': padding, 'output_size': output_size}\n        n_vecs = 1\n        for i, d in enumerate(kernel_size):\n            n_vecs *= int((output_size[i] + 2 * padding[i] - (d - 1) - 1) / stride[i] + 1)\n        for _ in range(stack_num):\n            blocks.append(TransformerBlock(hidden=hidden, num_head=num_head, dropout=dropout, n_vecs=n_vecs,\n                                           t2t_params=t2t_params))\n        self.transformer = nn.Sequential(*blocks)\n        self.ss = SoftSplit(channel // 2, hidden, kernel_size, stride, padding, dropout=dropout)\n        self.add_pos_emb = AddPosEmb(n_vecs, hidden)\n        self.sc = SoftComp(channel // 2, hidden, output_size, kernel_size, stride, padding)\n\n        self.encoder = Encoder()\n\n        # decoder: decode frames from features\n        self.decoder = nn.Sequential(\n            deconv(channel // 2, 128, kernel_size=3, padding=1),\n            nn.LeakyReLU(0.2, inplace=True),\n            nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1),\n            nn.LeakyReLU(0.2, inplace=True),\n            deconv(64, 64, kernel_size=3, padding=1),\n            nn.LeakyReLU(0.2, inplace=True),\n            nn.Conv2d(64, 3, kernel_size=3, stride=1, padding=1)\n        )\n\n        if init_weights:\n            self.init_weights()\n\n    def forward(self, masked_frames):\n        # extracting features\n        b, t, c, h, w = masked_frames.size()\n        time0 = time.time()\n        enc_feat = self.encoder(masked_frames.view(b * t, c, h, w))\n        _, c, h, w = enc_feat.size()\n        trans_feat = self.ss(enc_feat, b)\n        trans_feat = self.add_pos_emb(trans_feat)\n        trans_feat = self.transformer(trans_feat)\n        trans_feat = self.sc(trans_feat, t)\n        enc_feat = enc_feat + trans_feat\n        output = self.decoder(enc_feat)\n        output = torch.tanh(output)\n        return output\n\n\nclass deconv(nn.Module):\n    def __init__(self, input_channel, output_channel, kernel_size=3, padding=0):\n        super().__init__()\n        self.conv = nn.Conv2d(input_channel, output_channel,\n                              kernel_size=kernel_size, stride=1, padding=padding)\n\n    def forward(self, x):\n        x = F.interpolate(x, scale_factor=2, mode='bilinear',\n                          align_corners=True)\n        return self.conv(x)\n\n\n# #############################################################################\n# ############################# Transformer  ##################################\n# #############################################################################\n\n\nclass Attention(nn.Module):\n    \"\"\"\n    Compute 'Scaled Dot Product Attention\n    \"\"\"\n\n    def __init__(self, p=0.1):\n        super(Attention, self).__init__()\n        self.dropout = nn.Dropout(p=p)\n\n    def forward(self, query, key, value, m=None):\n        scores = torch.matmul(query, key.transpose(-2, -1)\n                              ) / math.sqrt(query.size(-1))\n        if m is not None:\n            scores.masked_fill_(m, -1e9)\n        p_attn = F.softmax(scores, dim=-1)\n        p_attn = self.dropout(p_attn)\n        p_val = torch.matmul(p_attn, value)\n        return p_val, p_attn\n\n\nclass AddPosEmb(nn.Module):\n    def __init__(self, n, c):\n        super(AddPosEmb, self).__init__()\n        self.pos_emb = nn.Parameter(torch.zeros(1, 1, n, c).float().normal_(mean=0, std=0.02), requires_grad=True)\n        self.num_vecs = n\n\n    def forward(self, x):\n        b, n, c = x.size()\n        x = x.view(b, -1, self.num_vecs, c)\n        x = x + self.pos_emb\n        x = x.view(b, n, c)\n        return x\n\n\nclass SoftSplit(nn.Module):\n    def __init__(self, channel, hidden, kernel_size, stride, padding, dropout=0.1):\n        super(SoftSplit, self).__init__()\n        self.kernel_size = kernel_size\n        self.t2t = nn.Unfold(kernel_size=kernel_size, stride=stride, padding=padding)\n        c_in = reduce((lambda x, y: x * y), kernel_size) * channel\n        self.embedding = nn.Linear(c_in, hidden)\n        self.dropout = nn.Dropout(p=dropout)\n\n    def forward(self, x, b):\n        feat = self.t2t(x)\n        feat = feat.permute(0, 2, 1)\n        feat = self.embedding(feat)\n        feat = feat.view(b, -1, feat.size(2))\n        feat = self.dropout(feat)\n        return feat\n\n\nclass SoftComp(nn.Module):\n    def __init__(self, channel, hidden, output_size, kernel_size, stride, padding):\n        super(SoftComp, self).__init__()\n        self.relu = nn.LeakyReLU(0.2, inplace=True)\n        c_out = reduce((lambda x, y: x * y), kernel_size) * channel\n        self.embedding = nn.Linear(hidden, c_out)\n        self.t2t = torch.nn.Fold(output_size=output_size, kernel_size=kernel_size, stride=stride, padding=padding)\n        h, w = output_size\n        self.bias = nn.Parameter(torch.zeros((channel, h, w), dtype=torch.float32), requires_grad=True)\n\n    def forward(self, x, t):\n        feat = self.embedding(x)\n        b, n, c = feat.size()\n        feat = feat.view(b * t, -1, c).permute(0, 2, 1)\n        feat = self.t2t(feat) + self.bias[None]\n        return feat\n\n\nclass MultiHeadedAttention(nn.Module):\n    \"\"\"\n    Take in model size and number of heads.\n    \"\"\"\n\n    def __init__(self, d_model, head, p=0.1):\n        super().__init__()\n        self.query_embedding = nn.Linear(d_model, d_model)\n        self.value_embedding = nn.Linear(d_model, d_model)\n        self.key_embedding = nn.Linear(d_model, d_model)\n        self.output_linear = nn.Linear(d_model, d_model)\n        self.attention = Attention(p=p)\n        self.head = head\n\n    def forward(self, x):\n        b, n, c = x.size()\n        c_h = c // self.head\n        key = self.key_embedding(x)\n        key = key.view(b, n, self.head, c_h).permute(0, 2, 1, 3)\n        query = self.query_embedding(x)\n        query = query.view(b, n, self.head, c_h).permute(0, 2, 1, 3)\n        value = self.value_embedding(x)\n        value = value.view(b, n, self.head, c_h).permute(0, 2, 1, 3)\n        att, _ = self.attention(query, key, value)\n        att = att.permute(0, 2, 1, 3).contiguous().view(b, n, c)\n        output = self.output_linear(att)\n        return output\n\n\nclass FeedForward(nn.Module):\n    def __init__(self, d_model, p=0.1):\n        super(FeedForward, self).__init__()\n        # We set d_ff as a default to 2048\n        self.conv = nn.Sequential(\n            nn.Linear(d_model, d_model * 4),\n            nn.ReLU(inplace=True),\n            nn.Dropout(p=p),\n            nn.Linear(d_model * 4, d_model),\n            nn.Dropout(p=p))\n\n    def forward(self, x):\n        x = self.conv(x)\n        return x\n\n\nclass FusionFeedForward(nn.Module):\n    def __init__(self, d_model, p=0.1, n_vecs=None, t2t_params=None):\n        super(FusionFeedForward, self).__init__()\n        # We set d_ff as a default to 1960\n        hd = 1960\n        self.conv1 = nn.Sequential(\n            nn.Linear(d_model, hd))\n        self.conv2 = nn.Sequential(\n            nn.ReLU(inplace=True),\n            nn.Dropout(p=p),\n            nn.Linear(hd, d_model),\n            nn.Dropout(p=p))\n        assert t2t_params is not None and n_vecs is not None\n        tp = t2t_params.copy()\n        self.fold = nn.Fold(**tp)\n        del tp['output_size']\n        self.unfold = nn.Unfold(**tp)\n        self.n_vecs = n_vecs\n\n    def forward(self, x):\n        x = self.conv1(x)\n        b, n, c = x.size()\n        normalizer = x.new_ones(b, n, 49).view(-1, self.n_vecs, 49).permute(0, 2, 1)\n        x = self.unfold(self.fold(x.view(-1, self.n_vecs, c).permute(0, 2, 1)) / self.fold(normalizer)).permute(0, 2,\n                                                                                                                1).contiguous().view(\n            b, n, c)\n        x = self.conv2(x)\n        return x\n\n\nclass TransformerBlock(nn.Module):\n    \"\"\"\n    Transformer = MultiHead_Attention + Feed_Forward with sublayer connection\n    \"\"\"\n\n    def __init__(self, hidden=128, num_head=4, dropout=0.1, n_vecs=None, t2t_params=None):\n        super().__init__()\n        self.attention = MultiHeadedAttention(d_model=hidden, head=num_head, p=dropout)\n        self.ffn = FusionFeedForward(hidden, p=dropout, n_vecs=n_vecs, t2t_params=t2t_params)\n        self.norm1 = nn.LayerNorm(hidden)\n        self.norm2 = nn.LayerNorm(hidden)\n        self.dropout = nn.Dropout(p=dropout)\n\n    def forward(self, input):\n        x = self.norm1(input)\n        x = input + self.dropout(self.attention(x))\n        y = self.norm2(x)\n        x = x + self.ffn(y)\n        return x\n\n\n# ######################################################################\n# ######################################################################\n\n\nclass Discriminator(BaseNetwork):\n    def __init__(self, in_channels=3, use_sigmoid=False, use_spectral_norm=True, init_weights=True):\n        super(Discriminator, self).__init__()\n        self.use_sigmoid = use_sigmoid\n        nf = 32\n\n        self.conv = nn.Sequential(\n            spectral_norm(\n                nn.Conv3d(in_channels=in_channels, out_channels=nf * 1, kernel_size=(3, 5, 5), stride=(1, 2, 2),\n                          padding=1, bias=not use_spectral_norm), use_spectral_norm),\n            # nn.InstanceNorm2d(64, track_running_stats=False),\n            nn.LeakyReLU(0.2, inplace=True),\n            spectral_norm(nn.Conv3d(nf * 1, nf * 2, kernel_size=(3, 5, 5), stride=(1, 2, 2),\n                                    padding=(1, 2, 2), bias=not use_spectral_norm), use_spectral_norm),\n            # nn.InstanceNorm2d(128, track_running_stats=False),\n            nn.LeakyReLU(0.2, inplace=True),\n            spectral_norm(nn.Conv3d(nf * 2, nf * 4, kernel_size=(3, 5, 5), stride=(1, 2, 2),\n                                    padding=(1, 2, 2), bias=not use_spectral_norm), use_spectral_norm),\n            # nn.InstanceNorm2d(256, track_running_stats=False),\n            nn.LeakyReLU(0.2, inplace=True),\n            spectral_norm(nn.Conv3d(nf * 4, nf * 4, kernel_size=(3, 5, 5), stride=(1, 2, 2),\n                                    padding=(1, 2, 2), bias=not use_spectral_norm), use_spectral_norm),\n            # nn.InstanceNorm2d(256, track_running_stats=False),\n            nn.LeakyReLU(0.2, inplace=True),\n            spectral_norm(nn.Conv3d(nf * 4, nf * 4, kernel_size=(3, 5, 5), stride=(1, 2, 2),\n                                    padding=(1, 2, 2), bias=not use_spectral_norm), use_spectral_norm),\n            # nn.InstanceNorm2d(256, track_running_stats=False),\n            nn.LeakyReLU(0.2, inplace=True),\n            nn.Conv3d(nf * 4, nf * 4, kernel_size=(3, 5, 5),\n                      stride=(1, 2, 2), padding=(1, 2, 2))\n        )\n\n        if init_weights:\n            self.init_weights()\n\n    def forward(self, xs):\n        # T, C, H, W = xs.shape\n        xs_t = torch.transpose(xs, 0, 1)\n        xs_t = xs_t.unsqueeze(0)  # B, C, T, H, W\n        feat = self.conv(xs_t)\n        if self.use_sigmoid:\n            feat = torch.sigmoid(feat)\n        out = torch.transpose(feat, 1, 2)  # B, T, C, H, W\n        return out\n\n\ndef spectral_norm(module, mode=True):\n    if mode:\n        return _spectral_norm(module)\n    return module\n",
+      "truncated": false
+    }
+  ],
+  "community": {
+    "issues": {
+      "source": {
+        "url": "https://api.github.com/repos/ruiliu-ai/FuseFormer/issues?per_page=5",
+        "retrieved_at": "2026-09-10T15:41:10.683995+00:00",
+        "sha256": "8f200301963b8164388772a6554e7dea37d6e0681f6d47c1f71d730b6bfa0b89",
+        "cached": false
+      },
+      "items": [
+        {
+          "number": 24,
+          "title": "Question for the extra conv layers in Encoder",
+          "html_url": "https://github.com/ruiliu-ai/FuseFormer/issues/24",
+          "state": "open",
+          "full_name": null,
+          "tag_name": null,
+          "body": "Hi, I have a question about the **Why adding  extra conv layers in the Encoder**. And this encoder structure is used in the latter SOTA methods like E2FGVI, Pro-painter. In the FuseFormer paper says:\r\n>  Other network structures including the CNN encoder, decoder and discriminator are the same as STTN [43], except that we insert several convolutional layers between encoder and the first Transformer block to compensate for aggressive channel reduction in patch tokenization.\r\n\r\nI did not understand this `compenstae aggressive channel reduction in patch tokenization`, it seems like without any channel reduction, below is my understanding:\r\nBefore Tokenized the Frames' feature shape= `[b, t, c=128, h/4=60, w/4=128]`. After patching with (k, k) kernel and tokenize, the feature becames `[b, t, (n1, n2), (c, k, k)]`, where `n1,n2` denotes the patch_num on height&width. \r\nIf we reshape the patch_token back to image, it becames `[b, t, c, k, k]` the channel still `c`, so where is the channel reduction I am wondering. :thinking:\r\n\r\nHere is the Encoder structure I redraw by referencing the code:\r\n![image](https://github.com/ruiliu-ai/FuseFormer/assets/55100748/b5f267ef-6dd8-4fe0-99a5-d9f6f1d9e146)\r\n\r\n\r\n"
+        },
+        {
+          "number": 23,
+          "title": "License",
+          "html_url": "https://github.com/ruiliu-ai/FuseFormer/issues/23",
+          "state": "open",
+          "full_name": null,
+          "tag_name": null,
+          "body": "Hey, what is the license of the repo?"
+        },
+        {
+          "number": 22,
+          "title": "Appendix",
+          "html_url": "https://github.com/ruiliu-ai/FuseFormer/issues/22",
+          "state": "open",
+          "full_name": null,
+          "tag_name": null,
+          "body": "According to Section 3.1 of the paper, it seems like the paper used to have an Appendix section.\r\nHowever, it seems like both the arxiv & cvf openaccess version don't provide supplementary materials or any other kind of passage that could be considered an appendix.\r\nCould you kindly direct me to where I could find it?"
+        },
+        {
+          "number": 21,
+          "title": "License",
+          "html_url": "https://github.com/ruiliu-ai/FuseFormer/issues/21",
+          "state": "open",
+          "full_name": null,
+          "tag_name": null,
+          "body": "Hi there,\r\ngreat work! Under which license is this repo published ?\r\nThanks!"
+        },
+        {
+          "number": 20,
+          "title": "about the  detail of ref_ids ",
+          "html_url": "https://github.com/ruiliu-ai/FuseFormer/issues/20",
+          "state": "open",
+          "full_name": null,
+          "tag_name": null,
+          "body": "hi，thank you for your work !\r\n\r\nin the test.py:\r\n\r\n    ref_ids = get_ref_index(f, neighbor_ids, video_length)\r\n\r\n    selected_imgs = imgs[:1, neighbor_ids+ref_ids :, :, :]\r\n\r\n    for i in range(len(neighbor_ids)):  \r\n                idx = neighbor_ids[i]\r\n                img = np.array(pred_img[i]).astype(\r\n                    np.uint8)*binary_masks[idx] + frames[idx] * (1-binary_masks[idx])\r\n                if comp_frames[idx] is None:\r\n                    comp_frames[idx] = img\r\n                else:\r\n                    comp_frames[idx] = comp_frames[idx].astype(\r\n                        np.float32)*0.5 + img.astype(np.float32)*0.5\r\n\r\nWhat is the purpose of the reference frames?"
+        }
+      ],
+      "coverage": "First page only; investigate topic-specific issues separately"
+    },
+    "pulls": {
+      "source": {
+        "url": "https://api.github.com/repos/ruiliu-ai/FuseFormer/pulls?per_page=5",
+        "retrieved_at": "2026-09-10T15:41:11.091509+00:00",
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "cached": false
+      },
+      "items": [],
+      "coverage": "First page only; investigate topic-specific issues separately"
+    },
+    "releases": {
+      "source": {
+        "url": "https://api.github.com/repos/ruiliu-ai/FuseFormer/releases?per_page=5",
+        "retrieved_at": "2026-09-10T15:41:11.446209+00:00",
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "cached": false
+      },
+      "items": [],
+      "coverage": "First page only; investigate topic-specific issues separately"
+    },
+    "forks": {
+      "source": {
+        "url": "https://api.github.com/repos/ruiliu-ai/FuseFormer/forks?per_page=5",
+        "retrieved_at": "2026-09-10T15:41:12.045618+00:00",
+        "sha256": "5190a56648db08fdfb2c9f66272603832228eca8c8f77921dc934f0053ead2d3",
+        "cached": false
+      },
+      "items": [
+        {
+          "number": null,
+          "title": null,
+          "html_url": "https://github.com/yjla1109/FuseFormer_test",
+          "state": null,
+          "full_name": "yjla1109/FuseFormer_test",
+          "tag_name": null,
+          "body": null
+        },
+        {
+          "number": null,
+          "title": null,
+          "html_url": "https://github.com/igorenkov/FuseFormer",
+          "state": null,
+          "full_name": "igorenkov/FuseFormer",
+          "tag_name": null,
+          "body": null
+        },
+        {
+          "number": null,
+          "title": null,
+          "html_url": "https://github.com/bingogo888/FuseFormer",
+          "state": null,
+          "full_name": "bingogo888/FuseFormer",
+          "tag_name": null,
+          "body": null
+        },
+        {
+          "number": null,
+          "title": null,
+          "html_url": "https://github.com/MasterHow/FuseFormer",
+          "state": null,
+          "full_name": "MasterHow/FuseFormer",
+          "tag_name": null,
+          "body": null
+        },
+        {
+          "number": null,
+          "title": null,
+          "html_url": "https://github.com/ndkamath/FuseFormer",
+          "state": null,
+          "full_name": "ndkamath/FuseFormer",
+          "tag_name": null,
+          "body": null
+        }
+      ],
+      "coverage": "First page only; investigate topic-specific issues separately"
+    }
+  },
+  "analysis_status": "SOURCE_EVIDENCE_READY_FOR_SKILL_REVIEW",
+  "questions": [
+    "architecture and relevant functions",
+    "inputs/preprocessing/core/temporal/output",
+    "engineering decisions",
+    "local adapter differences",
+    "license of every artifact"
+  ]
+}

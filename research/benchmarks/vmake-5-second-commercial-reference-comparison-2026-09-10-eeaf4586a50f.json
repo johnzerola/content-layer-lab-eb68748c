@@ -1,0 +1,12 @@
+{
+  "id": "vmake-5-second-commercial-reference-comparison-2026-09-10-eeaf4586a50f",
+  "title": "Vmake 5-second commercial reference comparison 2026-09-10",
+  "body": "CONFIRMED: input, Cleaner v3 and Vmake files decode to 147 frames at 1080x1920. Vmake scene cuts occur at frames 71 and 101 versus 74 and 104 in input/Cleaner, so visual pairing requires Vmake offset -3. Aligned 144-frame comparison shows Cleaner v3 removes subtitles but leaves localized blur/texture loss and buckle deformation; Vmake preserves more visible texture and contour in this clip. Subtitle-band Laplacian variance proxy: original 31.838, Cleaner v3 14.512, Vmake 62.256; proxy can reward noise/sharpening and is not a quality score. This is one commercial-reference clip without ground truth, so it cannot establish general win rate. No GPU job was run; incremental cost USD 0.",
+  "sources": [
+    "G:/dowloand/teste/comparacao-final-v3-vmake-20260910/report.json",
+    "G:/dowloand/teste/comparacao-final-v3-vmake-20260910/comparacao-nosso-vs-vmake.mp4"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-10T23:38:46.158850+00:00",
+  "category": "benchmarks"
+}

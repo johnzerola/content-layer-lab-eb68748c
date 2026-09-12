@@ -1,0 +1,17 @@
+{
+  "at": "2026-09-10T15:46:10.700954+00:00",
+  "results": [
+    {
+      "name": "videopainter",
+      "status": "UNAVAILABLE",
+      "error": "HTTPStatusError",
+      "detail": "Client error '403 rate limit exceeded' for url 'https://api.github.com/repos/TencentARC/VideoPainter'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403"
+    },
+    {
+      "name": "cutie",
+      "status": "UNAVAILABLE",
+      "error": "HTTPStatusError",
+      "detail": "Client error '403 rate limit exceeded' for url 'https://api.github.com/repos/hkchengrex/Cutie'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "id": "validate-measurement-harness-99362b9c7713",
+  "title": "Validate measurement harness",
+  "body": "{\"problem\": \"Validate measurement harness\", \"hypothesis\": \"Identity retains subtitles while spatial inpainting reduces synthetic ground-truth error without outside-mask changes\", \"baseline\": \"research/current-system/baseline.json\", \"change\": \"CPU control only; no production change\", \"dataset\": \"research/benchmarks/coverage.json\", \"metrics\": [\"mse_gt\", \"outside_mask_mae\", \"frame_count\"], \"status\": \"DESIGNED\", \"result\": null, \"production_changes\": false}",
+  "sources": [
+    "research/current-system/baseline.json",
+    "research/benchmarks/coverage.json"
+  ],
+  "evidence": "HYPOTHESIS",
+  "recorded_at": "2026-09-10T15:57:01.627326+00:00",
+  "category": "experiments"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "root-cause-a-b-c-c-raw-prediction-confirmed-a-support-composition-b-ra-c07cb8480ab8",
+  "title": "Root cause A/B/C: C raw prediction confirmed, A support/composition, B raw unavailable; DiffuEraser RAM retest",
+  "body": "Archive-only stage audit of A33–35 B87–89 C119–121, no pipeline edits. A/B true numerical raw and separate historical B2 YUV masters NOT_ARCHIVED; do not replace with encoded upstream or later C2 transport branch. C frame120 window15 float16 individual prediction visibly has smooth fabric band before aggregation/encode: MODEL_PREDICTION, priority alternative neural test. A frame34 infermask56800 vscomposition30712; source-relative boundary-step descriptor rises1.4719 restoredROI→5.7260 B2. A classifiedMULTIPLE_CAUSES support/composition contribution, no proof rawcorrect. B frame88 artificialbelt already upstream encoded MP4 (mixedprediction/composition/resize/codec); initialcauseUNDETERMINED; boundarydescriptor1.0146→3.4487. Buckle patch35.314%masked, no geometryGT; independent structuralgate requires5checks,missingRETEST/anyfailureREJECT. Local DiffuEraser FP16 low-memory GPU-loading policy retest aborted18.7989s RAMfree1028042752bytes below1GiB beforefirstCUDAcheckpoint, componentpolicynotexercised. Zero inference/GT/ABC alternativeoutputs. NoCPUOOM attribution/noclaimGPUminimum, B2unchanged,cloud0,noproduction/nofinish/nosweep.",
+  "sources": [
+    "G:/dowloand/teste/root-cause-isolation-20260911/ROOT_CAUSE_ISOLATION_REPORT.md",
+    "G:/dowloand/teste/root-cause-isolation-20260911/stage-evidence.json",
+    "G:/dowloand/teste/root-cause-isolation-20260911/boundary-measurements.json",
+    "G:/dowloand/teste/root-cause-isolation-20260911/diffueraser-retest/monitor.json"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-11T15:22:46.347695+00:00",
+  "category": "benchmarks"
+}

@@ -1,0 +1,22 @@
+{
+  "schema": "cleaneria-phase5-v1",
+  "cases": [
+    {
+      "id": "cloth-001",
+      "source_group": "independent-video-001",
+      "categories": ["cloth", "motion", "simple-subtitle"],
+      "input": "../../../G:/replace-with-local-input.mp4",
+      "baseline": "../../../G:/replace-with-approved-output.mp4",
+      "candidate": "../../../G:/replace-with-candidate-output.mp4",
+      "review": {
+        "residual": 0,
+        "blur": 0,
+        "flicker": 0,
+        "ghosting": 0,
+        "texture": 0,
+        "geometry": 0,
+        "preservation": 0
+      }
+    }
+  ]
+}

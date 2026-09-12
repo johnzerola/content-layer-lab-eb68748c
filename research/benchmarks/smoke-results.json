@@ -1,0 +1,534 @@
+{
+  "at": "2026-09-10T15:45:55.418684+00:00",
+  "claim_scope": "Synthetic CPU controls only",
+  "cases": [
+    {
+      "case": "static",
+      "comparison": {
+        "case_id": "synthetic-static",
+        "results": [
+          {
+            "id": "00aed235948143e9bfa2bc708d72ff5c",
+            "engine": "identity",
+            "seconds": 0.028723299968987703,
+            "metrics": {
+              "outside_mask_mae": 0.0,
+              "boundary_outside_mae": 0.0,
+              "mse_gt": 0.006897324813640053,
+              "psnr_db": 21.613193214302395,
+              "perfect_gt_match": false,
+              "ssim_gt": 0.926891735081194,
+              "temporal_error_delta_proxy": 0.0,
+              "laplacian_variance_proxy": 1020.4508463499282,
+              "lpips": null,
+              "ocr_residual": null,
+              "ghosting": null,
+              "unavailable_reasons": {
+                "lpips": "Optional learned metric not installed",
+                "ocr_residual": "Requires separately validated OCR annotations",
+                "ghosting": "Requires flow/occlusion or blinded human review"
+              },
+              "limitations": "Temporal proxy is unwarped error change, not perceptual flicker. Sharpness can reward noise."
+            }
+          },
+          {
+            "id": "f6aa835138084f209d2911cac65b4b2a",
+            "engine": "opencv-telea",
+            "seconds": 0.04076020000502467,
+            "metrics": {
+              "outside_mask_mae": 0.0,
+              "boundary_outside_mae": 0.0,
+              "mse_gt": 7.689350249903885e-07,
+              "psnr_db": 61.141103565318915,
+              "perfect_gt_match": false,
+              "ssim_gt": 0.9993990778551124,
+              "temporal_error_delta_proxy": 0.0,
+              "laplacian_variance_proxy": 14.987825516594777,
+              "lpips": null,
+              "ocr_residual": null,
+              "ghosting": null,
+              "unavailable_reasons": {
+                "lpips": "Optional learned metric not installed",
+                "ocr_residual": "Requires separately validated OCR annotations",
+                "ghosting": "Requires flow/occlusion or blinded human review"
+              },
+              "limitations": "Temporal proxy is unwarped error change, not perceptual flicker. Sharpness can reward noise."
+            }
+          }
+        ],
+        "verdict": "REVIEW_REQUIRED",
+        "reason": "Single-case metrics do not establish overall superiority"
+      },
+      "reports": [
+        {
+          "schema_version": 1,
+          "id": "00aed235948143e9bfa2bc708d72ff5c",
+          "created_at": "2026-09-10T15:45:53.891780+00:00",
+          "case_id": "synthetic-static",
+          "case_kind": "synthetic-harness-control",
+          "categories": [
+            "static",
+            "white-subtitle"
+          ],
+          "engine": "identity",
+          "parameters": {},
+          "inputs": {
+            "input": "7f49a336c2436d7e25eadc36a1e177ee16b898b8aa3da2f38e78af0674025196",
+            "mask": "e519b1fb7250fd63fbedbc1afb6c18de20bbaff54ce46768362f6c5b54da19fd",
+            "ground_truth": "a22f8e67bd78b19db44a9059570070af845017c5685651b1627571549f128002"
+          },
+          "fps": 30,
+          "frames": 12,
+          "seconds": 0.028723299968987703,
+          "processed_fps": 417.7792946129552,
+          "seconds_per_processed_second": 0.07180824992246926,
+          "ram_sampled_peak_bytes": 36290560,
+          "ram_scope": "Whole lab process, sampled after each frame",
+          "gpu": null,
+          "vram_peak_bytes": null,
+          "runpod_cost_usd": null,
+          "timing_scope": "PNG decode + CPU engine + PNG encode, excludes quality evaluation",
+          "environment": {
+            "python": "3.13.5",
+            "platform": "Windows-10-10.0.19045-SP0",
+            "opencv": "4.13.0",
+            "numpy": "2.4.2"
+          },
+          "metrics": {
+            "outside_mask_mae": 0.0,
+            "boundary_outside_mae": 0.0,
+            "mse_gt": 0.006897324813640053,
+            "psnr_db": 21.613193214302395,
+            "perfect_gt_match": false,
+            "ssim_gt": 0.926891735081194,
+            "temporal_error_delta_proxy": 0.0,
+            "laplacian_variance_proxy": 1020.4508463499282,
+            "lpips": null,
+            "ocr_residual": null,
+            "ghosting": null,
+            "unavailable_reasons": {
+              "lpips": "Optional learned metric not installed",
+              "ocr_residual": "Requires separately validated OCR annotations",
+              "ghosting": "Requires flow/occlusion or blinded human review"
+            },
+            "limitations": "Temporal proxy is unwarped error change, not perceptual flicker. Sharpness can reward noise."
+          },
+          "output_sha256": "7f49a336c2436d7e25eadc36a1e177ee16b898b8aa3da2f38e78af0674025196",
+          "claim_scope": "Harness control; not Cleaner GPU or commercial quality evidence",
+          "report_path": "research/benchmarks/runs/00aed235948143e9bfa2bc708d72ff5c/report.json"
+        },
+        {
+          "schema_version": 1,
+          "id": "f6aa835138084f209d2911cac65b4b2a",
+          "created_at": "2026-09-10T15:45:54.392121+00:00",
+          "case_id": "synthetic-static",
+          "case_kind": "synthetic-harness-control",
+          "categories": [
+            "static",
+            "white-subtitle"
+          ],
+          "engine": "opencv-telea",
+          "parameters": {
+            "radius": 3
+          },
+          "inputs": {
+            "input": "7f49a336c2436d7e25eadc36a1e177ee16b898b8aa3da2f38e78af0674025196",
+            "mask": "e519b1fb7250fd63fbedbc1afb6c18de20bbaff54ce46768362f6c5b54da19fd",
+            "ground_truth": "a22f8e67bd78b19db44a9059570070af845017c5685651b1627571549f128002"
+          },
+          "fps": 30,
+          "frames": 12,
+          "seconds": 0.04076020000502467,
+          "processed_fps": 294.4048360538151,
+          "seconds_per_processed_second": 0.10190050001256168,
+          "ram_sampled_peak_bytes": 40415232,
+          "ram_scope": "Whole lab process, sampled after each frame",
+          "gpu": null,
+          "vram_peak_bytes": null,
+          "runpod_cost_usd": null,
+          "timing_scope": "PNG decode + CPU engine + PNG encode, excludes quality evaluation",
+          "environment": {
+            "python": "3.13.5",
+            "platform": "Windows-10-10.0.19045-SP0",
+            "opencv": "4.13.0",
+            "numpy": "2.4.2"
+          },
+          "metrics": {
+            "outside_mask_mae": 0.0,
+            "boundary_outside_mae": 0.0,
+            "mse_gt": 7.689350249903885e-07,
+            "psnr_db": 61.141103565318915,
+            "perfect_gt_match": false,
+            "ssim_gt": 0.9993990778551124,
+            "temporal_error_delta_proxy": 0.0,
+            "laplacian_variance_proxy": 14.987825516594777,
+            "lpips": null,
+            "ocr_residual": null,
+            "ghosting": null,
+            "unavailable_reasons": {
+              "lpips": "Optional learned metric not installed",
+              "ocr_residual": "Requires separately validated OCR annotations",
+              "ghosting": "Requires flow/occlusion or blinded human review"
+            },
+            "limitations": "Temporal proxy is unwarped error change, not perceptual flicker. Sharpness can reward noise."
+          },
+          "output_sha256": "2163b1c3fde2c97de99f9223efef1c6d06927ca25edc9732f8d985327f079728",
+          "claim_scope": "Harness control; not Cleaner GPU or commercial quality evidence",
+          "report_path": "research/benchmarks/runs/f6aa835138084f209d2911cac65b4b2a/report.json"
+        }
+      ]
+    },
+    {
+      "case": "pan",
+      "comparison": {
+        "case_id": "synthetic-pan",
+        "results": [
+          {
+            "id": "90e44e5d64bb4af2829abe3d5d5a9ba0",
+            "engine": "identity",
+            "seconds": 0.029795899987220764,
+            "metrics": {
+              "outside_mask_mae": 0.0,
+              "boundary_outside_mae": 0.0,
+              "mse_gt": 0.006201361633524144,
+              "psnr_db": 22.075129419533944,
+              "perfect_gt_match": false,
+              "ssim_gt": 0.9276353956236282,
+              "temporal_error_delta_proxy": 0.00012425108932461877,
+              "laplacian_variance_proxy": 982.6754719999103,
+              "lpips": null,
+              "ocr_residual": null,
+              "ghosting": null,
+              "unavailable_reasons": {
+                "lpips": "Optional learned metric not installed",
+                "ocr_residual": "Requires separately validated OCR annotations",
+                "ghosting": "Requires flow/occlusion or blinded human review"
+              },
+              "limitations": "Temporal proxy is unwarped error change, not perceptual flicker. Sharpness can reward noise."
+            }
+          },
+          {
+            "id": "4af8684939d94473b9fc634b1078e7b8",
+            "engine": "opencv-telea",
+            "seconds": 0.037972499849274755,
+            "metrics": {
+              "outside_mask_mae": 0.0,
+              "boundary_outside_mae": 0.0,
+              "mse_gt": 7.691853293605023e-07,
+              "psnr_db": 61.13969007634988,
+              "perfect_gt_match": false,
+              "ssim_gt": 0.9993986254567363,
+              "temporal_error_delta_proxy": 9.20664983164983e-07,
+              "laplacian_variance_proxy": 14.975547954771253,
+              "lpips": null,
+              "ocr_residual": null,
+              "ghosting": null,
+              "unavailable_reasons": {
+                "lpips": "Optional learned metric not installed",
+                "ocr_residual": "Requires separately validated OCR annotations",
+                "ghosting": "Requires flow/occlusion or blinded human review"
+              },
+              "limitations": "Temporal proxy is unwarped error change, not perceptual flicker. Sharpness can reward noise."
+            }
+          }
+        ],
+        "verdict": "REVIEW_REQUIRED",
+        "reason": "Single-case metrics do not establish overall superiority"
+      },
+      "reports": [
+        {
+          "schema_version": 1,
+          "id": "90e44e5d64bb4af2829abe3d5d5a9ba0",
+          "created_at": "2026-09-10T15:45:54.620182+00:00",
+          "case_id": "synthetic-pan",
+          "case_kind": "synthetic-harness-control",
+          "categories": [
+            "pan",
+            "white-subtitle"
+          ],
+          "engine": "identity",
+          "parameters": {},
+          "inputs": {
+            "input": "e982a933ab7e15ce8e498c027523f03b5f7d3b59e385098da6a8f18fdf89a5bf",
+            "mask": "e519b1fb7250fd63fbedbc1afb6c18de20bbaff54ce46768362f6c5b54da19fd",
+            "ground_truth": "ad642f57d2632137825757f631718c86987ff9afb312066bbad2a076ff6c9789"
+          },
+          "fps": 30,
+          "frames": 12,
+          "seconds": 0.029795899987220764,
+          "processed_fps": 402.7399744644971,
+          "seconds_per_processed_second": 0.07448974996805191,
+          "ram_sampled_peak_bytes": 40419328,
+          "ram_scope": "Whole lab process, sampled after each frame",
+          "gpu": null,
+          "vram_peak_bytes": null,
+          "runpod_cost_usd": null,
+          "timing_scope": "PNG decode + CPU engine + PNG encode, excludes quality evaluation",
+          "environment": {
+            "python": "3.13.5",
+            "platform": "Windows-10-10.0.19045-SP0",
+            "opencv": "4.13.0",
+            "numpy": "2.4.2"
+          },
+          "metrics": {
+            "outside_mask_mae": 0.0,
+            "boundary_outside_mae": 0.0,
+            "mse_gt": 0.006201361633524144,
+            "psnr_db": 22.075129419533944,
+            "perfect_gt_match": false,
+            "ssim_gt": 0.9276353956236282,
+            "temporal_error_delta_proxy": 0.00012425108932461877,
+            "laplacian_variance_proxy": 982.6754719999103,
+            "lpips": null,
+            "ocr_residual": null,
+            "ghosting": null,
+            "unavailable_reasons": {
+              "lpips": "Optional learned metric not installed",
+              "ocr_residual": "Requires separately validated OCR annotations",
+              "ghosting": "Requires flow/occlusion or blinded human review"
+            },
+            "limitations": "Temporal proxy is unwarped error change, not perceptual flicker. Sharpness can reward noise."
+          },
+          "output_sha256": "e982a933ab7e15ce8e498c027523f03b5f7d3b59e385098da6a8f18fdf89a5bf",
+          "claim_scope": "Harness control; not Cleaner GPU or commercial quality evidence",
+          "report_path": "research/benchmarks/runs/90e44e5d64bb4af2829abe3d5d5a9ba0/report.json"
+        },
+        {
+          "schema_version": 1,
+          "id": "4af8684939d94473b9fc634b1078e7b8",
+          "created_at": "2026-09-10T15:45:54.844813+00:00",
+          "case_id": "synthetic-pan",
+          "case_kind": "synthetic-harness-control",
+          "categories": [
+            "pan",
+            "white-subtitle"
+          ],
+          "engine": "opencv-telea",
+          "parameters": {
+            "radius": 3
+          },
+          "inputs": {
+            "input": "e982a933ab7e15ce8e498c027523f03b5f7d3b59e385098da6a8f18fdf89a5bf",
+            "mask": "e519b1fb7250fd63fbedbc1afb6c18de20bbaff54ce46768362f6c5b54da19fd",
+            "ground_truth": "ad642f57d2632137825757f631718c86987ff9afb312066bbad2a076ff6c9789"
+          },
+          "fps": 30,
+          "frames": 12,
+          "seconds": 0.037972499849274755,
+          "processed_fps": 316.0181722992143,
+          "seconds_per_processed_second": 0.09493124962318689,
+          "ram_sampled_peak_bytes": 40390656,
+          "ram_scope": "Whole lab process, sampled after each frame",
+          "gpu": null,
+          "vram_peak_bytes": null,
+          "runpod_cost_usd": null,
+          "timing_scope": "PNG decode + CPU engine + PNG encode, excludes quality evaluation",
+          "environment": {
+            "python": "3.13.5",
+            "platform": "Windows-10-10.0.19045-SP0",
+            "opencv": "4.13.0",
+            "numpy": "2.4.2"
+          },
+          "metrics": {
+            "outside_mask_mae": 0.0,
+            "boundary_outside_mae": 0.0,
+            "mse_gt": 7.691853293605023e-07,
+            "psnr_db": 61.13969007634988,
+            "perfect_gt_match": false,
+            "ssim_gt": 0.9993986254567363,
+            "temporal_error_delta_proxy": 9.20664983164983e-07,
+            "laplacian_variance_proxy": 14.975547954771253,
+            "lpips": null,
+            "ocr_residual": null,
+            "ghosting": null,
+            "unavailable_reasons": {
+              "lpips": "Optional learned metric not installed",
+              "ocr_residual": "Requires separately validated OCR annotations",
+              "ghosting": "Requires flow/occlusion or blinded human review"
+            },
+            "limitations": "Temporal proxy is unwarped error change, not perceptual flicker. Sharpness can reward noise."
+          },
+          "output_sha256": "0fc0ac6b15526c89c97e5cbfc38c88a93e0280a66945625e44d254e6d9234a8d",
+          "claim_scope": "Harness control; not Cleaner GPU or commercial quality evidence",
+          "report_path": "research/benchmarks/runs/4af8684939d94473b9fc634b1078e7b8/report.json"
+        }
+      ]
+    },
+    {
+      "case": "scene-cut",
+      "comparison": {
+        "case_id": "synthetic-scene-cut",
+        "results": [
+          {
+            "id": "4aae3fae16fb47a0a81be3a4113ba0ff",
+            "engine": "identity",
+            "seconds": 0.02885110001079738,
+            "metrics": {
+              "outside_mask_mae": 0.0,
+              "boundary_outside_mae": 0.0,
+              "mse_gt": 0.006103947566908028,
+              "psnr_db": 22.143892056397284,
+              "perfect_gt_match": false,
+              "ssim_gt": 0.9277120034004044,
+              "temporal_error_delta_proxy": 0.0,
+              "laplacian_variance_proxy": 970.0319010374279,
+              "lpips": null,
+              "ocr_residual": null,
+              "ghosting": null,
+              "unavailable_reasons": {
+                "lpips": "Optional learned metric not installed",
+                "ocr_residual": "Requires separately validated OCR annotations",
+                "ghosting": "Requires flow/occlusion or blinded human review"
+              },
+              "limitations": "Temporal proxy is unwarped error change, not perceptual flicker. Sharpness can reward noise."
+            }
+          },
+          {
+            "id": "01a6dbc9fb2349229677370a8b6643db",
+            "engine": "opencv-telea",
+            "seconds": 0.03705850010737777,
+            "metrics": {
+              "outside_mask_mae": 0.0,
+              "boundary_outside_mae": 0.0,
+              "mse_gt": 1.1318763616557734e-06,
+              "psnr_db": 59.46201009882025,
+              "perfect_gt_match": false,
+              "ssim_gt": 0.9992549787847965,
+              "temporal_error_delta_proxy": 0.0,
+              "laplacian_variance_proxy": 15.05026041242811,
+              "lpips": null,
+              "ocr_residual": null,
+              "ghosting": null,
+              "unavailable_reasons": {
+                "lpips": "Optional learned metric not installed",
+                "ocr_residual": "Requires separately validated OCR annotations",
+                "ghosting": "Requires flow/occlusion or blinded human review"
+              },
+              "limitations": "Temporal proxy is unwarped error change, not perceptual flicker. Sharpness can reward noise."
+            }
+          }
+        ],
+        "verdict": "REVIEW_REQUIRED",
+        "reason": "Single-case metrics do not establish overall superiority"
+      },
+      "reports": [
+        {
+          "schema_version": 1,
+          "id": "4aae3fae16fb47a0a81be3a4113ba0ff",
+          "created_at": "2026-09-10T15:45:55.063419+00:00",
+          "case_id": "synthetic-scene-cut",
+          "case_kind": "synthetic-harness-control",
+          "categories": [
+            "scene-cut",
+            "white-subtitle"
+          ],
+          "engine": "identity",
+          "parameters": {},
+          "inputs": {
+            "input": "5c2ff8b3d481068aadfd596f85e126b5538d28979ed7a6bc7a370b6e9883a4fb",
+            "mask": "e519b1fb7250fd63fbedbc1afb6c18de20bbaff54ce46768362f6c5b54da19fd",
+            "ground_truth": "6ffb7a194fe38fb1515ca3b4ffcdbc84b1569d1ff29023b8d3fe2eaacebb32b8"
+          },
+          "fps": 30,
+          "frames": 12,
+          "seconds": 0.02885110001079738,
+          "processed_fps": 415.9286819396508,
+          "seconds_per_processed_second": 0.07212775002699345,
+          "ram_sampled_peak_bytes": 40345600,
+          "ram_scope": "Whole lab process, sampled after each frame",
+          "gpu": null,
+          "vram_peak_bytes": null,
+          "runpod_cost_usd": null,
+          "timing_scope": "PNG decode + CPU engine + PNG encode, excludes quality evaluation",
+          "environment": {
+            "python": "3.13.5",
+            "platform": "Windows-10-10.0.19045-SP0",
+            "opencv": "4.13.0",
+            "numpy": "2.4.2"
+          },
+          "metrics": {
+            "outside_mask_mae": 0.0,
+            "boundary_outside_mae": 0.0,
+            "mse_gt": 0.006103947566908028,
+            "psnr_db": 22.143892056397284,
+            "perfect_gt_match": false,
+            "ssim_gt": 0.9277120034004044,
+            "temporal_error_delta_proxy": 0.0,
+            "laplacian_variance_proxy": 970.0319010374279,
+            "lpips": null,
+            "ocr_residual": null,
+            "ghosting": null,
+            "unavailable_reasons": {
+              "lpips": "Optional learned metric not installed",
+              "ocr_residual": "Requires separately validated OCR annotations",
+              "ghosting": "Requires flow/occlusion or blinded human review"
+            },
+            "limitations": "Temporal proxy is unwarped error change, not perceptual flicker. Sharpness can reward noise."
+          },
+          "output_sha256": "5c2ff8b3d481068aadfd596f85e126b5538d28979ed7a6bc7a370b6e9883a4fb",
+          "claim_scope": "Harness control; not Cleaner GPU or commercial quality evidence",
+          "report_path": "research/benchmarks/runs/4aae3fae16fb47a0a81be3a4113ba0ff/report.json"
+        },
+        {
+          "schema_version": 1,
+          "id": "01a6dbc9fb2349229677370a8b6643db",
+          "created_at": "2026-09-10T15:45:55.309762+00:00",
+          "case_id": "synthetic-scene-cut",
+          "case_kind": "synthetic-harness-control",
+          "categories": [
+            "scene-cut",
+            "white-subtitle"
+          ],
+          "engine": "opencv-telea",
+          "parameters": {
+            "radius": 3
+          },
+          "inputs": {
+            "input": "5c2ff8b3d481068aadfd596f85e126b5538d28979ed7a6bc7a370b6e9883a4fb",
+            "mask": "e519b1fb7250fd63fbedbc1afb6c18de20bbaff54ce46768362f6c5b54da19fd",
+            "ground_truth": "6ffb7a194fe38fb1515ca3b4ffcdbc84b1569d1ff29023b8d3fe2eaacebb32b8"
+          },
+          "fps": 30,
+          "frames": 12,
+          "seconds": 0.03705850010737777,
+          "processed_fps": 323.81234980449165,
+          "seconds_per_processed_second": 0.09264625026844442,
+          "ram_sampled_peak_bytes": 40775680,
+          "ram_scope": "Whole lab process, sampled after each frame",
+          "gpu": null,
+          "vram_peak_bytes": null,
+          "runpod_cost_usd": null,
+          "timing_scope": "PNG decode + CPU engine + PNG encode, excludes quality evaluation",
+          "environment": {
+            "python": "3.13.5",
+            "platform": "Windows-10-10.0.19045-SP0",
+            "opencv": "4.13.0",
+            "numpy": "2.4.2"
+          },
+          "metrics": {
+            "outside_mask_mae": 0.0,
+            "boundary_outside_mae": 0.0,
+            "mse_gt": 1.1318763616557734e-06,
+            "psnr_db": 59.46201009882025,
+            "perfect_gt_match": false,
+            "ssim_gt": 0.9992549787847965,
+            "temporal_error_delta_proxy": 0.0,
+            "laplacian_variance_proxy": 15.05026041242811,
+            "lpips": null,
+            "ocr_residual": null,
+            "ghosting": null,
+            "unavailable_reasons": {
+              "lpips": "Optional learned metric not installed",
+              "ocr_residual": "Requires separately validated OCR annotations",
+              "ghosting": "Requires flow/occlusion or blinded human review"
+            },
+            "limitations": "Temporal proxy is unwarped error change, not perceptual flicker. Sharpness can reward noise."
+          },
+          "output_sha256": "8f37faa9643c98e7ad9012f5cfe3f2adfd4d3dd9f45adf974fffc426cdca61aa",
+          "claim_scope": "Harness control; not Cleaner GPU or commercial quality evidence",
+          "report_path": "research/benchmarks/runs/01a6dbc9fb2349229677370a8b6643db/report.json"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "phase-5-local-realbasicvsr-smoke-passes-sweater-a20-a40-not-promoted-818d1a7dd7f7",
+  "title": "Phase 5 local RealBasicVSR smoke passes; sweater A20 A40 not promoted",
+  "body": "CONFIRMED: local RTX2060 Torch2.11+cu128 executed pinned MMEditing RealBasicVSR via narrow infrastructure adapter, official checkpoint hash verified, all320 state keys strict-loaded; repeat synthetic smoke delta0.18 actual sweater frames116-133 at native512x224 were processed in six seven-frame windows,14.663s synchronized inference,27.704s runner,1.287GiB peak allocated VRAM. B2 OFF master SHA08e73ade1fa0048f33a5701502f6825428ee392c4e8748ddab6cffb1093779b5 frozen. A20/A40 differ only blend0.2/0.4, mask protects accepted real donors and all outside sweater support. Full147-frame lossless master decode proves zero altered pixels outside candidate support. Temporal proxy changed -1.294%/+0.122%, not proof of flicker-free perception. Visual sample judgment: synthetic band remains; more acutance does not prove texture recovery. Both REJECT for promotion, B2 retained. Motion comparison has SOURCE,V3,B2,A20,A40 and Vmake reference only; Vmake never model input/donor/GT. Commercial-reference constant-3 motion alignment has documented frame124 nearest-match exception. No full-scene inference, no production, no paid resource started; incremental cloud cost USD0, electricity unmeasured. Model GT metrics null. Browser playback tested; independent blinded motion assessment pending, not fabricated. Scope one short clip, not general superiority or parity with legacy runtime.",
+  "sources": [
+    "research/experiments/PHASE_5_REPORT.md",
+    "research/experiments/phase5_runtime.py",
+    "research/experiments/phase5_infer.py",
+    "research/experiments/phase5_evaluate.py",
+    "G:/dowloand/teste/phase-5-20260911/inference.json",
+    "G:/dowloand/teste/phase-5-20260911/harness-comparison.json",
+    "https://github.com/open-mmlab/mmediting/tree/8b819f1d28d6eed6244721278a099f5dc0848a20"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-11T04:00:14.334627+00:00",
+  "category": "benchmarks"
+}

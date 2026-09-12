@@ -1,0 +1,14 @@
+{
+  "id": "experiment-3-diffueraser-initialization-stopped-by-ram-guard-before-in-8f758b8c49cb",
+  "title": "Experiment 3 DiffuEraser initialization stopped by RAM guard before inference",
+  "body": "Local official commit 8e6f279ac7531e27ad1849c6f8dab5372a8597e7; Python3.11.9 Torch2.3.1cu121 RTX2060 6144MiB. CUDA minimal matrix operation and imports passed. pip check passed. 23 local weight/config artifacts hashed; 8 LFS etags match. Actual model initialization stopped after110.5065s at1014558720bytes free RAM, guard1GiB. Peak whole-device memory947MiB is partial initialization, NOT inference requirement; no CUDA OOM seen. No inference outputs or quality metrics. B2 hash unchanged. Cloud0. RETEST_RUNTIME_BLOCKED, not rejection of model quality. SOURCE GT prepared22real frames112-133,score118-129,same rectangle270295590345 in820x410crop, calibrated709 decode. Old Exp2 Telea+donors cannot be called a ProPainter GT baseline. Stock DiffuEraser prior defaults resize_ratio0.6; intermediate/final mp4v and prior deletion conflict with required fidelity/evidence. No alternative engine, no paid GPU, no Phase6/prod. Commercial chain not cleared: ProPainter prior NC absent separate authorization; PCM checkpoint-specific terms unresolved.",
+  "sources": [
+    "research/experiments/EXPERIMENT_3_ALTERNATIVE_INPAINTING_REPORT.md",
+    "G:/dowloand/teste/experiment-3-alternative-inpainting-20260911/initialization-monitor.json",
+    "G:/dowloand/teste/experiment-3-alternative-inpainting-20260911/preflight-inventory.json",
+    "https://github.com/lixiaowen-xw/DiffuEraser/blob/8e6f279ac7531e27ad1849c6f8dab5372a8597e7/README.md"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-11T13:38:11.326551+00:00",
+  "category": "failures"
+}

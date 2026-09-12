@@ -1,0 +1,20 @@
+{
+  "evidence": "LOCAL_WORKING_TREE",
+  "deployment": "UNVERIFIED",
+  "reviewed_at": "2026-09-10",
+  "stages": [
+    {"id":"frontend","next":["orchestration"],"files":["src/components/CleanerIAStudio.tsx","src/lib/cleaner.functions.ts"]},
+    {"id":"orchestration","next":["api","gpu"],"files":["src/lib/cleaner-chunks.server.ts","src/lib/cleaner-gpu.server.ts"]},
+    {"id":"api","next":["worker"],"files":["backend/app/main.py","backend/app/storage.py"]},
+    {"id":"gpu","next":["worker"],"files":["backend/runpod_handler.py"]},
+    {"id":"worker","symbol":"run_pipeline","next":["scenes"],"files":["backend/app/workers/tasks.py"]},
+    {"id":"scenes","next":["text-mask"],"files":["backend/app/services/scene.py","backend/app/services/scene_pipeline.py"]},
+    {"id":"text-mask","next":["roi"],"files":["backend/app/services/text_detect.py","backend/app/services/mask.py","backend/app/services/mask_modes.py","backend/app/services/tracking.py"]},
+    {"id":"roi","next":["engine"],"files":["backend/app/services/inference_region.py","backend/app/services/subtitle_policy.py"]},
+    {"id":"engine","next":["composition"],"files":["backend/app/engines/propainter_official.py","backend/app/engines/diffueraser_official.py","backend/app/engines/tbe.py"]},
+    {"id":"composition","next":["verify"],"files":["backend/app/services/pixel_composite.py","backend/app/utils/video.py"]},
+    {"id":"verify","next":["encode-output"],"files":["backend/app/services/verify.py","backend/app/services/quality_policy.py"]},
+    {"id":"encode-output","next":[],"files":["backend/app/utils/video.py","backend/app/services/chunking.py","backend/app/storage.py"]}
+  ],
+  "limitations": "Curated conceptual graph; conditional/crop-clean paths and runtime call graph require source inspection. Presence checks do not prove deployment."
+}

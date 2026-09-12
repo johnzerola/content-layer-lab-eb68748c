@@ -1,0 +1,15 @@
+{
+  "id": "legacy-refined-quality-profile-shared-by-propainter-and-diffueraser-0c44dc549dfd",
+  "title": "Legacy refined quality profile shared by ProPainter and DiffuEraser",
+  "body": "CONFIRMED in working tree: Cleaner requests default to quality_profile=legacy_refined. Both official engines use scene-local dual subtitle masks; inference uses stable context masks and final composition/audit use tight masks. Global enhancement remains off by default. The worker reports profile and selected engine under pipeline revision scene-roi-v4. Python focused suite: 42 passed. Frontend focused suite: 17 passed. TypeScript noEmit: passed.",
+  "sources": [
+    "backend/app/workers/tasks.py",
+    "backend/app/services/subtitle_policy.py",
+    "backend/runpod_handler.py",
+    "src/components/CleanerIAStudio.tsx",
+    "src/lib/cleaner-gpu.server.ts"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-11T20:38:07.386776+00:00",
+  "category": "current-system"
+}

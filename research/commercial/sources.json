@@ -1,0 +1,11 @@
+[
+  {"company":"Vmake","title":"Video subtitle remover","url":"https://vmake.ai/remove-subtitles-from-video","kind":"product claims","evidence":"CONFIRMED_PUBLIC_PAGE_NOT_ARCHITECTURE"},
+  {"company":"Vmake","title":"Video watermark remover","url":"https://vmake.ai/video-watermark-remover","kind":"product claims","evidence":"RETRIEVAL_REQUIRED"},
+  {"company":"Runway","title":"Inpainting documentation","url":"https://help.runwayml.com/hc/en-us/articles/19158047327507-Inpainting","kind":"documentation","evidence":"RETRIEVAL_REQUIRED"},
+  {"company":"Adobe","title":"Content-Aware Fill for video","url":"https://helpx.adobe.com/after-effects/desktop/remove-objects-from-your-videos/content-aware-fill.html","kind":"documentation","evidence":"CONFIRMED_PUBLIC_WORKFLOW_NOT_MODEL"},
+  {"company":"Vmake","title":"Terms of Service; AI Addendum section 5","url":"https://vmake.ai/terms-of-service","kind":"terms","evidence":"CONFIRMED_RESTRICTION_ON_IMPROVING_OTHER_AI_SERVICES"},
+  {"company":"Adobe Research","title":"Project Cloak: Remove Unwanted Objects in Video","url":"https://research.adobe.com/news/cloak-remove-unwanted-objects-in-video/","kind":"research","evidence":"CONFIRMED_DENSE_FORWARD_BACKWARD_TRACKING_AND_GENERATIVE_FALLBACK"},
+  {"company":"Adobe Research","title":"Project Fast Mask","url":"https://research.adobe.com/news/project-fast-mask/","kind":"research","evidence":"CONFIRMED_PUBLIC_VIDEO_MASKING_RESEARCH_NOT_CAF_ARCHITECTURE"},
+  {"company":"Robot Learning Lab","title":"DynaFill","url":"https://inpainting.cs.uni-freiburg.de/","kind":"research and licensing","evidence":"CONFIRMED_NONCOMMERCIAL_DATA_AND_COMMERCIAL_CONTACT_PATH"},
+  {"company":"UPOCR authors","title":"UPOCR paper","url":"https://arxiv.org/abs/2312.02694","kind":"paper","evidence":"CONFIRMED_PAPER_ONLY_LICENSE_ARTIFACT_PENDING"}
+]

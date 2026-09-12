@@ -1,0 +1,14 @@
+{
+  "id": "phase-5-validation-gate-implemented-with-current-coverage-audit-7b0bd5086dd5",
+  "title": "Phase 5 validation gate implemented with current coverage audit",
+  "body": "Phase 5 now has a reproducible validation gate. It requires at least ten cases from ten independent source groups and coverage of cloth, straight lines, skin/face, hair, motion, low light, simple subtitles, neon, shadow and transitions. It hashes input/baseline/candidate, checks resolution, FPS, decoded frame count, duration and audio presence, and defines seven human review dimensions scored 0..4. Current audit found one independent real source covering six categories; neon, shadow, straight lines and transitions are missing, and no accepted candidate exists. Therefore status is incomplete, three-minute cost is null and promotion is false. This is an evidence-based dataset gap, not a model quality verdict.",
+  "sources": [
+    "research/experiments/phase5_validate.py",
+    "research/experiments/phase5-current-20260910.json",
+    "research/benchmarks/runs/phase5-current-20260910/report.json",
+    "research/experiments/PHASE5-STATUS-20260910.md"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-10T23:06:16.521899+00:00",
+  "category": "benchmarks"
+}

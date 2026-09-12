@@ -1,0 +1,12 @@
+{
+  "id": "experiment-3-alternative-local-inpainting-under-explicit-runtime-and-g-656952fa8b1f",
+  "title": "Experiment 3: alternative local inpainting under explicit runtime and GT gates; no paid GPU or deployment.",
+  "body": "{\"problem\": \"Experiment 3: alternative local inpainting under explicit runtime and GT gates; no paid GPU or deployment.\", \"hypothesis\": \"Alternative inpainting may reconstruct residual texture more faithfully than ProPainter after fidelity and temporal-context controls.\", \"baseline\": \"B2 finish OFF frozen, Experiment 1 fidelity contract\", \"change\": \"DiffuEraser official SOURCE+approved mask. Local readiness and resource-guarded smoke first; GT before real cases.\", \"dataset\": \"Current source: synthetic clean sweater GT frames118-129; real cases A/B/C and clean sentinel D. Vmake visual reference only.\", \"metrics\": [\"runtime\", \"VRAM\", \"weight hashes\", \"GT MAE/SSIM\", \"texture correlation\", \"temporal error\", \"outside-mask identity\", \"license provenance\"], \"status\": \"DESIGNED\", \"result\": null, \"production_changes\": false}",
+  "sources": [
+    "B2 finish OFF frozen, Experiment 1 fidelity contract",
+    "Current source: synthetic clean sweater GT frames118-129; real cases A/B/C and clean sentinel D. Vmake visual reference only."
+  ],
+  "evidence": "HYPOTHESIS",
+  "recorded_at": "2026-09-11T13:26:08.425675+00:00",
+  "category": "experiments"
+}

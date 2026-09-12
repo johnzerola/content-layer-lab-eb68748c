@@ -1,0 +1,13 @@
+{
+  "id": "extra-fidelity-gate-with-real-c2-roi-exact-external-masters-alternativ-00d4b6d70c8a",
+  "title": "Extra fidelity gate with real C2 ROI: exact external masters, alternative engine pending",
+  "body": "Local transport experiment, SOURCE frames104–146 + archived ProPainter C2 real ROI + real masks. 43/43 RGB working/master decoded RGB external exact under symmetric709 accurate decoder; YUV external planes exact. Chroma inward guard4px selected on real and saturated controls: guard0 real leaked733 external RGB pixels at frame120; guard4 zero. Raw YUV initially suffered FFmpeg automatic conversion despite CRF0; truthful input setparams fixed it, decoded full-stream hashes now exact. ROI824x296 crop820x294 exact. Relative rational PTS zero error. Three local partitions content-identical to monolithic. One CRF16 slow delivery; no lossy transport, no neural inference, B2 unchanged, cloud0. Inside chroma boundary and three native stills inspected; no obvious added fringe, artificial band persists. Not blind human motion certification. Shared engine-neutral harness exists but actual DiffuEraser end-to-end NOT_RUN; runtime blocker persists. CRF sweep and perceptual finish deferred pending required gates. No production changes.",
+  "sources": [
+    "G:/dowloand/teste/extra-global-fidelity-gate-20260911/EXTRA_GLOBAL_FIDELITY_GATE_REPORT.md",
+    "G:/dowloand/teste/extra-global-fidelity-gate-20260911/result.json",
+    "G:/dowloand/teste/extra-global-fidelity-gate-20260911/review.json"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-11T14:36:52.123157+00:00",
+  "category": "benchmarks"
+}
