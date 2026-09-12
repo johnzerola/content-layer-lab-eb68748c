@@ -371,15 +371,33 @@ export function ChatSceneStudio() {
                     aria-label="Texto da mensagem"
                   />
 
-                  {m.kind === "image" && (
-                    <div className="mt-1.5 flex items-center gap-1.5">
+                  {(m.kind === "image" || m.kind === "sticker" || m.kind === "video") && (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <label className="flex cursor-pointer items-center gap-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs hover:border-primary">
+                        {uploading === m.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Upload className="size-3.5" />
+                        )}
+                        {m.kind === "video" ? "Enviar vídeo" : m.kind === "sticker" ? "Enviar figurinha" : "Enviar foto"}
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept={m.kind === "video" ? "video/*" : "image/*"}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            e.target.value = "";
+                            if (file) void handleUpload(m.id, file);
+                          }}
+                        />
+                      </label>
                       <ImageIcon className="size-3.5 text-muted-foreground" />
                       <input
-                        value={m.mediaUrl ?? ""}
+                        value={m.mediaUrl?.startsWith("blob:") ? "arquivo do computador" : m.mediaUrl ?? ""}
                         onChange={(e) => updateMessage(m.id, { mediaUrl: e.target.value || null })}
-                        placeholder="Endereço da imagem (https://…)"
-                        className="flex-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none"
-                        aria-label="Endereço da imagem"
+                        placeholder="ou cole um endereço (https://…)"
+                        className="min-w-[140px] flex-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none"
+                        aria-label="Endereço da mídia"
                       />
                     </div>
                   )}
