@@ -45,11 +45,74 @@ export interface ChatTheme {
   tail: boolean;
 }
 
-type ThemeFamily = { id: string; label: string; description: string; dark: ChatTheme; light: ChatTheme };
+/** Campos de apresentação que ganham valor automático quando não declarados. */
+type ThemeDraft = Omit<ChatTheme, "meta" | "metaSelf" | "check" | "wallpaper" | "doodle" | "tail"> &
+  Partial<Pick<ChatTheme, "meta" | "metaSelf" | "check" | "wallpaper" | "doodle" | "tail">>;
+
+type ThemeFamily = { id: string; label: string; description: string; dark: ThemeDraft; light: ThemeDraft };
 
 const FONT = "'Figtree', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif";
 
 const FAMILIES: ThemeFamily[] = [
+  {
+    id: "zap",
+    label: "Mensageiro",
+    description: "Verde clássico com papel de parede — cara de conversa real.",
+    dark: {
+      id: "zap",
+      label: "Mensageiro",
+      description: "",
+      background: "#0b141a",
+      backgroundAlt: "#0b141a",
+      surface: "#0b141a",
+      header: "#1f2c33",
+      headerText: "#e9edef",
+      headerMuted: "#8696a0",
+      divider: "#111b21",
+      selfBubble: "#005c4b",
+      selfText: "#e9edef",
+      peerBubble: "#1f2c33",
+      peerText: "#e9edef",
+      systemText: "#8696a0",
+      systemBubble: "#182229",
+      nameText: "#53bdeb",
+      fontFamily: FONT,
+      radius: 0.26,
+      meta: "#8696a0",
+      metaSelf: "#9fd7c4",
+      check: "#53bdeb",
+      wallpaper: "#0b141a",
+      doodle: "rgba(233,237,239,0.05)",
+      tail: true,
+    },
+    light: {
+      id: "zap",
+      label: "Mensageiro",
+      description: "",
+      background: "#efe7dd",
+      backgroundAlt: "#efe7dd",
+      surface: "#efe7dd",
+      header: "#f0f2f5",
+      headerText: "#111b21",
+      headerMuted: "#667781",
+      divider: "#d9dbdf",
+      selfBubble: "#d9fdd3",
+      selfText: "#111b21",
+      peerBubble: "#ffffff",
+      peerText: "#111b21",
+      systemText: "#5b6b73",
+      systemBubble: "#ffeecd",
+      nameText: "#1f7aad",
+      fontFamily: FONT,
+      radius: 0.26,
+      meta: "#667781",
+      metaSelf: "#5c8f74",
+      check: "#3aa3e3",
+      wallpaper: "#efe7dd",
+      doodle: "rgba(17,27,33,0.05)",
+      tail: true,
+    },
+  },
   {
     id: "noite",
     label: "Noite",
