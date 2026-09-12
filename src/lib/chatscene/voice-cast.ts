@@ -173,7 +173,13 @@ export function createGatewayVoiceProvider(
       const { audio, mime } = await call({
         text,
         voice: profile.providerVoiceId ?? preset.providerVoice,
-        direction: voiceDirection(profile.style, direction?.emotion),
+        direction: voiceDirection(
+          profile.style,
+          direction?.emotion,
+          Math.max(0, Math.min(1, (profile.energy ?? 0.5) * (direction?.energyMultiplier ?? 1))),
+          preset.age,
+          preset.gender,
+        ),
         speed: Math.max(0.7, Math.min(1.3, profile.speed * (direction?.speedMultiplier ?? 1))),
       });
       const bytes = Uint8Array.from(atob(audio), (c) => c.charCodeAt(0));

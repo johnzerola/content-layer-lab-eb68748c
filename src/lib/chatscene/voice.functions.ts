@@ -38,7 +38,10 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
         voice: data.voice,
         response_format: "mp3",
         speed: data.speed ?? 1,
-        ...(data.direction ? { instructions: data.direction } : {}),
+        // o idioma nunca é opcional: o estilo pedido é somado ao português do Brasil
+        instructions: `Fale em português do Brasil (pt-BR), com pronúncia brasileira natural e dicção clara. ${
+          data.direction ?? "Use tom de conversa real, sem soar robótico."
+        }`,
       }),
     });
 

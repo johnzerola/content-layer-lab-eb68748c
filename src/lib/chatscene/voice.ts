@@ -138,10 +138,13 @@ export function voicePreset(id: string | undefined): VoicePreset { return VOICE_
 export function profileFromPreset(id: string, base: Partial<VoiceProfile> = {}): VoiceProfile {
   const p=voicePreset(id); return { ...DEFAULT_VOICE,...p.profile,...base,presetId:p.id,providerVoiceId:base.providerVoiceId??p.providerVoice,ageStyle:p.age,genderStyle:p.gender,name:base.name??p.label };
 }
-export function voiceDirection(style: VoiceStyle | undefined, emotion: VoiceEmotion = "neutral"): string {
+export function voiceDirection(style: VoiceStyle | undefined, emotion: VoiceEmotion = "neutral", energy?: number, age?: string, gender?: string): string {
   const base=(VOICE_STYLES.find(s=>s.id===style)??VOICE_STYLES[0]!).direction;
   const emotionMap: Record<VoiceEmotion,string>={neutral:"",happy:" Soe feliz.",excited:" Soe empolgada.",serious:" Soe séria.",nervous:" Soe nervosa.",annoyed:" Soe incomodada.","angry-theatrical":" Soe brava de forma teatral, sem gritar.",sad:" Soe triste e contida.",sarcastic:" Use ironia leve.",surprised:" Soe surpresa.","whisper-like":" Fale como um segredo, sem perder clareza."};
-  return `${base}${emotionMap[emotion]}`;
+  const energyText = energy === undefined ? "" : energy <= .3 ? " Volume baixo e intensidade contida." : energy >= .7 ? " Bastante energia e projeção." : " Intensidade média, sem exagero.";
+  const castText = age || gender ? ` Personagem: ${[age, gender].filter(Boolean).join(", ")}.` : "";
+  // sotaque brasileiro é obrigatório: nunca deixar a voz cair para português europeu
+  return `Fale em português do Brasil (pt-BR) com pronúncia brasileira natural, dicção clara e ritmo de conversa real. ${base}${emotionMap[emotion]}${energyText}${castText}`.trim();
 }
 
 export interface VoiceMixSettings { enabled:boolean; ducking:boolean; normalize:boolean; musicUrl?:string|null; musicGain:number; duckingAmount?:number; duckingAttackMs?:number; duckingReleaseMs?:number; }
