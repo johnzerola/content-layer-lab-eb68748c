@@ -136,6 +136,22 @@ function emojiOnly(text: string): boolean {
 
 const isMedia = (kind: ChatMessage["kind"]) => kind === "image" || kind === "video" || kind === "sticker";
 
+/** Como a mensagem citada aparece quando ela não tem texto. */
+function quotedKindLabel(kind: ChatMessage["kind"]): string {
+  switch (kind) {
+    case "image":
+      return "Foto";
+    case "video":
+      return "Vídeo";
+    case "sticker":
+      return "Figurinha";
+    case "voice":
+      return "Mensagem de voz";
+    default:
+      return "Mensagem";
+  }
+}
+
 /**
  * Calcula posições de todas as mensagens visíveis. O layout é de cima para
  * baixo; a rolagem é aplicada depois, ao pintar.
