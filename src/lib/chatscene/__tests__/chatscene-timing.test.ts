@@ -92,3 +92,21 @@ describe("animação e enquadramento", () => {
     expect(rect).toMatchObject({ x: 0, y: 0, w: 1080, h: 1920 });
   });
 });
+
+describe("cartão de cena", () => {
+  it("não digita, não é falado e fica pelo menos 1,5s na tela", async () => {
+    const { createChatSceneProject, createMessage } = await import("../types");
+    const { computeMessageTimings } = await import("../timing");
+    const { speakableText } = await import("../voice");
+    const project = createChatSceneProject({
+      messages: [createMessage(project0Id(), { kind: "card", text: "Momentos antes" })],
+    });
+    function project0Id() {
+      return "unused";
+    }
+    const t = computeMessageTimings(project)[0]!;
+    expect(t.typingMs).toBe(0);
+    expect(t.readingMs).toBeGreaterThanOrEqual(1500);
+    expect(speakableText("card", "Momentos antes")).toBe("");
+  });
+});
