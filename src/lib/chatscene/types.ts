@@ -376,7 +376,7 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
     timing: { ...DEFAULT_TIMING, ...(raw.timing ?? {}) },
     render: { ...DEFAULT_RENDER, ...(raw.render ?? {}) },
     background: { ...DEFAULT_BACKGROUND, ...(raw.background ?? {}) },
-    animation: raw.animation ?? base.animation,
+    animation: raw.animation ?? base.animation ?? "soft-spring",
     layout: { ...DEFAULT_LAYOUT, ...(raw.layout ?? {}) },
     sound: { enabled: false, volume: 0.5, ...(raw.sound ?? {}) },
   };
