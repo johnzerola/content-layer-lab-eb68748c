@@ -33,6 +33,18 @@ export interface CameraShot {
   focusY: number;
 }
 
+/**
+ * Onde a conversa está na tela, em fração (0–1). A câmera mira nela: sem isso
+ * o plano fechado apertava o centro da tela e cortava os balões quando o
+ * painel fica em cima (conversa sobre gameplay).
+ */
+export interface CameraFocus {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 const WIDE: CameraShot = { scale: 1, focusX: 0.5, focusY: 0.5 };
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
