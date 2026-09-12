@@ -385,12 +385,22 @@ function drawWallpaper(
     ctx.fillRect(0, 0, width, height);
     return;
   }
-  if (bg.kind === "image" && bg.imageUrl) {
-    const item = media?.get(bg.imageUrl);
+  const sourceUrl =
+    bg.kind === "image" ? bg.imageUrl : bg.kind === "video" ? bg.videoUrl || bg.imageUrl : null;
+  if (sourceUrl) {
+    const item = media?.get(sourceUrl);
     ctx.fillStyle = theme.wallpaper;
     ctx.fillRect(0, 0, width, height);
     if (item) {
-      const frame = item.frames[0]!;
+      // vídeo de fundo: o quadro vem do tempo da cena, em laço quando pedido
+      const duration = item.animated ? item.frames.length / Math.max(1, item.fps) : 0;
+      const t =
+        bg.kind === "video" && duration
+          ? bg.loop === false
+            ? Math.min(seconds, duration - 1 / item.fps)
+            : seconds % duration
+          : 0;
+      const frame = item.animated ? mediaFrameAt(item, t) : item.frames[0]!;
       const scale = Math.max(width / item.width, height / item.height);
       const w = item.width * scale;
       const h = item.height * scale;
