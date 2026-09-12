@@ -643,7 +643,7 @@ export function paintFrame(
     const bw = width * scale;
     const bh = height * scale;
     ctx.translate((width - bw) / 2, (height - bh) / 2 + height * clampUnit(l.backgroundOffsetY, -0.3, 0.3));
-    drawWallpaper(ctx, theme, bw, bh, metricsFor(bw, bh), project.background, media);
+    drawWallpaper(ctx, theme, bw, bh, metricsFor(bw, bh), project.background, media, frame / plan.fps);
     ctx.restore();
   }
 
@@ -662,9 +662,59 @@ export function paintFrame(
   ctx.globalAlpha = 1;
   ctx.restore();
 
+  drawBranding(ctx, project, width, height, media);
+
   if (options.safeZones) {
     drawSafeZones(ctx, width, height);
   }
+}
+
+/** Marca do criador (@ e/ou logo) por cima da cena, fora da conversa. */
+function drawBranding(
+  ctx: Ctx2D,
+  project: ChatSceneProject,
+  width: number,
+  height: number,
+  media?: Map<string, LoadedMedia>,
+) {
+  const b = project.branding;
+  if (!b?.enabled) return;
+  const handle = (b.handle ?? "").trim();
+  const logo = b.logoUrl ? media?.get(b.logoUrl)?.frames[0] : undefined;
+  if (!handle && !logo) return;
+
+  const size = Math.round(width * Math.max(0.02, Math.min(0.12, b.size || 0.05)));
+  const pad = Math.round(width * 0.045);
+  const fontSize = Math.round(size * 0.62);
+  ctx.save();
+  ctx.globalAlpha = Math.max(0.15, Math.min(1, b.opacity ?? 0.85));
+  ctx.font = `600 ${fontSize}px Inter, system-ui, sans-serif`;
+  const textW = handle ? ctx.measureText(handle).width : 0;
+  const gap = handle && logo ? Math.round(size * 0.3) : 0;
+  const totalW = (logo ? size : 0) + gap + textW;
+  const right = (b.position ?? "bottom-right").endsWith("right");
+  const bottom = (b.position ?? "bottom-right").startsWith("bottom");
+  const x = right ? width - pad - totalW : pad;
+  const y = bottom ? height - pad - size : pad;
+
+  if (logo) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(logo, x, y, size, size);
+    ctx.restore();
+  }
+  if (handle) {
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.fillText(handle, x + (logo ? size + gap : 0) + 2, y + size / 2 + 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(handle, x + (logo ? size + gap : 0), y + size / 2);
+    ctx.textBaseline = "alphabetic";
+  }
+  ctx.restore();
 }
 
 function drawSafeZones(ctx: Ctx2D, width: number, height: number) {
@@ -699,7 +749,7 @@ function paintConversation(
   const media = options.media;
   const headerH = showHeader ? m.headerH : 0;
 
-  drawWallpaper(ctx, theme, width, height, m, project.background, media);
+  drawWallpaper(ctx, theme, width, height, m, project.background, media, frame / plan.fps);
 
   const appeared = project.messages.filter((msg) => frame >= (plan.byId[msg.id]?.appearFrame ?? Infinity));
 
