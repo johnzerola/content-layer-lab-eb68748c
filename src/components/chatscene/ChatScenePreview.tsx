@@ -122,6 +122,32 @@ export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPla
           {seconds}s / {total}s
         </span>
       </div>
+
+      {/* mini linha do tempo: cada traço é uma mensagem; clicar salta até ela */}
+      <div className="mx-auto flex w-full max-w-[380px] gap-px overflow-hidden rounded-md border border-border">
+        {plan.entries.map((entry, i) => {
+          const next = plan.entries[i + 1]?.appearFrame ?? plan.totalFrames;
+          const span = Math.max(1, next - entry.appearFrame);
+          const active = frame >= entry.appearFrame && frame < next;
+          return (
+            <button
+              key={entry.messageId}
+              type="button"
+              style={{ flexGrow: span }}
+              onClick={() => {
+                onPlaying(false);
+                onFrame(entry.appearFrame);
+              }}
+              title={`Mensagem ${i + 1} — ${(entry.appearFrame / plan.fps).toFixed(1)}s`}
+              aria-label={`Ir para a mensagem ${i + 1}`}
+              className={`h-3 min-w-[3px] transition ${
+                active ? "bg-primary" : "bg-muted hover:bg-primary/40"
+              }`}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
+
