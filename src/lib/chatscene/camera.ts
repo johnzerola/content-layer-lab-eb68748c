@@ -69,6 +69,7 @@ export function cameraAt(
   camera: ChatSceneCamera | undefined,
   plan: ConversationPlan,
   frame: number,
+  focus?: CameraFocus,
 ): CameraShot {
   const cam = camera ?? DEFAULT_CAMERA;
   if (cam.mode === "off" || !plan.entries.length) return WIDE;
@@ -84,23 +85,43 @@ export function cameraAt(
 
   // padrão fixo de planos: dois fechados, um aberto — varia sem virar aleatório
   const close = cam.mode === "cuts" ? index % 3 !== 2 : true;
-  const maxZoom = cam.mode === "cuts" ? 1 + 0.55 * intensity : 1 + 0.3 * intensity;
-  const focusY = 0.5 + 0.16 * intensity;
+  const wanted = cam.mode === "cuts" ? 1 + 0.55 * intensity : 1 + 0.3 * intensity;
+  // o plano fechado nunca pode ser mais apertado que a conversa: senão corta
+  // os balões nas laterais
+  const fit = focus ? 1 / Math.max(0.2, clamp(focus.w, 0.05, 1)) : Infinity;
+  const maxZoom = Math.min(wanted, fit);
+
+  // centro da conversa; no plano fechado mira a parte de baixo, onde entra a
+  // mensagem nova
+  const cx = focus ? focus.x + focus.w / 2 : 0.5;
+  const wideY = focus ? focus.y + focus.h / 2 : 0.5;
+  const closeY = focus ? focus.y + focus.h * (0.55 + 0.2 * intensity) : 0.5 + 0.16 * intensity;
 
   if (!close) {
     // plano aberto com uma respiração lenta, para não parecer imagem congelada
     const drift = 0.02 * intensity * Math.sin(progress * Math.PI);
-    return { scale: 1 + drift, focusX: 0.5, focusY: 0.5 };
+    return frame_(1 + drift, cx, wideY);
   }
 
   if (cam.mode === "cuts") {
     // corte seco: já entra fechado e vai afastando devagar até a próxima fala
-    const relax = 0.12 * intensity * easeOut(progress);
-    return { scale: maxZoom - relax, focusX: 0.5, focusY };
+    const relax = (maxZoom - 1) * 0.22 * easeOut(progress);
+    return frame_(maxZoom - relax, cx, closeY);
   }
 
   // suave: aproxima na entrada da mensagem e segura
   const inFrames = Math.max(1, Math.round(plan.fps * 0.6));
   const p = easeOut((frame - entry.appearFrame) / inFrames);
-  return { scale: 1 + (maxZoom - 1) * p, focusX: 0.5, focusY: 0.5 + (focusY - 0.5) * p };
+  return frame_(1 + (maxZoom - 1) * p, cx, wideY + (closeY - wideY) * p);
+}
+
+/** Mantém o enquadramento dentro da tela: nada de mostrar fora do vídeo. */
+function frame_(scale: number, focusX: number, focusY: number): CameraShot {
+  const s = Math.max(1, scale);
+  const half = 0.5 / s;
+  return {
+    scale: s,
+    focusX: clamp(focusX, half, 1 - half),
+    focusY: clamp(focusY, half, 1 - half),
+  };
 }
