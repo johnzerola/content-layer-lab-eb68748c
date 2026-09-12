@@ -35,7 +35,9 @@ describe("Voice Cast System", () => {
   it("migra a voz embutida de projetos antigos", () => {
     const old = createChatSceneProject();
     old.participants[0] = { ...old.participants[0]!, voice: { presetId: "mother-warm", style: "calma", speed: 1, gain: 1 } };
-    const reopened = normalizeChatSceneProject({ ...old, voiceProfiles: undefined });
+    const legacy = { ...old } as Partial<typeof old> & { voiceProfiles?: typeof old.voiceProfiles };
+    delete legacy.voiceProfiles;
+    const reopened = normalizeChatSceneProject(legacy);
     expect(reopened.participants[0]?.voiceProfileId).toBe(`voice_${old.participants[0]!.id}`);
     expect(reopened.voiceProfiles).toHaveLength(1);
   });

@@ -18,7 +18,7 @@ export function createMockVoiceProvider(): VoiceProvider {
   return {
     id:"mock",
     listVoices: async()=>[],
-    getCapabilities:()=>PROVIDER_CAPABILITIES.mock!,
+    getCapabilities:()=>PROVIDER_CAPABILITIES["mock"]!,
     previewVoice: async(profile,text)=>createMockVoiceProvider().synthesize(text,profile),
     async synthesize(text: string, profile: VoiceProfile, direction?: MessageVoiceDirection): Promise<VoiceClip> {
       const key=voiceKey(text,profile,direction); const seconds=Math.max(.65,Math.min(3.2,text.length/18))/Math.max(.7,profile.speed*(direction?.speedMultiplier??1)); const frequency=190+(voicePreset(profile.presetId).gender==="feminina"?90:0)+(profile.pitch??0)*8; return decodeClip(key,wavTone(seconds,frequency));

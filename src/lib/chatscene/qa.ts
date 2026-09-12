@@ -1,4 +1,4 @@
 export const VISUAL_QA_CRITERIA = ["composition","chat scale","header","bubbles","typography","wallpaper","message spacing","auto-scroll","message motion","timing","media messages","background integration","readability","mobile view","overall creator/viral feel"] as const;
 export const VOICE_QA_CRITERIA = ["identity consistency","pt-BR pronunciation","naturalness","emotion control","character fit","loudness consistency"] as const;
 export type QaScores<T extends readonly string[]> = Partial<Record<T[number],number>>;
-export function qaResult<T extends readonly string[]>(criteria:T,scores:QaScores<T>){const values=criteria.map(k=>Math.max(0,Math.min(5,scores[k]??0)));const average=values.reduce((a,b)=>a+b,0)/values.length;return {average,approved:values.every(v=>v>=3)&&average>=4,minimum:Math.min(...values)};}
+export function qaResult<T extends readonly string[]>(criteria:T,scores:QaScores<T>){const values=criteria.map(k=>Math.max(0,Math.min(5,scores[k as T[number]]??0)));const average=values.reduce((a,b)=>a+b,0)/values.length;return {average,approved:values.every(v=>v>=3)&&average>=4,minimum:Math.min(...values)};}
