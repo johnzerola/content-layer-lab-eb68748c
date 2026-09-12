@@ -66,6 +66,7 @@ export function ChatSceneStudio() {
   const abortRef = useRef<AbortController | null>(null);
 
   const plan = useMemo(() => buildPlan(project), [project]);
+  const isGroup = (project.chatKind ?? "direct") === "group";
 
   useEffect(() => {
     if (frame > plan.totalFrames - 1) setFrame(plan.totalFrames - 1);
