@@ -62,6 +62,7 @@ export function ChatSceneStudio() {
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [uploading, setUploading] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const plan = useMemo(() => buildPlan(project), [project]);
