@@ -66,6 +66,7 @@ import {
 } from "@/lib/chatscene/voice";
 import { CHAT_THEMES } from "@/lib/chatscene/theme";
 import { loadLocalDraft, saveLocalDraft } from "@/lib/chatscene/serialize";
+import { parseConversationScript } from "@/lib/chatscene/import-script";
 import {
   ANIMATION_PRESETS,
   BACKGROUND_PRESETS,
