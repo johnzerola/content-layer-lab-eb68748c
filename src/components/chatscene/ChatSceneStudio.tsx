@@ -114,6 +114,7 @@ export function ChatSceneStudio() {
   const [clips, setClips] = useState<Map<string, VoiceClip>>(new Map());
   const [castState, setCastState] = useState<"idle" | "running">("idle");
   const [castProgress, setCastProgress] = useState({ done: 0, total: 0 });
+  const [panel, setPanel] = useState<StudioPanel>("visual");
   useEffect(() => {
     setLibrary(readLibrary());
   }, []);
