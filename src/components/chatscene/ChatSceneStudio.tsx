@@ -33,7 +33,9 @@ import { uploadChatSceneMedia } from "@/lib/chatscene/upload";
 import { CHAT_THEMES } from "@/lib/chatscene/theme";
 import { loadLocalDraft, saveLocalDraft } from "@/lib/chatscene/serialize";
 import {
+  ANIMATION_PRESETS,
   BACKGROUND_PRESETS,
+  LAYOUT_PRESETS,
   createChatSceneProject,
   createDemoChatSceneProject,
   createMessage,
@@ -700,6 +702,47 @@ export function ChatSceneStudio() {
             </div>
 
             <div className="mt-3">
+              <p className="mono-label mb-1.5 text-muted-foreground">Enquadramento</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {LAYOUT_PRESETS.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => patch({ layout: { ...l.value, preset: l.id } })}
+                    className={`rounded-lg border px-2 py-1.5 text-xs transition ${
+                      (project.layout?.preset ?? "full-chat") === l.id
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <p className="mono-label mb-1.5 text-muted-foreground">Entrada das bolhas</p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {ANIMATION_PRESETS.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => patch({ animation: a.id })}
+                    className={`rounded-lg border px-2 py-1.5 text-xs transition ${
+                      (project.animation ?? "soft-spring") === a.id
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    {a.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+
+            <div className="mt-3">
               <label className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
                 Velocidade
                 <span className="mono-label">{project.timing.speed.toFixed(1)}×</span>
@@ -771,6 +814,26 @@ export function ChatSceneStudio() {
               <label className="flex items-center gap-1.5">
                 <input
                   type="checkbox"
+                  checked={project.timing.humanTyping ?? true}
+                  onChange={(e) =>
+                    patch({ timing: { ...project.timing, humanTyping: e.target.checked } })
+                  }
+                />
+                ritmo humano (calcula pelo texto)
+              </label>
+              <Range
+                label="Respiro ao trocar de pessoa"
+                value={project.timing.senderSwitchMs ?? 180}
+                min={0}
+                max={1500}
+                step={20}
+                suffix="ms"
+                onChange={(v) => patch({ timing: { ...project.timing, senderSwitchMs: v } })}
+              />
+
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
                   checked={project.receipts ?? true}
                   onChange={(e) => patch({ receipts: e.target.checked })}
                 />
@@ -828,6 +891,23 @@ export function ChatSceneStudio() {
                   suffix="ms"
                   onChange={(v) => updateMessage(selectedMessage.id, { typingMs: v })}
                 />
+                <Range
+                  label="Respiro depois desta mensagem"
+                  value={selectedMessage.pauseAfterMs ?? project.timing.gapMs}
+                  min={0}
+                  max={6000}
+                  step={100}
+                  suffix="ms"
+                  onChange={(v) => updateMessage(selectedMessage.id, { pauseAfterMs: v })}
+                />
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={selectedMessage.emphasis ?? false}
+                    onChange={(e) => updateMessage(selectedMessage.id, { emphasis: e.target.checked })}
+                  />
+                  momento de peso (segura mais na tela)
+                </label>
                 <div>
                   <p className="mb-1 text-muted-foreground">Reação nesta mensagem</p>
                   <div className="flex flex-wrap gap-1">

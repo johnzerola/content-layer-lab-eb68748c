@@ -10,6 +10,7 @@ import { typingAt } from "./clock";
 import { mediaFrameAt, type LoadedMedia } from "./media";
 import type { ChatTheme } from "./theme";
 import {
+  DEFAULT_LAYOUT,
   messageClock,
   participantOf,
   type ChatMessage,
@@ -501,6 +502,57 @@ function drawTypingBubble(
   ctx.globalAlpha = 1;
 }
 
+/** Transformação de entrada da bolha: transparência, deslocamento e escala. */
+export function entranceTransform(
+  animation: ChatSceneProject["animation"],
+  t: number,
+): { alpha: number; dy: number; scale: number } {
+  const p = Math.max(0, Math.min(1, t));
+  const easeOut = 1 - Math.pow(1 - p, 3);
+  switch (animation) {
+    case "fade":
+      return { alpha: p, dy: 0, scale: 1 };
+    case "slide-up":
+      return { alpha: easeOut, dy: (1 - easeOut) * 1, scale: 1 };
+    case "bubble-pop": {
+      const overshoot = 1 + Math.sin(p * Math.PI) * 0.06;
+      return { alpha: Math.min(1, p * 1.6), dy: 0, scale: p >= 1 ? 1 : overshoot * (0.86 + easeOut * 0.14) };
+    }
+    case "fast-pop":
+      return { alpha: Math.min(1, p * 2), dy: 0, scale: 0.94 + easeOut * 0.06 };
+    default: {
+      // soft-spring: sobe um pouco e assenta com leve oscilação
+      const spring = 1 - Math.exp(-6 * p) * Math.cos(p * Math.PI * 1.6);
+      return { alpha: Math.min(1, p * 1.4), dy: (1 - spring) * 0.6, scale: 0.97 + spring * 0.03 };
+    }
+  }
+}
+
+/** Retângulo ocupado pela conversa dentro do vídeo, a partir do enquadramento. */
+export function chatRect(
+  layout: ChatSceneProject["layout"],
+  width: number,
+  height: number,
+): { x: number; y: number; w: number; h: number; radius: number; opacity: number; header: boolean } {
+  const l = layout ?? DEFAULT_LAYOUT;
+  const w = Math.max(80, Math.round(width * clampUnit(l.width, 0.2, 1)));
+  const h = Math.max(120, Math.round(height * clampUnit(l.height, 0.2, 1)));
+  return {
+    x: Math.round(width * clampUnit(l.x, 0, 0.8)),
+    y: Math.round(height * clampUnit(l.y, 0, 0.8)),
+    w,
+    h,
+    radius: Math.round(w * clampUnit(l.radius, 0, 0.25)),
+    opacity: clampUnit(l.opacity, 0.2, 1),
+    header: l.header !== false,
+  };
+}
+
+function clampUnit(v: number | undefined, lo: number, hi: number): number {
+  const n = typeof v === "number" && Number.isFinite(v) ? v : hi;
+  return Math.max(lo, Math.min(hi, n));
+}
+
 /** Pinta um quadro completo da conversa. */
 export function paintFrame(
   ctx: Ctx2D,
@@ -512,42 +564,132 @@ export function paintFrame(
   height: number,
   options: PaintOptions = {},
 ) {
+  const media = options.media;
+  const rect = chatRect(project.layout, width, height);
+  const inset = rect.w < width || rect.h < height;
+
+  // fundo do vídeo (atrás da conversa)
+  if (inset) {
+    const l = project.layout ?? DEFAULT_LAYOUT;
+    ctx.save();
+    if (l.backgroundBlur > 0 && "filter" in ctx) {
+      (ctx as CanvasRenderingContext2D).filter = `blur(${Math.round((l.backgroundBlur * width) / 1080)}px)`;
+    }
+    const scale = clampUnit(l.backgroundScale, 1, 2);
+    const bw = width * scale;
+    const bh = height * scale;
+    ctx.translate((width - bw) / 2, (height - bh) / 2 + height * clampUnit(l.backgroundOffsetY, -0.3, 0.3));
+    drawWallpaper(ctx, theme, bw, bh, metricsFor(bw, bh), project.background, media);
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.translate(rect.x, rect.y);
+  if (rect.radius > 0) {
+    roundRect(ctx, 0, 0, rect.w, rect.h, rect.radius);
+    ctx.clip();
+  } else {
+    ctx.beginPath();
+    ctx.rect(0, 0, rect.w, rect.h);
+    ctx.clip();
+  }
+  ctx.globalAlpha = rect.opacity;
+  paintConversation(ctx, project, theme, plan, frame, rect.w, rect.h, rect.header, options);
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  if (options.safeZones) {
+    drawSafeZones(ctx, width, height);
+  }
+}
+
+function drawSafeZones(ctx: Ctx2D, width: number, height: number) {
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,90,140,0.75)";
+  ctx.setLineDash([12, 10]);
+  ctx.lineWidth = Math.max(2, Math.round((3 * width) / 1080));
+  const top = height * 0.12;
+  const bottom = height * 0.82;
+  ctx.beginPath();
+  ctx.moveTo(0, top);
+  ctx.lineTo(width, top);
+  ctx.moveTo(0, bottom);
+  ctx.lineTo(width, bottom);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Desenha a conversa em si dentro de um retângulo já posicionado. */
+function paintConversation(
+  ctx: Ctx2D,
+  project: ChatSceneProject,
+  theme: ChatTheme,
+  plan: ConversationPlan,
+  frame: number,
+  width: number,
+  height: number,
+  showHeader: boolean,
+  options: PaintOptions = {},
+) {
   const m = metricsFor(width, height);
   const media = options.media;
+  const headerH = showHeader ? m.headerH : 0;
 
   drawWallpaper(ctx, theme, width, height, m, project.background, media);
 
-  const visible = project.messages.filter((msg) => {
-    const e = plan.byId[msg.id];
-    return e ? frame >= e.typingFrame : false;
-  });
-  const appeared = visible.filter((msg) => frame >= (plan.byId[msg.id]?.appearFrame ?? 0));
+  const appeared = project.messages.filter((msg) => frame >= (plan.byId[msg.id]?.appearFrame ?? Infinity));
 
   const layout = layoutMessages(ctx, project, theme, appeared, width, height, media);
   const typing = typingAt(project, plan, frame);
   const typingH = typing ? Math.round(72 * m.scale) + m.gap : 0;
 
   // deixa a margem inferior livre para a interface das plataformas
-  const areaBottom = height - Math.max(m.pad, Math.round(height * 0.14));
-  const total = layout.contentH + typingH;
-  // conversa ancorada embaixo, como em um aplicativo de mensagens: as bolhas
-  // novas entram na base e empurram as antigas para cima (rolagem automática)
-  const offsetY = areaBottom - total;
+  const areaBottom = height - Math.max(m.pad, Math.round(height * 0.1));
+  // ScrollPlanner: a conversa fica ancorada embaixo, mas a rolagem entre uma
+  // mensagem e a seguinte é suavizada — e continua determinística, porque só
+  // depende do quadro atual.
+  const targetNow = areaBottom - (layout.contentH + typingH);
+  let offsetY = targetNow;
+  const last = appeared[appeared.length - 1];
+  const lastEntry = last ? plan.byId[last.id] : undefined;
+  if (lastEntry) {
+    const scrollFrames = Math.max(1, Math.round(plan.fps * 0.28));
+    const p = Math.max(0, Math.min(1, (frame - lastEntry.appearFrame) / scrollFrames));
+    if (p < 1) {
+      const previous = layoutMessages(ctx, project, theme, appeared.slice(0, -1), width, height, media);
+      const targetPrev = areaBottom - (previous.contentH + typingH);
+      const ease = 1 - Math.pow(1 - p, 3);
+      offsetY = targetPrev + (targetNow - targetPrev) * ease;
+    }
+  }
 
   ctx.save();
   ctx.beginPath();
-  ctx.rect(0, m.headerH, width, height - m.headerH);
+  ctx.rect(0, headerH, width, height - headerH);
   ctx.clip();
 
   for (const item of layout.items) {
     const entry = plan.byId[item.message.id];
     const age = entry ? frame - entry.appearFrame : 0;
-    const t = Math.max(0, Math.min(1, age / 7));
-    const ease = 1 - Math.pow(1 - t, 3);
-    const rise = (1 - ease) * Math.round(24 * m.scale);
+    const t = entry ? age / Math.max(1, entry.entranceFrames) : 1;
+    const anim = entranceTransform(project.animation, t);
+    const rise = anim.dy * Math.round(34 * m.scale);
     const y = offsetY + item.y + rise;
     const seconds = Math.max(0, age) / plan.fps;
-    ctx.globalAlpha = ease;
+    ctx.globalAlpha = anim.alpha;
+    const scale = anim.scale;
+    const scaling = Math.abs(scale - 1) > 0.001;
+    if (scaling) {
+      ctx.save();
+      const px = item.isSelf ? item.x + item.width : item.x;
+      const py = y + item.height;
+      ctx.translate(px, py);
+      ctx.scale(scale, scale);
+      ctx.translate(-px, -py);
+    }
+
+
+
 
     if (item.message.kind === "system") {
       const label = item.lines.join(" ");
@@ -563,6 +705,7 @@ export function paintFrame(
       ctx.fillText(label, width / 2, y + h / 2);
       ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
+      if (scaling) ctx.restore();
       continue;
     }
 
@@ -600,6 +743,7 @@ export function paintFrame(
       const label = item.clock;
       const lx = item.isSelf ? item.x + item.mediaW - ctx.measureText(label).width : item.x;
       ctx.fillText(label, lx, y + item.mediaH + m.metaSize);
+      if (scaling) ctx.restore();
       continue;
     }
 
@@ -707,6 +851,8 @@ export function paintFrame(
       ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
     }
+
+    if (scaling) ctx.restore();
   }
 
   ctx.globalAlpha = 1;
@@ -721,21 +867,6 @@ export function paintFrame(
 
   ctx.restore();
 
-  drawHeader(ctx, project, theme, width, m, media);
-
-  if (options.safeZones) {
-    ctx.save();
-    ctx.strokeStyle = "rgba(255,90,140,0.75)";
-    ctx.setLineDash([12, 10]);
-    ctx.lineWidth = Math.max(2, Math.round(3 * m.scale));
-    const top = height * 0.12;
-    const bottom = height * 0.82;
-    ctx.beginPath();
-    ctx.moveTo(0, top);
-    ctx.lineTo(width, top);
-    ctx.moveTo(0, bottom);
-    ctx.lineTo(width, bottom);
-    ctx.stroke();
-    ctx.restore();
-  }
+  if (showHeader) drawHeader(ctx, project, theme, width, m, media);
 }
+

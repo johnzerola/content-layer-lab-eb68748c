@@ -70,6 +70,12 @@ export interface ChatMessage {
   delayMs?: number | null;
   /** tempo de "digitando…" antes desta mensagem; null usa o automático */
   typingMs?: number | null;
+  /** respiro depois desta mensagem; null usa a pausa padrão da cena */
+  pauseAfterMs?: number | null;
+  /** momento de peso na história: leitura um pouco mais longa */
+  emphasis?: boolean;
+  /** duração da fala quando houver voz (preenchido na fase de vozes) */
+  voiceMs?: number | null;
   /** id da mensagem citada (reservado para a próxima fase) */
   replyToId?: string | null;
   /** hora mostrada dentro da bolha; null usa o relógio automático da cena */
@@ -77,6 +83,87 @@ export interface ChatMessage {
   /** emoji de reação preso na base da bolha */
   reaction?: string | null;
 }
+
+/** Estilo de entrada das bolhas. */
+export type MessageAnimation = "bubble-pop" | "slide-up" | "fade" | "soft-spring" | "fast-pop";
+
+export const ANIMATION_PRESETS: { id: MessageAnimation; label: string }[] = [
+  { id: "soft-spring", label: "Mola suave" },
+  { id: "bubble-pop", label: "Estouro" },
+  { id: "slide-up", label: "Subindo" },
+  { id: "fade", label: "Suave" },
+  { id: "fast-pop", label: "Rápido" },
+];
+
+/** Enquadramento da conversa dentro do vídeo. */
+export type ChatLayoutPreset = "full-chat" | "creator-split" | "phone-centered" | "floating-chat" | "custom";
+
+export interface ChatSceneLayout {
+  preset: ChatLayoutPreset;
+  /** posição e tamanho da conversa, em fração da tela (0–1) */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** opacidade da conversa sobre o fundo */
+  opacity: number;
+  /** arredondamento das bordas da conversa, em fração da largura */
+  radius: number;
+  /** mostrar o cabeçalho da conversa */
+  header: boolean;
+  /** zoom e deslocamento do fundo */
+  backgroundScale: number;
+  backgroundOffsetY: number;
+  /** desfoque do fundo, em pixels na referência 1080 */
+  backgroundBlur: number;
+}
+
+export const DEFAULT_LAYOUT: ChatSceneLayout = {
+  preset: "full-chat",
+  x: 0,
+  y: 0,
+  width: 1,
+  height: 1,
+  opacity: 1,
+  radius: 0,
+  header: true,
+  backgroundScale: 1,
+  backgroundOffsetY: 0,
+  backgroundBlur: 0,
+};
+
+export const LAYOUT_PRESETS: { id: ChatLayoutPreset; label: string; value: Omit<ChatSceneLayout, "preset"> }[] = [
+  {
+    id: "full-chat",
+    label: "Tela cheia",
+    value: { ...DEFAULT_LAYOUT },
+  },
+  {
+    id: "creator-split",
+    label: "Split do criador",
+    value: { ...DEFAULT_LAYOUT, y: 0.02, height: 0.56, x: 0.04, width: 0.92, radius: 0.05, backgroundScale: 1.1 },
+  },
+  {
+    id: "phone-centered",
+    label: "Celular no centro",
+    value: { ...DEFAULT_LAYOUT, x: 0.1, width: 0.8, y: 0.1, height: 0.8, radius: 0.09, backgroundBlur: 18, backgroundScale: 1.15 },
+  },
+  {
+    id: "floating-chat",
+    label: "Conversa flutuante",
+    value: {
+      ...DEFAULT_LAYOUT,
+      x: 0.06,
+      width: 0.88,
+      y: 0.22,
+      height: 0.56,
+      radius: 0.06,
+      opacity: 0.94,
+      header: false,
+      backgroundBlur: 8,
+    },
+  },
+];
 
 export interface ChatSceneTiming {
   /** multiplicador global de velocidade: 0.5 = metade da velocidade */
@@ -92,9 +179,16 @@ export interface ChatSceneTiming {
   typing: boolean;
   /** duração automática do "digitando…" (ms) */
   typingMs: number;
+  /** calcular o "digitando…" pelo texto, como uma pessoa de verdade */
+  humanTyping?: boolean;
+  /** ajustes finos do jeito de digitar */
+  typingProfile?: Partial<import("./timing").HumanTypingProfile>;
+  /** respiro extra quando a conversa troca de pessoa (ms) */
+  senderSwitchMs?: number;
   /** segundos parados no fim, para o laço não cortar a última mensagem */
   tailMs: number;
 }
+
 
 export interface ChatSceneRenderSettings {
   aspect: ChatSceneAspect;
@@ -126,6 +220,12 @@ export interface ChatSceneProject {
   receipts?: boolean;
   /** fundo da cena */
   background?: ChatSceneBackground;
+  /** estilo de entrada das bolhas */
+  animation?: MessageAnimation;
+  /** enquadramento da conversa dentro do vídeo */
+  layout?: ChatSceneLayout;
+  /** sons curtos de envio/recebimento na prévia */
+  sound?: { enabled: boolean; volume: number };
 }
 
 export const DEFAULT_TIMING: ChatSceneTiming = {
@@ -136,6 +236,8 @@ export const DEFAULT_TIMING: ChatSceneTiming = {
   maxReadMs: 4200,
   typing: true,
   typingMs: 900,
+  humanTyping: true,
+  senderSwitchMs: 180,
   tailMs: 1400,
 };
 
@@ -189,6 +291,9 @@ export function createMessage(participantId: string, init: Partial<ChatMessage> 
     mediaAspect: init.mediaAspect ?? null,
     delayMs: init.delayMs ?? null,
     typingMs: init.typingMs ?? null,
+    pauseAfterMs: init.pauseAfterMs ?? null,
+    emphasis: init.emphasis ?? false,
+    voiceMs: init.voiceMs ?? null,
     replyToId: init.replyToId ?? null,
     time: init.time ?? null,
     reaction: init.reaction ?? null,
@@ -220,6 +325,9 @@ export function createChatSceneProject(init: Partial<ChatSceneProject> = {}): Ch
     startClock: init.startClock ?? "21:14",
     receipts: init.receipts ?? true,
     background: init.background ?? { ...DEFAULT_BACKGROUND },
+    animation: init.animation ?? "soft-spring",
+    layout: init.layout ?? { ...DEFAULT_LAYOUT },
+    sound: init.sound ?? { enabled: false, volume: 0.5 },
     participants: init.participants ?? [me, other],
     messages:
       init.messages ??
@@ -268,6 +376,9 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
     timing: { ...DEFAULT_TIMING, ...(raw.timing ?? {}) },
     render: { ...DEFAULT_RENDER, ...(raw.render ?? {}) },
     background: { ...DEFAULT_BACKGROUND, ...(raw.background ?? {}) },
+    animation: raw.animation ?? base.animation ?? "soft-spring",
+    layout: { ...DEFAULT_LAYOUT, ...(raw.layout ?? {}) },
+    sound: { enabled: false, volume: 0.5, ...(raw.sound ?? {}) },
   };
 }
 
