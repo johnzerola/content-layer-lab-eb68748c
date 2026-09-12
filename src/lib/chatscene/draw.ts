@@ -315,8 +315,11 @@ export function paintFrame(
   const areaBottom = height - m.pad;
   const areaH = areaBottom - areaTop;
   const total = layout.contentH + typingH;
-  // âncora inferior quando a conversa passa da altura útil (rolagem automática)
-  const offsetY = total > areaH ? areaBottom - total : areaTop;
+  // conversa ancorada embaixo, como em um aplicativo de mensagens: as bolhas
+  // novas entram na base e empurram as antigas para cima (rolagem automática)
+  void areaTop;
+  void areaH;
+  const offsetY = areaBottom - total;
 
   ctx.save();
   ctx.beginPath();
