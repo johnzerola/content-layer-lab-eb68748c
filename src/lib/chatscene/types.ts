@@ -105,6 +105,9 @@ export const BACKGROUND_PRESETS: { id: string; label: string; value: ChatSceneBa
   { id: "forest-run", label: "Floresta", value: { kind: "video", videoUrl: "/chatscene/backgrounds/forest-run.mp4", loop: true } },
   { id: "lava-cave", label: "Caverna Lava", value: { kind: "video", videoUrl: "/chatscene/backgrounds/lava-cave.mp4", loop: true } },
   { id: "ocean-drift", label: "Oceano", value: { kind: "video", videoUrl: "/chatscene/backgrounds/ocean-drift.mp4", loop: true } },
+  { id: "neon-city-still", label: "Cidade Neon (parada)", value: { kind: "image", imageUrl: "/chatscene/backgrounds/neon-city-still.jpg" } },
+  { id: "forest-run-still", label: "Floresta (parada)", value: { kind: "image", imageUrl: "/chatscene/backgrounds/forest-run-still.jpg" } },
+  { id: "lava-cave-still", label: "Caverna (parada)", value: { kind: "image", imageUrl: "/chatscene/backgrounds/lava-cave-still.jpg" } },
   { id: "noite", label: "Noite", value: { kind: "gradient", color: "#141428", colorB: "#2b1b4d" } },
   { id: "aurora", label: "Aurora", value: { kind: "gradient", color: "#0d2b3e", colorB: "#1f6f6b" } },
   { id: "pessego", label: "Pêssego", value: { kind: "gradient", color: "#ffd9c0", colorB: "#ff9db0" } },
@@ -641,10 +644,11 @@ export function createDemoChatSceneProject(): ChatSceneProject {
 
 function importVoicePreset(id: string): import("./voice").VoiceProfile {
   const defaults: Record<string, Partial<import("./voice").VoiceProfile>> = {
-    "adult-male-boss": { providerVoiceId: "onyx", style: "autoritaria", speed: .9, energy: .72 },
-    "teen-boy-shy": { providerVoiceId: "echo", style: "calma", speed: .9, energy: .3 },
-    "adult-male-casual": { providerVoiceId: "ash", style: "natural", speed: 1, energy: .55 },
-    "mother-warm": { providerVoiceId: "sage", style: "calma", speed: .94, energy: .45 },
+    // ritmo e tom calibrados para soar como conversa brasileira, sem sotaque importado
+    "adult-male-boss": { providerVoiceId: "onyx", style: "autoritaria", speed: .96, pitch: -1.5, energy: .66 },
+    "teen-boy-shy": { providerVoiceId: "echo", style: "calma", speed: .99, pitch: 1.5, energy: .44 },
+    "adult-male-casual": { providerVoiceId: "ash", style: "natural", speed: 1.04, pitch: 0, energy: .62 },
+    "mother-warm": { providerVoiceId: "sage", style: "calma", speed: .98, pitch: .5, energy: .52 },
   };
   return { presetId: id, provider: "lovable-ai", language: "pt", locale: "pt-BR", style: "natural", speed: 1, gain: 1, ...defaults[id] };
 }

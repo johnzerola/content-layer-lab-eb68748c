@@ -246,6 +246,26 @@ export function ChatSceneStudio() {
     }
   }, []);
 
+  /** Imagem estática de fundo enviada pelo próprio criador. */
+  const handleBackgroundImage = useCallback(async (file: File) => {
+    setUploading("background-image");
+    try {
+      const { asset, library: next } = await addFileToLibrary(file, "background");
+      setLibrary(next);
+      setProject((prev) => ({
+        ...prev,
+        background: { kind: "image", imageUrl: asset.url },
+      }));
+      if (asset.temporary) {
+        toast.warning("A imagem ficou só nesta sessão; envie de novo antes de salvar a conversa.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível usar esta imagem.");
+    } finally {
+      setUploading(null);
+    }
+  }, []);
+
   /** Vídeo de fundo enviado pelo próprio criador. */
   const handleBackgroundVideo = useCallback(async (file: File) => {
     setUploading("background-video");
@@ -1013,6 +1033,7 @@ export function ChatSceneStudio() {
                   const active =
                     (project.background?.kind ?? "theme") === b.value.kind &&
                     (project.background?.color ?? null) === (b.value.color ?? null) &&
+                    (project.background?.imageUrl ?? null) === (b.value.imageUrl ?? null) &&
                     (project.background?.videoUrl ?? null) === (b.value.videoUrl ?? null);
                   return (
                     <button
@@ -1029,6 +1050,8 @@ export function ChatSceneStudio() {
                       <span className="relative block aspect-[9/16] overflow-hidden bg-muted">
                         {b.value.kind === "video" && b.value.videoUrl ? (
                           <video src={b.value.videoUrl} muted loop autoPlay playsInline preload="auto" className="size-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                        ) : b.value.kind === "image" && b.value.imageUrl ? (
+                          <img src={b.value.imageUrl} alt="" loading="lazy" className="size-full object-cover transition-transform duration-300 group-hover:scale-105" />
                         ) : b.value.kind === "gradient" ? (
                           <span className="block size-full" style={{ background: `linear-gradient(145deg, ${b.value.color}, ${b.value.colorB})` }} />
                         ) : b.value.kind === "solid" ? (
@@ -1037,6 +1060,7 @@ export function ChatSceneStudio() {
                           <span className="grid size-full place-items-center bg-secondary text-muted-foreground">Tema</span>
                         )}
                         {b.value.kind === "video" ? <span className="absolute bottom-1.5 left-1.5 rounded bg-background/80 px-1.5 py-0.5 text-[9px] font-medium text-foreground">LOOP</span> : null}
+                        {b.value.kind === "image" ? <span className="absolute bottom-1.5 left-1.5 rounded bg-background/80 px-1.5 py-0.5 text-[9px] font-medium text-foreground">PARADO</span> : null}
                         {active ? <span className="absolute right-1.5 top-1.5 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold text-primary-foreground">ATIVO</span> : null}
                       </span>
                       <span className="block px-2 py-1.5 font-medium">{b.label}</span>
@@ -1046,10 +1070,40 @@ export function ChatSceneStudio() {
               </div>
 
               <div className="mt-3 rounded-lg border border-dashed border-border bg-background/35 p-3">
-                <p className="text-xs font-medium">Usar meu próprio vídeo</p>
+                <p className="text-xs font-medium">Usar meu próprio vídeo ou imagem</p>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  Envie um vídeo vertical (9:16) do seu computador para usar como fundo da conversa.
+                  Envie um arquivo vertical (9:16) do seu computador para usar como fundo da conversa.
                 </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background/60 px-2.5 py-1.5 text-xs hover:border-primary">
+                    {uploading === "background-image" ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <ImageIcon className="size-3.5" />
+                    )}
+                    Escolher imagem
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/*"
+                      aria-label="Enviar imagem de fundo"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) void handleBackgroundImage(file);
+                      }}
+                    />
+                  </label>
+                  {project.background?.kind === "image" ? (
+                    <button
+                      type="button"
+                      className="text-[11px] text-muted-foreground underline hover:text-primary"
+                      onClick={() => patch({ background: { kind: "theme" } })}
+                    >
+                      tirar minha imagem
+                    </button>
+                  ) : null}
+                </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background/60 px-2.5 py-1.5 text-xs hover:border-primary">
                     {uploading === "background-video" ? (
