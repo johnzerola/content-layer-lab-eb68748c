@@ -76,11 +76,12 @@ export function CreatorLayouts({ project, plan, frame, onSelect }: Props) {
         </div>
       </div>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {CREATOR_LAYOUTS.map((option) => {
           const active = current === option.id;
           const preview: ChatSceneProject = {
             ...project,
+            ...(option.apply ?? {}),
             layout: { ...option.value, preset: option.id },
           };
           return (

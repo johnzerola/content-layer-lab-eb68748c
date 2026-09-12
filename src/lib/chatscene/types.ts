@@ -167,6 +167,7 @@ export const ANIMATION_PRESETS: { id: MessageAnimation; label: string }[] = [
 export type ChatLayoutPreset =
   | "full-chat"
   | "chat-gameplay"
+  | "canal-viral"
   | "creator-split"
   | "phone-centered"
   | "floating-chat"
@@ -190,6 +191,12 @@ export interface ChatSceneLayout {
   backgroundOffsetY: number;
   /** desfoque do fundo, em pixels na referência 1080 */
   backgroundBlur: number;
+  /**
+   * A altura acompanha a conversa: o painel começa pequeno (só o topo e a
+   * primeira mensagem) e cresce até o limite de `height`, como nos vídeos de
+   * conversa animada sobre gameplay.
+   */
+  autoHeight?: boolean;
 }
 
 export const DEFAULT_LAYOUT: ChatSceneLayout = {
@@ -204,6 +211,7 @@ export const DEFAULT_LAYOUT: ChatSceneLayout = {
   backgroundScale: 1,
   backgroundOffsetY: 0,
   backgroundBlur: 0,
+  autoHeight: false,
 };
 
 export const LAYOUT_PRESETS: { id: ChatLayoutPreset; label: string; value: Omit<ChatSceneLayout, "preset"> }[] = [
@@ -224,6 +232,22 @@ export const LAYOUT_PRESETS: { id: ChatLayoutPreset; label: string; value: Omit<
       radius: 0.05,
       opacity: 0.97,
       backgroundScale: 1.05,
+    },
+  },
+  {
+    id: "canal-viral",
+    label: "Conversa sobre gameplay",
+    value: {
+      ...DEFAULT_LAYOUT,
+      x: 0.035,
+      width: 0.93,
+      y: 0.035,
+      height: 0.66,
+      radius: 0.03,
+      opacity: 1,
+      header: true,
+      backgroundScale: 1.08,
+      autoHeight: true,
     },
   },
   {
@@ -261,13 +285,32 @@ export const LAYOUT_PRESETS: { id: ChatLayoutPreset; label: string; value: Omit<
   },
 ];
 
-/** Os três layouts principais de criador, mostrados com prévia no estúdio. */
+/** Layouts principais de criador, mostrados com prévia no estúdio. */
 export const CREATOR_LAYOUTS: {
   id: ChatLayoutPreset;
   label: string;
   hint: string;
   value: Omit<ChatSceneLayout, "preset">;
+  /** ajustes de apresentação aplicados junto com o enquadramento */
+  apply?: {
+    themeId?: string;
+    dark?: boolean;
+    animation?: MessageAnimation;
+    camera?: { mode: "off" | "smooth" | "cuts"; intensity: number };
+  };
 }[] = [
+  {
+    id: "canal-viral",
+    label: "Conversa sobre gameplay",
+    hint: "Painel de conversa em cima que cresce a cada mensagem, gameplay atrás e cortes de câmera.",
+    value: LAYOUT_PRESETS.find((l) => l.id === "canal-viral")!.value,
+    apply: {
+      themeId: "zap",
+      dark: true,
+      animation: "bubble-pop",
+      camera: { mode: "cuts", intensity: 0.6 },
+    },
+  },
   {
     id: "chat-gameplay",
     label: "Chat + Gameplay",

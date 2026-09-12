@@ -1425,7 +1425,7 @@ export function ChatSceneStudio() {
             frame={frame}
             onSelect={(preset) => {
               const option = CREATOR_LAYOUTS.find((l) => l.id === preset);
-              if (option) patch({ layout: { ...option.value, preset } });
+              if (option) patch({ ...(option.apply ?? {}), layout: { ...option.value, preset } });
             }}
           />
         </div>

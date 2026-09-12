@@ -166,8 +166,10 @@ export function layoutMessages(
   width: number,
   height: number,
   media?: Map<string, LoadedMedia>,
+  /** altura usada só para calcular tamanhos (painel de altura variável) */
+  metricsH?: number,
 ): Layout {
-  const m = metricsFor(width, height);
+  const m = metricsFor(width, metricsH ?? height);
   const isGroup = (project.chatKind ?? "direct") === "group" || project.participants.length > 2;
   const items: LaidOutMessage[] = [];
   let y = 0;
@@ -671,6 +673,48 @@ function clampUnit(v: number | undefined, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
+/**
+ * Altura do painel quando ele acompanha a conversa: começa com o topo e a
+ * primeira mensagem e cresce, com transição suave, até o limite do
+ * enquadramento. Determinística: depende só do quadro atual.
+ */
+export function autoPanelHeight(
+  ctx: Ctx2D,
+  project: ChatSceneProject,
+  theme: ChatTheme,
+  plan: ConversationPlan,
+  frame: number,
+  width: number,
+  maxHeight: number,
+  media?: Map<string, LoadedMedia>,
+): number {
+  const m = metricsFor(width, maxHeight);
+  const headerVisible = (project.header?.style ?? "messenger") !== "none";
+  const headerH = headerVisible ? m.headerH : 0;
+  const appeared = project.messages.filter((msg) => frame >= (plan.byId[msg.id]?.appearFrame ?? Infinity));
+  const typing = typingAt(project, plan, frame);
+  const typingH = typing ? Math.round(72 * m.scale) + m.gap : 0;
+
+  const heightFor = (list: ChatMessage[]) => {
+    const content = list.length ? layoutMessages(ctx, project, theme, list, width, maxHeight, media, maxHeight).contentH : 0;
+    const total = headerH + content + typingH + m.pad * 2;
+    return Math.max(headerH + m.pad * 2, Math.min(maxHeight, Math.round(total)));
+  };
+
+  const target = heightFor(appeared);
+  const last = appeared[appeared.length - 1];
+  const lastEntry = last ? plan.byId[last.id] : undefined;
+  if (!lastEntry) return target;
+  const growFrames = Math.max(1, Math.round(plan.fps * 0.24));
+  const p = Math.max(0, Math.min(1, (frame - lastEntry.appearFrame) / growFrames));
+  if (p >= 1) return target;
+  const previous = heightFor(appeared.slice(0, -1));
+  const ease = 1 - Math.pow(1 - p, 3);
+  return Math.round(previous + (target - previous) * ease);
+}
+
+
+
 /** Pinta um quadro completo da conversa. */
 export function paintFrame(
   ctx: Ctx2D,
@@ -683,7 +727,11 @@ export function paintFrame(
   options: PaintOptions = {},
 ) {
   const media = options.media;
-  const rect = chatRect(project.layout, width, height);
+  const base = chatRect(project.layout, width, height);
+  const auto = project.layout?.autoHeight
+    ? autoPanelHeight(ctx, project, theme, plan, frame, base.w, base.h, media)
+    : null;
+  const rect = auto != null ? { ...base, h: auto } : base;
   const inset = rect.w < width || rect.h < height;
 
   // câmera: aproxima na fala nova e alterna com a tela cheia
@@ -724,7 +772,18 @@ export function paintFrame(
     ctx.clip();
   }
   ctx.globalAlpha = rect.opacity;
-  paintConversation(ctx, project, theme, plan, frame, rect.w, rect.h, rect.header, options);
+  paintConversation(
+    ctx,
+    project,
+    theme,
+    plan,
+    frame,
+    rect.w,
+    rect.h,
+    rect.header,
+    options,
+    auto != null ? { metricsH: base.h } : undefined,
+  );
   ctx.globalAlpha = 1;
   ctx.restore();
 
@@ -812,8 +871,10 @@ function paintConversation(
   height: number,
   showHeader: boolean,
   options: PaintOptions = {},
+  /** painel de altura variável: tamanhos fixos e conversa colada embaixo */
+  fit?: { metricsH: number },
 ) {
-  const m = metricsFor(width, height);
+  const m = metricsFor(width, fit?.metricsH ?? height);
   const media = options.media;
   const headerVisible = showHeader && (project.header?.style ?? "messenger") !== "none";
   const headerH = headerVisible ? m.headerH : 0;
@@ -822,12 +883,12 @@ function paintConversation(
 
   const appeared = project.messages.filter((msg) => frame >= (plan.byId[msg.id]?.appearFrame ?? Infinity));
 
-  const layout = layoutMessages(ctx, project, theme, appeared, width, height, media);
+  const layout = layoutMessages(ctx, project, theme, appeared, width, height, media, fit?.metricsH);
   const typing = typingAt(project, plan, frame);
   const typingH = typing ? Math.round(72 * m.scale) + m.gap : 0;
 
   // deixa a margem inferior livre para a interface das plataformas
-  const areaBottom = height - Math.max(m.pad, Math.round(height * 0.1));
+  const areaBottom = fit ? height - m.pad : height - Math.max(m.pad, Math.round(height * 0.1));
   // ScrollPlanner: a conversa fica ancorada embaixo, mas a rolagem entre uma
   // mensagem e a seguinte é suavizada — e continua determinística, porque só
   // depende do quadro atual.
@@ -835,7 +896,7 @@ function paintConversation(
   let offsetY = targetNow;
   const last = appeared[appeared.length - 1];
   const lastEntry = last ? plan.byId[last.id] : undefined;
-  if (lastEntry) {
+  if (lastEntry && !fit) {
     const scrollFrames = Math.max(1, Math.round(plan.fps * 0.28));
     const p = Math.max(0, Math.min(1, (frame - lastEntry.appearFrame) / scrollFrames));
     if (p < 1) {
