@@ -16,7 +16,9 @@ import {
   Save,
   Sliders,
   Trash2,
+  Upload,
   UserPlus,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Input } from "@/components/ui/base";
