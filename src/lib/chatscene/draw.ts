@@ -1205,6 +1205,9 @@ function paintConversation(
 
   ctx.restore();
 
-  if (headerVisible) drawHeader(ctx, project, theme, width, m, media, typing ? typing.name : null);
+  if (headerVisible) {
+    const typingName = typing ? participantOf(project, typing.participantId).name : null;
+    drawHeader(ctx, project, theme, width, m, media, typingName);
+  }
 }
 
