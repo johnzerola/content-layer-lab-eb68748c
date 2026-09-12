@@ -686,8 +686,8 @@ function paintConversation(
       ctx.scale(scale, scale);
       ctx.translate(-px, -py);
     }
-    const ease = anim.alpha;
-    void ease;
+
+
 
 
     if (item.message.kind === "system") {
