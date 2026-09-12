@@ -443,6 +443,17 @@ function drawWallpaper(
   ctx.restore();
 }
 
+/** Desenha a imagem cobrindo o retângulo, mantendo a proporção. */
+function drawCover(ctx: Ctx2D, img: CanvasImageSource, x: number, y: number, w: number, h: number) {
+  const iw = (img as { width?: number }).width ?? w;
+  const ih = (img as { height?: number }).height ?? h;
+  if (!iw || !ih) return;
+  const scale = Math.max(w / iw, h / ih);
+  const dw = iw * scale;
+  const dh = ih * scale;
+  ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+}
+
 function drawHeader(
   ctx: Ctx2D,
   project: ChatSceneProject,
