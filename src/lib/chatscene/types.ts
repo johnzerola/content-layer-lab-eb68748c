@@ -27,6 +27,26 @@ export type MessageStatus = "sent" | "delivered" | "read";
 export type ChatKind = "direct" | "group";
 
 /**
+ * Conversa (thread) dentro da mesma história: a cena pode começar no chat do
+ * Chefe e, mais adiante, cortar para o chat do Pedro. Cada mensagem pertence a
+ * uma conversa; a troca vira uma transição na tela, com o topo mudando de nome
+ * e foto, exatamente como quando alguém abre outro chat no celular.
+ */
+export interface ChatSceneThread {
+  id: string;
+  /** nome mostrado no topo */
+  name: string;
+  avatarUrl?: string | null;
+  /** conversa direta ou grupo */
+  kind?: ChatKind;
+  /** texto embaixo do nome; vazio usa "online" */
+  subtitle?: string | null;
+}
+
+/** Conversa padrão de projetos que ainda não usam várias conversas. */
+export const MAIN_THREAD_ID = "main";
+
+/**
  * Fundo da cena: o papel de parede do tema, uma cor, um degradê, uma foto ou
  * um vídeo em laço (gameplay, paisagem, textura própria ou licenciada).
  */
@@ -163,6 +183,8 @@ export interface ChatMessage {
   reaction?: string | null;
   /** emoção e ritmo desta fala, sem trocar a identidade do personagem */
   voiceDirection?: Partial<import("./voice").MessageVoiceDirection> | null;
+  /** conversa a que esta mensagem pertence; vazio = conversa principal */
+  threadId?: string | null;
 }
 
 /** Estilo de entrada das bolhas. */
@@ -372,6 +394,8 @@ export interface ChatSceneTiming {
   typingProfile?: Partial<import("./timing").HumanTypingProfile>;
   /** respiro extra quando a conversa troca de pessoa (ms) */
   senderSwitchMs?: number;
+  /** respiro extra quando a cena corta para outra conversa (ms) */
+  threadSwitchMs?: number;
   /** segundos parados no fim, para o laço não cortar a última mensagem */
   tailMs: number;
 }
@@ -405,6 +429,8 @@ export interface ChatSceneProject {
   chatKind?: ChatKind;
   groupName?: string | null;
   groupAvatarUrl?: string | null;
+  /** conversas da história; quando há mais de uma, a cena corta entre elas */
+  threads?: ChatSceneThread[];
   /** hora inicial mostrada nas bolhas (HH:MM) */
   startClock?: string;
   /** mostrar os tiques de entregue/lido nas mensagens de quem escreve */
@@ -437,6 +463,7 @@ export const DEFAULT_TIMING: ChatSceneTiming = {
   typingMs: 900,
   humanTyping: true,
   senderSwitchMs: 180,
+  threadSwitchMs: 820,
   tailMs: 1400,
 };
 
@@ -500,6 +527,7 @@ export function createMessage(participantId: string, init: Partial<ChatMessage> 
     time: init.time ?? null,
     reaction: init.reaction ?? null,
     voiceDirection: init.voiceDirection ?? null,
+    threadId: init.threadId ?? null,
   };
 }
 
@@ -560,6 +588,48 @@ export function participantOf(project: ChatSceneProject, id: string): ChatPartic
   );
 }
 
+/** Conversas da história. Sempre existe ao menos a conversa principal. */
+export function threadsOf(project: ChatSceneProject): ChatSceneThread[] {
+  const list = (project.threads ?? []).filter((t) => t && t.id);
+  if (list.length) return list;
+  const isGroup = (project.chatKind ?? "direct") === "group" || project.participants.length > 2;
+  const peer = project.participants.find((p) => !p.isSelf);
+  return [
+    {
+      id: MAIN_THREAD_ID,
+      name: isGroup
+        ? project.groupName || project.title || "Grupo"
+        : peer?.name ?? project.participants[0]?.name ?? "Conversa",
+      avatarUrl: (isGroup ? project.groupAvatarUrl : peer?.avatarUrl) ?? null,
+      kind: isGroup ? "group" : "direct",
+      subtitle: null,
+    },
+  ];
+}
+
+/** Conversa a que a mensagem pertence (com volta segura para a principal). */
+export function threadIdOf(project: ChatSceneProject, message: ChatMessage): string {
+  const list = threadsOf(project);
+  if (message.threadId && list.some((t) => t.id === message.threadId)) return message.threadId;
+  return list[0]!.id;
+}
+
+export function threadOf(project: ChatSceneProject, id: string): ChatSceneThread {
+  const list = threadsOf(project);
+  return list.find((t) => t.id === id) ?? list[0]!;
+}
+
+/** Cria uma conversa nova para a história. */
+export function createThread(init: Partial<ChatSceneThread> = {}): ChatSceneThread {
+  return {
+    id: init.id ?? chatSceneId("t"),
+    name: init.name ?? "Nova conversa",
+    avatarUrl: init.avatarUrl ?? null,
+    kind: init.kind ?? "direct",
+    subtitle: init.subtitle ?? null,
+  };
+}
+
 /** Migração defensiva de documentos salvos em versões anteriores. */
 export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null | undefined): ChatSceneProject {
   const base = createChatSceneProject();
@@ -598,6 +668,7 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
     voiceMix: { ...DEFAULT_VOICE_MIX, ...(raw.voiceMix ?? {}) },
     camera: { ...DEFAULT_CAMERA, ...(raw.camera ?? {}) },
     themeOverrides: { ...(raw.themeOverrides ?? {}) },
+    threads: Array.isArray(raw.threads) ? raw.threads.filter((t) => t && t.id).map((t) => createThread(t)) : [],
   };
 }
 
@@ -622,6 +693,11 @@ export function createDemoChatSceneProject(): ChatSceneProject {
     camera: { ...DEFAULT_CAMERA, mode: "cuts", intensity: 0.45 },
     background: { kind: "video", videoUrl: "/chatscene/backgrounds/neon-city.mp4", loop: true },
     participants: [chefe, pedro, colega, mae],
+    // duas conversas na mesma história: a cena corta do trabalho para a família
+    threads: [
+      { id: "trabalho", name: "Equipe — Primeiro dia", kind: "group", subtitle: "chefe, colega" },
+      { id: "familia", name: "Mãe", kind: "direct", subtitle: "online" },
+    ],
     voiceProfiles: [
       { ...importVoicePreset("adult-male-boss"), id: "voice_chefe" },
       { ...importVoicePreset("teen-boy-shy"), id: "voice_pedro" },
@@ -631,17 +707,19 @@ export function createDemoChatSceneProject(): ChatSceneProject {
     // ritmo de short: cortes rápidos, como nos canais de conversa animada
     timing: { ...DEFAULT_TIMING, speed: 1.12, gapMs: 380, senderSwitchMs: 140 },
     messages: [
-      createMessage(chefe.id, { kind: "card", text: "Primeiro dia do Pedro" }),
-      createMessage(chefe.id, { kind: "system", text: "Pedro entrou na equipe" }),
-      line(chefe, "Bom dia, Pedro. Preparado para o primeiro dia?", { voiceDirection: { emotion: "serious" } }),
-      line(pedro, "Preparado... eu acho 😅", { voiceDirection: { emotion: "nervous" } }),
-      line(colega, "Relaxa. O café fica à esquerda e o chefe quase nunca morde."),
-      createMessage(colega.id, { kind: "image", text: "Seu lugar já está pronto.", mediaUrl: "/chatscene/backgrounds/office-message.jpg", mediaAspect: 9 / 16 }),
-      line(chefe, "Quase nunca?", { emphasis: true, voiceDirection: { emotion: "annoyed" } }),
-      line(colega, "Foi uma piada, chefe. Uma ótima piada."),
-      createMessage(chefe.id, { kind: "card", text: "Enquanto isso, no grupo da família" }),
-      line(mae, "Filho, boa sorte! E não esquece o almoço que deixei na mochila.", { voiceDirection: { emotion: "happy" } }),
-      line(pedro, "Valeu, mãe. Agora a empresa inteira sabe do meu almoço."),
+      createMessage(chefe.id, { kind: "card", text: "Primeiro dia do Pedro", threadId: "trabalho" }),
+      createMessage(chefe.id, { kind: "system", text: "Pedro entrou na equipe", threadId: "trabalho" }),
+      line(chefe, "Bom dia, Pedro. Preparado para o primeiro dia?", { threadId: "trabalho", voiceDirection: { emotion: "serious" } }),
+      line(pedro, "Preparado... eu acho 😅", { threadId: "trabalho", voiceDirection: { emotion: "nervous" } }),
+      line(colega, "Relaxa. O café fica à esquerda e o chefe quase nunca morde.", { threadId: "trabalho" }),
+      createMessage(colega.id, { kind: "image", text: "Seu lugar já está pronto.", mediaUrl: "/chatscene/backgrounds/office-message.jpg", mediaAspect: 9 / 16, threadId: "trabalho" }),
+      line(chefe, "Quase nunca?", { threadId: "trabalho", emphasis: true, voiceDirection: { emotion: "annoyed" } }),
+      line(colega, "Foi uma piada, chefe. Uma ótima piada.", { threadId: "trabalho" }),
+      createMessage(chefe.id, { kind: "card", text: "Enquanto isso, no chat da mãe", threadId: "familia" }),
+      line(mae, "Filho, boa sorte! E não esquece o almoço que deixei na mochila.", { threadId: "familia", voiceDirection: { emotion: "happy" } }),
+      line(pedro, "Valeu, mãe. Agora a empresa inteira sabe do meu almoço.", { threadId: "familia" }),
+      createMessage(chefe.id, { kind: "card", text: "De volta ao trabalho", threadId: "trabalho" }),
+      line(chefe, "Pedro, a reunião começa em cinco minutos.", { threadId: "trabalho", voiceDirection: { emotion: "serious" } }),
     ],
   });
 }

@@ -16,9 +16,13 @@ import {
   DEFAULT_LAYOUT,
   messageClock,
   participantOf,
+  threadIdOf,
+  threadOf,
+  threadsOf,
   type ChatMessage,
   type ChatSceneBackground,
   type ChatSceneProject,
+  type ChatSceneThread,
 } from "./types";
 
 export type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -495,6 +499,8 @@ function drawHeader(
   media?: Map<string, LoadedMedia>,
   /** nome de quem está digitando neste quadro; troca o status do topo */
   typingName?: string | null,
+  /** conversa no ar: troca nome, foto e status do topo ao cortar de chat */
+  thread?: ChatSceneThread | null,
 ) {
   const custom = project.header;
   const style = custom?.style ?? "messenger";
@@ -514,19 +520,27 @@ function drawHeader(
   ctx.fillStyle = theme.divider;
   ctx.fillRect(0, m.headerH - Math.max(1, Math.round(2 * m.scale)), width, Math.max(1, Math.round(2 * m.scale)));
 
-  const isGroup = (project.chatKind ?? "direct") === "group" || project.participants.length > 2;
+  const isGroup = thread
+    ? (thread.kind ?? "direct") === "group"
+    : (project.chatKind ?? "direct") === "group" || project.participants.length > 2;
   const peers = project.participants.filter((p) => !p.isSelf);
   const title =
+    (thread?.name || "").trim() ||
     (custom?.title || "").trim() ||
     (isGroup
       ? project.groupName || project.title || "Grupo"
       : peers[0]?.name ?? project.participants[0]?.name ?? "Conversa");
   const baseSubtitle =
-    custom?.subtitle != null
-      ? custom.subtitle
-      : isGroup
-        ? peers.map((p) => p.name).join(", ") || "conversa em grupo"
-        : "online";
+    (thread?.subtitle || "").trim() ||
+    (thread
+      ? isGroup
+        ? "conversa em grupo"
+        : "online"
+      : custom?.subtitle != null
+        ? custom.subtitle
+        : isGroup
+          ? peers.map((p) => p.name).join(", ") || "conversa em grupo"
+          : "online");
   const subtitle = typingName
     ? isGroup
       ? `${typingName} está digitando…`
@@ -559,7 +573,11 @@ function drawHeader(
   if (logoImg) {
     drawAvatarCircle(ctx, theme, cx, cy, size, peers[0]?.color ?? theme.selfBubble, title, logoImg);
   } else {
-    const avatarUrl = isGroup ? project.groupAvatarUrl : peers[0]?.avatarUrl;
+    const avatarUrl = thread
+      ? thread.avatarUrl ?? project.participants.find((p) => p.name === thread.name)?.avatarUrl ?? null
+      : isGroup
+        ? project.groupAvatarUrl
+        : peers[0]?.avatarUrl;
     const avatarImg = avatarUrl ? media?.get(avatarUrl)?.frames[0] : undefined;
     drawAvatarCircle(ctx, theme, cx, cy, size, peers[0]?.color ?? theme.selfBubble, title, avatarImg);
   }
@@ -708,6 +726,57 @@ export function chatRect(
 function clampUnit(v: number | undefined, lo: number, hi: number): number {
   const n = typeof v === "number" && Number.isFinite(v) ? v : hi;
   return Math.max(lo, Math.min(hi, n));
+}
+
+export interface ThreadFrame {
+  threadId: string;
+  thread: ChatSceneThread;
+  /** mensagens já visíveis da conversa no ar */
+  messages: ChatMessage[];
+  /** conversa que está saindo durante o corte */
+  previousThread: ChatSceneThread | null;
+  previousMessages: ChatMessage[];
+  /** andamento do corte entre conversas (1 = já terminou) */
+  cut: number;
+}
+
+/**
+ * Qual conversa está no ar neste quadro e como está o corte para ela.
+ * Determinístico: depende só do documento e do quadro.
+ */
+export function threadFrame(project: ChatSceneProject, plan: ConversationPlan, frame: number): ThreadFrame {
+  const appeared = project.messages.filter((msg) => frame >= (plan.byId[msg.id]?.appearFrame ?? Infinity));
+  const reference = appeared[appeared.length - 1] ?? project.messages[0] ?? null;
+  const threadId = reference ? threadIdOf(project, reference) : threadsOf(project)[0]!.id;
+
+  let start = appeared.length - 1;
+  while (start > 0 && threadIdOf(project, appeared[start - 1]!) === threadId) start -= 1;
+  const switched = appeared.length > 0 && start > 0;
+  const messages = appeared.filter((msg) => threadIdOf(project, msg) === threadId);
+
+  if (!switched) {
+    return {
+      threadId,
+      thread: threadOf(project, threadId),
+      messages,
+      previousThread: null,
+      previousMessages: [],
+      cut: 1,
+    };
+  }
+
+  const switchFrame = plan.byId[appeared[start]!.id]?.appearFrame ?? frame;
+  const cutFrames = Math.max(1, Math.round(plan.fps * 0.42));
+  const cut = Math.max(0, Math.min(1, (frame - switchFrame) / cutFrames));
+  const previousId = threadIdOf(project, appeared[start - 1]!);
+  return {
+    threadId,
+    thread: threadOf(project, threadId),
+    messages,
+    previousThread: threadOf(project, previousId),
+    previousMessages: appeared.slice(0, start).filter((msg) => threadIdOf(project, msg) === previousId),
+    cut,
+  };
 }
 
 /**
@@ -949,10 +1018,17 @@ function paintConversation(
 
   drawWallpaper(ctx, theme, width, height, m, conversationBackground, media, frame / plan.fps);
 
-  const appeared = project.messages.filter((msg) => frame >= (plan.byId[msg.id]?.appearFrame ?? Infinity));
+  const view = threadFrame(project, plan, frame);
+  const typingMsg = typingAt(project, plan, frame);
+  const typingActive = typingMsg && threadIdOf(project, typingMsg) === view.threadId ? typingMsg : null;
 
+  // desenha uma conversa inteira deslocada e com opacidade própria: é isso que
+  // permite o corte de um chat para o outro sem duplicar o código de desenho
+  const drawList = (appeared: ChatMessage[], dx: number, alphaMul: number, allowTyping: boolean) => {
+  ctx.save();
+  if (dx) ctx.translate(dx, 0);
+  const typing = allowTyping ? typingActive : null;
   const layout = layoutMessages(ctx, project, theme, appeared, width, height, media, fit?.metricsH);
-  const typing = typingAt(project, plan, frame);
   const typingH = typing ? Math.round(72 * m.scale) + m.gap : 0;
 
   // deixa a margem inferior livre para a interface das plataformas
@@ -1000,7 +1076,7 @@ function paintConversation(
     const seconds = Math.max(0, age) / plan.fps;
     const isSpot = spotlight != null && item.message.id === spotlight.id;
     const spotT = spotlight ? Math.max(0, Math.min(1, t)) : 0;
-    ctx.globalAlpha = anim.alpha * (spotlight && !isSpot ? 1 - 0.55 * spotT : 1);
+    ctx.globalAlpha = alphaMul * anim.alpha * (spotlight && !isSpot ? 1 - 0.55 * spotT : 1);
     const scale = anim.scale * (isSpot ? 1 + 0.06 * spotT : 1);
     const scaling = Math.abs(scale - 1) > 0.001;
     if (scaling) {
@@ -1163,7 +1239,7 @@ function paintConversation(
       ctx.lineTo(cx - r * 0.3, cy + r * 0.45);
       ctx.closePath();
       ctx.fill();
-      ctx.globalAlpha = anim.alpha;
+      ctx.globalAlpha = alphaMul * anim.alpha;
 
       const seconds = voiceSeconds(item.message);
       const label = durationLabel(seconds);
@@ -1266,7 +1342,7 @@ function paintConversation(
     if (scaling) ctx.restore();
   }
 
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = alphaMul;
 
   if (typing) {
     const author = participantOf(project, typing.participantId);
@@ -1276,11 +1352,24 @@ function paintConversation(
     drawTypingBubble(ctx, theme, m, x, offsetY + layout.contentH, frame);
   }
 
+  ctx.globalAlpha = 1;
   ctx.restore();
+  ctx.restore();
+  };
+
+  // corte entre conversas: a anterior sai para a esquerda enquanto a nova entra
+  if (view.cut < 1 && view.previousMessages.length) {
+    const ease = 1 - Math.pow(1 - view.cut, 3);
+    drawList(view.previousMessages, -width * 0.28 * ease, Math.max(0, 1 - ease * 1.25), false);
+    drawList(view.messages, width * 0.3 * (1 - ease), Math.min(1, ease * 1.3), true);
+  } else {
+    drawList(view.messages, 0, 1, true);
+  }
 
   if (headerVisible) {
-    const typingName = typing ? participantOf(project, typing.participantId).name : null;
-    drawHeader(ctx, project, theme, width, m, media, typingName);
+    const typingName = typingActive ? participantOf(project, typingActive.participantId).name : null;
+    const headThread = view.cut < 0.5 && view.previousThread ? view.previousThread : view.thread;
+    drawHeader(ctx, project, theme, width, m, media, typingName, headThread);
   }
 }
 
