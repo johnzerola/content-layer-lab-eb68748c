@@ -1109,6 +1109,6 @@ function paintConversation(
 
   ctx.restore();
 
-  if (showHeader) drawHeader(ctx, project, theme, width, m, media);
+  if (headerVisible) drawHeader(ctx, project, theme, width, m, media);
 }
 
