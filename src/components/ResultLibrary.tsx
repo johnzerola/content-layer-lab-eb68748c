@@ -119,12 +119,7 @@ export function ResultLibrary() {
             >
               <div className="relative grid aspect-[16/9] place-items-center overflow-hidden border-b border-border/60 bg-surface-2">
                 {e.thumb_url ? (
-                  <img
-                    src={e.thumb_url}
-                    alt={`Miniatura de ${e.file_name}`}
-                    loading="lazy"
-                    className="size-full object-cover"
-                  />
+                  <ExportThumb src={e.thumb_url} name={e.file_name} />
                 ) : (
                   <FileVideo className="size-8 text-primary/70" />
                 )}

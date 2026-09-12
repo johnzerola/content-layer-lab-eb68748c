@@ -247,6 +247,12 @@ export async function logExports(list: ExportLog[]) {
   if (!list.length) return;
   const user = await currentUser();
   if (!user) return;
+  // miniaturas vão para o armazenamento; o registro guarda só a referência
+  list = await Promise.all(
+    list.map(async (e) =>
+      isDataUrl(e.thumbUrl) ? { ...e, thumbUrl: await uploadDataUrl("thumbs", e.thumbUrl) } : e,
+    ),
+  );
   await supabase.from("exports").insert(
     list.map((e) => ({
       user_id: user.id,
