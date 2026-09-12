@@ -934,6 +934,10 @@ function paintConversation(
   ctx.rect(0, headerH, width, height - headerH);
   ctx.clip();
 
+  // destaque: quando a mensagem recém-chegada é um momento de peso, ela cresce
+  // um pouco e as anteriores escurecem, como nos vídeos virais
+  const spotlight = last?.emphasis === true ? last : null;
+
   for (const item of layout.items) {
     const entry = plan.byId[item.message.id];
     const age = entry ? frame - entry.appearFrame : 0;
@@ -942,8 +946,10 @@ function paintConversation(
     const rise = anim.dy * Math.round(34 * m.scale);
     const y = offsetY + item.y + rise;
     const seconds = Math.max(0, age) / plan.fps;
-    ctx.globalAlpha = anim.alpha;
-    const scale = anim.scale;
+    const isSpot = spotlight != null && item.message.id === spotlight.id;
+    const spotT = spotlight ? Math.max(0, Math.min(1, t)) : 0;
+    ctx.globalAlpha = anim.alpha * (spotlight && !isSpot ? 1 - 0.55 * spotT : 1);
+    const scale = anim.scale * (isSpot ? 1 + 0.06 * spotT : 1);
     const scaling = Math.abs(scale - 1) > 0.001;
     if (scaling) {
       ctx.save();
@@ -953,6 +959,7 @@ function paintConversation(
       ctx.scale(scale, scale);
       ctx.translate(-px, -py);
     }
+
 
 
 
