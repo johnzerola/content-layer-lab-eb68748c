@@ -1,7 +1,7 @@
 # Token Efficiency — Existing-State Audit
 
-Date: 2026-09-11  
-Checkpoint: `51870c8d3408e7a5bf7eb289df0afa825d832368`  
+Date: 2026-09-11
+Checkpoint: `51870c8d3408e7a5bf7eb289df0afa825d832368`
 Scope: development infrastructure only. No Cleaner engine, production pipeline,
 neural baseline, frontend behavior, or database configuration was changed.
 
