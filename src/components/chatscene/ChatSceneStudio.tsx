@@ -289,6 +289,52 @@ export function ChatSceneStudio() {
             </Button>
           </div>
 
+          {/* grupo */}
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-background/30 p-2">
+            <Button
+              variant={isGroup ? "default" : "secondary"}
+              size="sm"
+              onClick={() =>
+                patch({
+                  chatKind: isGroup ? "direct" : "group",
+                  groupName: isGroup ? project.groupName : project.groupName || "Grupo da treta",
+                })
+              }
+            >
+              <Users className="mr-1.5 size-4" />
+              {isGroup ? "É um grupo" : "Conversa de duas pessoas"}
+            </Button>
+            {isGroup && (
+              <>
+                <input
+                  value={project.groupName ?? ""}
+                  onChange={(e) => patch({ groupName: e.target.value })}
+                  placeholder="Nome do grupo"
+                  className="min-w-[140px] flex-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none"
+                  aria-label="Nome do grupo"
+                />
+                <label className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:border-primary">
+                  {uploading === "group" ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="size-3.5" />
+                  )}
+                  Foto do grupo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) void handleAvatarUpload("group", file);
+                    }}
+                  />
+                </label>
+              </>
+            )}
+          </div>
+
           <div className="mb-4 flex flex-wrap gap-2">
             {project.participants.map((p) => (
               <div
