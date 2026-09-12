@@ -517,6 +517,7 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
     layout: { ...DEFAULT_LAYOUT, ...(raw.layout ?? {}) },
     sound: { enabled: false, volume: 0.5, ...(raw.sound ?? {}) },
     branding: { ...DEFAULT_BRANDING, ...(raw.branding ?? {}) },
+    header: { ...DEFAULT_HEADER, ...(raw.header ?? {}) },
     voiceMix: { ...DEFAULT_VOICE_MIX, ...(raw.voiceMix ?? {}) },
     camera: { ...DEFAULT_CAMERA, ...(raw.camera ?? {}) },
   };
