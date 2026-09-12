@@ -690,6 +690,11 @@ export function createDemoChatSceneProject(): ChatSceneProject {
     camera: { ...DEFAULT_CAMERA, mode: "cuts", intensity: 0.45 },
     background: { kind: "video", videoUrl: "/chatscene/backgrounds/neon-city.mp4", loop: true },
     participants: [chefe, pedro, colega, mae],
+    // duas conversas na mesma história: a cena corta do trabalho para a família
+    threads: [
+      { id: "trabalho", name: "Equipe — Primeiro dia", kind: "group", subtitle: "chefe, colega" },
+      { id: "familia", name: "Mãe", kind: "direct", subtitle: "online" },
+    ],
     voiceProfiles: [
       { ...importVoicePreset("adult-male-boss"), id: "voice_chefe" },
       { ...importVoicePreset("teen-boy-shy"), id: "voice_pedro" },
@@ -699,17 +704,19 @@ export function createDemoChatSceneProject(): ChatSceneProject {
     // ritmo de short: cortes rápidos, como nos canais de conversa animada
     timing: { ...DEFAULT_TIMING, speed: 1.12, gapMs: 380, senderSwitchMs: 140 },
     messages: [
-      createMessage(chefe.id, { kind: "card", text: "Primeiro dia do Pedro" }),
-      createMessage(chefe.id, { kind: "system", text: "Pedro entrou na equipe" }),
-      line(chefe, "Bom dia, Pedro. Preparado para o primeiro dia?", { voiceDirection: { emotion: "serious" } }),
-      line(pedro, "Preparado... eu acho 😅", { voiceDirection: { emotion: "nervous" } }),
-      line(colega, "Relaxa. O café fica à esquerda e o chefe quase nunca morde."),
-      createMessage(colega.id, { kind: "image", text: "Seu lugar já está pronto.", mediaUrl: "/chatscene/backgrounds/office-message.jpg", mediaAspect: 9 / 16 }),
-      line(chefe, "Quase nunca?", { emphasis: true, voiceDirection: { emotion: "annoyed" } }),
-      line(colega, "Foi uma piada, chefe. Uma ótima piada."),
-      createMessage(chefe.id, { kind: "card", text: "Enquanto isso, no grupo da família" }),
-      line(mae, "Filho, boa sorte! E não esquece o almoço que deixei na mochila.", { voiceDirection: { emotion: "happy" } }),
-      line(pedro, "Valeu, mãe. Agora a empresa inteira sabe do meu almoço."),
+      createMessage(chefe.id, { kind: "card", text: "Primeiro dia do Pedro", threadId: "trabalho" }),
+      createMessage(chefe.id, { kind: "system", text: "Pedro entrou na equipe", threadId: "trabalho" }),
+      line(chefe, "Bom dia, Pedro. Preparado para o primeiro dia?", { threadId: "trabalho", voiceDirection: { emotion: "serious" } }),
+      line(pedro, "Preparado... eu acho 😅", { threadId: "trabalho", voiceDirection: { emotion: "nervous" } }),
+      line(colega, "Relaxa. O café fica à esquerda e o chefe quase nunca morde.", { threadId: "trabalho" }),
+      createMessage(colega.id, { kind: "image", text: "Seu lugar já está pronto.", mediaUrl: "/chatscene/backgrounds/office-message.jpg", mediaAspect: 9 / 16, threadId: "trabalho" }),
+      line(chefe, "Quase nunca?", { threadId: "trabalho", emphasis: true, voiceDirection: { emotion: "annoyed" } }),
+      line(colega, "Foi uma piada, chefe. Uma ótima piada.", { threadId: "trabalho" }),
+      createMessage(chefe.id, { kind: "card", text: "Enquanto isso, no chat da mãe", threadId: "familia" }),
+      line(mae, "Filho, boa sorte! E não esquece o almoço que deixei na mochila.", { threadId: "familia", voiceDirection: { emotion: "happy" } }),
+      line(pedro, "Valeu, mãe. Agora a empresa inteira sabe do meu almoço.", { threadId: "familia" }),
+      createMessage(chefe.id, { kind: "card", text: "De volta ao trabalho", threadId: "trabalho" }),
+      line(chefe, "Pedro, a reunião começa em cinco minutos.", { threadId: "trabalho", voiceDirection: { emotion: "serious" } }),
     ],
   });
 }
