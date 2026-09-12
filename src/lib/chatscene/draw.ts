@@ -16,9 +16,13 @@ import {
   DEFAULT_LAYOUT,
   messageClock,
   participantOf,
+  threadIdOf,
+  threadOf,
+  threadsOf,
   type ChatMessage,
   type ChatSceneBackground,
   type ChatSceneProject,
+  type ChatSceneThread,
 } from "./types";
 
 export type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -569,7 +573,11 @@ function drawHeader(
   if (logoImg) {
     drawAvatarCircle(ctx, theme, cx, cy, size, peers[0]?.color ?? theme.selfBubble, title, logoImg);
   } else {
-    const avatarUrl = isGroup ? project.groupAvatarUrl : peers[0]?.avatarUrl;
+    const avatarUrl = thread
+      ? thread.avatarUrl ?? project.participants.find((p) => p.name === thread.name)?.avatarUrl ?? null
+      : isGroup
+        ? project.groupAvatarUrl
+        : peers[0]?.avatarUrl;
     const avatarImg = avatarUrl ? media?.get(avatarUrl)?.frames[0] : undefined;
     drawAvatarCircle(ctx, theme, cx, cy, size, peers[0]?.color ?? theme.selfBubble, title, avatarImg);
   }
