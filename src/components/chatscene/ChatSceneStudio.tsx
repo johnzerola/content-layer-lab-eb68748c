@@ -30,6 +30,8 @@ import { encodeFrameSequence, frameEncoderSupported } from "@/lib/chatscene/enco
 import { CanvasConversationRenderer } from "@/lib/chatscene/renderer";
 import { saveChatSceneProject } from "@/lib/chatscene/project.service";
 import { uploadChatSceneMedia } from "@/lib/chatscene/upload";
+import { addFileToLibrary, readLibrary, removeAsset, type LibraryAsset } from "@/lib/chatscene/assets";
+import { MESSAGE_KINDS, messageKind, voiceSeconds } from "@/lib/chatscene/message-kinds";
 import { CHAT_THEMES } from "@/lib/chatscene/theme";
 import { loadLocalDraft, saveLocalDraft } from "@/lib/chatscene/serialize";
 import {
@@ -113,8 +115,11 @@ export function ChatSceneStudio() {
     async (messageId: string, file: File) => {
       setUploading(messageId);
       try {
-        const { url, aspect, temporary } = await uploadChatSceneMedia(file);
-        updateMessage(messageId, { mediaUrl: url, mediaAspect: aspect });
+        const { asset, library: next, reused } = await addFileToLibrary(file, "message");
+        setLibrary(next);
+        updateMessage(messageId, { mediaUrl: asset.url, mediaAspect: asset.aspect });
+        if (reused) toast.success("Arquivo reaproveitado da biblioteca — nada foi enviado de novo.");
+        const temporary = asset.temporary;
         if (temporary) {
           toast.warning("O arquivo ficou só nesta sessão; salve a conversa depois de enviá-lo de novo.");
         }
@@ -477,12 +482,11 @@ export function ChatSceneStudio() {
                       className="rounded-md border border-border bg-background px-1.5 py-1 text-xs text-muted-foreground"
                       aria-label="Tipo de mensagem"
                     >
-                      <option value="text">texto</option>
-                      <option value="emoji">emoji</option>
-                      <option value="image">foto</option>
-                      <option value="sticker">figurinha</option>
-                      <option value="video">vídeo / meme</option>
-                      <option value="system">aviso</option>
+                      {MESSAGE_KINDS.map((k) => (
+                        <option key={k.id} value={k.id}>
+                          {k.label}
+                        </option>
+                      ))}
                     </select>
                     <span className="ml-auto flex items-center gap-0.5">
                       <button
@@ -531,7 +535,7 @@ export function ChatSceneStudio() {
                     aria-label="Texto da mensagem"
                   />
 
-                  {(m.kind === "image" || m.kind === "sticker" || m.kind === "video") && (
+                  {messageKind(m.kind).needsMedia && (
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       <label className="flex cursor-pointer items-center gap-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs hover:border-primary">
                         {uploading === m.id ? (
@@ -539,11 +543,11 @@ export function ChatSceneStudio() {
                         ) : (
                           <Upload className="size-3.5" />
                         )}
-                        {m.kind === "video" ? "Enviar vídeo" : m.kind === "sticker" ? "Enviar figurinha" : "Enviar foto"}
+                        Enviar {messageKind(m.kind).label.toLowerCase()}
                         <input
                           type="file"
                           className="hidden"
-                          accept={m.kind === "video" ? "video/*" : "image/*"}
+                          accept={messageKind(m.kind).accept ?? "image/*"}
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             e.target.value = "";
@@ -551,6 +555,24 @@ export function ChatSceneStudio() {
                           }}
                         />
                       </label>
+                      {library.length > 0 && (
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const asset = library.find((a) => a.hash === e.target.value);
+                            if (asset) updateMessage(m.id, { mediaUrl: asset.url, mediaAspect: asset.aspect });
+                          }}
+                          className="rounded-md border border-border bg-background px-1.5 py-1 text-xs text-muted-foreground"
+                          aria-label="Reaproveitar da biblioteca"
+                        >
+                          <option value="">da biblioteca…</option>
+                          {library.map((a) => (
+                            <option key={a.hash} value={a.hash}>
+                              {a.name.slice(0, 24)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       <ImageIcon className="size-3.5 text-muted-foreground" />
                       <input
                         value={m.mediaUrl?.startsWith("blob:") ? "arquivo do computador" : m.mediaUrl ?? ""}
