@@ -44,7 +44,7 @@ const FAMILIES: ThemeFamily[] = [
     id: "noite",
     label: "Noite",
     description: "Azul-noite com violeta — a identidade VaiViral.",
-    description_: "",
+    
     dark: {
       id: "noite",
       label: "Noite",
