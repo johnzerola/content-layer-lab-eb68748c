@@ -23,6 +23,21 @@ import { ptBR } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useMediaUrl } from "@/hooks/useMediaUrl";
+
+/** Miniatura que resolve arquivos guardados na conta. */
+function ExportThumb({ src, name }: { src: string; name: string }) {
+  const url = useMediaUrl(src);
+  if (!url) return null;
+  return (
+    <img
+      src={url}
+      alt={`Miniatura de ${name}`}
+      loading="lazy"
+      className="size-full object-cover"
+    />
+  );
+}
 
 export function ResultLibrary() {
   const [exports, setExports] = useState<ExportRow[]>([]);
