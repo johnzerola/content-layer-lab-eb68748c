@@ -73,6 +73,11 @@ export function ChatSceneStudio() {
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [uploading, setUploading] = useState<string | null>(null);
+  /** mídia já enviada nesta conversa, para reaproveitar sem subir de novo */
+  const [library, setLibrary] = useState<LibraryAsset[]>([]);
+  useEffect(() => {
+    setLibrary(readLibrary());
+  }, []);
   const abortRef = useRef<AbortController | null>(null);
 
   const plan = useMemo(() => buildPlan(project), [project]);
