@@ -133,7 +133,13 @@ export const ANIMATION_PRESETS: { id: MessageAnimation; label: string }[] = [
 ];
 
 /** Enquadramento da conversa dentro do vídeo. */
-export type ChatLayoutPreset = "full-chat" | "creator-split" | "phone-centered" | "floating-chat" | "custom";
+export type ChatLayoutPreset =
+  | "full-chat"
+  | "chat-gameplay"
+  | "creator-split"
+  | "phone-centered"
+  | "floating-chat"
+  | "custom";
 
 export interface ChatSceneLayout {
   preset: ChatLayoutPreset;
