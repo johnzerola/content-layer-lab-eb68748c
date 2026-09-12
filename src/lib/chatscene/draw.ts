@@ -685,7 +685,11 @@ export function paintFrame(
   options: PaintOptions = {},
 ) {
   const media = options.media;
-  const rect = chatRect(project.layout, width, height);
+  const base = chatRect(project.layout, width, height);
+  const auto = project.layout?.autoHeight
+    ? autoPanelHeight(ctx, project, theme, plan, frame, base.w, base.h, media)
+    : null;
+  const rect = auto != null ? { ...base, h: auto } : base;
   const inset = rect.w < width || rect.h < height;
 
   // câmera: aproxima na fala nova e alterna com a tela cheia
