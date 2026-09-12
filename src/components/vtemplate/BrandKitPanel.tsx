@@ -126,8 +126,8 @@ export function BrandKitPanel({
 
       <div className="flex items-center gap-2">
         <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg border border-border/70 bg-card/60">
-          {kit.logoUrl ? (
-            <img src={kit.logoUrl} alt="Logo da marca" className="h-full w-full object-contain" />
+          {logoPreview ? (
+            <img src={logoPreview} alt="Logo da marca" className="h-full w-full object-contain" />
           ) : (
             <span className="text-[10px] text-muted-foreground">logo</span>
           )}
