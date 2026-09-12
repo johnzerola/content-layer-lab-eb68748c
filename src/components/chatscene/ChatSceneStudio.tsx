@@ -158,9 +158,24 @@ export function ChatSceneStudio() {
     });
   }, []);
 
+  const duplicateMessage = useCallback((id: string) => {
+    setProject((prev) => {
+      const idx = prev.messages.findIndex((m) => m.id === id);
+      if (idx < 0) return prev;
+      const copy = createMessage(prev.messages[idx]!.participantId, {
+        ...prev.messages[idx]!,
+        id: undefined,
+      });
+      const messages = [...prev.messages];
+      messages.splice(idx + 1, 0, copy);
+      setSelected(copy.id);
+      return { ...prev, messages };
+    });
+  }, []);
+
   const addParticipant = useCallback(() => {
     setProject((prev) => {
-      if (prev.participants.length >= 8) return prev;
+      if (prev.participants.length >= 12) return prev;
       const color = PALETTE[prev.participants.length % PALETTE.length]!;
       return {
         ...prev,
