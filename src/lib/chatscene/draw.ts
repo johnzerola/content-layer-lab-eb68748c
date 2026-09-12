@@ -166,8 +166,10 @@ export function layoutMessages(
   width: number,
   height: number,
   media?: Map<string, LoadedMedia>,
+  /** altura usada só para calcular tamanhos (painel de altura variável) */
+  metricsH?: number,
 ): Layout {
-  const m = metricsFor(width, height);
+  const m = metricsFor(width, metricsH ?? height);
   const isGroup = (project.chatKind ?? "direct") === "group" || project.participants.length > 2;
   const items: LaidOutMessage[] = [];
   let y = 0;
