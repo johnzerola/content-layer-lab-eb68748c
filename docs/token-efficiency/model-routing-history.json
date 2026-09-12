@@ -1,0 +1,5 @@
+{
+  "schema_version": "model-routing-history-v1",
+  "policy": "append evidence; never self-promote after a single task",
+  "records": []
+}
