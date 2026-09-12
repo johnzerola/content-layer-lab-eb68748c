@@ -77,8 +77,8 @@ export interface ScheduledSfx {
  * "Recebida".
  */
 export function sfxSchedule(project: ChatSceneProject, plan: ConversationPlan): ScheduledSfx[] {
-  const auto = project.soundEffects === "auto";
-  if (!auto && project.soundEffects !== "manual") return [];
+  if (!project.sound?.enabled) return [];
+  const auto = true;
   const out: ScheduledSfx[] = [];
   for (const message of project.messages) {
     const entry = plan.byId[message.id];
