@@ -33,6 +33,18 @@ export interface CameraShot {
   focusY: number;
 }
 
+/**
+ * Onde a conversa está na tela, em fração (0–1). A câmera mira nela: sem isso
+ * o plano fechado apertava o centro da tela e cortava os balões quando o
+ * painel fica em cima (conversa sobre gameplay).
+ */
+export interface CameraFocus {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 const WIDE: CameraShot = { scale: 1, focusX: 0.5, focusY: 0.5 };
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
@@ -57,6 +69,7 @@ export function cameraAt(
   camera: ChatSceneCamera | undefined,
   plan: ConversationPlan,
   frame: number,
+  focus?: CameraFocus,
 ): CameraShot {
   const cam = camera ?? DEFAULT_CAMERA;
   if (cam.mode === "off" || !plan.entries.length) return WIDE;
@@ -72,23 +85,43 @@ export function cameraAt(
 
   // padrão fixo de planos: dois fechados, um aberto — varia sem virar aleatório
   const close = cam.mode === "cuts" ? index % 3 !== 2 : true;
-  const maxZoom = cam.mode === "cuts" ? 1 + 0.55 * intensity : 1 + 0.3 * intensity;
-  const focusY = 0.5 + 0.16 * intensity;
+  const wanted = cam.mode === "cuts" ? 1 + 0.55 * intensity : 1 + 0.3 * intensity;
+  // o plano fechado nunca pode ser mais apertado que a conversa: senão corta
+  // os balões nas laterais
+  const fit = focus ? 1 / Math.max(0.2, clamp(focus.w, 0.05, 1)) : Infinity;
+  const maxZoom = Math.min(wanted, fit);
+
+  // centro da conversa; no plano fechado mira a parte de baixo, onde entra a
+  // mensagem nova
+  const cx = focus ? focus.x + focus.w / 2 : 0.5;
+  const wideY = focus ? focus.y + focus.h / 2 : 0.5;
+  const closeY = focus ? focus.y + focus.h * (0.55 + 0.2 * intensity) : 0.5 + 0.16 * intensity;
 
   if (!close) {
     // plano aberto com uma respiração lenta, para não parecer imagem congelada
     const drift = 0.02 * intensity * Math.sin(progress * Math.PI);
-    return { scale: 1 + drift, focusX: 0.5, focusY: 0.5 };
+    return frame_(1 + drift, cx, wideY);
   }
 
   if (cam.mode === "cuts") {
     // corte seco: já entra fechado e vai afastando devagar até a próxima fala
-    const relax = 0.12 * intensity * easeOut(progress);
-    return { scale: maxZoom - relax, focusX: 0.5, focusY };
+    const relax = (maxZoom - 1) * 0.22 * easeOut(progress);
+    return frame_(maxZoom - relax, cx, closeY);
   }
 
   // suave: aproxima na entrada da mensagem e segura
   const inFrames = Math.max(1, Math.round(plan.fps * 0.6));
   const p = easeOut((frame - entry.appearFrame) / inFrames);
-  return { scale: 1 + (maxZoom - 1) * p, focusX: 0.5, focusY: 0.5 + (focusY - 0.5) * p };
+  return frame_(1 + (maxZoom - 1) * p, cx, wideY + (closeY - wideY) * p);
+}
+
+/**
+ * Converte "quero este ponto no meio da tela" no ponto fixo usado pelo
+ * desenho, sem nunca deixar aparecer nada fora do vídeo.
+ */
+function frame_(scale: number, centerX: number, centerY: number): CameraShot {
+  const s = Math.max(1, scale);
+  if (s <= 1.0001) return { scale: s, focusX: 0.5, focusY: 0.5 };
+  const anchor = (c: number) => clamp((c - 0.5 / s) / (1 - 1 / s), 0, 1);
+  return { scale: s, focusX: anchor(centerX), focusY: anchor(centerY) };
 }
