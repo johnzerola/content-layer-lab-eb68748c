@@ -15,7 +15,7 @@ import { DEFAULT_VOICE_MIX } from "./voice";
 import { DEFAULT_CAMERA } from "./camera";
 
 export const CHATSCENE_PROJECT_MODE = "chatscene";
-export const CHATSCENE_PROJECT_VERSION = 1;
+export const CHATSCENE_PROJECT_VERSION = 2;
 
 export type ChatSceneAspect = "9:16" | "1:1" | "16:9";
 
@@ -599,10 +599,6 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
  * funcionando (cabeçalho de grupo, avatares, "digitando…", rolagem e ritmo).
  */
 export function createDemoChatSceneProject(): ChatSceneProject {
-  const profiles = [
-    import("./voice").then,
-  ];
-  void profiles;
   const chefe = createParticipant({ id: "chefe", name: "Chefe", color: "#f2b705", voiceProfileId: "voice_chefe" });
   const pedro = createParticipant({ id: "pedro", name: "Pedro", isSelf: true, color: "#7c5cff", voiceProfileId: "voice_pedro" });
   const colega = createParticipant({ id: "colega", name: "Colega", color: "#22c08a", voiceProfileId: "voice_colega" });
