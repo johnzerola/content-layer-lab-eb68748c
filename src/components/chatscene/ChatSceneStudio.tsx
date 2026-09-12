@@ -1046,10 +1046,40 @@ export function ChatSceneStudio() {
               </div>
 
               <div className="mt-3 rounded-lg border border-dashed border-border bg-background/35 p-3">
-                <p className="text-xs font-medium">Usar meu próprio vídeo</p>
+                <p className="text-xs font-medium">Usar meu próprio vídeo ou imagem</p>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  Envie um vídeo vertical (9:16) do seu computador para usar como fundo da conversa.
+                  Envie um arquivo vertical (9:16) do seu computador para usar como fundo da conversa.
                 </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background/60 px-2.5 py-1.5 text-xs hover:border-primary">
+                    {uploading === "background-image" ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <ImageIcon className="size-3.5" />
+                    )}
+                    Escolher imagem
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/*"
+                      aria-label="Enviar imagem de fundo"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) void handleBackgroundImage(file);
+                      }}
+                    />
+                  </label>
+                  {project.background?.kind === "image" ? (
+                    <button
+                      type="button"
+                      className="text-[11px] text-muted-foreground underline hover:text-primary"
+                      onClick={() => patch({ background: { kind: "theme" } })}
+                    >
+                      tirar minha imagem
+                    </button>
+                  ) : null}
+                </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background/60 px-2.5 py-1.5 text-xs hover:border-primary">
                     {uploading === "background-video" ? (
