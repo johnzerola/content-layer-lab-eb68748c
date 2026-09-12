@@ -891,6 +891,23 @@ export function ChatSceneStudio() {
                   suffix="ms"
                   onChange={(v) => updateMessage(selectedMessage.id, { typingMs: v })}
                 />
+                <Range
+                  label="Respiro depois desta mensagem"
+                  value={selectedMessage.pauseAfterMs ?? project.timing.gapMs}
+                  min={0}
+                  max={6000}
+                  step={100}
+                  suffix="ms"
+                  onChange={(v) => updateMessage(selectedMessage.id, { pauseAfterMs: v })}
+                />
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={selectedMessage.emphasis ?? false}
+                    onChange={(e) => updateMessage(selectedMessage.id, { emphasis: e.target.checked })}
+                  />
+                  momento de peso (segura mais na tela)
+                </label>
                 <div>
                   <p className="mb-1 text-muted-foreground">Reação nesta mensagem</p>
                   <div className="flex flex-wrap gap-1">
