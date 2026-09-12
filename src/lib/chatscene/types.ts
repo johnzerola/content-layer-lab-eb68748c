@@ -325,6 +325,9 @@ export function createChatSceneProject(init: Partial<ChatSceneProject> = {}): Ch
     startClock: init.startClock ?? "21:14",
     receipts: init.receipts ?? true,
     background: init.background ?? { ...DEFAULT_BACKGROUND },
+    animation: init.animation ?? "soft-spring",
+    layout: init.layout ?? { ...DEFAULT_LAYOUT },
+    sound: init.sound ?? { enabled: false, volume: 0.5 },
     participants: init.participants ?? [me, other],
     messages:
       init.messages ??
