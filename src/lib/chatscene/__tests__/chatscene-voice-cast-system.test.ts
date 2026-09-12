@@ -62,7 +62,7 @@ describe("Voice Cast System", () => {
   });
 
   it("repete falha transitória antes de desistir", async () => {
-    const project = createChatSceneProject();
+    const project = projectWithCast();
     let calls = 0;
     const provider = {
       id: "retry-test",
