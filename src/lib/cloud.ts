@@ -2,7 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { migrate, registerQuotaFallback, type Template } from "@/lib/template";
-import { isDataUrl, uploadDataUrl } from "@/lib/media-store";
+import { externalizeDataUrls, isDataUrl, uploadDataUrl } from "@/lib/media-store";
 
 export type CloudUser = { id: string; email: string | null };
 
