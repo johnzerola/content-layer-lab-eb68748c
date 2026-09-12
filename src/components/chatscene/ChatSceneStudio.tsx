@@ -505,6 +505,14 @@ export function ChatSceneStudio() {
                       </button>
                       <button
                         type="button"
+                        onClick={() => duplicateMessage(m.id)}
+                        className="rounded p-1 text-muted-foreground hover:bg-muted"
+                        aria-label="Duplicar mensagem"
+                      >
+                        <Copy className="size-3.5" />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => removeMessage(m.id)}
                         className="rounded p-1 text-muted-foreground hover:text-destructive"
                         aria-label="Apagar mensagem"
@@ -557,6 +565,24 @@ export function ChatSceneStudio() {
               );
             })}
           </ul>
+
+          {project.messages.length === 0 && (
+            <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+              <p className="mb-2">Nenhuma mensagem ainda.</p>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setProject(createDemoChatSceneProject());
+                  setSelected(null);
+                  setFrame(0);
+                }}
+              >
+                <Sparkle className="mr-1.5 size-4" />
+                Carregar conversa de exemplo
+              </Button>
+            </div>
+          )}
 
           <Button variant="secondary" size="sm" className="mt-3 w-full" onClick={addMessage}>
             <Plus className="mr-1.5 size-4" />
@@ -617,6 +643,62 @@ export function ChatSceneStudio() {
               <span className="mono-label ml-auto text-muted-foreground">
                 {width}×{height}
               </span>
+            </div>
+
+            <div className="mt-3">
+              <p className="mono-label mb-1.5 text-muted-foreground">Formato</p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(["9:16", "16:9", "1:1"] as ChatSceneAspect[]).map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => patch({ render: { ...project.render, aspect: a } })}
+                    className={`rounded-lg border px-2 py-1.5 text-xs transition ${
+                      project.render.aspect === a
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    {a}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <p className="mono-label mb-1.5 text-muted-foreground">Fundo</p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {BACKGROUND_PRESETS.map((b) => {
+                  const active =
+                    (project.background?.kind ?? "theme") === b.value.kind &&
+                    (project.background?.color ?? null) === (b.value.color ?? null);
+                  return (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => patch({ background: { ...b.value } })}
+                      className={`rounded-lg border px-2 py-1.5 text-xs transition ${
+                        active ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      {b.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <input
+                value={project.background?.kind === "image" ? project.background.imageUrl ?? "" : ""}
+                onChange={(e) =>
+                  patch({
+                    background: e.target.value
+                      ? { kind: "image", imageUrl: e.target.value }
+                      : { kind: "theme" },
+                  })
+                }
+                placeholder="ou cole a foto de fundo (https://…)"
+                className="mt-1.5 w-full rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none focus:border-primary"
+                aria-label="Foto de fundo"
+              />
             </div>
 
             <div className="mt-3">
