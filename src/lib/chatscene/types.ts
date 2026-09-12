@@ -585,6 +585,48 @@ export function participantOf(project: ChatSceneProject, id: string): ChatPartic
   );
 }
 
+/** Conversas da história. Sempre existe ao menos a conversa principal. */
+export function threadsOf(project: ChatSceneProject): ChatSceneThread[] {
+  const list = (project.threads ?? []).filter((t) => t && t.id);
+  if (list.length) return list;
+  const isGroup = (project.chatKind ?? "direct") === "group" || project.participants.length > 2;
+  const peer = project.participants.find((p) => !p.isSelf);
+  return [
+    {
+      id: MAIN_THREAD_ID,
+      name: isGroup
+        ? project.groupName || project.title || "Grupo"
+        : peer?.name ?? project.participants[0]?.name ?? "Conversa",
+      avatarUrl: (isGroup ? project.groupAvatarUrl : peer?.avatarUrl) ?? null,
+      kind: isGroup ? "group" : "direct",
+      subtitle: null,
+    },
+  ];
+}
+
+/** Conversa a que a mensagem pertence (com volta segura para a principal). */
+export function threadIdOf(project: ChatSceneProject, message: ChatMessage): string {
+  const list = threadsOf(project);
+  if (message.threadId && list.some((t) => t.id === message.threadId)) return message.threadId;
+  return list[0]!.id;
+}
+
+export function threadOf(project: ChatSceneProject, id: string): ChatSceneThread {
+  const list = threadsOf(project);
+  return list.find((t) => t.id === id) ?? list[0]!;
+}
+
+/** Cria uma conversa nova para a história. */
+export function createThread(init: Partial<ChatSceneThread> = {}): ChatSceneThread {
+  return {
+    id: init.id ?? chatSceneId("t"),
+    name: init.name ?? "Nova conversa",
+    avatarUrl: init.avatarUrl ?? null,
+    kind: init.kind ?? "direct",
+    subtitle: init.subtitle ?? null,
+  };
+}
+
 /** Migração defensiva de documentos salvos em versões anteriores. */
 export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null | undefined): ChatSceneProject {
   const base = createChatSceneProject();
