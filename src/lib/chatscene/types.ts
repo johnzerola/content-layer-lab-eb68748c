@@ -120,6 +120,8 @@ export interface ChatParticipant {
   avatarUrl?: string | null;
   /** voz genérica desta pessoa (elenco de vozes) */
   voice?: import("./voice").VoiceProfile | null;
+  /** identidade vocal reutilizável; `voice` continua aceito para projetos antigos */
+  voiceProfileId?: string | null;
 }
 
 export interface ChatMessage {
@@ -152,6 +154,8 @@ export interface ChatMessage {
   time?: string | null;
   /** emoji de reação preso na base da bolha */
   reaction?: string | null;
+  /** emoção e ritmo desta fala, sem trocar a identidade do personagem */
+  voiceDirection?: Partial<import("./voice").MessageVoiceDirection> | null;
 }
 
 /** Estilo de entrada das bolhas. */
@@ -257,12 +261,14 @@ export const LAYOUT_PRESETS: { id: ChatLayoutPreset; label: string; value: Omit<
     label: "Creator Split",
     value: {
       ...DEFAULT_LAYOUT,
-      x: 0.04,
-      width: 0.92,
-      y: 0.42,
-      height: 0.54,
-      radius: 0.05,
-      backgroundScale: 1.1,
+      x: 0.07,
+      width: 0.86,
+      y: 0.07,
+      height: 0.55,
+      radius: 0.045,
+      opacity: 0.98,
+      backgroundScale: 1,
+      autoHeight: true,
     },
   },
   {
@@ -330,6 +336,12 @@ export const CREATOR_LAYOUTS: {
     label: "Creator Split",
     hint: "Espaço em cima para o criador, conversa embaixo.",
     value: LAYOUT_PRESETS.find((l) => l.id === "creator-split")!.value,
+    apply: {
+      themeId: "zap",
+      dark: true,
+      animation: "soft-spring",
+      camera: { mode: "cuts", intensity: 0.45 },
+    },
   },
 ];
 
@@ -377,6 +389,8 @@ export interface ChatSceneProject {
   /** variante do tema */
   dark: boolean;
   participants: ChatParticipant[];
+  /** elenco reutilizável do projeto */
+  voiceProfiles?: import("./voice").VoiceProfile[];
   messages: ChatMessage[];
   timing: ChatSceneTiming;
   render: ChatSceneRenderSettings;
@@ -457,6 +471,7 @@ export function createParticipant(init: Partial<ChatParticipant> = {}): ChatPart
     color: init.color ?? "#7c5cff",
     avatarUrl: init.avatarUrl ?? null,
     voice: init.voice ?? null,
+    voiceProfileId: init.voiceProfileId ?? null,
   };
 }
 
@@ -477,6 +492,7 @@ export function createMessage(participantId: string, init: Partial<ChatMessage> 
     replyToId: init.replyToId ?? null,
     time: init.time ?? null,
     reaction: init.reaction ?? null,
+    voiceDirection: init.voiceDirection ?? null,
   };
 }
 
@@ -514,6 +530,7 @@ export function createChatSceneProject(init: Partial<ChatSceneProject> = {}): Ch
     voiceMix: init.voiceMix ?? { ...DEFAULT_VOICE_MIX },
     camera: init.camera ?? { ...DEFAULT_CAMERA },
     participants: init.participants ?? [me, other],
+    voiceProfiles: init.voiceProfiles ?? [],
     messages:
       init.messages ??
       [
@@ -540,9 +557,13 @@ export function participantOf(project: ChatSceneProject, id: string): ChatPartic
 export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null | undefined): ChatSceneProject {
   const base = createChatSceneProject();
   if (!raw) return base;
+  const legacyProfiles = (raw.participants ?? [])
+    .filter((p) => p.voice && !p.voiceProfileId)
+    .map((p) => ({ ...p.voice!, id: `voice_${p.id}` }));
+  const voiceProfiles = [...(raw.voiceProfiles ?? []), ...legacyProfiles.filter((v) => !(raw.voiceProfiles ?? []).some((p) => p.id === v.id))];
   const participants =
     Array.isArray(raw.participants) && raw.participants.length
-      ? raw.participants.map((p) => createParticipant(p))
+      ? raw.participants.map((p) => createParticipant({ ...p, voiceProfileId: p.voiceProfileId ?? (p.voice ? `voice_${p.id}` : null) }))
       : base.participants;
   const validIds = new Set(participants.map((p) => p.id));
   const fallbackId = participants[0]!.id;
@@ -557,6 +578,7 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
     id: raw.id ?? base.id,
     version: CHATSCENE_PROJECT_VERSION,
     participants,
+    voiceProfiles,
     messages,
     timing: { ...DEFAULT_TIMING, ...(raw.timing ?? {}) },
     render: { ...DEFAULT_RENDER, ...(raw.render ?? {}) },
@@ -577,26 +599,50 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
  * funcionando (cabeçalho de grupo, avatares, "digitando…", rolagem e ritmo).
  */
 export function createDemoChatSceneProject(): ChatSceneProject {
-  const eu = createParticipant({ name: "Você", isSelf: true, color: "#7c5cff" });
-  const ana = createParticipant({ name: "Ana", color: "#ff5c8a" });
-  const joao = createParticipant({ name: "João", color: "#22c08a" });
-  const vo = createParticipant({ name: "Vô Chico", color: "#f2b705" });
+  const profiles = [
+    import("./voice").then,
+  ];
+  void profiles;
+  const chefe = createParticipant({ id: "chefe", name: "Chefe", color: "#f2b705", voiceProfileId: "voice_chefe" });
+  const pedro = createParticipant({ id: "pedro", name: "Pedro", isSelf: true, color: "#7c5cff", voiceProfileId: "voice_pedro" });
+  const colega = createParticipant({ id: "colega", name: "Colega", color: "#22c08a", voiceProfileId: "voice_colega" });
+  const mae = createParticipant({ id: "mae", name: "Mãe", color: "#ff5c8a", voiceProfileId: "voice_mae" });
   const line = (p: ChatParticipant, text: string, extra: Partial<ChatMessage> = {}) =>
     createMessage(p.id, { text, ...extra });
   return createChatSceneProject({
-    title: "Grupo da Família",
+    title: "Primeiro dia no trabalho",
     chatKind: "group",
-    groupName: "Grupo da Família",
-    participants: [eu, ana, joao, vo],
+    groupName: "Equipe — Primeiro dia",
+    layout: { ...LAYOUT_PRESETS.find((l) => l.id === "creator-split")!.value, preset: "creator-split" },
+    dark: true,
+    animation: "soft-spring",
+    camera: { ...DEFAULT_CAMERA, mode: "cuts", intensity: 0.45 },
+    participants: [chefe, pedro, colega, mae],
+    voiceProfiles: [
+      { ...importVoicePreset("adult-male-boss"), id: "voice_chefe" },
+      { ...importVoicePreset("teen-boy-shy"), id: "voice_pedro" },
+      { ...importVoicePreset("adult-male-casual"), id: "voice_colega" },
+      { ...importVoicePreset("mother-warm"), id: "voice_mae" },
+    ],
     messages: [
-      createMessage(eu.id, { kind: "system", text: "Ana criou o grupo “Grupo da Família”" }),
-      line(ana, "gente, o almoço de domingo vai ser na minha casa"),
-      line(joao, "eu levo a sobremesa 🍮"),
-      line(vo, "eu levo fome"),
-      line(eu, "kkkkk combinado então"),
-      line(ana, "só não atrasem como da última vez"),
-      line(joao, "isso foi o João de 2019, outra pessoa"),
-      line(vo, "meio-dia em ponto. quem chegar depois lava a louça"),
+      createMessage(chefe.id, { kind: "system", text: "Pedro entrou na equipe" }),
+      line(chefe, "Bom dia, Pedro. Preparado para o primeiro dia?", { voiceDirection: { emotion: "serious" } }),
+      line(pedro, "Preparado... eu acho 😅", { voiceDirection: { emotion: "nervous" } }),
+      line(colega, "Relaxa. O café fica à esquerda e o chefe quase nunca morde."),
+      line(chefe, "Quase nunca?", { emphasis: true, voiceDirection: { emotion: "annoyed" } }),
+      line(colega, "Foi uma piada, chefe. Uma ótima piada."),
+      line(mae, "Filho, boa sorte! E não esquece o almoço que deixei na mochila.", { voiceDirection: { emotion: "happy" } }),
+      line(pedro, "Valeu, mãe. Agora a empresa inteira sabe do meu almoço."),
     ],
   });
+}
+
+function importVoicePreset(id: string): import("./voice").VoiceProfile {
+  const defaults: Record<string, Partial<import("./voice").VoiceProfile>> = {
+    "adult-male-boss": { providerVoiceId: "onyx", style: "autoritaria", speed: .9, energy: .72 },
+    "teen-boy-shy": { providerVoiceId: "echo", style: "calma", speed: .9, energy: .3 },
+    "adult-male-casual": { providerVoiceId: "ash", style: "natural", speed: 1, energy: .55 },
+    "mother-warm": { providerVoiceId: "sage", style: "calma", speed: .94, energy: .45 },
+  };
+  return { presetId: id, provider: "mock", language: "pt", locale: "pt-BR", style: "natural", speed: 1, gain: 1, ...defaults[id] };
 }
