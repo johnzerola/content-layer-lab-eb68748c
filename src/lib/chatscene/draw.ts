@@ -8,6 +8,7 @@
 import type { ConversationPlan } from "./clock";
 import { typingAt } from "./clock";
 import { mediaFrameAt, type LoadedMedia } from "./media";
+import { durationLabel, voiceSeconds, voiceWave } from "./message-kinds";
 import type { ChatTheme } from "./theme";
 import {
   DEFAULT_LAYOUT,
