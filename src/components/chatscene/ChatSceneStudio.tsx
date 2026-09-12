@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { Button, Input } from "@/components/ui/base";
 import { ChatScenePreview } from "@/components/chatscene/ChatScenePreview";
 import { ChatSceneTimeline } from "@/components/chatscene/ChatSceneTimeline";
+import { CreatorLayouts } from "@/components/chatscene/CreatorLayouts";
 import { buildPlan } from "@/lib/chatscene/clock";
 import { encodeFrameSequence, frameEncoderSupported } from "@/lib/chatscene/encode-frames";
 import { CanvasConversationRenderer } from "@/lib/chatscene/renderer";
@@ -61,6 +62,7 @@ import {
   ANIMATION_PRESETS,
   BACKGROUND_PRESETS,
   DEFAULT_BRANDING,
+  CREATOR_LAYOUTS,
   LAYOUT_PRESETS,
   createChatSceneProject,
   createDemoChatSceneProject,
