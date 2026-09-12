@@ -39,6 +39,13 @@ def test_stable_inference_band_and_narrow_composite_preserve_original(tmp_path):
     assert result.report["clean_frame_candidates"] == [0, 3]
     assert [path.read_bytes() for path in sorted(source.glob("*.png"))] == originals
     assert result.reference_stride == 2
+    assert result.report["dual_mask_audit"] == {
+        "composition_subset_of_inference": True,
+        "dual_mask_distinct": True,
+        "equal_frame_count": 2,
+        "distinct_frame_count": 2,
+        "reason": "stable_inference_band_with_tighter_per_frame_composition",
+    }
 
 
 def test_distant_clean_references_remain_in_short_scene_window(tmp_path):
@@ -132,3 +139,6 @@ def test_partial_reference_run_does_not_hide_visible_background(tmp_path):
     assert result.report["inference_mask_policy"] == "dynamic_partial_references"
     assert not read(result.inference_mask_dir, 0)[45:50, 40:70].any()
     assert read(result.inference_mask_dir, 3)[45:50, 40:70].all()
+    assert result.report["dual_mask_audit"]["composition_subset_of_inference"] is True
+    assert result.report["dual_mask_audit"]["dual_mask_distinct"] is False
+    assert result.report["dual_mask_audit"]["reason"] == "dynamic_partial_references_preserve_visible_background"

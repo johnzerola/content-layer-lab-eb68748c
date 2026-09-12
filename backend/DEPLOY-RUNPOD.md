@@ -68,6 +68,13 @@ reaplica, cena a cena, o contrato que produziu a melhor amostra anterior:
 - pixels externos à composição vêm do vídeo original;
 - enhancement global permanece desligado.
 
+No perfil `legacy_refined`, o ProPainter usa obrigatoriamente a rota PNG/RGB
+sem perdas, mesmo quando `PROPAINTER_PRESERVE_PIXELS` nao foi configurado no
+ambiente. A resposta identifica este contrato como `legacy_refined_b2_v1`.
+A referencia visual e o B2 sem acabamento da Fase 5. Como o B2 historico
+combina execucoes de cenas diferentes, o perfil reproduz a politica de
+qualidade e nao promete igualdade bit a bit com aquele arquivo.
+
 O contrato é igual para os dois motores oficiais. O preset **Qualidade** usa
 ProPainter e o preset **Máxima** usa DiffuEraser; `options.engine` aceita
 `propainter` ou `diffueraser` em ensaios controlados. A resposta registra

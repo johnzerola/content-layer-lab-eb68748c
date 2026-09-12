@@ -49,3 +49,28 @@ def test_handler_records_upload_time_and_removes_its_project(tmp_path, monkeypat
     assert result["gpu_name"] == "NVIDIA RTX A5000"
     assert uploaded == [b"result"]
     assert not list(tmp_path.iterdir())
+
+
+def test_handler_returns_persistent_failure_bundle_before_cleanup(tmp_path, monkeypatch):
+    spec = importlib.util.spec_from_file_location("handler_failure_test", Path(__file__).resolve().parents[1] / "runpod_handler.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setenv("CLEANER_PERSIST_FAILURE_ARTIFACTS", "1")
+    monkeypatch.setattr(module, "STORAGE_DIR", tmp_path)
+    monkeypatch.setattr(module, "probe", lambda _: SimpleNamespace(duration=1, width=64, height=64, fps=10, frames=10))
+    def download(_url, destination):
+        destination.write_bytes(b"source")
+        return destination
+    def fail(identity, *_args):
+        job = tmp_path / identity
+        (job / "state.json").write_text('{"status":"failed"}', encoding="utf-8")
+        raise RuntimeError("synthetic pipeline failure")
+    monkeypatch.setattr(module, "_download", download)
+    monkeypatch.setattr(module, "run_pipeline", fail)
+    result = module.handler({"input": {"source_url": "https://source.invalid", "source_is_chunk": True,
+        "start": 0, "end": 1, "overlap": 0, "expected_revision": "scene-roi-v4"}})
+    assert result["ok"] is False
+    assert result["failure_report"]["exception"]["type"] == "RuntimeError"
+    assert result["failure_bundle_b64"]
+    assert list((tmp_path / "failure-bundles").glob("*.zip"))
+    assert not [path for path in tmp_path.iterdir() if path.is_dir() and path.name != "failure-bundles"]

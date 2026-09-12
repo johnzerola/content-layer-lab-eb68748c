@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+import json
 import math
 import os
 from pathlib import Path
@@ -10,6 +12,8 @@ import subprocess
 import sys
 import time
 from typing import Callable, Dict, List, Optional, Tuple
+
+import cv2
 
 from .inpainting import cuda_available
 
@@ -164,6 +168,7 @@ def run_diffueraser(
     duration: float,
     on_stage: Optional[Callable[[str], None]] = None,
     cancel_file: Optional[str] = None,
+    diagnostics=None,
 ) -> str:
     status = diffueraser_status()
     if not status.ready:
@@ -174,6 +179,9 @@ def run_diffueraser(
     target.mkdir(parents=True, exist_ok=True)
     output = target / "diffueraser_result.mp4"
     log_path = target / "diffueraser.log"
+    stdout_path = target / "diffueraser.stdout.log"
+    stderr_path = target / "diffueraser.stderr.log"
+    report_path = target / "diffueraser.report.json"
     if output.exists():
         output.unlink()
     command = build_diffueraser_command(input_video, mask_video, output_dir, duration)
@@ -185,35 +193,69 @@ def run_diffueraser(
     if on_stage:
         on_stage("DiffuEraser oficial (difusao temporal + prior ProPainter)")
     timeout = max(600, int(os.getenv("DIFFUERASER_TIMEOUT_SECONDS", "21600")))
-    with log_path.open("w", encoding="utf-8") as log:
-        process = subprocess.Popen(
-            command,
-            cwd=status.root,
-            env=env,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-        )
-        deadline = time.monotonic() + timeout
-        while process.poll() is None:
-            if cancel_file and Path(cancel_file).exists():
-                process.terminate()
-                try:
-                    process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait(timeout=10)
-                raise RuntimeError("job cancelado")
-            if time.monotonic() >= deadline:
-                process.kill()
-                process.wait(timeout=10)
-                raise TimeoutError("DiffuEraser excedeu o tempo limite")
-            time.sleep(1)
-        returncode = process.returncode
-    if returncode != 0:
-        tail = "\n".join(
-            log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-20:]
-        )
-        raise RuntimeError(f"DiffuEraser falhou (codigo {returncode}).\n{tail}")
-    if not output.is_file() or output.stat().st_size < 1024:
-        raise RuntimeError(f"DiffuEraser concluiu sem resultado; log: {log_path}")
-    return str(output)
+    started = time.monotonic()
+    telemetry = {
+        "command": command, "cwd": status.root, "started_at": datetime.now(timezone.utc).isoformat(),
+        "ended_at": None, "duration_seconds": None, "pid": None, "exit_code": None,
+        "stdout": str(stdout_path), "stderr": str(stderr_path), "output": str(output),
+        "process_started": False, "model_loaded": None, "inference_started": None,
+        "inference_finished": False, "output_exists": False, "output_bytes": 0,
+        "output_frames": None, "output_width": None, "output_height": None,
+        "output_fps": None,
+        "lifecycle_visibility": "model/inference boundaries are only confirmed after a successful upstream exit",
+    }
+    def persist():
+        report_path.write_text(json.dumps(telemetry, ensure_ascii=False, indent=2), encoding="utf-8")
+        if diagnostics:
+            diagnostics.process(**telemetry)
+    persist()
+    try:
+        with stdout_path.open("w", encoding="utf-8") as stdout, stderr_path.open("w", encoding="utf-8") as stderr:
+            process = subprocess.Popen(command, cwd=status.root, env=env, stdout=stdout, stderr=stderr)
+            telemetry.update(pid=process.pid, process_started=True)
+            persist()
+            deadline = time.monotonic() + timeout
+            while process.poll() is None:
+                if diagnostics:
+                    diagnostics.sample_resources()
+                if cancel_file and Path(cancel_file).exists():
+                    process.terminate()
+                    try:
+                        process.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        process.kill(); process.wait(timeout=10)
+                    raise RuntimeError("job cancelado")
+                if time.monotonic() >= deadline:
+                    process.kill(); process.wait(timeout=10)
+                    raise TimeoutError("DiffuEraser excedeu o tempo limite")
+                time.sleep(1)
+            returncode = process.returncode
+            telemetry["exit_code"] = returncode
+        # Compatibility log remains a bounded merger of both streams.
+        log_path.write_text(stdout_path.read_text(encoding="utf-8", errors="replace") + "\n[stderr]\n" +
+                            stderr_path.read_text(encoding="utf-8", errors="replace"), encoding="utf-8")
+        if returncode != 0:
+            tail = "\n".join(log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-20:])
+            raise RuntimeError(f"DiffuEraser falhou (codigo {returncode}).\n{tail}")
+        if not output.is_file() or output.stat().st_size < 1024:
+            raise RuntimeError(f"DiffuEraser concluiu sem resultado; log: {log_path}")
+        telemetry.update(model_loaded=True, inference_started=True, inference_finished=True,
+                          output_exists=True, output_bytes=output.stat().st_size)
+        capture = cv2.VideoCapture(str(output))
+        try:
+            if capture.isOpened():
+                telemetry.update(
+                    output_frames=int(capture.get(cv2.CAP_PROP_FRAME_COUNT)),
+                    output_width=int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                    output_height=int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+                    output_fps=float(capture.get(cv2.CAP_PROP_FPS)),
+                )
+        finally:
+            capture.release()
+        return str(output)
+    finally:
+        telemetry.update(ended_at=datetime.now(timezone.utc).isoformat(),
+                         duration_seconds=round(time.monotonic() - started, 6),
+                         output_exists=output.is_file(),
+                         output_bytes=output.stat().st_size if output.is_file() else 0)
+        persist()

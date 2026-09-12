@@ -108,7 +108,7 @@ def refine_junctions(original, rebuilt, composite, excluded, allowed, donors):
     selected = (composite > 0) & (allowed > 0)
     baseline = original.copy()
     baseline[selected] = rebuilt[selected]
-    report = {"donors": 0, "accepted_observations": 0, "consensus_pixels": 0,
+    report = {"donors": 0, "donor_reports": [], "accepted_observations": 0, "consensus_pixels": 0,
               "original_pixels_recovered": 0, "donor_pixels_changed": 0, "fallback": None}
     if not selected.any() or len(donors) < 2:
         report["fallback"] = "insufficient_donors_or_empty_mask"
@@ -116,13 +116,19 @@ def refine_junctions(original, rebuilt, composite, excluded, allowed, donors):
     guide = original.copy()
     guide[selected] = rebuilt[selected]
     observations = []
-    for donor in donors[:4]:
+    for donor_index, donor in enumerate(donors[:4]):
         if (not _valid_image(donor.original, original.shape) or not _valid_image(donor.guide, original.shape)
                 or donor.excluded.shape != shape):
             raise ValueError("invalid donor geometry")
         warped, visible, score = _observations(original, guide, excluded, donor)
         report["donors"] += 1
-        report["accepted_observations"] += int(np.count_nonzero(visible & selected))
+        accepted = int(np.count_nonzero(visible & selected))
+        report["accepted_observations"] += accepted
+        report["donor_reports"].append({
+            "candidate_index": donor_index, "accepted_pixels": accepted,
+            "rejected": accepted == 0,
+            "reason": "no_valid_visible_pixels" if accepted == 0 else "accepted_flow_observation",
+        })
         observations.append((warped, visible, score))
     best = np.full(shape, np.inf, np.float32)
     chosen = rebuilt.copy()
@@ -136,6 +142,7 @@ def refine_junctions(original, rebuilt, composite, excluded, allowed, donors):
         best[take], chosen[take] = score[take], warped[take]
     consensus = np.isfinite(best) & selected
     report["consensus_pixels"] = int(consensus.sum())
+    report["confidence"] = float(consensus.sum() / max(1, selected.sum()))
     if not consensus.any():
         report["fallback"] = "no_two_donor_consensus"
         return baseline, baseline.copy(), report
@@ -157,4 +164,5 @@ def refine_junctions(original, rebuilt, composite, excluded, allowed, donors):
     result = np.clip(np.rint(mask_only * (1 - alpha[..., None]) + chosen * alpha[..., None]), 0, 255).astype(np.uint8)
     result[~selected] = original[~selected]
     report["donor_pixels_changed"] = int(np.count_nonzero(np.any(result != mask_only, axis=2)))
+    report["gate"] = "pass" if report["donor_pixels_changed"] or report["original_pixels_recovered"] else "fallback"
     return mask_only, result, report

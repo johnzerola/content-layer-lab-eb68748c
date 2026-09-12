@@ -16,10 +16,21 @@ from ..utils.video import read_frames
 from ..video.subtitle_junctions import Donor, exclusion_mask, refine_junctions
 
 
-def refine_subtitle_scene(original, native, raw_masks, composite_masks, destination,
-                          info, regions, *, cancel_file=None):
+def _refine_subtitle_scene(original, native, raw_masks, composite_masks, destination,
+                           info, regions, *, cancel_file=None):
     target = Path(destination).resolve()
     target.mkdir(parents=True, exist_ok=False)
+    report_path = target / "subtitle-junctions.report.json"
+    report = {
+        "revision": "subtitle-junctions-v1", "started": True, "completed": False,
+        "started_at_unix": time.time(), "frames_analyzed": 0,
+        "frames_with_accepted_donor": 0, "frames_fallback": 0,
+        "frame_reports": [], "failure": None,
+    }
+    def persist_report():
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        (target / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    persist_report()
     expected = {f"{i:06d}.png" for i in range(info.frames)}
     for folder in (raw_masks, composite_masks):
         if {p.name for p in Path(folder).iterdir()} != expected:
@@ -84,11 +95,12 @@ def refine_subtitle_scene(original, native, raw_masks, composite_masks, destinat
     finally:
         for stream in streams:
             stream.close()
-    report = {"revision": "subtitle-junctions-v1", "frames": info.frames,
+    report.update({"frames": info.frames,
               "crop_xyxy": [left, top, right, bottom], "donor_indices": donor_indices,
-              "frame_reports": [], "original_pixels_recovered": 0, "donor_pixels_changed": 0,
+              "original_pixels_recovered": 0, "donor_pixels_changed": 0,
               "scope": "scene-local neural reconstruction; mask transitions and verified original donors only",
-              "donor_detector": detector_status(), "donor_masks": "cached masks OR new detection, connected effects and halo"}
+              "donor_detector": detector_status(), "donor_masks": "cached masks OR new detection, connected effects and halo"})
+    persist_report()
     start = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="junctions-", dir=target) as temp:
         scratch = Path(temp)
@@ -112,11 +124,18 @@ def refine_subtitle_scene(original, native, raw_masks, composite_masks, destinat
                     masks_only, refined, stats = refine_junctions(crop(a), crop(b), crop(mask(composite_masks, i)),
                                                                 core, allowed, [cached[j] for j in chosen])
                     stats.update(frame=i, donors_used=chosen)
+                    for donor_report in stats.get("donor_reports", []):
+                        candidate = donor_report.get("candidate_index")
+                        donor_report["frame_index"] = chosen[candidate] if isinstance(candidate, int) and candidate < len(chosen) else None
                     report["frame_reports"].append(stats)
+                    report["frames_analyzed"] += 1
+                    report["frames_with_accepted_donor"] += int(stats.get("consensus_pixels", 0) > 0)
+                    report["frames_fallback"] += int(bool(stats.get("fallback")))
                     for key in ("original_pixels_recovered", "donor_pixels_changed"):
                         report[key] += stats[key]
                     if not cv2.imwrite(str(scratch / f"{i:06d}.png"), refined):
                         raise RuntimeError("phase-2 temporary frame write failed")
+                    persist_report()
                     crop(a)[:] = masks_only
                     yield a
                     count += 1
@@ -140,5 +159,41 @@ def refine_subtitle_scene(original, native, raw_masks, composite_masks, destinat
                 stream.close()
         _write_video(target / "reference-master.mp4", info.width, info.height, info.fps, references())
     report["seconds"] = time.monotonic() - start
-    (target / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    report["completed"] = True
+    report["ended_at_unix"] = time.time()
+    persist_report()
     return report
+
+
+def refine_subtitle_scene(original, native, raw_masks, composite_masks, destination,
+                          info, regions, *, cancel_file=None):
+    """Run junction recovery while leaving a readable partial report on error."""
+    target = Path(destination).resolve()
+    started = time.monotonic()
+    try:
+        return _refine_subtitle_scene(
+            original, native, raw_masks, composite_masks, destination,
+            info, regions, cancel_file=cancel_file,
+        )
+    except BaseException as exc:
+        target.mkdir(parents=True, exist_ok=True)
+        report_path = target / "subtitle-junctions.report.json"
+        try:
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+        except Exception:
+            report = {
+                "revision": "subtitle-junctions-v1", "started": True,
+                "completed": False, "frames_analyzed": 0,
+                "frames_with_accepted_donor": 0, "frames_fallback": 0,
+                "frame_reports": [],
+            }
+        report.update(
+            completed=False,
+            ended_at_unix=time.time(),
+            seconds=report.get("seconds", time.monotonic() - started),
+            failure={"type": type(exc).__name__, "message": str(exc)},
+        )
+        serialized = json.dumps(report, ensure_ascii=False, indent=2)
+        report_path.write_text(serialized, encoding="utf-8")
+        (target / "report.json").write_text(serialized, encoding="utf-8")
+        raise

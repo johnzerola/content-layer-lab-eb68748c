@@ -23,11 +23,13 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import os
 from pathlib import Path
 import shutil
 import tempfile
 import time
+import traceback
 import uuid
 
 import requests
@@ -37,7 +39,9 @@ from app.engines.diffueraser_official import diffueraser_status
 from app.engines.propainter_official import propainter_status
 from app.storage import job_dir as safe_job_dir
 from app.utils.video import probe
+from app.utils.video import ffmpeg_filter
 from app.workers.tasks import run_pipeline
+from app.observability import FailureDiagnostics
 
 STORAGE_DIR = Path(os.getenv("CLEANER_STORAGE", "storage")).resolve()
 DOWNLOAD_TIMEOUT = (30, 3600)
@@ -86,6 +90,59 @@ def _upload(url: str, path: Path) -> None:
             timeout=DOWNLOAD_TIMEOUT,
         )
     response.raise_for_status()
+
+
+def _upload_artifact(spec: dict, path: Path) -> dict:
+    """Upload one opt-in evidence artifact without exposing its credential."""
+    method = str(spec.get("method") or "POST").upper()
+    headers = {
+        "content-type": "video/mp4",
+        "x-file-name": str(spec.get("filename") or path.name),
+        "x-file-size": str(path.stat().st_size),
+    }
+    if spec.get("token"):
+        headers["x-job-token"] = str(spec["token"])
+    with path.open("rb") as handle:
+        response = requests.request(method, str(spec["url"]), data=handle,
+                                    headers=headers, timeout=DOWNLOAD_TIMEOUT)
+    response.raise_for_status()
+    return {
+        "bytes": path.stat().st_size,
+        "sha256": _sha256(path),
+        "output_url": str(spec.get("output_url") or spec["url"]).split("?")[0],
+    }
+
+
+def _read_json(path: Path) -> dict | None:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def _read_text_bounded(path: Path, limit: int = 512 * 1024) -> dict:
+    if not path.is_file():
+        return {"text": None, "bytes": None, "truncated": False}
+    data = path.read_bytes()
+    return {
+        "text": data[-limit:].decode("utf-8", errors="replace"),
+        "bytes": len(data),
+        "truncated": len(data) > limit,
+    }
+
+
+def _upload_available_artifacts(specs: dict, candidates: dict[str, Path]) -> dict:
+    uploaded = {}
+    for name, spec in specs.items():
+        candidate = candidates.get(name)
+        if candidate is None or not candidate.is_file():
+            uploaded[name] = {"error": "artifact_missing"}
+            continue
+        try:
+            uploaded[name] = _upload_artifact(dict(spec), candidate)
+        except Exception as exc:  # evidence transport must not hide the pipeline failure
+            uploaded[name] = {"error": f"{type(exc).__name__}: {exc}"}
+    return uploaded
 
 
 WORKER_VERSION = "v4"
@@ -163,8 +220,21 @@ def handler(event: dict) -> dict:
     job_path = safe_job_dir(STORAGE_DIR, job_id)
     job_path.mkdir(parents=True, exist_ok=True)
     scratch = Path(tempfile.mkdtemp(prefix=f"chunk-{index}-"))
+    options = dict(payload.get("options") or {})
+    artifact_uploads = dict(payload.get("artifact_uploads") or {})
+    diagnostics = FailureDiagnostics(job_id, STORAGE_DIR, {
+        "commit": os.getenv("CLEANER_BUILD_COMMIT", "unknown"),
+        "image_digest": os.getenv("CLEANER_IMAGE_DIGEST", "unknown"),
+        "pipeline_revision": PIPELINE_REVISION,
+        "worker_version": WORKER_VERSION,
+        "engine": options.get("engine", "auto"),
+        "quality_profile": options.get("quality_profile", "standard"),
+        "preset": preset,
+        "mode": str(payload.get("mode", "subtitle")),
+    })
     try:
-        full = _download(source_url, scratch / "source.mp4")
+        with diagnostics.stage("01_download", source_url="redacted"):
+            full = _download(source_url, scratch / "source.mp4")
         # Só o trecho necessário (miolo + contexto) entra na pipeline.
         if source_is_chunk:
             chunk_input = str(job_path / "input.mp4")
@@ -172,8 +242,12 @@ def handler(event: dict) -> dict:
         else:
             # Compatibilidade com jobs enfileirados antes desta versao.
             chunk_input = slice_video(str(full), str(job_path / "input.mp4"), read_start, read_duration)
-        info = probe(chunk_input)
+        with diagnostics.stage("02_probe"):
+            info = probe(chunk_input)
+        diagnostics.update("geometry", input_width=info.width, input_height=info.height,
+                           fps=info.fps, frame_count=info.frames, duration=info.duration)
         masks = localize_masks(list(payload.get("masks") or []), read_start, read_duration)
+        options["_failure_diagnostics"] = diagnostics
 
         result = run_pipeline(
             job_id,
@@ -182,7 +256,7 @@ def handler(event: dict) -> dict:
             masks,
             None,
             None,
-            dict(payload.get("options") or {}),
+            options,
         )
         processed = job_path / "output.mp4"
         if not processed.exists():
@@ -222,21 +296,69 @@ def handler(event: dict) -> dict:
             "checksum": _sha256(final_path),
             "bytes": final_path.stat().st_size,
         }
+        run_dir = job_path / "diffueraser-run"
+        junction_dir = job_path / "subtitle-junctions"
+        response["diffueraser_report"] = _read_json(run_dir / "diffueraser.report.json")
+        response["subtitle_junctions_report"] = _read_json(
+            junction_dir / "subtitle-junctions.report.json"
+        )
+        response["diffueraser_stdout"] = _read_text_bounded(
+            run_dir / "diffueraser.stdout.log"
+        )
+        response["diffueraser_stderr"] = _read_text_bounded(
+            run_dir / "diffueraser.stderr.log"
+        )
         upload_url = payload.get("upload_url")
-        if upload_url:
-            _upload(str(upload_url), final_path)
-            response["output_url"] = str(payload.get("output_url") or upload_url).split("?")[0]
-        else:
-            response["output_b64"] = base64.b64encode(final_path.read_bytes()).decode("ascii")
+        with diagnostics.stage("14_upload", method="evidence_uploads" if artifact_uploads else (
+                "signed_put" if upload_url else "inline_base64")):
+            if artifact_uploads:
+                delivery = Path(ffmpeg_filter(
+                    str(final_path), str(job_path / "delivery-crf14.mp4"), "null", crf=14
+                ))
+                candidates = {
+                    "diffueraser_upstream": run_dir / "diffueraser_result.mp4",
+                    "diffueraser_pure": job_path / "diffueraser-native.mp4",
+                    "junctions": diagnostics.destination / "checkpoints" / "11-subtitle-junctions-master.mp4",
+                    "master_lossless": final_path,
+                    "delivery_final": delivery,
+                }
+                response["artifacts"] = _upload_available_artifacts(artifact_uploads, candidates)
+            if upload_url:
+                _upload(str(upload_url), final_path)
+                response["output_url"] = str(payload.get("output_url") or upload_url).split("?")[0]
+            elif not artifact_uploads:
+                response["output_b64"] = base64.b64encode(final_path.read_bytes()).decode("ascii")
+        diagnostics.capture_success()
+        response.update(diagnostics.response())
         response["seconds"] = round(time.monotonic() - started, 2)
         return response
     except Exception as exc:  # pragma: no cover - caminho de erro do provedor
-        return {
+        diagnostics.capture_failure(job_path, exc, traceback.format_exc())
+        run_dir = job_path / "diffueraser-run"
+        junction_dir = job_path / "subtitle-junctions"
+        failure = {
             "ok": False,
             "chunk_index": index,
             "seconds": round(time.monotonic() - started, 2),
             "error": f"{type(exc).__name__}: {exc}",
+            "diffueraser_report": _read_json(run_dir / "diffueraser.report.json"),
+            "subtitle_junctions_report": _read_json(
+                junction_dir / "subtitle-junctions.report.json"
+            ),
+            "diffueraser_stdout": _read_text_bounded(run_dir / "diffueraser.stdout.log"),
+            "diffueraser_stderr": _read_text_bounded(run_dir / "diffueraser.stderr.log"),
         }
+        if artifact_uploads:
+            checkpoint_dir = diagnostics.destination / "checkpoints"
+            failure["artifacts"] = _upload_available_artifacts(artifact_uploads, {
+                "diffueraser_upstream": checkpoint_dir / "08-diffueraser-output.mp4",
+                "diffueraser_pure": checkpoint_dir / "10-diffueraser-native.mp4",
+                "junctions": checkpoint_dir / "11-subtitle-junctions-master.mp4",
+                "master_lossless": job_path / "output.mp4",
+                "delivery_final": job_path / "delivery-crf14.mp4",
+            })
+        failure.update(diagnostics.response())
+        return failure
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
         shutil.rmtree(job_path, ignore_errors=True)

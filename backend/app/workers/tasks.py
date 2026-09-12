@@ -5,6 +5,7 @@ video → scene detection → text detection → mask generation → refinement
 """
 from __future__ import annotations
 
+from contextlib import nullcontext
 import hashlib
 import hmac
 import json
@@ -12,6 +13,7 @@ import os
 from pathlib import Path
 import shutil
 import time
+import traceback
 from typing import Dict, List, Optional
 
 import cv2
@@ -545,6 +547,7 @@ def _run_official_pipeline(
         cancel_file,
         **({"reference_stride": policy.reference_stride,
             "temporal_window": policy.temporal_window} if policy else {}),
+        **({"preserve_pixels": True} if refined_policy else {}),
     )
     normalized_video = restore_inference_region(
         video_only, region, input_path,
@@ -648,6 +651,7 @@ def _run_diffusion_pipeline(
     scene_cuts=(),
     prepared_mask_dir: Optional[str] = None,
     quality_profile: str = "standard",
+    diagnostics=None,
 ) -> tuple[List[Dict], dict, int]:
     if prepared_mask_dir and len(frame_spans(info.frames, scene_cuts)) > 1:
         raise ValueError("mascaras revisadas devem ser fornecidas separadamente por cena")
@@ -657,76 +661,97 @@ def _run_diffusion_pipeline(
                 _run_diffusion_pipeline(source, output, directory, masks, part_info,
                     mode, dynamic, key_step, auto_protect, verify_on,
                     progress, cancel_file, composite_on,
-                    quality_profile=quality_profile), emit, cancel_file)
+                    quality_profile=quality_profile, diagnostics=diagnostics), emit, cancel_file)
     mask_dir = prepared_mask_dir or os.path.join(job_dir, "masks")
     mask_video = os.path.join(job_dir, "masks.mp4")
     run_dir = os.path.join(job_dir, "diffueraser-run")
     emit(18, "gerando mascaras temporais", "tracking")
-    frames = info.frames if prepared_mask_dir else _write_mask_sequence(
-        input_path,
-        mask_dir,
-        regions,
-        info,
-        mode,
-        dynamic,
-        key_step,
-        auto_protect,
-        lambda ratio: emit(18 + ratio * 12, "gerando mascaras temporais", "tracking"),
-    )
+    with diagnostics.stage("04_mask_generation", prepared=bool(prepared_mask_dir)) if diagnostics else nullcontext():
+        frames = info.frames if prepared_mask_dir else _write_mask_sequence(
+            input_path, mask_dir, regions, info, mode, dynamic, key_step, auto_protect,
+            lambda ratio: emit(18 + ratio * 12, "gerando mascaras temporais", "tracking"))
     policy = None
     if (quality_profile == "legacy_refined" and dynamic
             and mode in ("subtitle", "karaoke")):
-        policy = prepare_subtitle_policy(mask_dir, job_dir, regions, info, cancel_file)
+        with diagnostics.stage("05_subtitle_policy") if diagnostics else nullcontext():
+            policy = prepare_subtitle_policy(mask_dir, job_dir, regions, info, cancel_file)
+    elif diagnostics:
+        diagnostics.skip("05_subtitle_policy", "profile_or_mode_not_applicable")
     inference_masks = policy.inference_mask_dir if policy else mask_dir
     composite_masks = policy.composite_mask_dir if policy else mask_dir
-    region = _prepare_official_region(input_path, inference_masks, job_dir, info, emit, cancel_file)
+    with diagnostics.stage("06_roi_extraction") if diagnostics else nullcontext():
+        region = _prepare_official_region(input_path, inference_masks, job_dir, info, emit, cancel_file)
+        if diagnostics:
+            diagnostics.update("geometry", roi_box=list(region.box),
+                roi_width=region.width, roi_height=region.height, roi_active=region.active)
     if not region.active:
         return _copy_unmasked_scene(input_path, output_path, frames)
-    masks_to_video(region.mask_dir, mask_video, info.fps)
+    with diagnostics.stage("07_engine_input") if diagnostics else nullcontext():
+        masks_to_video(region.mask_dir, mask_video, info.fps)
+        if diagnostics:
+            engine_input_info = probe(region.source_path)
+            diagnostics.update("geometry", engine_input_width=engine_input_info.width,
+                engine_input_height=engine_input_info.height,
+                engine_input_fps=engine_input_info.fps,
+                engine_input_frames=engine_input_info.frames)
     emit(32, "iniciando DiffuEraser oficial", "inpainting")
-    video_only = run_diffueraser(
-        region.source_path,
-        mask_video,
-        run_dir,
-        info.duration,
-        lambda stage: emit(34, stage, "inpainting"),
-        cancel_file,
-    )
-    normalized_video = restore_inference_region(
-        video_only, region, input_path,
-        os.path.join(job_dir, "diffueraser-native.mp4"), info,
-        cancel_file=cancel_file,
-    )
+    with diagnostics.stage("08_diffueraser") if diagnostics else nullcontext():
+        engine_kwargs = {"diagnostics": diagnostics} if diagnostics else {}
+        video_only = run_diffueraser(region.source_path, mask_video, run_dir, info.duration,
+            lambda stage: emit(34, stage, "inpainting"), cancel_file, **engine_kwargs)
+        if diagnostics:
+            diagnostics.persist_checkpoint("08-diffueraser-output.mp4", video_only)
+    with diagnostics.stage("09_engine_output") if diagnostics else nullcontext():
+        if diagnostics:
+            engine_info = probe(video_only)
+            diagnostics.update("geometry", engine_output_width=engine_info.width,
+                engine_output_height=engine_info.height, engine_output_fps=engine_info.fps,
+                engine_output_frames=engine_info.frames)
+    with diagnostics.stage("10_roi_restore") if diagnostics else nullcontext():
+        normalized_video = restore_inference_region(video_only, region, input_path,
+            os.path.join(job_dir, "diffueraser-native.mp4"), info, cancel_file=cancel_file)
+        if diagnostics:
+            diagnostics.persist_checkpoint("10-diffueraser-native.mp4", normalized_video)
+        if diagnostics:
+            restored_info = probe(normalized_video)
+            diagnostics.update("geometry",
+                resize_applied=(engine_info.width, engine_info.height) != (region.width, region.height),
+                restored_width=restored_info.width, restored_height=restored_info.height,
+                restored_fps=restored_info.fps, restored_frames=restored_info.frames)
     junction_report = None
     junction_composited = False
     if (composite_on and policy
             and os.getenv("CLEANER_SUBTITLE_JUNCTIONS", "1") == "1"):
         emit(89, "recuperando fundo verificado entre quadros", "refining")
         junction_dir = os.path.join(job_dir, "subtitle-junctions")
-        junction_report = refine_subtitle_scene(
-            input_path, normalized_video, mask_dir, composite_masks,
-            junction_dir, info, regions, cancel_file=cancel_file,
-        )
+        with diagnostics.stage("11_subtitle_junctions") if diagnostics else nullcontext():
+            junction_report = refine_subtitle_scene(input_path, normalized_video, mask_dir,
+                composite_masks, junction_dir, info, regions, cancel_file=cancel_file)
         normalized_video = os.path.join(junction_dir, "reference-master.mp4")
+        if diagnostics:
+            diagnostics.persist_checkpoint("11-subtitle-junctions-master.mp4", normalized_video)
         junction_composited = True
     if composite_on:
         if not junction_composited:
-            normalized_video = _composite_step(
-                input_path, normalized_video, composite_masks, info.fps, job_dir, emit
-            )
+            with diagnostics.stage("12_selective_composition") if diagnostics else nullcontext():
+                normalized_video = _composite_step(input_path, normalized_video, composite_masks,
+                                                    info.fps, job_dir, emit)
+        elif diagnostics:
+            diagnostics.skip("12_selective_composition", "integrated_in_subtitle_junctions")
     else:
         normalized_video = ffmpeg_filter(
             normalized_video, os.path.join(job_dir, "diffueraser-delivery.mp4"),
             "null", crf=16,
         )
-    emit(92, "validando resultado", "refining")
-    if verify_on:
-        segments, metrics = _audit_video(normalized_video, composite_masks, info.fps)
-    else:
-        segments = []
-        metrics = {"residual_text": 0.0, "sharpness_ratio": 1.0, "temporal_consistency": 1.0}
-    emit(96, "remontando audio", "encoding")
-    mux_audio(normalized_video, input_path, output_path, info.has_audio)
+    with diagnostics.stage("13_encode") if diagnostics else nullcontext():
+        emit(92, "validando resultado", "refining")
+        if verify_on:
+            segments, metrics = _audit_video(normalized_video, composite_masks, info.fps)
+        else:
+            segments = []
+            metrics = {"residual_text": 0.0, "sharpness_ratio": 1.0, "temporal_consistency": 1.0}
+        emit(96, "remontando audio", "encoding")
+        mux_audio(normalized_video, input_path, output_path, info.has_audio)
     if policy:
         metrics["subtitle_policy"] = policy.report
     if junction_report:
@@ -836,6 +861,7 @@ def run_pipeline(
     options: Optional[Dict] = None,
 ) -> Dict:
     opts = dict(options or {})
+    diagnostics = opts.pop("_failure_diagnostics", None)
     quality_profile = str(opts.get("quality_profile", "standard")).strip().lower()
     if quality_profile not in ("standard", "legacy_refined"):
         raise ValueError("quality_profile deve ser standard ou legacy_refined")
@@ -949,7 +975,8 @@ def run_pipeline(
             return result_payload
 
         emit(8, "detectando cortes de cena", "analyzing")
-        scenes = detect_scenes(input_path)
+        with diagnostics.stage("03_scene_detection") if diagnostics else nullcontext():
+            scenes = detect_scenes(input_path)
         cuts = sorted({int(s) for s, _ in scenes})
 
         regions = list(masks_data or [])
@@ -985,6 +1012,7 @@ def run_pipeline(
                 composite_on,
                 scene_cuts=cuts,
                 quality_profile=quality_profile,
+                diagnostics=diagnostics,
             )
             engine_name = "diffueraser-official"
             pass_count = 2
@@ -1072,7 +1100,7 @@ def run_pipeline(
                 "preview": is_preview,
                 "quality_profile": quality_profile,
                 "profile_contract": (
-                    "scene_local_dual_masks_preserve_pixels"
+                    "legacy_refined_b2_v1"
                     if quality_profile == "legacy_refined" else "standard"
                 ),
                 "subtitle_policy": aggregate.get("subtitle_policy"),
@@ -1109,6 +1137,8 @@ def run_pipeline(
         failure = {"job_id": job_id, "callback_seq": callback_seq, "status": "failed",
                    "progress": 0, "error": str(exc)[:1000]}
         write_state(job_path, {**read_state(job_path), **failure})
+        if diagnostics:
+            diagnostics.capture_failure(job_path, exc, traceback.format_exc())
         _notify(callback_url, failure)
         raise
     finally:

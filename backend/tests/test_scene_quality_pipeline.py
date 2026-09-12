@@ -145,6 +145,39 @@ def test_both_official_engines_dispatch_by_scene_before_inference(engine):
     assert dispatch.call_args.args[5] == [30]
 
 
+def test_legacy_refined_propainter_requires_lossless_pixel_route(tmp_path):
+    info = SimpleNamespace(width=100, height=60, fps=10, frames=1, duration=.1, has_audio=False)
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"video")
+    masks = tmp_path / "reviewed"
+    masks.mkdir()
+    mask = np.zeros((60, 100), np.uint8)
+    mask[40:48, 10:30] = 255
+    assert cv2.imwrite(str(masks / "000000.png"), mask)
+    regions = [{"kind": "rect", "role": "remove", "x": 0, "y": 0, "w": 1, "h": 1}]
+
+    with patch("app.workers.tasks.prepare_subtitle_policy") as policy, \
+         patch("app.workers.tasks._prepare_official_region") as prepare_region, \
+         patch("app.workers.tasks.run_propainter", return_value=str(source)) as run, \
+         patch("app.workers.tasks.restore_inference_region", return_value=str(source)), \
+         patch("app.workers.tasks.refine_subtitle_scene") as junctions, \
+         patch("app.workers.tasks._audit_video", return_value=([], {"residual_text": 0,
+               "sharpness_ratio": 1, "temporal_consistency": 1})), \
+         patch("app.workers.tasks.mux_audio"):
+        policy.return_value = SimpleNamespace(
+            inference_mask_dir=str(masks), composite_mask_dir=str(masks),
+            reference_stride=10, temporal_window=32, report={"policy": "test"})
+        prepare_region.return_value = SimpleNamespace(
+            active=True, source_path=str(source), mask_dir=str(masks), width=100, height=60)
+        junctions.return_value = {"revision": "subtitle-junctions-v1"}
+        _run_official_pipeline(
+            str(source), str(tmp_path / "output.mp4"), str(tmp_path / "job"), regions,
+            info, "subtitle", "quality", True, 1, False, True, lambda *_: None,
+            prepared_mask_dir=str(masks), quality_profile="legacy_refined")
+
+    assert run.call_args.kwargs["preserve_pixels"] is True
+
+
 def test_legacy_refined_diffusion_uses_wide_inference_and_tight_composite(tmp_path):
     info = SimpleNamespace(width=100, height=60, fps=10, frames=3, duration=.3, has_audio=False)
     source = tmp_path / "source.mp4"

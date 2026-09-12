@@ -36,6 +36,8 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile.runpod
           push: true
+          build-args: |
+            CLEANER_BUILD_COMMIT=${{ github.sha }}
           tags: |
             ${{ env.IMAGE }}:${{ inputs.tag }}
             ${{ env.IMAGE }}:${{ github.sha }}

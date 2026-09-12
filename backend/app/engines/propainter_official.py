@@ -189,6 +189,7 @@ def run_propainter(
     cancel_file: Optional[str] = None,
     reference_stride: Optional[int] = None,
     temporal_window: Optional[int] = None,
+    preserve_pixels: Optional[bool] = None,
 ) -> str:
     status = propainter_status(require_cuda=os.getenv("PROPAINTER_ALLOW_CPU", "0") != "1")
     if not status.ready:
@@ -198,7 +199,13 @@ def run_propainter(
 
     root = Path(status.root)
     target = Path(output_dir)
-    preserve_pixels = os.getenv("PROPAINTER_PRESERVE_PIXELS", "0") == "1"
+    # The refined quality contract must not depend on a deployment-specific
+    # environment variable. Callers can require the PNG/RGB lossless route;
+    # other profiles retain the existing opt-in environment behavior.
+    preserve_pixels = (
+        os.getenv("PROPAINTER_PRESERVE_PIXELS", "0") == "1"
+        if preserve_pixels is None else bool(preserve_pixels)
+    )
     if preserve_pixels:
         # Never erase a caller's existing directory or a source on this route.
         target.mkdir(parents=True, exist_ok=False)

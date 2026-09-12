@@ -137,6 +137,7 @@ def prepare_subtitle_policy(mask_dir: str, job_dir: str, regions: list,
     inference_dir.mkdir()
     composite_dir.mkdir()
     inference_areas, composite_areas, candidates, gap_filled = [], [], [], []
+    equal_frames = 0
     for index, path in enumerate(paths):
         _check_cancel(cancel_file)
         allowed = _allowed(regions, info, index)
@@ -149,6 +150,10 @@ def prepare_subtitle_policy(mask_dir: str, job_dir: str, regions: list,
             inference = composite.copy() if preserve_partial else cv2.bitwise_and(
                 _rectangle(band if box is not None else None, info), allowed)
         inference_area, composite_area = int(cv2.countNonZero(inference)), int(cv2.countNonZero(composite))
+        outside = cv2.bitwise_and(composite, cv2.bitwise_not(inference))
+        if cv2.countNonZero(outside):
+            raise AssertionError(f"composition mask is not a subset of inference mask at frame {index}")
+        equal_frames += int(np.array_equal(inference, composite))
         inference_areas.append(inference_area)
         composite_areas.append(composite_area)
         if inference_area == 0:
@@ -185,6 +190,17 @@ def prepare_subtitle_policy(mask_dir: str, job_dir: str, regions: list,
         "mean_coverage": {"input": sum(input_areas) / total_pixels,
                           "inference": sum(inference_areas) / total_pixels,
                           "composite": sum(composite_areas) / total_pixels},
+        "dual_mask_audit": {
+            "composition_subset_of_inference": True,
+            "dual_mask_distinct": equal_frames < info.frames,
+            "equal_frame_count": equal_frames,
+            "distinct_frame_count": info.frames - equal_frames,
+            "reason": (
+                "band_taller_than_40_percent_uses_same_constrained_mask" if fallback else
+                "dynamic_partial_references_preserve_visible_background" if preserve_partial else
+                "stable_inference_band_with_tighter_per_frame_composition"
+            ),
+        },
     }
     (target / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     return SubtitlePolicy(str(inference_dir), str(composite_dir), reference_stride, temporal_window, report)
