@@ -387,12 +387,18 @@ export function ChatSceneStudio() {
         draw: (ctx, index) => renderer.drawFrame(ctx, { width, height, frame: index, plan }),
       });
       const url = URL.createObjectURL(blob);
+      const name = `${slugify(project.title)}.mp4`;
+      setExportUrl((old) => {
+        if (old) URL.revokeObjectURL(old);
+        return url;
+      });
+      setExportName(name);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${slugify(project.title)}.mp4`;
+      a.download = name;
       a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 8000);
-      toast.success("Vídeo pronto. O download começou.");
+      toast.success("Vídeo pronto. Baixou e já dá para assistir aqui.");
+
     } catch (err) {
       if ((err as DOMException)?.name === "AbortError") toast("Exportação cancelada.");
       else toast.error(err instanceof Error ? err.message : "A exportação falhou.");
