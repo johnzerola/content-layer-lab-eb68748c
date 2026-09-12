@@ -8,3 +8,12 @@
 - [x] Corrigir lentidão e ausência do menu em /templates e permitir selecionar novamente o mesmo vídeo
 - [x] Criar Estúdio de câmera/microfone com envio direto ao editor profissional
 - [x] Corrigir navegação travada em Integrações e padronizar o menu nas ferramentas internas
+
+## Analogue ChatScene — fundação
+- [x] Auditoria de skills e ferramentas do workspace
+- [x] Ativação do pacote Remotion oficial (best-practices, captions, multimedia, saas, interactivity)
+- [x] Criação das 11 skills ChatScene
+- [x] Documentação em docs/chatscene/ (skill, mcp, repository, knowledge, license)
+- [ ] Context7: indisponível neste ambiente; reavaliar com o app de desktop
+- [ ] Figma MCP: exige app de desktop; opcional
+- [ ] Implementar Fase 0/1 do ChatScene
