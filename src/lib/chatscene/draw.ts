@@ -9,7 +9,13 @@ import type { ConversationPlan } from "./clock";
 import { typingAt } from "./clock";
 import { mediaFrameAt, type LoadedMedia } from "./media";
 import type { ChatTheme } from "./theme";
-import { messageClock, participantOf, type ChatMessage, type ChatSceneProject } from "./types";
+import {
+  messageClock,
+  participantOf,
+  type ChatMessage,
+  type ChatSceneBackground,
+  type ChatSceneProject,
+} from "./types";
 
 export type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -509,7 +515,7 @@ export function paintFrame(
   const m = metricsFor(width, height);
   const media = options.media;
 
-  drawWallpaper(ctx, theme, width, height, m);
+  drawWallpaper(ctx, theme, width, height, m, project.background, media);
 
   const visible = project.messages.filter((msg) => {
     const e = plan.byId[msg.id];
