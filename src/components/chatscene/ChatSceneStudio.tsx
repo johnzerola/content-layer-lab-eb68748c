@@ -16,7 +16,6 @@ import {
   Image as ImageIcon,
   Loader2,
   Save,
-  Upload,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -207,20 +206,6 @@ export function ChatSceneStudio() {
     },
     [updateMessage],
   );
-
-  /** Vídeo em laço atrás da conversa. */
-  const handleBackgroundVideo = useCallback(async (file: File) => {
-    setUploading("background");
-    try {
-      const { asset, library: next } = await addFileToLibrary(file, "background");
-      setLibrary(next);
-      setProject((prev) => ({ ...prev, background: { kind: "video", videoUrl: asset.url, loop: true } }));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível usar este vídeo.");
-    } finally {
-      setUploading(null);
-    }
-  }, []);
 
   /** Logo do criador mostrada por cima da cena. */
   const handleLogo = useCallback(async (file: File) => {
@@ -1027,7 +1012,7 @@ export function ChatSceneStudio() {
                   );
                 })}
               </div>
-              <div className="mt-3 grid gap-3 rounded-lg border border-border bg-background/35 p-3 sm:grid-cols-2">
+              <div className="mt-3 rounded-lg border border-border bg-background/35 p-3">
                 <label className="flex items-center justify-between gap-3 text-xs">
                   Repetir vídeo
                   <input
@@ -1035,19 +1020,6 @@ export function ChatSceneStudio() {
                     checked={project.background?.kind === "video" ? project.background.loop !== false : false}
                     disabled={project.background?.kind !== "video"}
                     onChange={(e) => project.background?.kind === "video" && patch({ background: { ...project.background, loop: e.target.checked } })}
-                  />
-                </label>
-                <label className="text-xs text-muted-foreground">
-                  <span className="mb-1 flex justify-between"><span>Desfoque</span><span>{project.layout?.backgroundBlur ?? 0}px</span></span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={32}
-                    step={1}
-                    value={project.layout?.backgroundBlur ?? 0}
-                    onChange={(e) => patch({ layout: { ...(project.layout ?? DEFAULT_LAYOUT), backgroundBlur: Number(e.target.value) } })}
-                    className="w-full accent-primary"
-                    aria-label="Desfoque do fundo"
                   />
                 </label>
               </div>
