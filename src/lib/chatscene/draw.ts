@@ -312,7 +312,8 @@ export function paintFrame(
   const typingH = typing ? Math.round(76 * m.scale) + m.gap : 0;
 
   const areaTop = m.headerH + m.pad;
-  const areaBottom = height - m.pad;
+  // deixa a margem inferior livre para a interface das plataformas
+  const areaBottom = height - Math.max(m.pad, Math.round(height * 0.14));
   const areaH = areaBottom - areaTop;
   const total = layout.contentH + typingH;
   // conversa ancorada embaixo, como em um aplicativo de mensagens: as bolhas
