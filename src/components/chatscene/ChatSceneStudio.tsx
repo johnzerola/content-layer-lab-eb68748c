@@ -33,7 +33,9 @@ import { uploadChatSceneMedia } from "@/lib/chatscene/upload";
 import { CHAT_THEMES } from "@/lib/chatscene/theme";
 import { loadLocalDraft, saveLocalDraft } from "@/lib/chatscene/serialize";
 import {
+  ANIMATION_PRESETS,
   BACKGROUND_PRESETS,
+  LAYOUT_PRESETS,
   createChatSceneProject,
   createDemoChatSceneProject,
   createMessage,
