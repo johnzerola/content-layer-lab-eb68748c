@@ -8,6 +8,7 @@
 import type { ConversationPlan } from "./clock";
 import type { VoiceClip } from "./voice-cast";
 import { pitchRate, type VoiceMixSettings } from "./voice";
+import { renderSoundEffect, sfxSchedule } from "./sfx";
 import type { ChatSceneProject } from "./types";
 import { participantOf } from "./types";
 
