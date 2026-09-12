@@ -101,6 +101,9 @@ export function ChatSceneStudio() {
     setLibrary(readLibrary());
   }, []);
   const abortRef = useRef<AbortController | null>(null);
+  const [exportUrl, setExportUrl] = useState<string | null>(null);
+  const [exportName, setExportName] = useState("chatscene.mp4");
+
 
   const plan = useMemo(() => buildPlan(project), [project]);
   const isGroup = (project.chatKind ?? "direct") === "group";
