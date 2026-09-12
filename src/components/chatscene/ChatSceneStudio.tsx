@@ -246,6 +246,28 @@ export function ChatSceneStudio() {
     }
   }, []);
 
+  /** Vídeo de fundo enviado pelo próprio criador. */
+  const handleBackgroundVideo = useCallback(async (file: File) => {
+    setUploading("background-video");
+    try {
+      const { asset, library: next } = await addFileToLibrary(file, "background");
+      setLibrary(next);
+      setProject((prev) => ({
+        ...prev,
+        background: { kind: "video", videoUrl: asset.url, loop: true },
+      }));
+      if (asset.temporary) {
+        toast.warning("O vídeo ficou só nesta sessão; envie de novo antes de salvar a conversa.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível usar este vídeo.");
+    } finally {
+      setUploading(null);
+    }
+  }, []);
+
+
+
   /** Música de fundo do vídeo. */
   const handleMusic = useCallback(async (file: File) => {
     setUploading("music");
