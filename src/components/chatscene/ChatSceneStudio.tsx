@@ -15,6 +15,8 @@ import {
   Plus,
   Save,
   Sliders,
+  Copy,
+  Sparkle,
   Trash2,
   Upload,
   UserPlus,
@@ -29,12 +31,16 @@ import { CanvasConversationRenderer } from "@/lib/chatscene/renderer";
 import { saveChatSceneProject } from "@/lib/chatscene/project.service";
 import { uploadChatSceneMedia } from "@/lib/chatscene/upload";
 import { CHAT_THEMES } from "@/lib/chatscene/theme";
+import { loadLocalDraft, saveLocalDraft } from "@/lib/chatscene/serialize";
 import {
+  BACKGROUND_PRESETS,
   createChatSceneProject,
+  createDemoChatSceneProject,
   createMessage,
   createParticipant,
   participantOf,
   renderSize,
+  type ChatSceneAspect,
   type ChatMessage,
   type ChatSceneProject,
 } from "@/lib/chatscene/types";
