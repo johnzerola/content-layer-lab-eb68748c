@@ -3,7 +3,7 @@ import { computeMessageTimings } from "../timing";
 import { planScroll } from "../scroll-planner";
 import { attachPreset, effectiveVoice } from "../voice-resolution";
 import { DEFAULT_VOICE, voiceKey } from "../voice";
-import { createGatewayVoiceProvider } from "../voice-cast";
+import { createGatewayVoiceProvider, generateCast } from "../voice-cast";
 import { createChatSceneProject, createMessage, createParticipant, normalizeChatSceneProject } from "../types";
 
 const projectWithCast = () => {
