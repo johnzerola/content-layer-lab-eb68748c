@@ -27,6 +27,26 @@ export type MessageStatus = "sent" | "delivered" | "read";
 export type ChatKind = "direct" | "group";
 
 /**
+ * Conversa (thread) dentro da mesma história: a cena pode começar no chat do
+ * Chefe e, mais adiante, cortar para o chat do Pedro. Cada mensagem pertence a
+ * uma conversa; a troca vira uma transição na tela, com o topo mudando de nome
+ * e foto, exatamente como quando alguém abre outro chat no celular.
+ */
+export interface ChatSceneThread {
+  id: string;
+  /** nome mostrado no topo */
+  name: string;
+  avatarUrl?: string | null;
+  /** conversa direta ou grupo */
+  kind?: ChatKind;
+  /** texto embaixo do nome; vazio usa "online" */
+  subtitle?: string | null;
+}
+
+/** Conversa padrão de projetos que ainda não usam várias conversas. */
+export const MAIN_THREAD_ID = "main";
+
+/**
  * Fundo da cena: o papel de parede do tema, uma cor, um degradê, uma foto ou
  * um vídeo em laço (gameplay, paisagem, textura própria ou licenciada).
  */
@@ -163,6 +183,8 @@ export interface ChatMessage {
   reaction?: string | null;
   /** emoção e ritmo desta fala, sem trocar a identidade do personagem */
   voiceDirection?: Partial<import("./voice").MessageVoiceDirection> | null;
+  /** conversa a que esta mensagem pertence; vazio = conversa principal */
+  threadId?: string | null;
 }
 
 /** Estilo de entrada das bolhas. */
@@ -405,6 +427,8 @@ export interface ChatSceneProject {
   chatKind?: ChatKind;
   groupName?: string | null;
   groupAvatarUrl?: string | null;
+  /** conversas da história; quando há mais de uma, a cena corta entre elas */
+  threads?: ChatSceneThread[];
   /** hora inicial mostrada nas bolhas (HH:MM) */
   startClock?: string;
   /** mostrar os tiques de entregue/lido nas mensagens de quem escreve */
@@ -500,6 +524,7 @@ export function createMessage(participantId: string, init: Partial<ChatMessage> 
     time: init.time ?? null,
     reaction: init.reaction ?? null,
     voiceDirection: init.voiceDirection ?? null,
+    threadId: init.threadId ?? null,
   };
 }
 
