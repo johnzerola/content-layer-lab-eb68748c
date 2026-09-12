@@ -7,7 +7,15 @@
  */
 import type { ChatSceneProject } from "./types";
 import { participantOf } from "./types";
-import { speakableText, voiceDirection, voiceKey, voicePreset, type VoiceProfile } from "./voice";
+import {
+  pitchRate,
+  speakableText,
+  voiceDirection,
+  voiceKey,
+  voicePreset,
+  VOICE_SAMPLE_TEXT,
+  type VoiceProfile,
+} from "./voice";
 
 export interface VoiceClip {
   key: string;
@@ -51,6 +59,44 @@ export function cacheSize(): number {
 
 export function clearVoiceCache() {
   cache.clear();
+}
+
+/** Duração real da fala já com o tom aplicado, em milissegundos. */
+export function clipDurationMs(clip: VoiceClip, profile: VoiceProfile | null | undefined): number {
+  return Math.round((clip.durationSec / pitchRate(profile?.pitch)) * 1000);
+}
+
+/**
+ * Toca uma fala no navegador com o tom e o volume da pessoa. Devolve uma
+ * função para parar no meio.
+ */
+export function playClip(clip: VoiceClip, profile?: VoiceProfile | null): () => void {
+  const ctx = context();
+  void ctx.resume().catch(() => {});
+  const source = ctx.createBufferSource();
+  source.buffer = clip.buffer;
+  source.playbackRate.value = pitchRate(profile?.pitch);
+  const gain = ctx.createGain();
+  gain.gain.value = Math.max(0.2, Math.min(1.5, profile?.gain ?? 1));
+  source.connect(gain).connect(ctx.destination);
+  source.start();
+  return () => {
+    try {
+      source.stop();
+    } catch {
+      /* já parou */
+    }
+  };
+}
+
+/** Gera (ou reaproveita) uma frase curta e toca, para ouvir a voz escolhida. */
+export async function previewVoice(
+  provider: VoiceProvider,
+  profile: VoiceProfile,
+  text = VOICE_SAMPLE_TEXT,
+): Promise<() => void> {
+  const clip = await provider.synthesize(text.slice(0, 160), profile);
+  return playClip(clip, profile);
 }
 
 /** Provedor padrão: IA da Lovable, sempre passando pelo servidor. */
@@ -143,7 +189,7 @@ export async function generateCast(
           if (hit) result.reused += 1;
           else result.generated += 1;
           result.clips.set(message.id, clip);
-          result.durations[message.id] = Math.round(clip.durationSec * 1000);
+          result.durations[message.id] = clipDurationMs(clip, profile);
         } catch (err) {
           result.failures.push({
             id: message.id,
