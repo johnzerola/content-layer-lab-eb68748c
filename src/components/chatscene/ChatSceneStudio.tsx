@@ -10,6 +10,9 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowDown,
   ArrowUp,
+  BadgeCheck,
+  Mic,
+  Palette,
   Download,
   Image as ImageIcon,
   Loader2,
@@ -29,6 +32,9 @@ import { Button, Input } from "@/components/ui/base";
 import { ChatScenePreview } from "@/components/chatscene/ChatScenePreview";
 import { ChatSceneTimeline } from "@/components/chatscene/ChatSceneTimeline";
 import { CreatorLayouts } from "@/components/chatscene/CreatorLayouts";
+import { VoicePanel } from "@/components/chatscene/VoicePanel";
+import { BrandPanel } from "@/components/chatscene/BrandPanel";
+import { MusicPanel } from "@/components/chatscene/MusicPanel";
 import { buildPlan } from "@/lib/chatscene/clock";
 import { encodeFrameSequence, frameEncoderSupported } from "@/lib/chatscene/encode-frames";
 import { CanvasConversationRenderer } from "@/lib/chatscene/renderer";
@@ -62,6 +68,7 @@ import {
   ANIMATION_PRESETS,
   BACKGROUND_PRESETS,
   DEFAULT_BRANDING,
+  DEFAULT_HEADER,
   CREATOR_LAYOUTS,
   LAYOUT_PRESETS,
   createChatSceneProject,
@@ -206,6 +213,46 @@ export function ChatSceneStudio() {
       }));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível usar esta imagem.");
+    } finally {
+      setUploading(null);
+    }
+  }, []);
+
+  /** Logo ou imagem de fundo do cabeçalho do vídeo. */
+  const handleHeaderImage = useCallback(async (file: File, slot: "logo" | "background") => {
+    setUploading(slot === "logo" ? "header-logo" : "header-bg");
+    try {
+      const { asset, library: next } = await addFileToLibrary(file, slot === "logo" ? "logo" : "background");
+      setLibrary(next);
+      setProject((prev) => ({
+        ...prev,
+        header: {
+          ...DEFAULT_HEADER,
+          ...prev.header,
+          ...(slot === "logo" ? { logoUrl: asset.url } : { bgImageUrl: asset.url }),
+        },
+      }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível usar esta imagem.");
+    } finally {
+      setUploading(null);
+    }
+  }, []);
+
+  /** Música de fundo do vídeo. */
+  const handleMusic = useCallback(async (file: File) => {
+    setUploading("music");
+    try {
+      const { url, temporary } = await uploadChatSceneMedia(file);
+      setProject((prev) => ({
+        ...prev,
+        voiceMix: { ...DEFAULT_VOICE_MIX, ...prev.voiceMix, musicUrl: url },
+      }));
+      if (temporary) {
+        toast.warning("A música ficou só nesta sessão; envie de novo depois de salvar.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível usar esta música.");
     } finally {
       setUploading(null);
     }
