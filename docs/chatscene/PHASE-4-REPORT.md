@@ -35,6 +35,8 @@ Cleaner IA, RunPod, Editor V1 e internals do Editor V2 não foram tocados.
 | Vitest ChatScene | 45 testes, 5 arquivos, todos passando |
 | Browser QA desktop 1280×1800 | `/chatscene` sem overflow horizontal, sem erro de console |
 | Painel de vozes | visível, presets e mixagem operando |
+| TTS do gateway | testado: HTTP 200, MP3 24 kHz; as 7 vozes do elenco respondem 200 |
+| Geração ponta a ponta no navegador | voz escolhida por participante, 5 falas geradas, durações aplicadas ao ritmo, sem erro de console |
 
 ## Limitações conhecidas
 
@@ -42,3 +44,4 @@ Cleaner IA, RunPod, Editor V1 e internals do Editor V2 não foram tocados.
 - Áudio embutido em vídeos de mídia ainda não entra na mixagem (só falas + música).
 - O cache de falas é de sessão; recarregar a página exige gerar de novo.
 - Benchmark de voz com números medidos em produção ainda não foi executado.
+- Erros do gateway são tratados por status (401/402/403/429) com aviso em português.
