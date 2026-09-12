@@ -491,12 +491,17 @@ function drawHeader(
     (isGroup
       ? project.groupName || project.title || "Grupo"
       : peers[0]?.name ?? project.participants[0]?.name ?? "Conversa");
-  const subtitle =
+  const baseSubtitle =
     custom?.subtitle != null
       ? custom.subtitle
       : isGroup
         ? peers.map((p) => p.name).join(", ") || "conversa em grupo"
         : "online";
+  const subtitle = typingName
+    ? isGroup
+      ? `${typingName} está digitando…`
+      : "digitando…"
+    : baseSubtitle;
 
   const textColor = custom?.textColor || theme.headerText;
   const mutedColor = custom?.textColor || theme.headerMuted;
