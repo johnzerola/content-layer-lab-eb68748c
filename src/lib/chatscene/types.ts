@@ -326,6 +326,7 @@ export function createMessage(participantId: string, init: Partial<ChatMessage> 
     pauseAfterMs: init.pauseAfterMs ?? null,
     emphasis: init.emphasis ?? false,
     voiceMs: init.voiceMs ?? null,
+    durationSec: init.durationSec ?? null,
     replyToId: init.replyToId ?? null,
     time: init.time ?? null,
     reaction: init.reaction ?? null,
