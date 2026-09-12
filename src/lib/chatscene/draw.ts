@@ -463,6 +463,8 @@ function drawHeader(
   width: number,
   m: Metrics,
   media?: Map<string, LoadedMedia>,
+  /** nome de quem está digitando neste quadro; troca o status do topo */
+  typingName?: string | null,
 ) {
   const custom = project.header;
   const style = custom?.style ?? "messenger";
