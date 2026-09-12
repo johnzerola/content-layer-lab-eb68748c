@@ -86,7 +86,8 @@ function offlineContext(seconds: number): OfflineAudioContext {
 /** Monta a trilha inteira da cena. Devolve null quando não há som nenhum. */
 export async function mixConversationAudio(input: MixInput): Promise<AudioBuffer | null> {
   const schedule = voiceSchedule(input.project, input.plan, input.clips);
-  if (!schedule.length && !input.music) return null;
+  const effects = sfxSchedule(input.project, input.plan);
+  if (!schedule.length && !input.music && !effects.length) return null;
 
   const seconds = input.plan.totalFrames / input.plan.fps;
   const ctx = offlineContext(seconds);
@@ -103,6 +104,24 @@ export async function mixConversationAudio(input: MixInput): Promise<AudioBuffer
     source.connect(gain).connect(master);
     source.start(Math.min(item.startSec, Math.max(0, seconds - 0.05)));
   }
+
+  // sons curtos de envio/recebimento
+  if (effects.length) {
+    const volume = Math.max(0, Math.min(1, input.project.sound?.volume ?? 0.5));
+    const cache = new Map<string, AudioBuffer>();
+    for (const fx of effects) {
+      let buffer = cache.get(fx.effect);
+      if (!buffer) {
+        buffer = renderSoundEffect(ctx, fx.effect, volume);
+        cache.set(fx.effect, buffer);
+      }
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(master);
+      source.start(Math.min(fx.startSec, Math.max(0, seconds - 0.05)));
+    }
+  }
+
 
   if (input.music) {
     const source = ctx.createBufferSource();
