@@ -351,6 +351,8 @@ export interface ChatSceneProject {
   sound?: { enabled: boolean; volume: number };
   /** marca do criador sobre a cena */
   branding?: ChatSceneBranding;
+  /** cabeçalho personalizado do vídeo */
+  header?: ChatSceneHeader;
   /** falas, música e mixagem */
   voiceMix?: import("./voice").VoiceMixSettings;
   /** movimento de câmera (meia tela, cortes) */
