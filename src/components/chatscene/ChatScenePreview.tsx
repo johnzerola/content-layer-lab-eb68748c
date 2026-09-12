@@ -7,6 +7,7 @@ import { CanvasConversationRenderer, paintPreview } from "@/lib/chatscene/render
 import type { ChatSceneProject } from "@/lib/chatscene/types";
 import { renderSize } from "@/lib/chatscene/types";
 import { voiceSchedule } from "@/lib/chatscene/audio-mix";
+import { renderSoundEffect, sfxSchedule } from "@/lib/chatscene/sfx";
 import type { VoiceClip } from "@/lib/chatscene/voice-cast";
 
 interface Props {
