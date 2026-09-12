@@ -11,6 +11,8 @@ import {
 import { NARRATION_VOICES, generateNarration } from "@/lib/tts.functions";
 import { SoundLibrary } from "@/components/editor/SoundLibrary";
 import { separateStems } from "@/lib/editor/stems";
+import { uploadMediaBlob } from "@/lib/media-store";
+import { useMediaUrl } from "@/hooks/useMediaUrl";
 
 const NARRATION_TONES: { id: string; label: string; prompt: string }[] = [
   { id: "viral", label: "Viral / energia alta", prompt: "Narre em português do Brasil com energia alta de vídeo curto, ritmo acelerado e ênfase nas primeiras palavras." },
@@ -444,8 +446,7 @@ export function AudioPanel({ audio, onChange, scriptText = "", currentTime, getS
                 <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
               </button>
             </div>
-            <audio src={c.url} controls className="mt-1.5 h-8 w-full" />
-            {c.stemRole && <a href={c.url} download={`${c.stemRole}.mp3`} className="mt-1 inline-block text-xs underline">Baixar esta trilha</a>}
+            <ClipPlayer url={c.url} stemRole={c.stemRole} />
             <Row label="Mudo">
               <input type="checkbox" checked={c.muted} onChange={(e) => updateClip(c.id, { muted: e.target.checked })} />
             </Row>

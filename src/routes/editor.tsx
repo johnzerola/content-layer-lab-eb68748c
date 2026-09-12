@@ -57,7 +57,10 @@ async function probe(file: File): Promise<{ duration: number; width: number; hei
   }
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
+/** Guarda a gravação no armazenamento da conta; se não der, embute como antes. */
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  const ref = await uploadMediaBlob("editor-recording", blob);
+  if (ref) return ref;
   return new Promise((res, rej) => {
     const fr = new FileReader();
     fr.onload = () => res(String(fr.result));
