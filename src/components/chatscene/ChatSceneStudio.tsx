@@ -32,6 +32,22 @@ import { saveChatSceneProject } from "@/lib/chatscene/project.service";
 import { uploadChatSceneMedia } from "@/lib/chatscene/upload";
 import { addFileToLibrary, readLibrary, type LibraryAsset } from "@/lib/chatscene/assets";
 import { MESSAGE_KINDS, messageKind, voiceSeconds } from "@/lib/chatscene/message-kinds";
+import { synthesizeVoice } from "@/lib/chatscene/voice.functions";
+import {
+  applyVoiceDurations,
+  createGatewayVoiceProvider,
+  generateCast,
+  speakingMessages,
+  type VoiceClip,
+} from "@/lib/chatscene/voice-cast";
+import { loadMusic, mixConversationAudio } from "@/lib/chatscene/audio-mix";
+import {
+  DEFAULT_VOICE,
+  DEFAULT_VOICE_MIX,
+  VOICE_PRESETS,
+  VOICE_STYLES,
+  type VoiceProfile,
+} from "@/lib/chatscene/voice";
 import { CHAT_THEMES } from "@/lib/chatscene/theme";
 import { loadLocalDraft, saveLocalDraft } from "@/lib/chatscene/serialize";
 import {
@@ -76,6 +92,10 @@ export function ChatSceneStudio() {
   const [uploading, setUploading] = useState<string | null>(null);
   /** mídia já enviada nesta conversa, para reaproveitar sem subir de novo */
   const [library, setLibrary] = useState<LibraryAsset[]>([]);
+  /** falas geradas, por mensagem */
+  const [clips, setClips] = useState<Map<string, VoiceClip>>(new Map());
+  const [castState, setCastState] = useState<"idle" | "running">("idle");
+  const [castProgress, setCastProgress] = useState({ done: 0, total: 0 });
   useEffect(() => {
     setLibrary(readLibrary());
   }, []);
