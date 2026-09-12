@@ -742,6 +742,7 @@ function paintConversation(
       const label = item.clock;
       const lx = item.isSelf ? item.x + item.mediaW - ctx.measureText(label).width : item.x;
       ctx.fillText(label, lx, y + item.mediaH + m.metaSize);
+      if (scaling) ctx.restore();
       continue;
     }
 
