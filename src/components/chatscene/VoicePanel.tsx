@@ -43,7 +43,8 @@ export function VoicePanel({
     <div>
       <p className="mono-label mb-1.5 text-muted-foreground">Vozes</p>
       <p className="mb-2 text-[11px] text-muted-foreground">
-        Vozes sintéticas genéricas. Nada de imitar a voz de pessoas reais.
+        Vozes sintéticas genéricas. Nada de imitar a voz de pessoas reais. Toque em{" "}
+        <strong>Ouvir</strong> para escutar uma amostra antes de gerar.
       </p>
       <div className="space-y-2">
         {project.participants.map((p) => {
@@ -123,17 +124,19 @@ export function VoicePanel({
                   </span>
                   <Button
                     size="sm"
-                    variant="ghost"
-                    className="h-7 px-2"
+                    variant="secondary"
+                    className="h-7 gap-1 px-2 text-[11px]"
                     disabled={previewing === p.id}
                     onClick={() => onPreview(p.id, { ...DEFAULT_VOICE, ...voice })}
                     aria-label={`Ouvir a voz de ${p.name}`}
+                    title="Ouvir uma amostra com esta voz, jeito, velocidade e tom"
                   >
                     {previewing === p.id ? (
                       <Loader2 className="size-3.5 animate-spin" />
                     ) : (
                       <Volume2 className="size-3.5" />
                     )}
+                    Ouvir
                   </Button>
                 </div>
               )}
