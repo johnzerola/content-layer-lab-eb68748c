@@ -814,6 +814,26 @@ export function ChatSceneStudio() {
               <label className="flex items-center gap-1.5">
                 <input
                   type="checkbox"
+                  checked={project.timing.humanTyping ?? true}
+                  onChange={(e) =>
+                    patch({ timing: { ...project.timing, humanTyping: e.target.checked } })
+                  }
+                />
+                ritmo humano (calcula pelo texto)
+              </label>
+              <Range
+                label="Respiro ao trocar de pessoa"
+                value={project.timing.senderSwitchMs ?? 180}
+                min={0}
+                max={1500}
+                step={20}
+                suffix="ms"
+                onChange={(v) => patch({ timing: { ...project.timing, senderSwitchMs: v } })}
+              />
+
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
                   checked={project.receipts ?? true}
                   onChange={(e) => patch({ receipts: e.target.checked })}
                 />
