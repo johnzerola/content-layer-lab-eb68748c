@@ -761,6 +761,18 @@ export function paintFrame(
     ctx.restore();
   }
 
+  // sombra suave e borda fina: separa o cartão do vídeo de fundo
+  if (inset) {
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = Math.round(width * 0.035);
+    ctx.shadowOffsetY = Math.round(width * 0.012);
+    ctx.fillStyle = theme.wallpaper;
+    roundRect(ctx, rect.x, rect.y, rect.w, rect.h, rect.radius);
+    ctx.fill();
+    ctx.restore();
+  }
+
   ctx.save();
   ctx.translate(rect.x, rect.y);
   if (rect.radius > 0) {
