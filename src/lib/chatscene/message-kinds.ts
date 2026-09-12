@@ -102,6 +102,16 @@ export const MESSAGE_KINDS: MessageKindSpec[] = [
     isSystem: true,
     isTimed: false,
   },
+  {
+    id: "card",
+    label: "Cartão de cena",
+    hint: "Quebra de cena em destaque, como “Momentos antes” ou “Enquanto isso”.",
+    needsMedia: false,
+    textIsCaption: false,
+    canReply: false,
+    isSystem: true,
+    isTimed: false,
+  },
 ];
 
 const BY_ID = new Map(MESSAGE_KINDS.map((k) => [k.id, k]));

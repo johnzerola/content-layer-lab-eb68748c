@@ -19,7 +19,7 @@ export const CHATSCENE_PROJECT_VERSION = 2;
 
 export type ChatSceneAspect = "9:16" | "1:1" | "16:9";
 
-export type MessageKind = "text" | "image" | "emoji" | "system" | "sticker" | "video" | "voice";
+export type MessageKind = "text" | "image" | "emoji" | "system" | "sticker" | "video" | "voice" | "card";
 
 /** Confirmação de entrega mostrada ao lado da hora, como em um app real. */
 export type MessageStatus = "sent" | "delivered" | "read";
@@ -628,7 +628,10 @@ export function createDemoChatSceneProject(): ChatSceneProject {
       { ...importVoicePreset("adult-male-casual"), id: "voice_colega" },
       { ...importVoicePreset("mother-warm"), id: "voice_mae" },
     ],
+    // ritmo de short: cortes rápidos, como nos canais de conversa animada
+    timing: { ...DEFAULT_TIMING, speed: 1.12, gapMs: 380, senderSwitchMs: 140 },
     messages: [
+      createMessage(chefe.id, { kind: "card", text: "Primeiro dia do Pedro" }),
       createMessage(chefe.id, { kind: "system", text: "Pedro entrou na equipe" }),
       line(chefe, "Bom dia, Pedro. Preparado para o primeiro dia?", { voiceDirection: { emotion: "serious" } }),
       line(pedro, "Preparado... eu acho 😅", { voiceDirection: { emotion: "nervous" } }),
@@ -636,6 +639,7 @@ export function createDemoChatSceneProject(): ChatSceneProject {
       createMessage(colega.id, { kind: "image", text: "Seu lugar já está pronto.", mediaUrl: "/chatscene/backgrounds/office-message.jpg", mediaAspect: 9 / 16 }),
       line(chefe, "Quase nunca?", { emphasis: true, voiceDirection: { emotion: "annoyed" } }),
       line(colega, "Foi uma piada, chefe. Uma ótima piada."),
+      createMessage(chefe.id, { kind: "card", text: "Enquanto isso, no grupo da família" }),
       line(mae, "Filho, boa sorte! E não esquece o almoço que deixei na mochila.", { voiceDirection: { emotion: "happy" } }),
       line(pedro, "Valeu, mãe. Agora a empresa inteira sabe do meu almoço."),
     ],
