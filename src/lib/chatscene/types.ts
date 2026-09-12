@@ -327,6 +327,8 @@ export interface ChatSceneProject {
   version: number;
   title: string;
   themeId: string;
+  /** ajustes de cor, fonte e forma por cima do tema escolhido */
+  themeOverrides?: import("./theme").ThemeOverrides;
   /** variante do tema */
   dark: boolean;
   participants: ChatParticipant[];
@@ -451,6 +453,7 @@ export function createChatSceneProject(init: Partial<ChatSceneProject> = {}): Ch
     version: CHATSCENE_PROJECT_VERSION,
     title: init.title ?? "Nova conversa",
     themeId: init.themeId ?? "zap",
+    themeOverrides: init.themeOverrides ?? {},
     dark: init.dark ?? false,
     chatKind: init.chatKind ?? "direct",
     groupName: init.groupName ?? null,
@@ -520,6 +523,7 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
     header: { ...DEFAULT_HEADER, ...(raw.header ?? {}) },
     voiceMix: { ...DEFAULT_VOICE_MIX, ...(raw.voiceMix ?? {}) },
     camera: { ...DEFAULT_CAMERA, ...(raw.camera ?? {}) },
+    themeOverrides: { ...(raw.themeOverrides ?? {}) },
   };
 }
 

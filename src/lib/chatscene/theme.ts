@@ -369,7 +369,57 @@ export const CHAT_THEMES = FAMILIES.map((f) => ({
   description: f.description,
 }));
 
-export function resolveTheme(themeId: string, dark: boolean): ChatTheme {
+/** Campos que o usuário pode personalizar por cima de um tema existente. */
+export type ThemeOverrides = Partial<
+  Pick<
+    ChatTheme,
+    | "background"
+    | "backgroundAlt"
+    | "surface"
+    | "header"
+    | "headerText"
+    | "headerMuted"
+    | "selfBubble"
+    | "selfText"
+    | "peerBubble"
+    | "peerText"
+    | "nameText"
+    | "systemText"
+    | "systemBubble"
+    | "check"
+    | "wallpaper"
+    | "fontFamily"
+    | "radius"
+    | "tail"
+  >
+>;
+
+/** Cores editáveis, na ordem em que aparecem na tela de temas. */
+export const THEME_COLOR_FIELDS: { key: keyof ThemeOverrides & string; label: string }[] = [
+  { key: "selfBubble", label: "Balão de quem conta" },
+  { key: "selfText", label: "Texto de quem conta" },
+  { key: "peerBubble", label: "Balão dos outros" },
+  { key: "peerText", label: "Texto dos outros" },
+  { key: "wallpaper", label: "Papel de parede" },
+  { key: "background", label: "Fundo da cena" },
+  { key: "header", label: "Topo" },
+  { key: "headerText", label: "Texto do topo" },
+  { key: "nameText", label: "Nome do autor" },
+  { key: "check", label: "Tiques de lido" },
+  { key: "systemText", label: "Avisos" },
+  { key: "systemBubble", label: "Fundo do aviso" },
+];
+
+/** Fontes disponíveis na tela de temas. */
+export const THEME_FONTS: { id: string; label: string; value: string }[] = [
+  { id: "figtree", label: "Figtree (padrão)", value: FONT },
+  { id: "outfit", label: "Outfit", value: "'Outfit', 'Figtree', system-ui, sans-serif" },
+  { id: "mono", label: "JetBrains Mono", value: "'JetBrains Mono', ui-monospace, Menlo, monospace" },
+  { id: "serif", label: "Serifada", value: "'Georgia', 'Times New Roman', serif" },
+  { id: "system", label: "Do sistema", value: "system-ui, -apple-system, 'Segoe UI', sans-serif" },
+];
+
+export function resolveTheme(themeId: string, dark: boolean, overrides?: ThemeOverrides | null): ChatTheme {
   const family = FAMILIES.find((f) => f.id === themeId) ?? FAMILIES[0]!;
   const draft = dark ? family.dark : family.light;
   return {
@@ -382,5 +432,6 @@ export function resolveTheme(themeId: string, dark: boolean): ChatTheme {
     tail: draft.tail ?? false,
     label: family.label,
     description: family.description,
+    ...(overrides ?? {}),
   };
 }
