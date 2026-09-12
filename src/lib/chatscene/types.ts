@@ -665,6 +665,7 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
     voiceMix: { ...DEFAULT_VOICE_MIX, ...(raw.voiceMix ?? {}) },
     camera: { ...DEFAULT_CAMERA, ...(raw.camera ?? {}) },
     themeOverrides: { ...(raw.themeOverrides ?? {}) },
+    threads: Array.isArray(raw.threads) ? raw.threads.filter((t) => t && t.id).map((t) => createThread(t)) : [],
   };
 }
 
