@@ -495,6 +495,8 @@ function drawHeader(
   media?: Map<string, LoadedMedia>,
   /** nome de quem está digitando neste quadro; troca o status do topo */
   typingName?: string | null,
+  /** conversa no ar: troca nome, foto e status do topo ao cortar de chat */
+  thread?: ChatSceneThread | null,
 ) {
   const custom = project.header;
   const style = custom?.style ?? "messenger";
@@ -514,19 +516,27 @@ function drawHeader(
   ctx.fillStyle = theme.divider;
   ctx.fillRect(0, m.headerH - Math.max(1, Math.round(2 * m.scale)), width, Math.max(1, Math.round(2 * m.scale)));
 
-  const isGroup = (project.chatKind ?? "direct") === "group" || project.participants.length > 2;
+  const isGroup = thread
+    ? (thread.kind ?? "direct") === "group"
+    : (project.chatKind ?? "direct") === "group" || project.participants.length > 2;
   const peers = project.participants.filter((p) => !p.isSelf);
   const title =
+    (thread?.name || "").trim() ||
     (custom?.title || "").trim() ||
     (isGroup
       ? project.groupName || project.title || "Grupo"
       : peers[0]?.name ?? project.participants[0]?.name ?? "Conversa");
   const baseSubtitle =
-    custom?.subtitle != null
-      ? custom.subtitle
-      : isGroup
-        ? peers.map((p) => p.name).join(", ") || "conversa em grupo"
-        : "online";
+    (thread?.subtitle || "").trim() ||
+    (thread
+      ? isGroup
+        ? "conversa em grupo"
+        : "online"
+      : custom?.subtitle != null
+        ? custom.subtitle
+        : isGroup
+          ? peers.map((p) => p.name).join(", ") || "conversa em grupo"
+          : "online");
   const subtitle = typingName
     ? isGroup
       ? `${typingName} está digitando…`
