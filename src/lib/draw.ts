@@ -104,10 +104,20 @@ export function setBackdropQuality(level: "alta" | "media" | "baixa") {
 }
 
 const imgCache = new Map<string, HTMLImageElement>();
+/** referências guardadas no armazenamento já pedidas (evita repetir a rede) */
+const pendingRefs = new Set<string>();
 
 /** Registra uma imagem já decodificada (usado pelos workers, que não têm `Image`). */
 export function setImageSource(src: string, img: CanvasImageSource) {
   imgCache.set(src, img as unknown as HTMLImageElement);
+}
+
+function startLoad(key: string, url: string): HTMLImageElement {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = url;
+  imgCache.set(key, img);
+  return img;
 }
 
 export function getImage(src: string): HTMLImageElement | null {
@@ -118,24 +128,39 @@ export function getImage(src: string): HTMLImageElement | null {
     return cached.complete && cached.naturalWidth ? cached : null;
   }
   if (typeof Image === "undefined") return null;
-  const img = new Image();
-  img.crossOrigin = "anonymous";
-  img.src = src;
-  imgCache.set(src, img);
+  if (isStorageRef(src)) {
+    const ready = peekMediaUrl(src);
+    if (ready) {
+      startLoad(src, ready);
+      return null;
+    }
+    if (!pendingRefs.has(src)) {
+      pendingRefs.add(src);
+      void resolveMediaUrl(src).then((url) => {
+        pendingRefs.delete(src);
+        if (url) startLoad(src, url);
+      });
+    }
+    return null;
+  }
+  startLoad(src, src);
   return null;
 }
 
 export function preloadImage(src: string) {
   return new Promise<void>((resolve) => {
     if (typeof Image === "undefined") return resolve();
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      imgCache.set(src, img);
-      resolve();
-    };
-    img.onerror = () => resolve();
-    img.src = src;
+    void resolveMediaUrl(src).then((url) => {
+      if (!url) return resolve();
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        imgCache.set(src, img);
+        resolve();
+      };
+      img.onerror = () => resolve();
+      img.src = url;
+    });
   });
 }
 
