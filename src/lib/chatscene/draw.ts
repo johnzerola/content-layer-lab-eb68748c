@@ -967,10 +967,17 @@ function paintConversation(
 
   drawWallpaper(ctx, theme, width, height, m, conversationBackground, media, frame / plan.fps);
 
-  const appeared = project.messages.filter((msg) => frame >= (plan.byId[msg.id]?.appearFrame ?? Infinity));
+  const view = threadFrame(project, plan, frame);
+  const typingMsg = typingAt(project, plan, frame);
+  const typingActive = typingMsg && threadIdOf(project, typingMsg) === view.threadId ? typingMsg : null;
 
+  // desenha uma conversa inteira deslocada e com opacidade própria: é isso que
+  // permite o corte de um chat para o outro sem duplicar o código de desenho
+  const drawList = (appeared: ChatMessage[], dx: number, alphaMul: number, allowTyping: boolean) => {
+  ctx.save();
+  if (dx) ctx.translate(dx, 0);
+  const typing = allowTyping ? typingActive : null;
   const layout = layoutMessages(ctx, project, theme, appeared, width, height, media, fit?.metricsH);
-  const typing = typingAt(project, plan, frame);
   const typingH = typing ? Math.round(72 * m.scale) + m.gap : 0;
 
   // deixa a margem inferior livre para a interface das plataformas
@@ -1018,7 +1025,7 @@ function paintConversation(
     const seconds = Math.max(0, age) / plan.fps;
     const isSpot = spotlight != null && item.message.id === spotlight.id;
     const spotT = spotlight ? Math.max(0, Math.min(1, t)) : 0;
-    ctx.globalAlpha = anim.alpha * (spotlight && !isSpot ? 1 - 0.55 * spotT : 1);
+    ctx.globalAlpha = alphaMul * anim.alpha * (spotlight && !isSpot ? 1 - 0.55 * spotT : 1);
     const scale = anim.scale * (isSpot ? 1 + 0.06 * spotT : 1);
     const scaling = Math.abs(scale - 1) > 0.001;
     if (scaling) {
@@ -1181,7 +1188,7 @@ function paintConversation(
       ctx.lineTo(cx - r * 0.3, cy + r * 0.45);
       ctx.closePath();
       ctx.fill();
-      ctx.globalAlpha = anim.alpha;
+      ctx.globalAlpha = alphaMul * anim.alpha;
 
       const seconds = voiceSeconds(item.message);
       const label = durationLabel(seconds);
@@ -1284,7 +1291,7 @@ function paintConversation(
     if (scaling) ctx.restore();
   }
 
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = alphaMul;
 
   if (typing) {
     const author = participantOf(project, typing.participantId);
@@ -1294,11 +1301,24 @@ function paintConversation(
     drawTypingBubble(ctx, theme, m, x, offsetY + layout.contentH, frame);
   }
 
+  ctx.globalAlpha = 1;
   ctx.restore();
+  ctx.restore();
+  };
+
+  // corte entre conversas: a anterior sai para a esquerda enquanto a nova entra
+  if (view.cut < 1 && view.previousMessages.length) {
+    const ease = 1 - Math.pow(1 - view.cut, 3);
+    drawList(view.previousMessages, -width * 0.28 * ease, Math.max(0, 1 - ease * 1.25), false);
+    drawList(view.messages, width * 0.3 * (1 - ease), Math.min(1, ease * 1.3), true);
+  } else {
+    drawList(view.messages, 0, 1, true);
+  }
 
   if (headerVisible) {
-    const typingName = typing ? participantOf(project, typing.participantId).name : null;
-    drawHeader(ctx, project, theme, width, m, media, typingName);
+    const typingName = typingActive ? participantOf(project, typingActive.participantId).name : null;
+    const headThread = view.cut < 0.5 && view.previousThread ? view.previousThread : view.thread;
+    drawHeader(ctx, project, theme, width, m, media, typingName, headThread);
   }
 }
 
