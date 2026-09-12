@@ -808,6 +808,7 @@ export function paintFrame(
     rect.header,
     options,
     auto != null ? { metricsH: base.h } : undefined,
+    inset ? { kind: "theme" } : project.background,
   );
   ctx.globalAlpha = 1;
   ctx.restore();
@@ -908,13 +909,15 @@ function paintConversation(
   options: PaintOptions = {},
   /** painel de altura variável: tamanhos fixos e conversa colada embaixo */
   fit?: { metricsH: number },
+  /** em layouts sobre vídeo, o painel mantém seu próprio papel de parede */
+  conversationBackground: ChatSceneBackground | undefined = project.background,
 ) {
   const m = metricsFor(width, fit?.metricsH ?? height);
   const media = options.media;
   const headerVisible = showHeader && (project.header?.style ?? "messenger") !== "none";
   const headerH = headerVisible ? m.headerH : 0;
 
-  drawWallpaper(ctx, theme, width, height, m, project.background, media, frame / plan.fps);
+  drawWallpaper(ctx, theme, width, height, m, conversationBackground, media, frame / plan.fps);
 
   const appeared = project.messages.filter((msg) => frame >= (plan.byId[msg.id]?.appearFrame ?? Infinity));
 
