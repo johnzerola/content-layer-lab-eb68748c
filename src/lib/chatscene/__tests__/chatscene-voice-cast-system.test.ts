@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { computeMessageTimings } from "../timing";
 import { planScroll } from "../scroll-planner";
 import { attachPreset, effectiveVoice } from "../voice-resolution";
-import { voiceKey } from "../voice";
+import { DEFAULT_VOICE, voiceKey } from "../voice";
+import { createGatewayVoiceProvider, generateCast } from "../voice-cast";
 import { createChatSceneProject, createMessage, createParticipant, normalizeChatSceneProject } from "../types";
 
 const projectWithCast = () => {
@@ -48,6 +49,35 @@ describe("Voice Cast System", () => {
     const timing = computeMessageTimings(project)[0]!;
     expect(timing.leadInMs).toBe(300);
     expect(timing.pauseAfterMs).toBe(project.timing.gapMs + 500);
+  });
+
+  it("envia a voz persistida ao provider real", async () => {
+    let sentVoice = "";
+    const provider = createGatewayVoiceProvider(async (input) => {
+      sentVoice = input.voice;
+      throw new Error("parar antes da decodificação");
+    });
+    await expect(provider.synthesize("Olá", { ...DEFAULT_VOICE, providerVoiceId: "ash" })).rejects.toThrow();
+    expect(sentVoice).toBe("ash");
+  });
+
+  it("repete falha transitória antes de desistir", async () => {
+    const project = projectWithCast();
+    let calls = 0;
+    const provider = {
+      id: "retry-test",
+      listVoices: async () => [],
+      getCapabilities: () => ({ languages: ["pt-BR"], maxCharacters: 600, controls: { speed: true, pitch: true, energy: false, expressiveness: true, roughness: false, warmth: false, brightness: false, emotion: true }, costEstimate: false, local: false }),
+      previewVoice: async () => { throw new Error("não usado"); },
+      synthesize: async () => {
+        calls += 1;
+        if (calls < 3) throw new Error("temporário");
+        return { key: "ok", blob: new Blob(), durationSec: 1, buffer: {} as AudioBuffer };
+      },
+    };
+    const result = await generateCast(project, provider);
+    expect(calls).toBeGreaterThanOrEqual(3);
+    expect(result.failures).toHaveLength(0);
   });
 });
 

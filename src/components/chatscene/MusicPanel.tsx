@@ -91,9 +91,23 @@ export function MusicPanel({ project, patch, uploading, onUpload }: MusicPanelPr
         />
         abaixar a música enquanto alguém fala
       </label>
+      {mix.ducking ? (
+        <details className="mt-2 rounded-md border border-border bg-background/35 p-2">
+          <summary className="cursor-pointer text-[11px] text-muted-foreground">Ajustar transição da música</summary>
+          <div className="mt-2 space-y-2">
+            <MixRange label="Redução" value={mix.duckingAmount ?? .78} min={.2} max={.95} step={.05} suffix="%" display={(v) => Math.round(v * 100)} onChange={(duckingAmount) => set({ duckingAmount })} />
+            <MixRange label="Entrada" value={mix.duckingAttackMs ?? 180} min={50} max={800} step={10} suffix="ms" onChange={(duckingAttackMs) => set({ duckingAttackMs })} />
+            <MixRange label="Retorno" value={mix.duckingReleaseMs ?? 240} min={50} max={1200} step={10} suffix="ms" onChange={(duckingReleaseMs) => set({ duckingReleaseMs })} />
+          </div>
+        </details>
+      ) : null}
       <p className="mt-1 text-[11px] text-muted-foreground">
         Use apenas músicas suas ou com permissão de uso.
       </p>
     </div>
   );
+}
+
+function MixRange({ label, value, min, max, step, suffix, display, onChange }: { label: string; value: number; min: number; max: number; step: number; suffix: string; display?: (value: number) => number; onChange: (value: number) => void }) {
+  return <label className="block text-[11px] text-muted-foreground"><span className="mb-1 flex justify-between"><span>{label}</span><span>{display ? display(value) : value}{suffix}</span></span><input type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} className="w-full accent-primary" /></label>;
 }

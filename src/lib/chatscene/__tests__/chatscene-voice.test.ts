@@ -86,11 +86,13 @@ describe("ritmo e trilha", () => {
   });
 
   it("a música abaixa enquanto alguém fala e volta depois", () => {
-    const curve = duckingCurve([{ startSec: 2, clip: { durationSec: 3 } }], true);
+    const curve = duckingCurve([{ startSec: 2, clip: { durationSec: 3 } }], true, { amount: .6, attackMs: 100, releaseMs: 400 });
     const at = (t: number) => curve.filter((p) => p.time <= t).at(-1)!.value;
     expect(at(0)).toBe(1);
     expect(at(3)).toBeLessThan(0.5);
     expect(at(6)).toBe(1);
+    expect(curve.some((point) => point.time === 1.9)).toBe(true);
+    expect(curve.some((point) => point.value === .4)).toBe(true);
     expect(duckingCurve([{ startSec: 2, clip: { durationSec: 3 } }], false)).toEqual([
       { time: 0, value: 1 },
     ]);

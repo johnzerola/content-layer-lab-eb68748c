@@ -617,6 +617,7 @@ export function createDemoChatSceneProject(): ChatSceneProject {
     dark: true,
     animation: "soft-spring",
     camera: { ...DEFAULT_CAMERA, mode: "cuts", intensity: 0.45 },
+    background: { kind: "video", videoUrl: "/chatscene/backgrounds/neon-city.mp4", loop: true },
     participants: [chefe, pedro, colega, mae],
     voiceProfiles: [
       { ...importVoicePreset("adult-male-boss"), id: "voice_chefe" },
@@ -629,6 +630,7 @@ export function createDemoChatSceneProject(): ChatSceneProject {
       line(chefe, "Bom dia, Pedro. Preparado para o primeiro dia?", { voiceDirection: { emotion: "serious" } }),
       line(pedro, "Preparado... eu acho 😅", { voiceDirection: { emotion: "nervous" } }),
       line(colega, "Relaxa. O café fica à esquerda e o chefe quase nunca morde."),
+      createMessage(colega.id, { kind: "image", text: "Seu lugar já está pronto.", mediaUrl: "/chatscene/backgrounds/office-message.jpg", mediaAspect: 9 / 16 }),
       line(chefe, "Quase nunca?", { emphasis: true, voiceDirection: { emotion: "annoyed" } }),
       line(colega, "Foi uma piada, chefe. Uma ótima piada."),
       line(mae, "Filho, boa sorte! E não esquece o almoço que deixei na mochila.", { voiceDirection: { emotion: "happy" } }),
@@ -644,5 +646,5 @@ function importVoicePreset(id: string): import("./voice").VoiceProfile {
     "adult-male-casual": { providerVoiceId: "ash", style: "natural", speed: 1, energy: .55 },
     "mother-warm": { providerVoiceId: "sage", style: "calma", speed: .94, energy: .45 },
   };
-  return { presetId: id, provider: "mock", language: "pt", locale: "pt-BR", style: "natural", speed: 1, gain: 1, ...defaults[id] };
+  return { presetId: id, provider: "lovable-ai", language: "pt", locale: "pt-BR", style: "natural", speed: 1, gain: 1, ...defaults[id] };
 }
