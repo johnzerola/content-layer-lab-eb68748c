@@ -1,5 +1,5 @@
 ---
-name: react
+name: react-react
 description: Current React 19.2 guidance for concurrent rendering, Server Components, Actions, effects, React Compiler, state, and memoization. Use for React components and hooks. Next.js-specific routing/caching belongs to the nextjs skill; React Hook Form integration belongs to react-hook-form.
 ---
 

@@ -1,5 +1,5 @@
 ---
-name: typescript
+name: react-typescript
 description: Current TypeScript guidance, including TypeScript 7 migration, tsconfig design, type errors, declaration performance, async patterns, module organization, and runtime type safety. Use for .ts, .tsx, and .d.ts work; framework-specific patterns and testing are covered by their dedicated skills.
 ---
 
