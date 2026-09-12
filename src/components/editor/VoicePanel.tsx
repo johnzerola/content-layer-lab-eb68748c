@@ -10,6 +10,7 @@ import { useRef, useState } from "react";
 import { Mic, Play, Plus, Sparkles, Square, Trash2 } from "lucide-react";
 import { createAudioClip, defaultEditorAudio, type AudioClip, type EditorAudio } from "@/lib/editor/audio";
 import { NARRATION_VOICES, generateNarration } from "@/lib/tts.functions";
+import { uploadMediaBlob } from "@/lib/media-store";
 
 interface Props {
   audio: EditorAudio | undefined;

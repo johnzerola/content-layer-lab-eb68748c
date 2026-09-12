@@ -53,6 +53,22 @@ async function toPersistentUrl(blob: Blob): Promise<string> {
   });
 }
 
+/** Player que resolve arquivos guardados na conta antes de tocar. */
+function ClipPlayer({ url, stemRole }: { url: string; stemRole?: string | undefined }) {
+  const src = useMediaUrl(url);
+  if (!src) return null;
+  return (
+    <>
+      <audio src={src} controls className="mt-1.5 h-8 w-full" />
+      {stemRole && (
+        <a href={src} download={`${stemRole}.mp3`} className="mt-1 inline-block text-xs underline">
+          Baixar esta trilha
+        </a>
+      )}
+    </>
+  );
+}
+
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex items-center gap-2 py-1 text-xs">
