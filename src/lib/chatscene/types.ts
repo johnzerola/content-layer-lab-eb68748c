@@ -16,21 +16,51 @@ export const CHATSCENE_PROJECT_VERSION = 1;
 
 export type ChatSceneAspect = "9:16" | "1:1" | "16:9";
 
-export type MessageKind = "text" | "image" | "emoji" | "system" | "sticker" | "video";
+export type MessageKind = "text" | "image" | "emoji" | "system" | "sticker" | "video" | "voice";
 
 /** Confirmação de entrega mostrada ao lado da hora, como em um app real. */
 export type MessageStatus = "sent" | "delivered" | "read";
 
 export type ChatKind = "direct" | "group";
 
-/** Fundo da cena: o papel de parede do tema, uma cor, um degradê ou uma foto. */
+/**
+ * Fundo da cena: o papel de parede do tema, uma cor, um degradê, uma foto ou
+ * um vídeo em laço (gameplay, paisagem, textura própria ou licenciada).
+ */
 export interface ChatSceneBackground {
-  kind: "theme" | "solid" | "gradient" | "image";
+  kind: "theme" | "solid" | "gradient" | "image" | "video";
   color?: string | null;
   /** segunda cor do degradê */
   colorB?: string | null;
   imageUrl?: string | null;
+  /** endereço do vídeo de fundo quando kind === "video" */
+  videoUrl?: string | null;
+  /** repetir o vídeo do começo quando ele acabar */
+  loop?: boolean;
 }
+
+/**
+ * Marca do criador sobre a cena: um @ e/ou uma logo, sempre do próprio
+ * usuário. Fica fora da conversa, nunca dentro das bolhas.
+ */
+export interface ChatSceneBranding {
+  enabled: boolean;
+  handle: string;
+  logoUrl?: string | null;
+  position: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+  opacity: number;
+  /** tamanho relativo à largura do vídeo (0.02–0.12) */
+  size: number;
+}
+
+export const DEFAULT_BRANDING: ChatSceneBranding = {
+  enabled: false,
+  handle: "",
+  logoUrl: null,
+  position: "bottom-right",
+  opacity: 0.85,
+  size: 0.05,
+};
 
 export const DEFAULT_BACKGROUND: ChatSceneBackground = { kind: "theme" };
 
@@ -76,7 +106,9 @@ export interface ChatMessage {
   emphasis?: boolean;
   /** duração da fala quando houver voz (preenchido na fase de vozes) */
   voiceMs?: number | null;
-  /** id da mensagem citada (reservado para a próxima fase) */
+  /** duração mostrada no áudio/recado de voz, em segundos */
+  durationSec?: number | null;
+  /** id da mensagem citada: desenha o trecho respondido dentro da bolha */
   replyToId?: string | null;
   /** hora mostrada dentro da bolha; null usa o relógio automático da cena */
   time?: string | null;
@@ -226,6 +258,8 @@ export interface ChatSceneProject {
   layout?: ChatSceneLayout;
   /** sons curtos de envio/recebimento na prévia */
   sound?: { enabled: boolean; volume: number };
+  /** marca do criador sobre a cena */
+  branding?: ChatSceneBranding;
 }
 
 export const DEFAULT_TIMING: ChatSceneTiming = {
@@ -294,6 +328,7 @@ export function createMessage(participantId: string, init: Partial<ChatMessage> 
     pauseAfterMs: init.pauseAfterMs ?? null,
     emphasis: init.emphasis ?? false,
     voiceMs: init.voiceMs ?? null,
+    durationSec: init.durationSec ?? null,
     replyToId: init.replyToId ?? null,
     time: init.time ?? null,
     reaction: init.reaction ?? null,
@@ -328,6 +363,7 @@ export function createChatSceneProject(init: Partial<ChatSceneProject> = {}): Ch
     animation: init.animation ?? "soft-spring",
     layout: init.layout ?? { ...DEFAULT_LAYOUT },
     sound: init.sound ?? { enabled: false, volume: 0.5 },
+    branding: init.branding ?? { ...DEFAULT_BRANDING },
     participants: init.participants ?? [me, other],
     messages:
       init.messages ??
@@ -379,6 +415,7 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
     animation: raw.animation ?? base.animation ?? "soft-spring",
     layout: { ...DEFAULT_LAYOUT, ...(raw.layout ?? {}) },
     sound: { enabled: false, volume: 0.5, ...(raw.sound ?? {}) },
+    branding: { ...DEFAULT_BRANDING, ...(raw.branding ?? {}) },
   };
 }
 

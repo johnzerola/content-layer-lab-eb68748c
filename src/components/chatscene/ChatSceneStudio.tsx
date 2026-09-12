@@ -30,11 +30,14 @@ import { encodeFrameSequence, frameEncoderSupported } from "@/lib/chatscene/enco
 import { CanvasConversationRenderer } from "@/lib/chatscene/renderer";
 import { saveChatSceneProject } from "@/lib/chatscene/project.service";
 import { uploadChatSceneMedia } from "@/lib/chatscene/upload";
+import { addFileToLibrary, readLibrary, type LibraryAsset } from "@/lib/chatscene/assets";
+import { MESSAGE_KINDS, messageKind, voiceSeconds } from "@/lib/chatscene/message-kinds";
 import { CHAT_THEMES } from "@/lib/chatscene/theme";
 import { loadLocalDraft, saveLocalDraft } from "@/lib/chatscene/serialize";
 import {
   ANIMATION_PRESETS,
   BACKGROUND_PRESETS,
+  DEFAULT_BRANDING,
   LAYOUT_PRESETS,
   createChatSceneProject,
   createDemoChatSceneProject,
@@ -71,6 +74,11 @@ export function ChatSceneStudio() {
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [uploading, setUploading] = useState<string | null>(null);
+  /** mídia já enviada nesta conversa, para reaproveitar sem subir de novo */
+  const [library, setLibrary] = useState<LibraryAsset[]>([]);
+  useEffect(() => {
+    setLibrary(readLibrary());
+  }, []);
   const abortRef = useRef<AbortController | null>(null);
 
   const plan = useMemo(() => buildPlan(project), [project]);
@@ -113,8 +121,11 @@ export function ChatSceneStudio() {
     async (messageId: string, file: File) => {
       setUploading(messageId);
       try {
-        const { url, aspect, temporary } = await uploadChatSceneMedia(file);
-        updateMessage(messageId, { mediaUrl: url, mediaAspect: aspect });
+        const { asset, library: next, reused } = await addFileToLibrary(file, "message");
+        setLibrary(next);
+        updateMessage(messageId, { mediaUrl: asset.url, mediaAspect: asset.aspect });
+        if (reused) toast.success("Arquivo reaproveitado da biblioteca — nada foi enviado de novo.");
+        const temporary = asset.temporary;
         if (temporary) {
           toast.warning("O arquivo ficou só nesta sessão; salve a conversa depois de enviá-lo de novo.");
         }
@@ -126,6 +137,37 @@ export function ChatSceneStudio() {
     },
     [updateMessage],
   );
+
+  /** Vídeo em laço atrás da conversa. */
+  const handleBackgroundVideo = useCallback(async (file: File) => {
+    setUploading("background");
+    try {
+      const { asset, library: next } = await addFileToLibrary(file, "background");
+      setLibrary(next);
+      setProject((prev) => ({ ...prev, background: { kind: "video", videoUrl: asset.url, loop: true } }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível usar este vídeo.");
+    } finally {
+      setUploading(null);
+    }
+  }, []);
+
+  /** Logo do criador mostrada por cima da cena. */
+  const handleLogo = useCallback(async (file: File) => {
+    setUploading("logo");
+    try {
+      const { asset, library: next } = await addFileToLibrary(file, "logo");
+      setLibrary(next);
+      setProject((prev) => ({
+        ...prev,
+        branding: { ...DEFAULT_BRANDING, ...prev.branding, enabled: true, logoUrl: asset.url },
+      }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível usar esta imagem.");
+    } finally {
+      setUploading(null);
+    }
+  }, []);
 
   /** Foto de um participante ou do grupo. */
   const handleAvatarUpload = useCallback(async (target: string, file: File) => {
@@ -477,12 +519,11 @@ export function ChatSceneStudio() {
                       className="rounded-md border border-border bg-background px-1.5 py-1 text-xs text-muted-foreground"
                       aria-label="Tipo de mensagem"
                     >
-                      <option value="text">texto</option>
-                      <option value="emoji">emoji</option>
-                      <option value="image">foto</option>
-                      <option value="sticker">figurinha</option>
-                      <option value="video">vídeo / meme</option>
-                      <option value="system">aviso</option>
+                      {MESSAGE_KINDS.map((k) => (
+                        <option key={k.id} value={k.id}>
+                          {k.label}
+                        </option>
+                      ))}
                     </select>
                     <span className="ml-auto flex items-center gap-0.5">
                       <button
@@ -531,7 +572,7 @@ export function ChatSceneStudio() {
                     aria-label="Texto da mensagem"
                   />
 
-                  {(m.kind === "image" || m.kind === "sticker" || m.kind === "video") && (
+                  {messageKind(m.kind).needsMedia && (
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       <label className="flex cursor-pointer items-center gap-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs hover:border-primary">
                         {uploading === m.id ? (
@@ -539,11 +580,11 @@ export function ChatSceneStudio() {
                         ) : (
                           <Upload className="size-3.5" />
                         )}
-                        {m.kind === "video" ? "Enviar vídeo" : m.kind === "sticker" ? "Enviar figurinha" : "Enviar foto"}
+                        Enviar {messageKind(m.kind).label.toLowerCase()}
                         <input
                           type="file"
                           className="hidden"
-                          accept={m.kind === "video" ? "video/*" : "image/*"}
+                          accept={messageKind(m.kind).accept ?? "image/*"}
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             e.target.value = "";
@@ -551,6 +592,24 @@ export function ChatSceneStudio() {
                           }}
                         />
                       </label>
+                      {library.length > 0 && (
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const asset = library.find((a) => a.hash === e.target.value);
+                            if (asset) updateMessage(m.id, { mediaUrl: asset.url, mediaAspect: asset.aspect });
+                          }}
+                          className="rounded-md border border-border bg-background px-1.5 py-1 text-xs text-muted-foreground"
+                          aria-label="Reaproveitar da biblioteca"
+                        >
+                          <option value="">da biblioteca…</option>
+                          {library.map((a) => (
+                            <option key={a.hash} value={a.hash}>
+                              {a.name.slice(0, 24)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       <ImageIcon className="size-3.5 text-muted-foreground" />
                       <input
                         value={m.mediaUrl?.startsWith("blob:") ? "arquivo do computador" : m.mediaUrl ?? ""}
@@ -699,6 +758,108 @@ export function ChatSceneStudio() {
                 className="mt-1.5 w-full rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none focus:border-primary"
                 aria-label="Foto de fundo"
               />
+              <div className="mt-1.5 flex items-center gap-1.5">
+                <label className="flex cursor-pointer items-center gap-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs hover:border-primary">
+                  {uploading === "background" ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="size-3.5" />
+                  )}
+                  Vídeo de fundo
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="video/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) void handleBackgroundVideo(file);
+                    }}
+                  />
+                </label>
+                <input
+                  value={project.background?.kind === "video" ? project.background.videoUrl ?? "" : ""}
+                  onChange={(e) =>
+                    patch({
+                      background: e.target.value
+                        ? { kind: "video", videoUrl: e.target.value, loop: true }
+                        : { kind: "theme" },
+                    })
+                  }
+                  placeholder="ou endereço do vídeo em laço"
+                  className="min-w-[120px] flex-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none focus:border-primary"
+                  aria-label="Vídeo de fundo"
+                />
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Use apenas vídeos seus ou com permissão de uso.
+              </p>
+            </div>
+
+            <div className="mt-3">
+              <p className="mono-label mb-1.5 text-muted-foreground">Sua marca</p>
+              <label className="flex items-center gap-1.5 text-xs">
+                <input
+                  type="checkbox"
+                  checked={project.branding?.enabled ?? false}
+                  onChange={(e) =>
+                    patch({ branding: { ...DEFAULT_BRANDING, ...project.branding, enabled: e.target.checked } })
+                  }
+                />
+                mostrar meu @ e logo no vídeo
+              </label>
+              {project.branding?.enabled && (
+                <div className="mt-1.5 space-y-1.5">
+                  <input
+                    value={project.branding.handle}
+                    onChange={(e) =>
+                      patch({ branding: { ...DEFAULT_BRANDING, ...project.branding, handle: e.target.value } })
+                    }
+                    placeholder="@seuperfil"
+                    className="w-full rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none focus:border-primary"
+                    aria-label="Seu @"
+                  />
+                  <div className="flex items-center gap-1.5">
+                    <label className="flex cursor-pointer items-center gap-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs hover:border-primary">
+                      {uploading === "logo" ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="size-3.5" />
+                      )}
+                      Logo
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = "";
+                          if (file) void handleLogo(file);
+                        }}
+                      />
+                    </label>
+                    <select
+                      value={project.branding.position}
+                      onChange={(e) =>
+                        patch({
+                          branding: {
+                            ...DEFAULT_BRANDING,
+                            ...project.branding,
+                            position: e.target.value as NonNullable<typeof project.branding>["position"],
+                          },
+                        })
+                      }
+                      className="flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs"
+                      aria-label="Posição da marca"
+                    >
+                      <option value="bottom-right">canto inferior direito</option>
+                      <option value="bottom-left">canto inferior esquerdo</option>
+                      <option value="top-right">canto superior direito</option>
+                      <option value="top-left">canto superior esquerdo</option>
+                    </select>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="mt-3">
@@ -900,6 +1061,39 @@ export function ChatSceneStudio() {
                   suffix="ms"
                   onChange={(v) => updateMessage(selectedMessage.id, { pauseAfterMs: v })}
                 />
+                {messageKind(selectedMessage.kind).canReply && (
+                  <div>
+                    <p className="mb-1 text-muted-foreground">Responder a</p>
+                    <select
+                      value={selectedMessage.replyToId ?? ""}
+                      onChange={(e) =>
+                        updateMessage(selectedMessage.id, { replyToId: e.target.value || null })
+                      }
+                      className="w-full rounded-md border border-border bg-background px-2 py-1.5"
+                      aria-label="Responder a outra mensagem"
+                    >
+                      <option value="">nenhuma</option>
+                      {project.messages
+                        .filter((q) => q.id !== selectedMessage.id && q.kind !== "system")
+                        .map((q) => (
+                          <option key={q.id} value={q.id}>
+                            {(q.text || messageKind(q.kind).label).slice(0, 40)}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
+                {selectedMessage.kind === "voice" && (
+                  <Range
+                    label="Duração do recado de voz"
+                    value={Math.round(voiceSeconds(selectedMessage))}
+                    min={1}
+                    max={120}
+                    step={1}
+                    suffix="s"
+                    onChange={(v) => updateMessage(selectedMessage.id, { durationSec: v })}
+                  />
+                )}
                 <label className="flex items-center gap-1.5">
                   <input
                     type="checkbox"

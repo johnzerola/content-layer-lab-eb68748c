@@ -8,6 +8,7 @@
 import type { ConversationPlan } from "./clock";
 import { typingAt } from "./clock";
 import { mediaFrameAt, type LoadedMedia } from "./media";
+import { durationLabel, voiceSeconds, voiceWave } from "./message-kinds";
 import type { ChatTheme } from "./theme";
 import {
   DEFAULT_LAYOUT,
@@ -114,6 +115,10 @@ interface LaidOutMessage {
   /** figurinha: sem bolha, fundo transparente */
   bare: boolean;
   clock: string;
+  /** citação da mensagem respondida, desenhada no topo da bolha */
+  reply?: { name: string; color: string; text: string; height: number } | null;
+  /** altura da barra do recado de voz (0 quando não é voz) */
+  voiceH?: number;
 }
 
 interface Layout {
@@ -131,6 +136,22 @@ function emojiOnly(text: string): boolean {
 }
 
 const isMedia = (kind: ChatMessage["kind"]) => kind === "image" || kind === "video" || kind === "sticker";
+
+/** Como a mensagem citada aparece quando ela não tem texto. */
+function quotedKindLabel(kind: ChatMessage["kind"]): string {
+  switch (kind) {
+    case "image":
+      return "Foto";
+    case "video":
+      return "Vídeo";
+    case "sticker":
+      return "Figurinha";
+    case "voice":
+      return "Mensagem de voz";
+    default:
+      return "Mensagem";
+  }
+}
 
 /**
  * Calcula posições de todas as mensagens visíveis. O layout é de cima para
@@ -223,12 +244,40 @@ export function layoutMessages(
     }
 
     const withMedia = isMedia(message.kind);
+    const isVoice = message.kind === "voice";
     const maxTextW = m.bubbleMaxW - padX * 2 - avatarLane;
     const lines = message.text ? wrapText(ctx, message.text, maxTextW) : [];
     const textW = lines.reduce((w, l) => Math.max(w, ctx.measureText(l).width), 0);
 
     const mediaW = withMedia ? m.bubbleMaxW - padX * 2 - avatarLane : 0;
     const mediaH = withMedia ? Math.round(mediaW / (aspect || 1.4)) : 0;
+
+    // recado de voz: barra de largura fixa com onda e duração
+    const voiceH = isVoice ? Math.round(78 * m.scale) : 0;
+    const voiceW = isVoice ? Math.round(m.bubbleMaxW * 0.86) - avatarLane : 0;
+
+    // citação da mensagem respondida
+    let reply: LaidOutMessage["reply"] = null;
+    if (message.replyToId) {
+      const quoted = project.messages.find((q) => q.id === message.replyToId);
+      if (quoted) {
+        const quotedAuthor = participantOf(project, quoted.participantId);
+        ctx.font = `400 ${Math.round(m.fontSize * 0.74)}px ${theme.fontFamily}`;
+        const snippet = ellipsize(
+          ctx,
+          quoted.text || quotedKindLabel(quoted.kind),
+          maxTextW - Math.round(20 * m.scale),
+        );
+        reply = {
+          name: quotedAuthor.name,
+          color: quotedAuthor.color,
+          text: snippet,
+          height: Math.round(m.fontSize * 1.85),
+        };
+      }
+      ctx.font = `${big ? 400 : 500} ${fontSize}px ${theme.fontFamily}`;
+    }
+    const replyH = reply ? reply.height + Math.round(10 * m.scale) : 0;
 
     const showName = isGroup && !isSelf && author.id !== lastAuthor;
     const nameH = showName ? Math.round(m.fontSize * 0.9) : 0;
@@ -239,10 +288,12 @@ export function layoutMessages(
 
     const bubbleW = Math.min(
       m.bubbleMaxW - avatarLane,
-      Math.max(mediaW, textW, lines.length ? 0 : metaW) + padX * 2,
+      Math.max(mediaW, voiceW, textW, lines.length ? 0 : metaW) + padX * 2,
     );
     const bubbleH =
       padY * 2 +
+      replyH +
+      voiceH +
       lines.length * lineH +
       metaH +
       (mediaH ? mediaH + (lines.length ? Math.round(12 * m.scale) : 0) : 0);
@@ -267,6 +318,8 @@ export function layoutMessages(
       mediaW,
       bare: false,
       clock: messageClock(project, index, message),
+      reply,
+      voiceH,
     });
 
     y += nameH + bubbleH + reactionH + m.gap;
@@ -316,6 +369,7 @@ function drawWallpaper(
   m: Metrics,
   background?: ChatSceneBackground,
   media?: Map<string, LoadedMedia>,
+  seconds = 0,
 ) {
   const bg = background ?? { kind: "theme" as const };
   if (bg.kind === "solid" && bg.color) {
@@ -331,12 +385,22 @@ function drawWallpaper(
     ctx.fillRect(0, 0, width, height);
     return;
   }
-  if (bg.kind === "image" && bg.imageUrl) {
-    const item = media?.get(bg.imageUrl);
+  const sourceUrl =
+    bg.kind === "image" ? bg.imageUrl : bg.kind === "video" ? bg.videoUrl || bg.imageUrl : null;
+  if (sourceUrl) {
+    const item = media?.get(sourceUrl);
     ctx.fillStyle = theme.wallpaper;
     ctx.fillRect(0, 0, width, height);
     if (item) {
-      const frame = item.frames[0]!;
+      // vídeo de fundo: o quadro vem do tempo da cena, em laço quando pedido
+      const duration = item.animated ? item.frames.length / Math.max(1, item.fps) : 0;
+      const t =
+        bg.kind === "video" && duration
+          ? bg.loop === false
+            ? Math.min(seconds, duration - 1 / item.fps)
+            : seconds % duration
+          : 0;
+      const frame = item.animated ? mediaFrameAt(item, t) : item.frames[0]!;
       const scale = Math.max(width / item.width, height / item.height);
       const w = item.width * scale;
       const h = item.height * scale;
@@ -579,7 +643,7 @@ export function paintFrame(
     const bw = width * scale;
     const bh = height * scale;
     ctx.translate((width - bw) / 2, (height - bh) / 2 + height * clampUnit(l.backgroundOffsetY, -0.3, 0.3));
-    drawWallpaper(ctx, theme, bw, bh, metricsFor(bw, bh), project.background, media);
+    drawWallpaper(ctx, theme, bw, bh, metricsFor(bw, bh), project.background, media, frame / plan.fps);
     ctx.restore();
   }
 
@@ -598,9 +662,59 @@ export function paintFrame(
   ctx.globalAlpha = 1;
   ctx.restore();
 
+  drawBranding(ctx, project, width, height, media);
+
   if (options.safeZones) {
     drawSafeZones(ctx, width, height);
   }
+}
+
+/** Marca do criador (@ e/ou logo) por cima da cena, fora da conversa. */
+function drawBranding(
+  ctx: Ctx2D,
+  project: ChatSceneProject,
+  width: number,
+  height: number,
+  media?: Map<string, LoadedMedia>,
+) {
+  const b = project.branding;
+  if (!b?.enabled) return;
+  const handle = (b.handle ?? "").trim();
+  const logo = b.logoUrl ? media?.get(b.logoUrl)?.frames[0] : undefined;
+  if (!handle && !logo) return;
+
+  const size = Math.round(width * Math.max(0.02, Math.min(0.12, b.size || 0.05)));
+  const pad = Math.round(width * 0.045);
+  const fontSize = Math.round(size * 0.62);
+  ctx.save();
+  ctx.globalAlpha = Math.max(0.15, Math.min(1, b.opacity ?? 0.85));
+  ctx.font = `600 ${fontSize}px Inter, system-ui, sans-serif`;
+  const textW = handle ? ctx.measureText(handle).width : 0;
+  const gap = handle && logo ? Math.round(size * 0.3) : 0;
+  const totalW = (logo ? size : 0) + gap + textW;
+  const right = (b.position ?? "bottom-right").endsWith("right");
+  const bottom = (b.position ?? "bottom-right").startsWith("bottom");
+  const x = right ? width - pad - totalW : pad;
+  const y = bottom ? height - pad - size : pad;
+
+  if (logo) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(logo, x, y, size, size);
+    ctx.restore();
+  }
+  if (handle) {
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.fillText(handle, x + (logo ? size + gap : 0) + 2, y + size / 2 + 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(handle, x + (logo ? size + gap : 0), y + size / 2);
+    ctx.textBaseline = "alphabetic";
+  }
+  ctx.restore();
 }
 
 function drawSafeZones(ctx: Ctx2D, width: number, height: number) {
@@ -635,7 +749,7 @@ function paintConversation(
   const media = options.media;
   const headerH = showHeader ? m.headerH : 0;
 
-  drawWallpaper(ctx, theme, width, height, m, project.background, media);
+  drawWallpaper(ctx, theme, width, height, m, project.background, media, frame / plan.fps);
 
   const appeared = project.messages.filter((msg) => frame >= (plan.byId[msg.id]?.appearFrame ?? Infinity));
 
@@ -775,6 +889,65 @@ function paintConversation(
     }
 
     let cursorY = y + padY;
+
+    // trecho respondido, com a barrinha colorida do autor citado
+    if (item.reply) {
+      const rw = item.width - padX * 2;
+      const rh = item.reply.height;
+      ctx.save();
+      ctx.globalAlpha = ctx.globalAlpha * 0.92;
+      ctx.fillStyle = item.isSelf ? theme.peerBubble : theme.systemBubble;
+      roundRect(ctx, item.x + padX, cursorY, rw, rh, Math.round(10 * m.scale));
+      ctx.fill();
+      ctx.fillStyle = item.reply.color;
+      ctx.fillRect(item.x + padX, cursorY, Math.round(6 * m.scale), rh);
+      ctx.font = `600 ${Math.round(m.fontSize * 0.62)}px ${theme.fontFamily}`;
+      ctx.fillText(item.reply.name, item.x + padX + Math.round(18 * m.scale), cursorY + rh * 0.42);
+      ctx.font = `400 ${Math.round(m.fontSize * 0.62)}px ${theme.fontFamily}`;
+      ctx.fillStyle = theme.meta;
+      ctx.fillText(item.reply.text, item.x + padX + Math.round(18 * m.scale), cursorY + rh * 0.85);
+      ctx.restore();
+      cursorY += rh + Math.round(10 * m.scale);
+    }
+
+    // recado de voz: play, onda e duração
+    if (item.voiceH) {
+      const vh = item.voiceH;
+      const vw = item.width - padX * 2;
+      const r = Math.round(vh * 0.36);
+      const cx = item.x + padX + r;
+      const cy = cursorY + vh / 2;
+      ctx.fillStyle = item.isSelf ? theme.selfText : theme.peerText;
+      ctx.globalAlpha = ctx.globalAlpha * 0.85;
+      ctx.beginPath();
+      ctx.moveTo(cx - r * 0.3, cy - r * 0.45);
+      ctx.lineTo(cx + r * 0.5, cy);
+      ctx.lineTo(cx - r * 0.3, cy + r * 0.45);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = anim.alpha;
+
+      const seconds = voiceSeconds(item.message);
+      const label = durationLabel(seconds);
+      ctx.font = `400 ${m.metaSize}px ${theme.fontFamily}`;
+      const labelW = ctx.measureText(label).width + Math.round(12 * m.scale);
+      const waveX = cx + r + Math.round(16 * m.scale);
+      const waveW = Math.max(Math.round(40 * m.scale), item.x + padX + vw - labelW - waveX);
+      const bars = Math.max(10, Math.min(34, Math.round(waveW / Math.max(6, 10 * m.scale))));
+      const wave = voiceWave(item.message.id, bars);
+      const barW = Math.max(2, Math.round(waveW / (bars * 1.9)));
+      const played = Math.max(0, Math.min(1, (age / plan.fps) / Math.max(0.5, seconds)));
+      for (let i = 0; i < bars; i += 1) {
+        const bh = Math.max(barW, wave[i]! * vh * 0.52);
+        const bx = waveX + i * (waveW / bars);
+        ctx.fillStyle = i / bars <= played ? theme.check : item.isSelf ? theme.metaSelf : theme.meta;
+        roundRect(ctx, bx, cy - bh / 2, barW, bh, barW / 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = item.isSelf ? theme.metaSelf : theme.meta;
+      ctx.fillText(label, item.x + padX + vw - labelW + Math.round(6 * m.scale), cy + m.metaSize * 0.35);
+      cursorY += vh;
+    }
 
     if (item.mediaH) {
       const mw = item.width - padX * 2;

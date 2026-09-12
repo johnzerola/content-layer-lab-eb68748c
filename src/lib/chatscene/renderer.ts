@@ -48,9 +48,10 @@ export class CanvasConversationRenderer implements ConversationRenderer {
     for (const m of project.messages) if (m.mediaUrl) urls.add(m.mediaUrl);
     for (const p of project.participants) if (p.avatarUrl) urls.add(p.avatarUrl);
     if (project.groupAvatarUrl) urls.add(project.groupAvatarUrl);
-    if (project.background?.kind === "image" && project.background.imageUrl) {
-      urls.add(project.background.imageUrl);
-    }
+    const bg = project.background;
+    if (bg?.kind === "image" && bg.imageUrl) urls.add(bg.imageUrl);
+    if (bg?.kind === "video" && (bg.videoUrl || bg.imageUrl)) urls.add((bg.videoUrl || bg.imageUrl)!);
+    if (project.branding?.enabled && project.branding.logoUrl) urls.add(project.branding.logoUrl);
     await Promise.all(
       [...urls]
         .filter((u) => !this.media.has(u))
