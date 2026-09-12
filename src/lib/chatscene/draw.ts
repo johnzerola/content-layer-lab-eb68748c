@@ -443,6 +443,17 @@ function drawWallpaper(
   ctx.restore();
 }
 
+/** Desenha a imagem cobrindo o retângulo, mantendo a proporção. */
+function drawCover(ctx: Ctx2D, img: CanvasImageSource, x: number, y: number, w: number, h: number) {
+  const iw = (img as { width?: number }).width ?? w;
+  const ih = (img as { height?: number }).height ?? h;
+  if (!iw || !ih) return;
+  const scale = Math.max(w / iw, h / ih);
+  const dw = iw * scale;
+  const dh = ih * scale;
+  ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+}
+
 function drawHeader(
   ctx: Ctx2D,
   project: ChatSceneProject,
@@ -451,48 +462,90 @@ function drawHeader(
   m: Metrics,
   media?: Map<string, LoadedMedia>,
 ) {
-  ctx.fillStyle = theme.header;
+  const custom = project.header;
+  const style = custom?.style ?? "messenger";
+  if (style === "none") return;
+
+  ctx.fillStyle = custom?.bgColor || theme.header;
   ctx.fillRect(0, 0, width, m.headerH);
+  const bgImg = custom?.bgImageUrl ? media?.get(custom.bgImageUrl)?.frames[0] : undefined;
+  if (bgImg) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, width, m.headerH);
+    ctx.clip();
+    drawCover(ctx, bgImg, 0, 0, width, m.headerH);
+    ctx.restore();
+  }
   ctx.fillStyle = theme.divider;
   ctx.fillRect(0, m.headerH - Math.max(1, Math.round(2 * m.scale)), width, Math.max(1, Math.round(2 * m.scale)));
 
   const isGroup = (project.chatKind ?? "direct") === "group" || project.participants.length > 2;
   const peers = project.participants.filter((p) => !p.isSelf);
-  const title = isGroup
-    ? project.groupName || project.title || "Grupo"
-    : peers[0]?.name ?? project.participants[0]?.name ?? "Conversa";
-  const subtitle = isGroup
-    ? peers.map((p) => p.name).join(", ") || "conversa em grupo"
-    : "online";
+  const title =
+    (custom?.title || "").trim() ||
+    (isGroup
+      ? project.groupName || project.title || "Grupo"
+      : peers[0]?.name ?? project.participants[0]?.name ?? "Conversa");
+  const subtitle =
+    custom?.subtitle != null
+      ? custom.subtitle
+      : isGroup
+        ? peers.map((p) => p.name).join(", ") || "conversa em grupo"
+        : "online";
 
+  const textColor = custom?.textColor || theme.headerText;
+  const mutedColor = custom?.textColor || theme.headerMuted;
   const cy = m.headerH / 2;
-  // seta de voltar
-  const arrowX = Math.round(26 * m.scale);
-  ctx.strokeStyle = theme.headerText;
-  ctx.lineWidth = Math.max(2, Math.round(4 * m.scale));
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(arrowX + Math.round(16 * m.scale), cy - Math.round(14 * m.scale));
-  ctx.lineTo(arrowX, cy);
-  ctx.lineTo(arrowX + Math.round(16 * m.scale), cy + Math.round(14 * m.scale));
-  ctx.stroke();
+  const showChrome = style === "messenger";
 
-  const size = Math.round(74 * m.scale);
-  const cx = arrowX + Math.round(34 * m.scale) + size / 2;
-  const avatarUrl = isGroup ? project.groupAvatarUrl : peers[0]?.avatarUrl;
-  const avatarImg = avatarUrl ? media?.get(avatarUrl)?.frames[0] : undefined;
-  drawAvatarCircle(ctx, theme, cx, cy, size, peers[0]?.color ?? theme.selfBubble, title, avatarImg);
+  let cursorX = Math.round(26 * m.scale);
+  if (showChrome) {
+    // seta de voltar
+    const arrowX = cursorX;
+    ctx.strokeStyle = textColor;
+    ctx.lineWidth = Math.max(2, Math.round(4 * m.scale));
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(arrowX + Math.round(16 * m.scale), cy - Math.round(14 * m.scale));
+    ctx.lineTo(arrowX, cy);
+    ctx.lineTo(arrowX + Math.round(16 * m.scale), cy + Math.round(14 * m.scale));
+    ctx.stroke();
+    cursorX = arrowX + Math.round(34 * m.scale);
+  }
+
+  const size = Math.round((style === "banner" ? 88 : 74) * m.scale);
+  const cx = cursorX + size / 2;
+  const logoImg = custom?.logoUrl ? media?.get(custom.logoUrl)?.frames[0] : undefined;
+  if (logoImg) {
+    drawAvatarCircle(ctx, theme, cx, cy, size, peers[0]?.color ?? theme.selfBubble, title, logoImg);
+  } else {
+    const avatarUrl = isGroup ? project.groupAvatarUrl : peers[0]?.avatarUrl;
+    const avatarImg = avatarUrl ? media?.get(avatarUrl)?.frames[0] : undefined;
+    drawAvatarCircle(ctx, theme, cx, cy, size, peers[0]?.color ?? theme.selfBubble, title, avatarImg);
+  }
 
   ctx.textAlign = "left";
-  ctx.fillStyle = theme.headerText;
-  ctx.font = `600 ${Math.round(36 * m.scale)}px ${theme.fontFamily}`;
+  ctx.fillStyle = textColor;
+  ctx.font = `600 ${Math.round((style === "banner" ? 44 : 36) * m.scale)}px ${theme.fontFamily}`;
   const tx = cx + size / 2 + Math.round(20 * m.scale);
-  const maxW = width - tx - Math.round(150 * m.scale);
+  const maxW = width - tx - Math.round((showChrome ? 150 : 40) * m.scale);
   ctx.textBaseline = "middle";
-  ctx.fillText(ellipsize(ctx, title, maxW), tx, cy - Math.round(14 * m.scale));
-  ctx.fillStyle = theme.headerMuted;
-  ctx.font = `400 ${Math.round(25 * m.scale)}px ${theme.fontFamily}`;
-  ctx.fillText(ellipsize(ctx, subtitle, maxW), tx, cy + Math.round(22 * m.scale));
+  if (subtitle) {
+    ctx.fillText(ellipsize(ctx, title, maxW), tx, cy - Math.round(14 * m.scale));
+    ctx.fillStyle = mutedColor;
+    ctx.globalAlpha = custom?.textColor ? 0.75 : 1;
+    ctx.font = `400 ${Math.round(25 * m.scale)}px ${theme.fontFamily}`;
+    ctx.fillText(ellipsize(ctx, subtitle, maxW), tx, cy + Math.round(22 * m.scale));
+    ctx.globalAlpha = 1;
+  } else {
+    ctx.fillText(ellipsize(ctx, title, maxW), tx, cy);
+  }
+
+  if (!showChrome) {
+    ctx.textBaseline = "alphabetic";
+    return;
+  }
 
   // ícones de chamada, como em um app real (formas próprias, sem logotipos)
   ctx.strokeStyle = theme.headerMuted;
@@ -762,7 +815,8 @@ function paintConversation(
 ) {
   const m = metricsFor(width, height);
   const media = options.media;
-  const headerH = showHeader ? m.headerH : 0;
+  const headerVisible = showHeader && (project.header?.style ?? "messenger") !== "none";
+  const headerH = headerVisible ? m.headerH : 0;
 
   drawWallpaper(ctx, theme, width, height, m, project.background, media, frame / plan.fps);
 
@@ -1055,6 +1109,6 @@ function paintConversation(
 
   ctx.restore();
 
-  if (showHeader) drawHeader(ctx, project, theme, width, m, media);
+  if (headerVisible) drawHeader(ctx, project, theme, width, m, media);
 }
 

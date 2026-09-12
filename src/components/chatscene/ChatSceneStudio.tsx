@@ -10,6 +10,9 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowDown,
   ArrowUp,
+  BadgeCheck,
+  Mic,
+  Palette,
   Download,
   Image as ImageIcon,
   Loader2,
@@ -29,6 +32,9 @@ import { Button, Input } from "@/components/ui/base";
 import { ChatScenePreview } from "@/components/chatscene/ChatScenePreview";
 import { ChatSceneTimeline } from "@/components/chatscene/ChatSceneTimeline";
 import { CreatorLayouts } from "@/components/chatscene/CreatorLayouts";
+import { VoicePanel } from "@/components/chatscene/VoicePanel";
+import { BrandPanel } from "@/components/chatscene/BrandPanel";
+import { MusicPanel } from "@/components/chatscene/MusicPanel";
 import { buildPlan } from "@/lib/chatscene/clock";
 import { encodeFrameSequence, frameEncoderSupported } from "@/lib/chatscene/encode-frames";
 import { CanvasConversationRenderer } from "@/lib/chatscene/renderer";
@@ -62,6 +68,7 @@ import {
   ANIMATION_PRESETS,
   BACKGROUND_PRESETS,
   DEFAULT_BRANDING,
+  DEFAULT_HEADER,
   CREATOR_LAYOUTS,
   LAYOUT_PRESETS,
   createChatSceneProject,
@@ -76,6 +83,15 @@ import {
 } from "@/lib/chatscene/types";
 
 const PALETTE = ["#7c5cff", "#ff5c8a", "#22c08a", "#f2b705", "#4ec3ff", "#ff8a4c"];
+
+type StudioPanel = "visual" | "vozes" | "marca";
+
+/** Barra lateral do estúdio: visual, vozes e marca, sem abrir outra tela. */
+const PANEL_TABS: { id: StudioPanel; label: string; icon: typeof Palette }[] = [
+  { id: "visual", label: "Visual", icon: Palette },
+  { id: "vozes", label: "Vozes", icon: Mic },
+  { id: "marca", label: "Marca do criador", icon: BadgeCheck },
+];
 
 function slugify(text: string): string {
   return (
@@ -105,6 +121,7 @@ export function ChatSceneStudio() {
   const [clips, setClips] = useState<Map<string, VoiceClip>>(new Map());
   const [castState, setCastState] = useState<"idle" | "running">("idle");
   const [castProgress, setCastProgress] = useState({ done: 0, total: 0 });
+  const [panel, setPanel] = useState<StudioPanel>("visual");
   useEffect(() => {
     setLibrary(readLibrary());
   }, []);
@@ -196,6 +213,46 @@ export function ChatSceneStudio() {
       }));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível usar esta imagem.");
+    } finally {
+      setUploading(null);
+    }
+  }, []);
+
+  /** Logo ou imagem de fundo do cabeçalho do vídeo. */
+  const handleHeaderImage = useCallback(async (file: File, slot: "logo" | "background") => {
+    setUploading(slot === "logo" ? "header-logo" : "header-bg");
+    try {
+      const { asset, library: next } = await addFileToLibrary(file, slot === "logo" ? "logo" : "background");
+      setLibrary(next);
+      setProject((prev) => ({
+        ...prev,
+        header: {
+          ...DEFAULT_HEADER,
+          ...prev.header,
+          ...(slot === "logo" ? { logoUrl: asset.url } : { bgImageUrl: asset.url }),
+        },
+      }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível usar esta imagem.");
+    } finally {
+      setUploading(null);
+    }
+  }, []);
+
+  /** Música de fundo do vídeo. */
+  const handleMusic = useCallback(async (file: File) => {
+    setUploading("music");
+    try {
+      const { url, temporary } = await uploadChatSceneMedia(file);
+      setProject((prev) => ({
+        ...prev,
+        voiceMix: { ...DEFAULT_VOICE_MIX, ...prev.voiceMix, musicUrl: url },
+      }));
+      if (temporary) {
+        toast.warning("A música ficou só nesta sessão; envie de novo depois de salvar.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível usar esta música.");
     } finally {
       setUploading(null);
     }
@@ -814,7 +871,54 @@ export function ChatSceneStudio() {
             clips={clips}
           />
 
-          <div className="mt-4">
+          <div className="mt-4 flex gap-3">
+            <nav className="flex shrink-0 flex-col gap-1.5" aria-label="Painéis do ChatScene">
+              {PANEL_TABS.map((t) => {
+                const Icon = t.icon;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    title={t.label}
+                    aria-label={t.label}
+                    aria-pressed={panel === t.id}
+                    onClick={() => setPanel(t.id)}
+                    className={`flex size-9 items-center justify-center rounded-lg border transition ${
+                      panel === t.id
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border text-muted-foreground hover:border-primary/50"
+                    }`}
+                  >
+                    <Icon className="size-4" />
+                  </button>
+                );
+              })}
+            </nav>
+            <div className="min-w-0 flex-1">
+            {panel === "vozes" && (
+              <VoicePanel
+                project={project}
+                patch={patch}
+                clipCount={clips.size}
+                castState={castState}
+                castProgress={castProgress}
+                onGenerate={() => void handleGenerateVoices()}
+                previewing={previewingVoice}
+                onPreview={(id, profile) => void handlePreviewVoice(id, profile)}
+              />
+            )}
+            {panel === "marca" && (
+              <BrandPanel
+                project={project}
+                patch={patch}
+                uploading={uploading}
+                onLogo={(file) => void handleLogo(file)}
+                onHeaderLogo={(file) => void handleHeaderImage(file, "logo")}
+                onHeaderBackground={(file) => void handleHeaderImage(file, "background")}
+              />
+            )}
+            {panel === "visual" && (
+              <>
             <p className="mono-label mb-2 text-muted-foreground">Visual</p>
             <div className="grid grid-cols-2 gap-1.5">
               {CHAT_THEMES.map((t) => (
@@ -950,236 +1054,6 @@ export function ChatSceneStudio() {
               </p>
             </div>
 
-            <div className="mt-3">
-              <p className="mono-label mb-1.5 text-muted-foreground">Vozes</p>
-              <p className="mb-2 text-[11px] text-muted-foreground">
-                Vozes sintéticas genéricas. Nada de imitar a voz de pessoas reais.
-              </p>
-              <div className="space-y-2">
-                {project.participants.map((p) => {
-                  const voice = p.voice ?? null;
-                  const setVoice = (changes: Partial<VoiceProfile> | null) =>
-                    patch({
-                      participants: project.participants.map((x) =>
-                        x.id === p.id
-                          ? { ...x, voice: changes ? { ...DEFAULT_VOICE, ...x.voice, ...changes } : null }
-                          : x,
-                      ),
-                    });
-                  return (
-                    <div key={p.id} className="rounded-lg border border-border bg-background/40 p-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="size-2.5 shrink-0 rounded-full" style={{ background: p.color }} />
-                        <span className="text-xs font-medium">{p.name}</span>
-                        <select
-                          value={voice?.presetId ?? ""}
-                          onChange={(e) => setVoice(e.target.value ? { presetId: e.target.value } : null)}
-                          className="ml-auto rounded-md border border-border bg-background px-1.5 py-1 text-xs"
-                          aria-label={`Voz de ${p.name}`}
-                        >
-                          <option value="">sem voz</option>
-                          {VOICE_PRESETS.map((v) => (
-                            <option key={v.id} value={v.id}>
-                              {v.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      {voice && (
-                        <div className="mt-1.5 flex items-center gap-1.5">
-                          <select
-                            value={voice.style}
-                            onChange={(e) => setVoice({ style: e.target.value as VoiceProfile["style"] })}
-                            className="flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs"
-                            aria-label={`Jeito de falar de ${p.name}`}
-                          >
-                            {VOICE_STYLES.map((v) => (
-                              <option key={v.id} value={v.id}>
-                                {v.label}
-                              </option>
-                            ))}
-                          </select>
-                          <input
-                            type="range"
-                            min={0.8}
-                            max={1.2}
-                            step={0.05}
-                            value={voice.speed}
-                            onChange={(e) => setVoice({ speed: Number(e.target.value) })}
-                            className="w-20"
-                            aria-label={`Velocidade da fala de ${p.name}`}
-                          />
-                          <span className="w-10 text-right text-[11px] text-muted-foreground">
-                            {voice.speed.toFixed(2)}x
-                          </span>
-                        </div>
-                      )}
-                      {voice && (
-                        <div className="mt-1.5 flex items-center gap-1.5">
-                          <span className="mono-label shrink-0 text-[10px] text-muted-foreground">tom</span>
-                          <input
-                            type="range"
-                            min={PITCH_MIN}
-                            max={PITCH_MAX}
-                            step={0.5}
-                            value={voice.pitch ?? 0}
-                            onChange={(e) => setVoice({ pitch: Number(e.target.value) })}
-                            className="flex-1"
-                            aria-label={`Tom da voz de ${p.name}`}
-                          />
-                          <span className="w-14 text-right text-[11px] text-muted-foreground">
-                            {(voice.pitch ?? 0) > 0 ? "+" : ""}
-                            {(voice.pitch ?? 0).toFixed(1)}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 px-2"
-                            disabled={previewingVoice === p.id}
-                            onClick={() =>
-                              void handlePreviewVoice(p.id, { ...DEFAULT_VOICE, ...voice })
-                            }
-                            aria-label={`Ouvir a voz de ${p.name}`}
-                          >
-                            {previewingVoice === p.id ? (
-                              <Loader2 className="size-3.5 animate-spin" />
-                            ) : (
-                              <Volume2 className="size-3.5" />
-                            )}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <Button
-                size="sm"
-                variant="secondary"
-                className="mt-2 w-full"
-                disabled={castState === "running"}
-                onClick={() => void handleGenerateVoices()}
-              >
-                {castState === "running" ? (
-                  <>
-                    <Loader2 className="mr-1.5 size-4 animate-spin" />
-                    Gerando {castProgress.done}/{castProgress.total}
-                  </>
-                ) : (
-                  "Gerar as falas"
-                )}
-              </Button>
-              {clips.size > 0 && (
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  {clips.size} falas prontas — elas entram no vídeo exportado.
-                </p>
-              )}
-
-              <div className="mt-2 space-y-1.5 text-xs">
-                <input
-                  value={project.voiceMix?.musicUrl ?? ""}
-                  onChange={(e) =>
-                    patch({
-                      voiceMix: { ...DEFAULT_VOICE_MIX, ...project.voiceMix, musicUrl: e.target.value || null },
-                    })
-                  }
-                  placeholder="música de fundo (endereço, uso permitido)"
-                  className="w-full rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none focus:border-primary"
-                  aria-label="Música de fundo"
-                />
-                <label className="flex items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    checked={project.voiceMix?.ducking ?? true}
-                    onChange={(e) =>
-                      patch({
-                        voiceMix: { ...DEFAULT_VOICE_MIX, ...project.voiceMix, ducking: e.target.checked },
-                      })
-                    }
-                  />
-                  abaixar a música enquanto alguém fala
-                </label>
-                <label className="flex items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    checked={project.voiceMix?.normalize ?? true}
-                    onChange={(e) =>
-                      patch({
-                        voiceMix: { ...DEFAULT_VOICE_MIX, ...project.voiceMix, normalize: e.target.checked },
-                      })
-                    }
-                  />
-                  deixar tudo no mesmo volume
-                </label>
-              </div>
-            </div>
-
-            <div className="mt-3">
-              <p className="mono-label mb-1.5 text-muted-foreground">Sua marca</p>
-              <label className="flex items-center gap-1.5 text-xs">
-                <input
-                  type="checkbox"
-                  checked={project.branding?.enabled ?? false}
-                  onChange={(e) =>
-                    patch({ branding: { ...DEFAULT_BRANDING, ...project.branding, enabled: e.target.checked } })
-                  }
-                />
-                mostrar meu @ e logo no vídeo
-              </label>
-              {project.branding?.enabled && (
-                <div className="mt-1.5 space-y-1.5">
-                  <input
-                    value={project.branding.handle}
-                    onChange={(e) =>
-                      patch({ branding: { ...DEFAULT_BRANDING, ...project.branding, handle: e.target.value } })
-                    }
-                    placeholder="@seuperfil"
-                    className="w-full rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none focus:border-primary"
-                    aria-label="Seu @"
-                  />
-                  <div className="flex items-center gap-1.5">
-                    <label className="flex cursor-pointer items-center gap-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs hover:border-primary">
-                      {uploading === "logo" ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : (
-                        <Upload className="size-3.5" />
-                      )}
-                      Logo
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          e.target.value = "";
-                          if (file) void handleLogo(file);
-                        }}
-                      />
-                    </label>
-                    <select
-                      value={project.branding.position}
-                      onChange={(e) =>
-                        patch({
-                          branding: {
-                            ...DEFAULT_BRANDING,
-                            ...project.branding,
-                            position: e.target.value as NonNullable<typeof project.branding>["position"],
-                          },
-                        })
-                      }
-                      className="flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs"
-                      aria-label="Posição da marca"
-                    >
-                      <option value="bottom-right">canto inferior direito</option>
-                      <option value="bottom-left">canto inferior esquerdo</option>
-                      <option value="top-right">canto superior direito</option>
-                      <option value="top-left">canto superior esquerdo</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-            </div>
 
             <div className="mt-3">
               <p className="mono-label mb-1.5 text-muted-foreground">Enquadramento</p>
@@ -1290,6 +1164,9 @@ export function ChatSceneStudio() {
                 aria-label="Velocidade da conversa"
               />
             </div>
+              </>
+            )}
+            </div>
           </div>
         </section>
 
@@ -1381,6 +1258,12 @@ export function ChatSceneStudio() {
                   aria-label="Hora inicial da conversa"
                 />
               </div>
+              <MusicPanel
+                project={project}
+                patch={patch}
+                uploading={uploading}
+                onUpload={(file) => void handleMusic(file)}
+              />
               <div>
                 <p className="mb-1 text-muted-foreground">Qualidade do vídeo</p>
                 <select

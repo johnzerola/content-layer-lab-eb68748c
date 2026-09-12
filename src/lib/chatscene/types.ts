@@ -65,6 +65,37 @@ export const DEFAULT_BRANDING: ChatSceneBranding = {
   size: 0.05,
 };
 
+/** Estilos de cabeçalho do vídeo (topo da conversa). */
+export type HeaderStyle = "messenger" | "minimal" | "banner" | "none";
+
+export const HEADER_STYLES: { id: HeaderStyle; label: string; hint: string }[] = [
+  { id: "messenger", label: "Conversa", hint: "Como um app de mensagens: foto, nome e ícones." },
+  { id: "minimal", label: "Simples", hint: "Só a foto e o nome, sem ícones." },
+  { id: "banner", label: "Faixa", hint: "Faixa larga com logo e título grande." },
+  { id: "none", label: "Sem topo", hint: "Esconde o cabeçalho." },
+];
+
+/** Cabeçalho personalizado do criador (logo, texto e estilo). */
+export interface ChatSceneHeader {
+  style: HeaderStyle;
+  title?: string | null;
+  subtitle?: string | null;
+  logoUrl?: string | null;
+  bgImageUrl?: string | null;
+  bgColor?: string | null;
+  textColor?: string | null;
+}
+
+export const DEFAULT_HEADER: ChatSceneHeader = {
+  style: "messenger",
+  title: null,
+  subtitle: null,
+  logoUrl: null,
+  bgImageUrl: null,
+  bgColor: null,
+  textColor: null,
+};
+
 export const DEFAULT_BACKGROUND: ChatSceneBackground = { kind: "theme" };
 
 /** Fundos prontos, para escolher com um clique. */
@@ -320,6 +351,8 @@ export interface ChatSceneProject {
   sound?: { enabled: boolean; volume: number };
   /** marca do criador sobre a cena */
   branding?: ChatSceneBranding;
+  /** cabeçalho personalizado do vídeo */
+  header?: ChatSceneHeader;
   /** falas, música e mixagem */
   voiceMix?: import("./voice").VoiceMixSettings;
   /** movimento de câmera (meia tela, cortes) */
@@ -429,6 +462,7 @@ export function createChatSceneProject(init: Partial<ChatSceneProject> = {}): Ch
     layout: init.layout ?? { ...DEFAULT_LAYOUT },
     sound: init.sound ?? { enabled: false, volume: 0.5 },
     branding: init.branding ?? { ...DEFAULT_BRANDING },
+    header: init.header ?? { ...DEFAULT_HEADER },
     voiceMix: init.voiceMix ?? { ...DEFAULT_VOICE_MIX },
     camera: init.camera ?? { ...DEFAULT_CAMERA },
     participants: init.participants ?? [me, other],
@@ -483,6 +517,7 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
     layout: { ...DEFAULT_LAYOUT, ...(raw.layout ?? {}) },
     sound: { enabled: false, volume: 0.5, ...(raw.sound ?? {}) },
     branding: { ...DEFAULT_BRANDING, ...(raw.branding ?? {}) },
+    header: { ...DEFAULT_HEADER, ...(raw.header ?? {}) },
     voiceMix: { ...DEFAULT_VOICE_MIX, ...(raw.voiceMix ?? {}) },
     camera: { ...DEFAULT_CAMERA, ...(raw.camera ?? {}) },
   };
