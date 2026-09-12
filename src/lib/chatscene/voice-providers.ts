@@ -1,5 +1,5 @@
 import { decodeClip, type VoiceClip, type VoiceProvider } from "./voice-cast";
-import { voiceKey, voicePreset, type VoiceProfile, type VoiceProviderCapabilities, type VoiceProviderMode } from "./voice";
+import { voiceKey, voicePreset, type MessageVoiceDirection, type VoiceProfile, type VoiceProviderCapabilities, type VoiceProviderMode } from "./voice";
 
 export const PROVIDER_CAPABILITIES: Record<string, VoiceProviderCapabilities> = {
   mock: { languages:["pt-BR"],maxCharacters:600,controls:{speed:true,pitch:true,energy:true,expressiveness:false,roughness:false,warmth:false,brightness:false,emotion:true},costEstimate:false,local:true },
@@ -20,8 +20,8 @@ export function createMockVoiceProvider(): VoiceProvider {
     listVoices: async()=>[],
     getCapabilities:()=>PROVIDER_CAPABILITIES.mock!,
     previewVoice: async(profile,text)=>createMockVoiceProvider().synthesize(text,profile),
-    async synthesize(text: string, profile: VoiceProfile): Promise<VoiceClip> {
-      const key=voiceKey(text,profile); const seconds=Math.max(.65,Math.min(3.2,text.length/18))/Math.max(.7,profile.speed); const frequency=190+(voicePreset(profile.presetId).gender==="feminina"?90:0)+(profile.pitch??0)*8; return decodeClip(key,wavTone(seconds,frequency));
+    async synthesize(text: string, profile: VoiceProfile, direction?: MessageVoiceDirection): Promise<VoiceClip> {
+      const key=voiceKey(text,profile,direction); const seconds=Math.max(.65,Math.min(3.2,text.length/18))/Math.max(.7,profile.speed*(direction?.speedMultiplier??1)); const frequency=190+(voicePreset(profile.presetId).gender==="feminina"?90:0)+(profile.pitch??0)*8; return decodeClip(key,wavTone(seconds,frequency));
     },
   };
 }

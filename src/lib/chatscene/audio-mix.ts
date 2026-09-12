@@ -10,7 +10,7 @@ import type { VoiceClip } from "./voice-cast";
 import { pitchRate, type VoiceMixSettings } from "./voice";
 import { renderSoundEffect, sfxSchedule } from "./sfx";
 import type { ChatSceneProject } from "./types";
-import { participantOf } from "./types";
+import { effectiveVoice } from "./voice-resolution";
 
 export const MIX_SAMPLE_RATE = 48000;
 
@@ -45,13 +45,13 @@ export function voiceSchedule(
     const clip = clips.get(message.id);
     const entry = plan.byId[message.id];
     if (!clip || !entry) continue;
-    const author = participantOf(project, message.participantId);
-    const rate = pitchRate(author.voice?.pitch);
+    const voice = effectiveVoice(project, message);
+    const rate = pitchRate(voice?.profile.pitch);
     out.push({
       id: message.id,
       startSec: entry.appearFrame / plan.fps,
       clip,
-      gain: Math.max(0.2, Math.min(1.5, author.voice?.gain ?? 1)),
+      gain: Math.max(0.2, Math.min(1.5, (voice?.profile.gain ?? 1) * (voice?.direction.energyMultiplier ?? 1))),
       rate,
       durationSec: clip.durationSec / rate,
     });

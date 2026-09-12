@@ -10,6 +10,7 @@ import type { ConversationPlan } from "./clock";
 import { typingAt } from "./clock";
 import { mediaFrameAt, type LoadedMedia } from "./media";
 import { durationLabel, voiceSeconds, voiceWave } from "./message-kinds";
+import { planScroll } from "./scroll-planner";
 import type { ChatTheme } from "./theme";
 import {
   DEFAULT_LAYOUT,
@@ -939,9 +940,15 @@ function paintConversation(
     const p = Math.max(0, Math.min(1, (frame - lastEntry.appearFrame) / scrollFrames));
     if (p < 1) {
       const previous = layoutMessages(ctx, project, theme, appeared.slice(0, -1), width, height, media);
-      const targetPrev = areaBottom - (previous.contentH + typingH);
-      const ease = 1 - Math.pow(1 - p, 3);
-      offsetY = targetPrev + (targetNow - targetPrev) * ease;
+      offsetY = planScroll({
+        frame,
+        appearFrame: lastEntry.appearFrame,
+        fps: plan.fps,
+        currentContentHeight: layout.contentH,
+        previousContentHeight: previous.contentH,
+        typingHeight: typingH,
+        viewportBottom: areaBottom,
+      });
     }
   }
 
