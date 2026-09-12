@@ -7,6 +7,7 @@
  */
 import { buildPlan, type ConversationPlan } from "./clock";
 import { paintFrame } from "./draw";
+import { loadMedia, type LoadedMedia } from "./media";
 import { resolveTheme } from "./theme";
 import { renderSize, type ChatSceneProject } from "./types";
 
@@ -26,24 +27,6 @@ export interface ConversationRenderer {
   plan(project: ChatSceneProject): ConversationPlan;
 }
 
-async function loadImage(url: string): Promise<CanvasImageSource | null> {
-  try {
-    const res = await fetch(url, { mode: "cors" });
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    if (typeof createImageBitmap === "function") return await createImageBitmap(blob);
-    return await new Promise<CanvasImageSource | null>((resolve) => {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => resolve(img);
-      img.onerror = () => resolve(null);
-      img.src = URL.createObjectURL(blob);
-    });
-  } catch {
-    return null;
-  }
-}
-
 export interface CanvasRendererOptions {
   safeZones?: boolean;
 }
@@ -51,7 +34,7 @@ export interface CanvasRendererOptions {
 /** Implementação padrão: canvas 2D, determinística e sem dependências extras. */
 export class CanvasConversationRenderer implements ConversationRenderer {
   readonly id = "canvas-2d";
-  private images = new Map<string, CanvasImageSource>();
+  private media = new Map<string, LoadedMedia>();
   private project: ChatSceneProject | null = null;
   private options: CanvasRendererOptions;
 
@@ -64,12 +47,13 @@ export class CanvasConversationRenderer implements ConversationRenderer {
     const urls = new Set<string>();
     for (const m of project.messages) if (m.mediaUrl) urls.add(m.mediaUrl);
     for (const p of project.participants) if (p.avatarUrl) urls.add(p.avatarUrl);
+    if (project.groupAvatarUrl) urls.add(project.groupAvatarUrl);
     await Promise.all(
       [...urls]
-        .filter((u) => !this.images.has(u))
+        .filter((u) => !this.media.has(u))
         .map(async (u) => {
-          const img = await loadImage(u);
-          if (img) this.images.set(u, img);
+          const item = await loadMedia(u);
+          if (item) this.media.set(u, item);
         }),
     );
     if (typeof document !== "undefined" && "fonts" in document) {
@@ -93,7 +77,7 @@ export class CanvasConversationRenderer implements ConversationRenderer {
     if (!project) return;
     const theme = resolveTheme(project.themeId, project.dark);
     paintFrame(target, project, theme, ctx.plan, ctx.frame, ctx.width, ctx.height, {
-      images: this.images,
+      media: this.media,
       safeZones: this.options.safeZones ?? false,
     });
   }

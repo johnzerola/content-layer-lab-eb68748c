@@ -16,7 +16,12 @@ export const CHATSCENE_PROJECT_VERSION = 1;
 
 export type ChatSceneAspect = "9:16" | "1:1" | "16:9";
 
-export type MessageKind = "text" | "image" | "emoji" | "system";
+export type MessageKind = "text" | "image" | "emoji" | "system" | "sticker" | "video";
+
+/** Confirmação de entrega mostrada ao lado da hora, como em um app real. */
+export type MessageStatus = "sent" | "delivered" | "read";
+
+export type ChatKind = "direct" | "group";
 
 export interface ChatParticipant {
   id: string;
@@ -46,6 +51,10 @@ export interface ChatMessage {
   typingMs?: number | null;
   /** id da mensagem citada (reservado para a próxima fase) */
   replyToId?: string | null;
+  /** hora mostrada dentro da bolha; null usa o relógio automático da cena */
+  time?: string | null;
+  /** emoji de reação preso na base da bolha */
+  reaction?: string | null;
 }
 
 export interface ChatSceneTiming {
@@ -86,6 +95,14 @@ export interface ChatSceneProject {
   messages: ChatMessage[];
   timing: ChatSceneTiming;
   render: ChatSceneRenderSettings;
+  /** conversa entre duas pessoas ou grupo com nome e foto próprios */
+  chatKind?: ChatKind;
+  groupName?: string | null;
+  groupAvatarUrl?: string | null;
+  /** hora inicial mostrada nas bolhas (HH:MM) */
+  startClock?: string;
+  /** mostrar os tiques de entregue/lido nas mensagens de quem escreve */
+  receipts?: boolean;
 }
 
 export const DEFAULT_TIMING: ChatSceneTiming = {
@@ -150,7 +167,18 @@ export function createMessage(participantId: string, init: Partial<ChatMessage> 
     delayMs: init.delayMs ?? null,
     typingMs: init.typingMs ?? null,
     replyToId: init.replyToId ?? null,
+    time: init.time ?? null,
+    reaction: init.reaction ?? null,
   };
+}
+
+/** Hora mostrada na bolha: a informada pelo usuário ou o relógio da cena. */
+export function messageClock(project: ChatSceneProject, index: number, message: ChatMessage): string {
+  if (message.time) return message.time;
+  const [h, min] = (project.startClock ?? "21:14").split(":");
+  const base = (Number(h) || 21) * 60 + (Number(min) || 14) + Math.floor(index / 3);
+  const total = ((base % 1440) + 1440) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
 /** Projeto novo já com dois participantes e uma conversa de exemplo curta. */
@@ -161,8 +189,13 @@ export function createChatSceneProject(init: Partial<ChatSceneProject> = {}): Ch
     id: init.id ?? chatSceneId("cs"),
     version: CHATSCENE_PROJECT_VERSION,
     title: init.title ?? "Nova conversa",
-    themeId: init.themeId ?? "noite",
-    dark: init.dark ?? true,
+    themeId: init.themeId ?? "zap",
+    dark: init.dark ?? false,
+    chatKind: init.chatKind ?? "direct",
+    groupName: init.groupName ?? null,
+    groupAvatarUrl: init.groupAvatarUrl ?? null,
+    startClock: init.startClock ?? "21:14",
+    receipts: init.receipts ?? true,
     participants: init.participants ?? [me, other],
     messages:
       init.messages ??

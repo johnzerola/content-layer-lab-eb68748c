@@ -7,14 +7,15 @@
  */
 import type { ConversationPlan } from "./clock";
 import { typingAt } from "./clock";
+import { mediaFrameAt, type LoadedMedia } from "./media";
 import type { ChatTheme } from "./theme";
-import { participantOf, type ChatMessage, type ChatSceneProject } from "./types";
+import { messageClock, participantOf, type ChatMessage, type ChatSceneProject } from "./types";
 
 export type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
 export interface PaintOptions {
-  /** imagens já carregadas, por URL */
-  images?: Map<string, CanvasImageSource>;
+  /** mídias já carregadas (foto, figurinha, vídeo), por URL */
+  media?: Map<string, LoadedMedia>;
   /** desenhar as margens seguras por cima (só na prévia) */
   safeZones?: boolean;
 }
@@ -28,22 +29,24 @@ interface Metrics {
   lineH: number;
   gap: number;
   avatar: number;
+  metaSize: number;
 }
 
 function metricsFor(width: number, height: number): Metrics {
   // referência: 1080x1920. Tudo escala pela menor dimensão relativa para que
   // 1:1 e 16:9 não fiquem com texto gigante.
   const scale = Math.min(width / 1080, height / 1920) * (width >= height ? 1.35 : 1);
-  const pad = Math.round(48 * scale);
+  const pad = Math.round(34 * scale);
   return {
     scale,
     pad,
     headerH: Math.round(150 * scale),
-    bubbleMaxW: Math.round((width - pad * 2) * 0.78),
+    bubbleMaxW: Math.round((width - pad * 2) * 0.8),
     fontSize: Math.round(40 * scale),
-    lineH: Math.round(52 * scale),
-    gap: Math.round(22 * scale),
+    lineH: Math.round(54 * scale),
+    gap: Math.round(16 * scale),
     avatar: Math.round(56 * scale),
+    metaSize: Math.round(24 * scale),
   };
 }
 
@@ -94,10 +97,16 @@ interface LaidOutMessage {
   height: number;
   isSelf: boolean;
   showName: boolean;
+  showAvatar: boolean;
   name: string;
   nameColor: string;
-  /** altura da imagem dentro da bolha (0 quando não há) */
+  avatarUrl: string | null;
+  /** altura da mídia dentro da bolha (0 quando não há) */
   mediaH: number;
+  mediaW: number;
+  /** figurinha: sem bolha, fundo transparente */
+  bare: boolean;
+  clock: string;
 }
 
 interface Layout {
@@ -114,6 +123,8 @@ function emojiOnly(text: string): boolean {
   return stripped.length <= 6 && !/[a-z0-9à-ú]/i.test(stripped);
 }
 
+const isMedia = (kind: ChatMessage["kind"]) => kind === "image" || kind === "video" || kind === "sticker";
+
 /**
  * Calcula posições de todas as mensagens visíveis. O layout é de cima para
  * baixo; a rolagem é aplicada depois, ao pintar.
@@ -125,14 +136,16 @@ export function layoutMessages(
   messages: ChatMessage[],
   width: number,
   height: number,
+  media?: Map<string, LoadedMedia>,
 ): Layout {
   const m = metricsFor(width, height);
-  const isGroup = project.participants.length > 2;
+  const isGroup = (project.chatKind ?? "direct") === "group" || project.participants.length > 2;
   const items: LaidOutMessage[] = [];
   let y = 0;
   let lastAuthor = "";
 
-  for (const message of messages) {
+  messages.forEach((message) => {
+    const index = project.messages.indexOf(message);
     const author = participantOf(project, message.participantId);
     const isSelf = author.isSelf;
     const big = message.kind === "emoji" || emojiOnly(message.text);
@@ -142,7 +155,7 @@ export function layoutMessages(
 
     if (message.kind === "system") {
       const lines = wrapText(ctx, message.text, width - m.pad * 4);
-      const h = lines.length * lineH + m.gap;
+      const h = lines.length * lineH * 0.8 + m.gap * 1.6;
       items.push({
         message,
         lines,
@@ -152,33 +165,83 @@ export function layoutMessages(
         height: h,
         isSelf: false,
         showName: false,
+        showAvatar: false,
         name: "",
         nameColor: theme.systemText,
+        avatarUrl: null,
         mediaH: 0,
+        mediaW: 0,
+        bare: true,
+        clock: "",
       });
-      y += h + m.gap;
+      y += h;
       lastAuthor = "";
-      continue;
+      return;
     }
 
-    const padX = Math.round(28 * m.scale);
-    const padY = Math.round(20 * m.scale);
-    const avatarLane = isGroup && !isSelf ? m.avatar + Math.round(16 * m.scale) : 0;
+    const padX = Math.round(24 * m.scale);
+    const padY = Math.round(18 * m.scale);
+    const avatarLane = isGroup && !isSelf ? m.avatar + Math.round(14 * m.scale) : 0;
+    const loaded = message.mediaUrl ? media?.get(message.mediaUrl) : undefined;
+    const aspect = loaded?.aspect || message.mediaAspect || 1.4;
+
+    // figurinha: solta, sem bolha
+    if (message.kind === "sticker") {
+      const sw = Math.round((width - m.pad * 2 - avatarLane) * 0.44);
+      const sh = Math.round(sw / (aspect || 1));
+      const x = isSelf ? width - m.pad - sw : m.pad + avatarLane;
+      const showName = isGroup && !isSelf && author.id !== lastAuthor;
+      const nameH = showName ? Math.round(m.fontSize * 0.85) : 0;
+      items.push({
+        message,
+        lines: [],
+        x,
+        y: y + nameH,
+        width: sw,
+        height: sh + Math.round(m.metaSize * 1.3),
+        isSelf,
+        showName,
+        showAvatar: showName,
+        name: author.name,
+        nameColor: author.color,
+        avatarUrl: author.avatarUrl ?? null,
+        mediaH: sh,
+        mediaW: sw,
+        bare: true,
+        clock: messageClock(project, index, message),
+      });
+      y += nameH + sh + Math.round(m.metaSize * 1.3) + m.gap;
+      lastAuthor = author.id;
+      return;
+    }
+
+    const withMedia = isMedia(message.kind);
     const maxTextW = m.bubbleMaxW - padX * 2 - avatarLane;
     const lines = message.text ? wrapText(ctx, message.text, maxTextW) : [];
     const textW = lines.reduce((w, l) => Math.max(w, ctx.measureText(l).width), 0);
 
-    const mediaW = message.kind === "image" ? Math.min(maxTextW, m.bubbleMaxW - padX * 2) : 0;
-    const mediaH = message.kind === "image" ? Math.round(mediaW / (message.mediaAspect || 1.4)) : 0;
+    const mediaW = withMedia ? m.bubbleMaxW - padX * 2 - avatarLane : 0;
+    const mediaH = withMedia ? Math.round(mediaW / (aspect || 1.4)) : 0;
 
     const showName = isGroup && !isSelf && author.id !== lastAuthor;
-    const nameH = showName ? Math.round(m.fontSize * 0.85) + Math.round(8 * m.scale) : 0;
+    const nameH = showName ? Math.round(m.fontSize * 0.9) : 0;
 
-    const bubbleW = Math.max(mediaW, textW) + padX * 2;
+    ctx.font = `400 ${m.metaSize}px ${theme.fontFamily}`;
+    const metaW = ctx.measureText(`${messageClock(project, index, message)}  `).width + (isSelf ? m.metaSize * 1.6 : 0);
+    const metaH = Math.round(m.metaSize * 1.35);
+
+    const bubbleW = Math.min(
+      m.bubbleMaxW - avatarLane,
+      Math.max(mediaW, textW, lines.length ? 0 : metaW) + padX * 2,
+    );
     const bubbleH =
-      padY * 2 + lines.length * lineH + (mediaH ? mediaH + (lines.length ? Math.round(14 * m.scale) : 0) : 0);
+      padY * 2 +
+      lines.length * lineH +
+      metaH +
+      (mediaH ? mediaH + (lines.length ? Math.round(12 * m.scale) : 0) : 0);
 
     const x = isSelf ? width - m.pad - bubbleW : m.pad + avatarLane;
+    const reactionH = message.reaction ? Math.round(m.metaSize * 1.9) : 0;
 
     items.push({
       message,
@@ -189,16 +252,88 @@ export function layoutMessages(
       height: bubbleH,
       isSelf,
       showName,
+      showAvatar: showName,
       name: author.name,
       nameColor: author.color,
+      avatarUrl: author.avatarUrl ?? null,
       mediaH,
+      mediaW,
+      bare: false,
+      clock: messageClock(project, index, message),
     });
 
-    y += nameH + bubbleH + m.gap;
+    y += nameH + bubbleH + reactionH + m.gap;
     lastAuthor = author.id;
-  }
+  });
 
   return { items, contentH: y, metrics: m };
+}
+
+function drawAvatarCircle(
+  ctx: Ctx2D,
+  theme: ChatTheme,
+  cx: number,
+  cy: number,
+  size: number,
+  color: string,
+  label: string,
+  image?: CanvasImageSource,
+) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+  if (image) {
+    ctx.drawImage(image, cx - size / 2, cy - size / 2, size, size);
+  } else {
+    ctx.fillStyle = color;
+    ctx.fillRect(cx - size / 2, cy - size / 2, size, size);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `600 ${Math.round(size * 0.42)}px ${theme.fontFamily}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText((label[0] ?? "?").toUpperCase(), cx, cy + size * 0.02);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+  }
+  ctx.restore();
+}
+
+/** Papel de parede com um desenho discreto repetido, como nos apps reais. */
+function drawWallpaper(ctx: Ctx2D, theme: ChatTheme, width: number, height: number, m: Metrics) {
+  ctx.fillStyle = theme.wallpaper;
+  ctx.fillRect(0, 0, width, height);
+  const step = Math.round(150 * m.scale);
+  ctx.save();
+  ctx.strokeStyle = theme.doodle;
+  ctx.fillStyle = theme.doodle;
+  ctx.lineWidth = Math.max(1, Math.round(3 * m.scale));
+  for (let row = 0, y = m.headerH; y < height + step; row++, y += step) {
+    for (let col = 0, x = 0; x < width + step; col++, x += step) {
+      const ox = x + ((row % 2) * step) / 2;
+      const kind = (row * 3 + col) % 4;
+      const r = step * 0.16;
+      ctx.beginPath();
+      if (kind === 0) {
+        ctx.arc(ox, y, r, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (kind === 1) {
+        ctx.moveTo(ox - r, y + r);
+        ctx.lineTo(ox, y - r);
+        ctx.lineTo(ox + r, y + r);
+        ctx.closePath();
+        ctx.stroke();
+      } else if (kind === 2) {
+        roundRect(ctx, ox - r, y - r * 0.8, r * 2, r * 1.6, r * 0.5);
+        ctx.stroke();
+      } else {
+        ctx.arc(ox, y, r * 0.45, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+  ctx.restore();
 }
 
 function drawHeader(
@@ -207,42 +342,71 @@ function drawHeader(
   theme: ChatTheme,
   width: number,
   m: Metrics,
+  media?: Map<string, LoadedMedia>,
 ) {
   ctx.fillStyle = theme.header;
   ctx.fillRect(0, 0, width, m.headerH);
   ctx.fillStyle = theme.divider;
   ctx.fillRect(0, m.headerH - Math.max(1, Math.round(2 * m.scale)), width, Math.max(1, Math.round(2 * m.scale)));
 
+  const isGroup = (project.chatKind ?? "direct") === "group" || project.participants.length > 2;
   const peers = project.participants.filter((p) => !p.isSelf);
-  const title =
-    project.participants.length > 2
-      ? project.title || "Grupo"
-      : peers[0]?.name ?? project.participants[0]?.name ?? "Conversa";
-  const subtitle =
-    project.participants.length > 2 ? peers.map((p) => p.name).join(", ") : "online";
+  const title = isGroup
+    ? project.groupName || project.title || "Grupo"
+    : peers[0]?.name ?? project.participants[0]?.name ?? "Conversa";
+  const subtitle = isGroup
+    ? peers.map((p) => p.name).join(", ") || "conversa em grupo"
+    : "online";
 
-  const size = Math.round(72 * m.scale);
-  const cx = m.pad + size / 2;
   const cy = m.headerH / 2;
+  // seta de voltar
+  const arrowX = Math.round(26 * m.scale);
+  ctx.strokeStyle = theme.headerText;
+  ctx.lineWidth = Math.max(2, Math.round(4 * m.scale));
+  ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
-  ctx.fillStyle = peers[0]?.color ?? theme.selfBubble;
-  ctx.fill();
-  ctx.fillStyle = "#ffffff";
-  ctx.font = `600 ${Math.round(32 * m.scale)}px ${theme.fontFamily}`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText((title[0] ?? "?").toUpperCase(), cx, cy + Math.round(2 * m.scale));
+  ctx.moveTo(arrowX + Math.round(16 * m.scale), cy - Math.round(14 * m.scale));
+  ctx.lineTo(arrowX, cy);
+  ctx.lineTo(arrowX + Math.round(16 * m.scale), cy + Math.round(14 * m.scale));
+  ctx.stroke();
+
+  const size = Math.round(74 * m.scale);
+  const cx = arrowX + Math.round(34 * m.scale) + size / 2;
+  const avatarUrl = isGroup ? project.groupAvatarUrl : peers[0]?.avatarUrl;
+  const avatarImg = avatarUrl ? media?.get(avatarUrl)?.frames[0] : undefined;
+  drawAvatarCircle(ctx, theme, cx, cy, size, peers[0]?.color ?? theme.selfBubble, title, avatarImg);
 
   ctx.textAlign = "left";
   ctx.fillStyle = theme.headerText;
   ctx.font = `600 ${Math.round(36 * m.scale)}px ${theme.fontFamily}`;
-  const tx = m.pad + size + Math.round(20 * m.scale);
-  const maxW = width - tx - m.pad;
+  const tx = cx + size / 2 + Math.round(20 * m.scale);
+  const maxW = width - tx - Math.round(150 * m.scale);
+  ctx.textBaseline = "middle";
   ctx.fillText(ellipsize(ctx, title, maxW), tx, cy - Math.round(14 * m.scale));
   ctx.fillStyle = theme.headerMuted;
-  ctx.font = `400 ${Math.round(26 * m.scale)}px ${theme.fontFamily}`;
-  ctx.fillText(ellipsize(ctx, subtitle, maxW), tx, cy + Math.round(24 * m.scale));
+  ctx.font = `400 ${Math.round(25 * m.scale)}px ${theme.fontFamily}`;
+  ctx.fillText(ellipsize(ctx, subtitle, maxW), tx, cy + Math.round(22 * m.scale));
+
+  // ícones de chamada, como em um app real (formas próprias, sem logotipos)
+  ctx.strokeStyle = theme.headerMuted;
+  ctx.fillStyle = theme.headerMuted;
+  ctx.lineWidth = Math.max(2, Math.round(3.5 * m.scale));
+  const iconR = Math.round(17 * m.scale);
+  const camX = width - Math.round(112 * m.scale);
+  roundRect(ctx, camX - iconR, cy - iconR * 0.7, iconR * 1.7, iconR * 1.4, iconR * 0.4);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(camX + iconR * 0.8, cy);
+  ctx.lineTo(camX + iconR * 1.5, cy - iconR * 0.6);
+  ctx.lineTo(camX + iconR * 1.5, cy + iconR * 0.6);
+  ctx.closePath();
+  ctx.fill();
+  const dotX = width - Math.round(36 * m.scale);
+  for (let i = -1; i <= 1; i++) {
+    ctx.beginPath();
+    ctx.arc(dotX, cy + i * Math.round(14 * m.scale), Math.round(3.4 * m.scale), 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.textBaseline = "alphabetic";
 }
 
@@ -253,6 +417,23 @@ function ellipsize(ctx: Ctx2D, text: string, maxWidth: number): string {
   return `${out}…`;
 }
 
+/** Tiques de entregue/lido desenhados à mão, ao lado da hora. */
+function drawChecks(ctx: Ctx2D, x: number, y: number, size: number, color: string) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1.5, size * 0.14);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  for (const offset of [0, size * 0.42]) {
+    ctx.beginPath();
+    ctx.moveTo(x + offset, y);
+    ctx.lineTo(x + offset + size * 0.26, y + size * 0.28);
+    ctx.lineTo(x + offset + size * 0.72, y - size * 0.3);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawTypingBubble(
   ctx: Ctx2D,
   theme: ChatTheme,
@@ -261,8 +442,8 @@ function drawTypingBubble(
   y: number,
   frame: number,
 ) {
-  const w = Math.round(140 * m.scale);
-  const h = Math.round(76 * m.scale);
+  const w = Math.round(130 * m.scale);
+  const h = Math.round(72 * m.scale);
   ctx.fillStyle = theme.peerBubble;
   roundRect(ctx, x, y, w, h, h * theme.radius);
   ctx.fill();
@@ -291,15 +472,9 @@ export function paintFrame(
   options: PaintOptions = {},
 ) {
   const m = metricsFor(width, height);
+  const media = options.media;
 
-  // fundo
-  const grad = ctx.createLinearGradient(0, 0, 0, height);
-  grad.addColorStop(0, theme.background);
-  grad.addColorStop(1, theme.backgroundAlt);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, width, height);
-  ctx.fillStyle = theme.surface;
-  ctx.fillRect(0, m.headerH, width, height - m.headerH);
+  drawWallpaper(ctx, theme, width, height, m);
 
   const visible = project.messages.filter((msg) => {
     const e = plan.byId[msg.id];
@@ -307,19 +482,15 @@ export function paintFrame(
   });
   const appeared = visible.filter((msg) => frame >= (plan.byId[msg.id]?.appearFrame ?? 0));
 
-  const layout = layoutMessages(ctx, project, theme, appeared, width, height);
+  const layout = layoutMessages(ctx, project, theme, appeared, width, height, media);
   const typing = typingAt(project, plan, frame);
-  const typingH = typing ? Math.round(76 * m.scale) + m.gap : 0;
+  const typingH = typing ? Math.round(72 * m.scale) + m.gap : 0;
 
-  const areaTop = m.headerH + m.pad;
   // deixa a margem inferior livre para a interface das plataformas
   const areaBottom = height - Math.max(m.pad, Math.round(height * 0.14));
-  const areaH = areaBottom - areaTop;
   const total = layout.contentH + typingH;
   // conversa ancorada embaixo, como em um aplicativo de mensagens: as bolhas
   // novas entram na base e empurram as antigas para cima (rolagem automática)
-  void areaTop;
-  void areaH;
   const offsetY = areaBottom - total;
 
   ctx.save();
@@ -332,49 +503,124 @@ export function paintFrame(
     const age = entry ? frame - entry.appearFrame : 0;
     const t = Math.max(0, Math.min(1, age / 7));
     const ease = 1 - Math.pow(1 - t, 3);
-    const rise = (1 - ease) * Math.round(28 * m.scale);
+    const rise = (1 - ease) * Math.round(24 * m.scale);
     const y = offsetY + item.y + rise;
+    const seconds = Math.max(0, age) / plan.fps;
     ctx.globalAlpha = ease;
 
     if (item.message.kind === "system") {
+      const label = item.lines.join(" ");
+      ctx.font = `500 ${Math.round(26 * m.scale)}px ${theme.fontFamily}`;
+      const w = ctx.measureText(label).width + Math.round(40 * m.scale);
+      const h = Math.round(48 * m.scale);
+      ctx.fillStyle = theme.systemBubble;
+      roundRect(ctx, (width - w) / 2, y, w, h, h / 2);
+      ctx.fill();
       ctx.fillStyle = theme.systemText;
-      ctx.font = `500 ${Math.round(28 * m.scale)}px ${theme.fontFamily}`;
       ctx.textAlign = "center";
-      item.lines.forEach((line, i) => {
-        ctx.fillText(line, width / 2, y + (i + 1) * m.lineH * 0.8);
-      });
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, width / 2, y + h / 2);
       ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+      continue;
+    }
+
+    const padX = Math.round(24 * m.scale);
+    const padY = Math.round(18 * m.scale);
+    const loaded = item.message.mediaUrl ? media?.get(item.message.mediaUrl) : undefined;
+
+    if (item.showAvatar) {
+      const size = m.avatar;
+      const avatarImg = item.avatarUrl ? media?.get(item.avatarUrl)?.frames[0] : undefined;
+      drawAvatarCircle(
+        ctx,
+        theme,
+        m.pad + size / 2,
+        y + size / 2,
+        size,
+        item.nameColor,
+        item.name,
+        avatarImg,
+      );
+    }
+
+    // figurinha: sem bolha, só o desenho e a hora embaixo
+    if (item.bare) {
+      const src = loaded ? mediaFrameAt(loaded, seconds) : null;
+      if (src) {
+        ctx.drawImage(src, item.x, y, item.mediaW, item.mediaH);
+      } else {
+        ctx.fillStyle = theme.systemBubble;
+        roundRect(ctx, item.x, y, item.mediaW, item.mediaH, Math.round(24 * m.scale));
+        ctx.fill();
+      }
+      ctx.fillStyle = theme.meta;
+      ctx.font = `400 ${m.metaSize}px ${theme.fontFamily}`;
+      const label = item.clock;
+      const lx = item.isSelf ? item.x + item.mediaW - ctx.measureText(label).width : item.x;
+      ctx.fillText(label, lx, y + item.mediaH + m.metaSize);
       continue;
     }
 
     if (item.showName) {
       ctx.fillStyle = item.nameColor;
-      ctx.font = `600 ${Math.round(m.fontSize * 0.72)}px ${theme.fontFamily}`;
-      ctx.fillText(item.name, item.x + Math.round(10 * m.scale), y - Math.round(10 * m.scale));
+      ctx.font = `600 ${Math.round(m.fontSize * 0.68)}px ${theme.fontFamily}`;
+      ctx.fillText(item.name, item.x + Math.round(8 * m.scale), y - Math.round(8 * m.scale));
     }
 
+    // bolha com rabinho apontando para o autor
     ctx.fillStyle = item.isSelf ? theme.selfBubble : theme.peerBubble;
-    roundRect(ctx, item.x, y, item.width, item.height, item.height * theme.radius);
+    const radius = Math.min(item.height, Math.round(70 * m.scale)) * theme.radius * 1.6;
+    roundRect(ctx, item.x, y, item.width, item.height, radius);
     ctx.fill();
+    if (theme.tail) {
+      const tw = Math.round(16 * m.scale);
+      ctx.beginPath();
+      if (item.isSelf) {
+        ctx.moveTo(item.x + item.width - tw * 0.2, y);
+        ctx.lineTo(item.x + item.width + tw, y);
+        ctx.lineTo(item.x + item.width - tw * 0.2, y + tw * 1.5);
+      } else {
+        ctx.moveTo(item.x + tw * 0.2, y);
+        ctx.lineTo(item.x - tw, y);
+        ctx.lineTo(item.x + tw * 0.2, y + tw * 1.5);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
 
-    const padX = Math.round(28 * m.scale);
-    const padY = Math.round(20 * m.scale);
     let cursorY = y + padY;
 
     if (item.mediaH) {
-      const src = item.message.mediaUrl ? options.images?.get(item.message.mediaUrl) : undefined;
       const mw = item.width - padX * 2;
+      const mh = Math.round(mw / (loaded?.aspect || item.message.mediaAspect || 1.4));
+      const src = loaded ? mediaFrameAt(loaded, seconds) : null;
       ctx.save();
-      roundRect(ctx, item.x + padX, cursorY, mw, item.mediaH, Math.round(18 * m.scale));
+      roundRect(ctx, item.x + padX, cursorY, mw, mh, Math.round(16 * m.scale));
       ctx.clip();
       if (src) {
-        ctx.drawImage(src, item.x + padX, cursorY, mw, item.mediaH);
+        ctx.drawImage(src, item.x + padX, cursorY, mw, mh);
       } else {
         ctx.fillStyle = theme.divider;
-        ctx.fillRect(item.x + padX, cursorY, mw, item.mediaH);
+        ctx.fillRect(item.x + padX, cursorY, mw, mh);
       }
       ctx.restore();
-      cursorY += item.mediaH + (item.lines.length ? Math.round(14 * m.scale) : 0);
+      if (item.message.kind === "video" && !loaded?.animated) {
+        // vídeo ainda não carregado: marca de reprodução no centro
+        const r = Math.round(44 * m.scale);
+        ctx.fillStyle = "rgba(0,0,0,0.45)";
+        ctx.beginPath();
+        ctx.arc(item.x + padX + mw / 2, cursorY + mh / 2, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.moveTo(item.x + padX + mw / 2 - r * 0.25, cursorY + mh / 2 - r * 0.4);
+        ctx.lineTo(item.x + padX + mw / 2 + r * 0.45, cursorY + mh / 2);
+        ctx.lineTo(item.x + padX + mw / 2 - r * 0.25, cursorY + mh / 2 + r * 0.4);
+        ctx.closePath();
+        ctx.fill();
+      }
+      cursorY += mh + (item.lines.length ? Math.round(12 * m.scale) : 0);
     }
 
     const big = item.message.kind === "emoji" || emojiOnly(item.message.text);
@@ -383,21 +629,58 @@ export function paintFrame(
     ctx.font = `${big ? 400 : 500} ${fontSize}px ${theme.fontFamily}`;
     ctx.fillStyle = item.isSelf ? theme.selfText : theme.peerText;
     item.lines.forEach((line, i) => {
-      ctx.fillText(line, item.x + padX, cursorY + (i + 1) * lineH - lineH * 0.28);
+      ctx.fillText(line, item.x + padX, cursorY + (i + 1) * lineH - lineH * 0.3);
     });
+
+    // hora e confirmação de leitura, no canto inferior direito da bolha
+    ctx.font = `400 ${m.metaSize}px ${theme.fontFamily}`;
+    ctx.fillStyle = item.isSelf ? theme.metaSelf : theme.meta;
+    const showChecks = item.isSelf && (project.receipts ?? true);
+    const checkW = showChecks ? m.metaSize * 1.7 : 0;
+    const clockW = ctx.measureText(item.clock).width;
+    const metaX = item.x + item.width - padX - clockW - checkW;
+    const metaY = y + item.height - padY * 0.6;
+    ctx.fillText(item.clock, metaX, metaY);
+    if (showChecks) {
+      drawChecks(
+        ctx,
+        metaX + clockW + m.metaSize * 0.4,
+        metaY - m.metaSize * 0.35,
+        m.metaSize,
+        theme.check,
+      );
+    }
+
+    if (item.message.reaction) {
+      const rSize = Math.round(m.metaSize * 1.7);
+      const rx = item.isSelf ? item.x + item.width - rSize * 1.8 : item.x + Math.round(14 * m.scale);
+      const ry = y + item.height - rSize * 0.35;
+      ctx.fillStyle = theme.peerBubble;
+      roundRect(ctx, rx, ry, rSize * 1.6, rSize, rSize / 2);
+      ctx.fill();
+      ctx.font = `400 ${Math.round(rSize * 0.72)}px ${theme.fontFamily}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = theme.peerText;
+      ctx.fillText(item.message.reaction, rx + rSize * 0.8, ry + rSize / 2);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+    }
   }
 
   ctx.globalAlpha = 1;
 
   if (typing) {
     const author = participantOf(project, typing.participantId);
-    const x = author.isSelf ? width - m.pad - Math.round(140 * m.scale) : m.pad;
+    const isGroup = (project.chatKind ?? "direct") === "group" || project.participants.length > 2;
+    const lane = isGroup && !author.isSelf ? m.avatar + Math.round(14 * m.scale) : 0;
+    const x = author.isSelf ? width - m.pad - Math.round(130 * m.scale) : m.pad + lane;
     drawTypingBubble(ctx, theme, m, x, offsetY + layout.contentH, frame);
   }
 
   ctx.restore();
 
-  drawHeader(ctx, project, theme, width, m);
+  drawHeader(ctx, project, theme, width, m, media);
 
   if (options.safeZones) {
     ctx.save();

@@ -16,7 +16,9 @@ import {
   Save,
   Sliders,
   Trash2,
+  Upload,
   UserPlus,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Input } from "@/components/ui/base";
@@ -25,6 +27,7 @@ import { buildPlan } from "@/lib/chatscene/clock";
 import { encodeFrameSequence, frameEncoderSupported } from "@/lib/chatscene/encode-frames";
 import { CanvasConversationRenderer } from "@/lib/chatscene/renderer";
 import { saveChatSceneProject } from "@/lib/chatscene/project.service";
+import { uploadChatSceneMedia } from "@/lib/chatscene/upload";
 import { CHAT_THEMES } from "@/lib/chatscene/theme";
 import {
   createChatSceneProject,
@@ -59,9 +62,11 @@ export function ChatSceneStudio() {
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [uploading, setUploading] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const plan = useMemo(() => buildPlan(project), [project]);
+  const isGroup = (project.chatKind ?? "direct") === "group";
 
   useEffect(() => {
     if (frame > plan.totalFrames - 1) setFrame(plan.totalFrames - 1);
@@ -76,6 +81,47 @@ export function ChatSceneStudio() {
       ...prev,
       messages: prev.messages.map((m) => (m.id === id ? { ...m, ...changes } : m)),
     }));
+  }, []);
+
+  /** Envia um arquivo do computador e aponta a mensagem para ele. */
+  const handleUpload = useCallback(
+    async (messageId: string, file: File) => {
+      setUploading(messageId);
+      try {
+        const { url, aspect, temporary } = await uploadChatSceneMedia(file);
+        updateMessage(messageId, { mediaUrl: url, mediaAspect: aspect });
+        if (temporary) {
+          toast.warning("O arquivo ficou só nesta sessão; salve a conversa depois de enviá-lo de novo.");
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Não foi possível usar este arquivo.");
+      } finally {
+        setUploading(null);
+      }
+    },
+    [updateMessage],
+  );
+
+  /** Foto de um participante ou do grupo. */
+  const handleAvatarUpload = useCallback(async (target: string, file: File) => {
+    setUploading(target);
+    try {
+      const { url } = await uploadChatSceneMedia(file);
+      setProject((prev) =>
+        target === "group"
+          ? { ...prev, groupAvatarUrl: url }
+          : {
+              ...prev,
+              participants: prev.participants.map((p) =>
+                p.id === target ? { ...p, avatarUrl: url } : p,
+              ),
+            },
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível usar esta foto.");
+    } finally {
+      setUploading(null);
+    }
   }, []);
 
   const addMessage = useCallback(() => {
@@ -244,6 +290,52 @@ export function ChatSceneStudio() {
             </Button>
           </div>
 
+          {/* grupo */}
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-background/30 p-2">
+            <Button
+              variant={isGroup ? "default" : "secondary"}
+              size="sm"
+              onClick={() =>
+                patch({
+                  chatKind: isGroup ? "direct" : "group",
+                  groupName: isGroup ? project.groupName ?? null : project.groupName || "Grupo da treta",
+                })
+              }
+            >
+              <Users className="mr-1.5 size-4" />
+              {isGroup ? "É um grupo" : "Conversa de duas pessoas"}
+            </Button>
+            {isGroup && (
+              <>
+                <input
+                  value={project.groupName ?? ""}
+                  onChange={(e) => patch({ groupName: e.target.value })}
+                  placeholder="Nome do grupo"
+                  className="min-w-[140px] flex-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none"
+                  aria-label="Nome do grupo"
+                />
+                <label className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:border-primary">
+                  {uploading === "group" ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="size-3.5" />
+                  )}
+                  Foto do grupo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) void handleAvatarUpload("group", file);
+                    }}
+                  />
+                </label>
+              </>
+            )}
+          </div>
+
           <div className="mb-4 flex flex-wrap gap-2">
             {project.participants.map((p) => (
               <div
@@ -280,6 +372,26 @@ export function ChatSceneStudio() {
                 >
                   eu
                 </button>
+                <label
+                  className="cursor-pointer text-muted-foreground hover:text-primary"
+                  title={`Foto de ${p.name}`}
+                >
+                  {uploading === p.id ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <ImageIcon className="size-3.5" />
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) void handleAvatarUpload(p.id, file);
+                    }}
+                  />
+                </label>
                 {project.participants.length > 2 && (
                   <button
                     type="button"
@@ -329,7 +441,9 @@ export function ChatSceneStudio() {
                     >
                       <option value="text">texto</option>
                       <option value="emoji">emoji</option>
-                      <option value="image">imagem</option>
+                      <option value="image">foto</option>
+                      <option value="sticker">figurinha</option>
+                      <option value="video">vídeo / meme</option>
                       <option value="system">aviso</option>
                     </select>
                     <span className="ml-auto flex items-center gap-0.5">
@@ -371,15 +485,33 @@ export function ChatSceneStudio() {
                     aria-label="Texto da mensagem"
                   />
 
-                  {m.kind === "image" && (
-                    <div className="mt-1.5 flex items-center gap-1.5">
+                  {(m.kind === "image" || m.kind === "sticker" || m.kind === "video") && (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <label className="flex cursor-pointer items-center gap-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs hover:border-primary">
+                        {uploading === m.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Upload className="size-3.5" />
+                        )}
+                        {m.kind === "video" ? "Enviar vídeo" : m.kind === "sticker" ? "Enviar figurinha" : "Enviar foto"}
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept={m.kind === "video" ? "video/*" : "image/*"}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            e.target.value = "";
+                            if (file) void handleUpload(m.id, file);
+                          }}
+                        />
+                      </label>
                       <ImageIcon className="size-3.5 text-muted-foreground" />
                       <input
-                        value={m.mediaUrl ?? ""}
+                        value={m.mediaUrl?.startsWith("blob:") ? "arquivo do computador" : m.mediaUrl ?? ""}
                         onChange={(e) => updateMessage(m.id, { mediaUrl: e.target.value || null })}
-                        placeholder="Endereço da imagem (https://…)"
-                        className="flex-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none"
-                        aria-label="Endereço da imagem"
+                        placeholder="ou cole um endereço (https://…)"
+                        className="min-w-[140px] flex-1 rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none"
+                        aria-label="Endereço da mídia"
                       />
                     </div>
                   )}
@@ -518,6 +650,24 @@ export function ChatSceneStudio() {
                 />
                 mostrar “digitando…”
               </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={project.receipts ?? true}
+                  onChange={(e) => patch({ receipts: e.target.checked })}
+                />
+                tiques de mensagem lida
+              </label>
+              <div>
+                <p className="mb-1 text-muted-foreground">Hora inicial da conversa</p>
+                <input
+                  value={project.startClock ?? "21:14"}
+                  onChange={(e) => patch({ startClock: e.target.value })}
+                  placeholder="21:14"
+                  className="w-full rounded-md border border-border bg-background px-2 py-1.5"
+                  aria-label="Hora inicial da conversa"
+                />
+              </div>
               <div>
                 <p className="mb-1 text-muted-foreground">Qualidade do vídeo</p>
                 <select
@@ -560,6 +710,35 @@ export function ChatSceneStudio() {
                   suffix="ms"
                   onChange={(v) => updateMessage(selectedMessage.id, { typingMs: v })}
                 />
+                <div>
+                  <p className="mb-1 text-muted-foreground">Reação nesta mensagem</p>
+                  <div className="flex flex-wrap gap-1">
+                    {["", "❤️", "😂", "😮", "😢", "👍", "🔥"].map((emoji) => (
+                      <button
+                        key={emoji || "none"}
+                        type="button"
+                        onClick={() => updateMessage(selectedMessage.id, { reaction: emoji || null })}
+                        className={`rounded-md border px-2 py-1 ${
+                          (selectedMessage.reaction ?? "") === emoji
+                            ? "border-primary bg-primary/10"
+                            : "border-border"
+                        }`}
+                      >
+                        {emoji || "nenhuma"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-1 text-muted-foreground">Hora desta mensagem</p>
+                  <input
+                    value={selectedMessage.time ?? ""}
+                    onChange={(e) => updateMessage(selectedMessage.id, { time: e.target.value || null })}
+                    placeholder="automática"
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5"
+                    aria-label="Hora desta mensagem"
+                  />
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
