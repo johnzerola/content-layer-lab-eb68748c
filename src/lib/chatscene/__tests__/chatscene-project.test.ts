@@ -35,10 +35,14 @@ describe("documento da conversa", () => {
     expect(without.map((m) => m.id)).not.toContain(target.id);
   });
 
-  it("ignora mensagem de remetente inexistente", () => {
+  it("mensagem de remetente inexistente não quebra a cena", () => {
     const p = createChatSceneProject();
     const orfa = createMessage("nao-existe", { text: "oi" });
-    expect(participantOf({ ...p, messages: [...p.messages, orfa] }, orfa.participantId)).toBeFalsy();
+    const doc = { ...p, messages: [...p.messages, orfa] };
+    const autor = participantOf(doc, orfa.participantId);
+    expect(autor).toBeTruthy();
+    expect(doc.participants.some((x) => x.id === autor!.id)).toBe(true);
+    expect(buildPlan(doc).totalFrames).toBeGreaterThan(0);
   });
 
   it("serializa e reabre preservando conteúdo", () => {
