@@ -329,7 +329,9 @@ export function ChatSceneStudio() {
                     >
                       <option value="text">texto</option>
                       <option value="emoji">emoji</option>
-                      <option value="image">imagem</option>
+                      <option value="image">foto</option>
+                      <option value="sticker">figurinha</option>
+                      <option value="video">vídeo / meme</option>
                       <option value="system">aviso</option>
                     </select>
                     <span className="ml-auto flex items-center gap-0.5">
