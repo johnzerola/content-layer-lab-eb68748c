@@ -59,8 +59,8 @@ describe("ConversationClock", () => {
 
   it("limita o tempo de leitura entre o mínimo e o máximo", () => {
     const p = project();
-    expect(readMs(createMessage("ana", { text: "a" }), p.timing)).toBe(p.timing.minReadMs);
-    expect(readMs(createMessage("ana", { text: "a".repeat(9999) }), p.timing)).toBe(p.timing.maxReadMs);
+    expect(readMs(createMessage("ana", { text: "a" }), p)).toBe(p.timing.minReadMs);
+    expect(readMs(createMessage("ana", { text: "a".repeat(9999) }), p)).toBe(p.timing.maxReadMs);
   });
 });
 
