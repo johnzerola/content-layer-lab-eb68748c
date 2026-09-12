@@ -312,6 +312,16 @@ export const CHAT_THEMES = FAMILIES.map((f) => ({
 
 export function resolveTheme(themeId: string, dark: boolean): ChatTheme {
   const family = FAMILIES.find((f) => f.id === themeId) ?? FAMILIES[0]!;
-  const theme = dark ? family.dark : family.light;
-  return { ...theme, label: family.label, description: family.description };
+  const draft = dark ? family.dark : family.light;
+  return {
+    ...draft,
+    meta: draft.meta ?? draft.systemText,
+    metaSelf: draft.metaSelf ?? draft.systemText,
+    check: draft.check ?? draft.nameText,
+    wallpaper: draft.wallpaper ?? draft.surface,
+    doodle: draft.doodle ?? "rgba(0,0,0,0)",
+    tail: draft.tail ?? false,
+    label: family.label,
+    description: family.description,
+  };
 }
