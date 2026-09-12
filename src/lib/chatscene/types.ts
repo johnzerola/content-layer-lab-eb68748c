@@ -394,6 +394,8 @@ export interface ChatSceneTiming {
   typingProfile?: Partial<import("./timing").HumanTypingProfile>;
   /** respiro extra quando a conversa troca de pessoa (ms) */
   senderSwitchMs?: number;
+  /** respiro extra quando a cena corta para outra conversa (ms) */
+  threadSwitchMs?: number;
   /** segundos parados no fim, para o laço não cortar a última mensagem */
   tailMs: number;
 }
@@ -461,6 +463,7 @@ export const DEFAULT_TIMING: ChatSceneTiming = {
   typingMs: 900,
   humanTyping: true,
   senderSwitchMs: 180,
+  threadSwitchMs: 820,
   tailMs: 1400,
 };
 

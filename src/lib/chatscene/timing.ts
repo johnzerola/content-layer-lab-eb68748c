@@ -137,15 +137,20 @@ export function computeMessageTimings(project: ChatSceneProject): MessageTiming[
   const out: MessageTiming[] = [];
   let cursor = 0;
   let previousAuthor = "";
+  let previousThread = "";
 
   project.messages.forEach((message) => {
     const author = participantOf(project, message.participantId);
-    const switched = previousAuthor && previousAuthor !== author.id;
+    const thread = threadIdOf(project, message);
+    // corte para outra conversa: um respiro maior, como quem sai de um chat e abre outro
+    const threadSwitched = previousThread !== "" && previousThread !== thread;
+    const switched = !threadSwitched && previousAuthor && previousAuthor !== author.id;
     const leadIn =
       Math.max(0, message.delayMs ?? 0) +
       Math.max(0, message.voiceDirection?.pauseBeforeMs ?? 0) +
+      (threadSwitched ? Math.max(0, t.threadSwitchMs ?? 820) : 0) +
       (switched ? Math.max(0, t.senderSwitchMs ?? 180) : 0);
-    const typing = typingMsOf(message, project);
+    const typing = threadSwitched ? 0 : typingMsOf(message, project);
     const entrance = entranceMsOf(project);
     const reading = readingMs(message, project);
     const voice = Math.max(0, message.voiceMs ?? 0);
