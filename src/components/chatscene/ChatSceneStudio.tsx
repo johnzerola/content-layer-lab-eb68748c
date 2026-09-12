@@ -37,6 +37,7 @@ import { loadLocalDraft, saveLocalDraft } from "@/lib/chatscene/serialize";
 import {
   ANIMATION_PRESETS,
   BACKGROUND_PRESETS,
+  DEFAULT_BRANDING,
   LAYOUT_PRESETS,
   createChatSceneProject,
   createDemoChatSceneProject,
@@ -136,6 +137,37 @@ export function ChatSceneStudio() {
     },
     [updateMessage],
   );
+
+  /** Vídeo em laço atrás da conversa. */
+  const handleBackgroundVideo = useCallback(async (file: File) => {
+    setUploading("background");
+    try {
+      const { asset, library: next } = await addFileToLibrary(file, "background");
+      setLibrary(next);
+      setProject((prev) => ({ ...prev, background: { kind: "video", videoUrl: asset.url, loop: true } }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível usar este vídeo.");
+    } finally {
+      setUploading(null);
+    }
+  }, []);
+
+  /** Logo do criador mostrada por cima da cena. */
+  const handleLogo = useCallback(async (file: File) => {
+    setUploading("logo");
+    try {
+      const { asset, library: next } = await addFileToLibrary(file, "logo");
+      setLibrary(next);
+      setProject((prev) => ({
+        ...prev,
+        branding: { ...DEFAULT_BRANDING, ...prev.branding, enabled: true, logoUrl: asset.url },
+      }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível usar esta imagem.");
+    } finally {
+      setUploading(null);
+    }
+  }, []);
 
   /** Foto de um participante ou do grupo. */
   const handleAvatarUpload = useCallback(async (target: string, file: File) => {
