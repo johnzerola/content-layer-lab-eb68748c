@@ -850,6 +850,8 @@ function paintConversation(
       ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
     }
+
+    if (scaling) ctx.restore();
   }
 
   ctx.globalAlpha = 1;
@@ -864,21 +866,6 @@ function paintConversation(
 
   ctx.restore();
 
-  drawHeader(ctx, project, theme, width, m, media);
-
-  if (options.safeZones) {
-    ctx.save();
-    ctx.strokeStyle = "rgba(255,90,140,0.75)";
-    ctx.setLineDash([12, 10]);
-    ctx.lineWidth = Math.max(2, Math.round(3 * m.scale));
-    const top = height * 0.12;
-    const bottom = height * 0.82;
-    ctx.beginPath();
-    ctx.moveTo(0, top);
-    ctx.lineTo(width, top);
-    ctx.moveTo(0, bottom);
-    ctx.lineTo(width, bottom);
-    ctx.stroke();
-    ctx.restore();
-  }
+  if (showHeader) drawHeader(ctx, project, theme, width, m, media);
 }
+
