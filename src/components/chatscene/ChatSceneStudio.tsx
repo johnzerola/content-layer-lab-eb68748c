@@ -1100,7 +1100,72 @@ export function ChatSceneStudio() {
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Use apenas vídeos seus ou com permissão de uso.
               </p>
+
+              {/* ajuste fino do fundo: aproximar, subir/descer e desfocar */}
+              <div className="mt-2 space-y-2">
+                <label className="block text-[11px] text-muted-foreground">
+                  Aproximar fundo
+                  <input
+                    type="range"
+                    min={1}
+                    max={2}
+                    step={0.01}
+                    value={project.layout?.backgroundScale ?? 1}
+                    onChange={(e) =>
+                      patch({
+                        layout: {
+                          ...(project.layout ?? DEFAULT_LAYOUT),
+                          backgroundScale: Number(e.target.value),
+                        },
+                      })
+                    }
+                    className="mt-1 w-full"
+                    aria-label="Aproximar fundo"
+                  />
+                </label>
+                <label className="block text-[11px] text-muted-foreground">
+                  Subir ou descer fundo
+                  <input
+                    type="range"
+                    min={-0.3}
+                    max={0.3}
+                    step={0.01}
+                    value={project.layout?.backgroundOffsetY ?? 0}
+                    onChange={(e) =>
+                      patch({
+                        layout: {
+                          ...(project.layout ?? DEFAULT_LAYOUT),
+                          backgroundOffsetY: Number(e.target.value),
+                        },
+                      })
+                    }
+                    className="mt-1 w-full"
+                    aria-label="Subir ou descer fundo"
+                  />
+                </label>
+                <label className="block text-[11px] text-muted-foreground">
+                  Desfoque do fundo
+                  <input
+                    type="range"
+                    min={0}
+                    max={30}
+                    step={1}
+                    value={project.layout?.backgroundBlur ?? 0}
+                    onChange={(e) =>
+                      patch({
+                        layout: {
+                          ...(project.layout ?? DEFAULT_LAYOUT),
+                          backgroundBlur: Number(e.target.value),
+                        },
+                      })
+                    }
+                    className="mt-1 w-full"
+                    aria-label="Desfoque do fundo"
+                  />
+                </label>
+              </div>
             </div>
+
 
 
             <div className="mt-3">
