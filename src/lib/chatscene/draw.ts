@@ -741,8 +741,14 @@ export function paintFrame(
   const rect = auto != null ? { ...base, h: auto } : base;
   const inset = rect.w < width || rect.h < height;
 
-  // câmera: aproxima na fala nova e alterna com a tela cheia
-  const shot = cameraAt(project.camera, plan, frame);
+  // câmera: aproxima na fala nova e alterna com a tela cheia, sempre mirando
+  // a conversa (mesmo quando ela ocupa só a parte de cima da tela)
+  const shot = cameraAt(project.camera, plan, frame, {
+    x: rect.x / width,
+    y: rect.y / height,
+    w: rect.w / width,
+    h: rect.h / height,
+  });
   const moving = Math.abs(shot.scale - 1) > 0.001;
   if (moving) {
     ctx.save();
