@@ -23,3 +23,4 @@
 - [x] Gap analysis e escopo MUST/SHOULD/V2/FUTURE/DONT
 - [x] ChatScene: corrigir vídeo de fundo atrás da conversa e incluir efeitos sonoros no download sem vozes
 - [x] ChatScene: integrar galeria de fundos 9:16 com troca em tempo real, loop e desfoque
+- [ ] ChatScene: validar em navegador a fala real sincronizada com chat e fundo animado (aguardando login na prévia)
