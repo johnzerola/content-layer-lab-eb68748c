@@ -91,12 +91,16 @@ function Slider({
   );
 }
 
+/** Envia a imagem para o armazenamento da conta (cai para data URL se falhar). */
 async function fileToDataUrl(file: File) {
-  return new Promise<string>((res) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result as string);
-    r.readAsDataURL(file);
-  });
+  return uploadFileOrInline("template", file);
+}
+
+/** Miniatura que entende tanto link direto quanto arquivo guardado na conta. */
+function MediaThumb({ src, className }: { src: string; className?: string }) {
+  const url = useMediaUrl(src);
+  if (!url) return null;
+  return <img src={url} alt="" className={className} />;
 }
 
 function DebugPanel({
