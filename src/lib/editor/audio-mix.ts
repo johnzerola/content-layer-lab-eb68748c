@@ -1,5 +1,6 @@
 import { decodeSourceAudio, type AudioTrack } from "@/lib/audio-track";
 import { duckGainAt, type AudioClip, type EditorAudio } from "./audio";
+import { resolveMediaUrl } from "@/lib/media-store";
 
 export type AudioRange = { start: number; end: number; speed?: number };
 
