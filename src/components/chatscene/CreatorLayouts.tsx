@@ -81,6 +81,7 @@ export function CreatorLayouts({ project, plan, frame, onSelect }: Props) {
           const active = current === option.id;
           const preview: ChatSceneProject = {
             ...project,
+            ...(option.apply ?? {}),
             layout: { ...option.value, preset: option.id },
           };
           return (
