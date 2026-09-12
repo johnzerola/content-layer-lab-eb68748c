@@ -1,0 +1,14 @@
+{
+  "id": "microtexture-stage-audit-and-revised-quality-plan-2026-09-10-6150a31abe4c",
+  "title": "Microtexture stage audit and revised quality plan 2026-09-10",
+  "body": "CONFIRMED LOCAL: 67 crop observations across 13 frames from one source compare original SOURCE, prepared INPUT, V3, phase1 CRF14, phase2 reference, Vmake. Wider normalized visual matching +/-15 retains best global offset -3 but individual -2/-3 and residual spatial differences disallow exact-frame/pixel-GT claims. LPIPS unavailable (package missing), null; SSIM versus source only for regions outside text. Five sweater frames (106,115,120,130,140) from retained phase1 intermediates: crop==source crop; native ROI==raw lossless; composite==raw inside opaque mask and ==source outside, all max deltas zero. Smooth sweater band visible already in raw. Mean masked gradient RMS raw/master22.410, CRF14 22.377, CRF12 22.469; encode is not sufficient explanation for reconstructed smooth band. V3 raw is already encoded MP4. Mask policy hides 627x100 through all43 scene frames; insufficient donors remains hypothesis. Outside subtitle sweater SOURCE mean gradient2.612 vs V3 2.595, SSIM .9813: global blur loss is not established by texture energy. Vmake has greater local contrast than source but global enhancement architecture is unconfirmed; lower/near-original saturation in measured regions contradicts blanket boost claim. New phased plan: diagnostic complete; color/native preservation; masks+temporal references; bounded finishing; conditional neural restoration after runtime correction; independent cases, real cost and proven deployment. No new billable GPU/no production mutation.",
+  "sources": [
+    "G:/dowloand/teste/analise-microtextura-20260910/report.json",
+    "G:/dowloand/teste/analise-microtextura-20260910/stage-ablation.json",
+    "G:/dowloand/teste/analise-microtextura-20260910/etapas-sueter-frame120.png",
+    "docs/design/PLANO-MICROTEXTURA-CLEANERIA-20260910.md"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-11T00:05:05.591909+00:00",
+  "category": "benchmarks"
+}

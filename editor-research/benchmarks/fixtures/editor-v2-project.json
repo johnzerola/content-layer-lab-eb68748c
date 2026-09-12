@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "id": "fixture-editor-v2-phase0",
+  "name": "Fixture Editor V2 Phase 0",
+  "assets": [],
+  "tracks": [
+    { "id": "track-video", "kind": "video", "name": "Vídeo", "order": 0, "locked": false, "hidden": false, "muted": false, "clips": [] },
+    { "id": "track-overlay", "kind": "overlay", "name": "Sobreposições", "order": 1, "locked": false, "hidden": false, "muted": false, "clips": [] },
+    { "id": "track-captions", "kind": "captions", "name": "Legendas", "order": 2, "locked": false, "hidden": false, "muted": false, "clips": [], "language": "pt-BR", "cues": [] },
+    { "id": "track-voice", "kind": "voice", "name": "Voz", "order": 3, "locked": false, "hidden": false, "muted": false, "clips": [] },
+    { "id": "track-music", "kind": "music", "name": "Música", "order": 4, "locked": false, "hidden": false, "muted": false, "clips": [] },
+    { "id": "track-sfx", "kind": "sfx", "name": "Efeitos sonoros", "order": 5, "locked": false, "hidden": false, "muted": false, "clips": [] }
+  ],
+  "transitions": [],
+  "templates": [],
+  "selection": { "itemIds": [], "primaryId": null, "surface": null },
+  "settings": { "aspectRatio": "9:16", "width": 1080, "height": 1920, "fps": 30, "duration": 12, "snapEnabled": true, "rippleEnabled": false },
+  "revisions": { "document": 0, "render": 0, "saved": 0 }
+}

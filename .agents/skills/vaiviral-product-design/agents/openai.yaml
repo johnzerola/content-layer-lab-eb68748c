@@ -1,0 +1,4 @@
+interface:
+  display_name: "VaiViral Product Design"
+  short_description: "UI, UX e interações próprias do VaiViral"
+  default_prompt: "Use $vaiviral-product-design para melhorar a interface solicitada e verificar seu fluxo de uso."

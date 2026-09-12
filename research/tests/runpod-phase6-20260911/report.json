@@ -1,0 +1,81 @@
+{
+  "input": ".codex\\artifacts\\scene-roi-v2\\remote-sample.mp4",
+  "duration": 2.4,
+  "endpoint_id": "km860ju9ded2e0",
+  "image": "docker.io/nivaldo12/leaneria-runpod@sha256:372ec3760d724b08c9967f362cbcc730e7b0b1258330904d329bb9cd8d7ee8c7",
+  "jobs": [
+    {
+      "id": "515568de-eda1-4a44-b951-6f2e91044eb3-u2",
+      "action": "health"
+    }
+  ],
+  "billing_before": {
+    "unix_time": 1789153930.0528467,
+    "client_balance_usd": 7.6452599632,
+    "current_usd_per_hour": 0.005
+  },
+  "previous": {
+    "templateId": "05ev1ypfvn",
+    "workersMin": 0,
+    "workersMax": 1,
+    "idleTimeout": 5
+  },
+  "hostear_job": "ee17a0a6-dbda-42c5-9857-b9d0e0f300b2",
+  "regions": [
+    {
+      "id": "det_0",
+      "kind": "rect",
+      "role": "remove",
+      "x": 0.31851851851851853,
+      "y": 0.9151041666666667,
+      "w": 0.3638888888888889,
+      "h": 0.025520833333333333,
+      "grow": 0.008,
+      "label": "Legenda"
+    },
+    {
+      "id": "det_1",
+      "kind": "rect",
+      "role": "remove",
+      "x": 0.3314814814814815,
+      "y": 0.7354166666666667,
+      "w": 0.32685185185185184,
+      "h": 0.0296875,
+      "grow": 0.008,
+      "label": "Legenda"
+    }
+  ],
+  "template_id": "05ev1ypfvn",
+  "error": "Bounded sample deadline reached",
+  "expired_provider_jobs": [
+    "515568de-eda1-4a44-b951-6f2e91044eb3-u2"
+  ],
+  "capacity_disabled": true,
+  "original_configuration_restored": true,
+  "final_health": {
+    "jobs": {
+      "completed": 51,
+      "failed": 21,
+      "inProgress": 0,
+      "inQueue": 0,
+      "retried": 0
+    },
+    "workers": {
+      "idle": 0,
+      "initializing": 0,
+      "ready": 0,
+      "running": 0,
+      "throttled": 0,
+      "unhealthy": 0
+    }
+  },
+  "billing_after": {
+    "unix_time": 1789154374.7316926,
+    "client_balance_usd": 7.6452599632,
+    "current_usd_per_hour": 0.005
+  },
+  "billing_note": "Account balance delta includes storage and may be delayed; not a per-video invoice",
+  "temporary_projects_deleted": [
+    "ee17a0a6-dbda-42c5-9857-b9d0e0f300b2"
+  ]
+}

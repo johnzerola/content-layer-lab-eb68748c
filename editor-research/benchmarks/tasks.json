@@ -1,0 +1,7 @@
+[
+  {"id":"import-trim","task":"Import a fixture video and trim five seconds.","fixture":"licensed 20s 1080p H.264 fixture","success":"Preview and persisted project agree; undo restores the original."},
+  {"id":"add-text","task":"Add, resize and change the font of a text layer.","fixture":"same fixture","success":"Selection, preview, keyboard focus and undo are coherent."},
+  {"id":"audio-separate","task":"Separate voice/music and place resulting stems in tracks.","fixture":"licensed speech-plus-music fixture","success":"Progress/error states truthful; tracks can mute, solo and change volume."},
+  {"id":"split-move","task":"Split, duplicate and move a clip with snapping.","fixture":"three-clip project fixture","success":"Playhead, timing and render manifest remain aligned."},
+  {"id":"export","task":"Export a saved project.","fixture":"small deterministic fixture","success":"Output identifies project revision, duration/FPS and failure/cancel state."}
+]

@@ -1,0 +1,7 @@
+[
+  {"id":"UX-01","severity":"BLOCKER","finding":"Save state and recovery semantics need task-based verification; a false saved indication risks lost work.","evidence":"Existing static audit E04."},
+  {"id":"UX-02","severity":"HIGH","finding":"Timeline coordinate space must be verified against clip offset, zoom and scroll.","evidence":"Existing static audit E05."},
+  {"id":"UX-03","severity":"HIGH","finding":"Common edits span separate state surfaces, so undo/redo may not be transactional.","evidence":"Existing static audit E14."},
+  {"id":"UX-04","severity":"HIGH","finding":"The professional layout needs viewport validation for its multiple concurrent panels.","evidence":"Existing static audit E10."},
+  {"id":"UX-05","severity":"MEDIUM","finding":"Advanced controls compete with common actions; validate discoverability with novice tasks.","evidence":"Static review of grouped VideoStudio panels."}
+]

@@ -32,6 +32,7 @@ import { ProcessSteps } from "@/components/ProcessSteps";
 import { useAccess } from "@/lib/subscription";
 import { planFromId } from "@/lib/plan";
 import { markPendingShellMode, type ShellMode } from "@/lib/handoff";
+import { EDITOR_V2_ENABLED } from "@/lib/editor-v2";
 
 export type AppMode = "lote" | "clip" | "external";
 
@@ -107,6 +108,7 @@ const ROUTE_PATHS = [
   "/estilos",
   "/comparar",
   "/editor",
+  "/editor-v2",
   "/projects",
   "/projetos",
   "/estudio",
@@ -347,6 +349,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
         {routeLink("/comparar", "Comparar layouts", Layers, expanded, close)}
 
         {routeLink("/editor", "Editor profissional", Wand2, expanded, close)}
+        {EDITOR_V2_ENABLED && routeLink("/editor-v2", "Editor V2 · Library", Library, expanded, close)}
         {routeLink("/projetos", "Projetos", FolderKanban, expanded, close)}
         {routeLink("/biblioteca", "Resultados", History, expanded, close)}
         {routeLink("/armazenamento", "Armazenamento", HardDrive, expanded, close)}

@@ -1,0 +1,13 @@
+# RealBasicVSR benchmark only. Build from repository root.
+# This runtime intentionally does not replace the production inpainting image.
+FROM pytorch/pytorch:1.13.1-cuda11.6-cudnn8-runtime@sha256:1e26efd426b0fecbfe7cf3d3ae5003fada6ac5a76eddc1e042857f5d049605ee
+ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip install numpy==1.23.5 opencv-python==4.8.1.78 mmcv-full==1.7.1 \
+    -f https://download.openmmlab.com/mmcv/dist/cu116/torch1.13.0/index.html \
+    && pip install --only-binary=av mmedit==0.16.0 av==14.0.1
+WORKDIR /lab
+COPY research/experiments/phase4_restore.py /lab/phase4_restore.py
+RUN python -c "from mmedit.models import build_backbone; import cv2,torch; print(torch.__version__, cv2.__version__)"
+ENTRYPOINT ["python", "/lab/phase4_restore.py"]

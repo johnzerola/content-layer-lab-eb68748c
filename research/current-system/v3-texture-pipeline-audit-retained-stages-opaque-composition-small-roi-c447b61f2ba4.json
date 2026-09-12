@@ -1,0 +1,17 @@
+{
+  "id": "v3-texture-pipeline-audit-retained-stages-opaque-composition-small-roi-c447b61f2ba4",
+  "title": "v3 texture pipeline audit: retained stages, opaque composition, small ROI resize",
+  "body": "The compared v3 is concatenation of cached outputs from three historical scene runs, not the later padding/PNG experiment. ROI sizes: 762x294->760x288, 678x294->672x288, 820x294->816x288; maximum-side960 did not cause large downscale. restore_inference_region is unchanged and uses Lanczos only on mismatch, then RGB-lossless intermediate. composite_masked is unchanged, opaque RGB maskedmerge with no feather/blur, followed by CRF16/YUV420. Scene2 inference hides a constant627x100 band in43 frames, no entirely empty reference mask. All three scenes retain input/ROI/upstream-MP4/native/output/masks. Upstream MP4 already uses imageio quality9; no historical pre-codec tensor/PNG checkpoint, so network vs upstream encoding cannot be isolated perfectly without rerun. Phase1-b retained lossless candidate and exports, but review recorded persistent soft cloth and local buckle regression. Code presence does not certify deployment; no remote state was queried. Causal priority remains hypothesis until stage measurements.",
+  "sources": [
+    "research/current-system/texture-pipeline-audit-20260910.md",
+    "backend/app/services/inference_region.py",
+    "backend/app/utils/video.py",
+    "backend/app/services/subtitle_policy.py",
+    "backend/PIXEL-PRESERVATION-VALIDATION-20260910.md",
+    "G:/dowloand/teste/resultado-automatico-v3-20260909/manifest.json",
+    "G:/dowloand/teste/resultado-fase1-preservacao-b-20260910/manifest.json"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-10T23:53:04.290045+00:00",
+  "category": "current-system"
+}

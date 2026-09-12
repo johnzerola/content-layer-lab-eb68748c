@@ -1,0 +1,13 @@
+{
+  "id": "phase-4-slim-realbasicvsr-image-and-bounded-gpu-probes-939c7c4a3893",
+  "title": "Phase 4 slim RealBasicVSR image and bounded GPU probes",
+  "body": "The slim serverless image was built from CUDA/cuDNN without the monolithic Conda base and published as nivaldo12/leaneria-runpod@sha256:20c2d4ad05e354c32137c638ba859435ef930b8afe5bcc3347679cb38dc32aae. Its unpacked size is 4,612,845,428 bytes versus 17.6 GB for the prior image, about 74 percent smaller. Torch 1.13.1+cu116, MMCV 1.7.1, RealBasicVSR imports, runner startup, and checkpoint SHA256 passed locally in the container. A RunPod health job completed after 91,345 ms delay and 163 ms execution, confirming CUDA, a 24 GB GPU and checkpoint. A 600x300 restoration job then failed at provider level without a returned artifact; provider termination/OOM is a hypothesis, not confirmed because logs were not preserved. A later 400x200 attempt timed out waiting for capacity before health. Every temporary endpoint, template and Hostear project was deleted and capacity returned to zero.",
+  "sources": [
+    "research/experiments/Dockerfile.phase4-slim-runpod",
+    "research/experiments/phase4_isolated_sample.py",
+    "research/experiments/PHASE4-STATUS-20260910.md"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-10T22:51:47.613607+00:00",
+  "category": "benchmarks"
+}

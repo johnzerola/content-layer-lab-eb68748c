@@ -46,7 +46,7 @@ as duas trilhas mantiverem duração, pico e ausência de clipping.
 ## Rollback e limpeza
 
 Atualizar somente a imagem/overlay do worker de áudio, preservar o compose base
-e manter a imagem anterior identificada para rollback. Depois de um teste,
+e manter a imagem anterior identificada para rollback. Depois de um teste,sssss
 remover amostras temporárias e conferir que não há processo Demucs filho.
 Como não há RunPod nesta fase, não existe GPU para deixar ligada nem volume
 externo gerando cobrança.

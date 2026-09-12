@@ -1,0 +1,12 @@
+{
+  "id": "realbasicvsr-phase4-official-checkpoint-7945bff9cbb4",
+  "title": "RealBasicVSR phase4 official checkpoint",
+  "body": "Official MMEditing v0.16.0 model-zoo checkpoint downloaded on VPS. SHA256 52f77c2c835aaa3fe675b3959b2f85010a6c6f63f77f7e279394646e55a4e376. Intended experiment: same native input ROI, x4 restoration reduced to native output, bounded 25 percent mix, max 12 colour levels, same scene windows. No visual improvement measured.",
+  "sources": [
+    "https://raw.githubusercontent.com/open-mmlab/mmediting/v0.16.0/configs/restorers/real_basicvsr/README.md",
+    "https://download.openmmlab.com/mmediting/restorers/real_basicvsr/realbasicvsr_c64b20_1x30x8_lr5e-5_150k_reds_20211104-52f77c2c.pth"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-10T17:40:01.690868+00:00",
+  "category": "models"
+}

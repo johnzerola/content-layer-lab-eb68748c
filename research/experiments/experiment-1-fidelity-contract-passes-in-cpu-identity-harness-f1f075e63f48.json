@@ -1,0 +1,16 @@
+{
+  "id": "experiment-1-fidelity-contract-passes-in-cpu-identity-harness-f1f075e63f48",
+  "title": "Experiment 1 fidelity contract passes in CPU identity harness",
+  "body": "CPU-only identity experiment on three independent 4-second sources plus deterministic RGB bars/luma/chroma ramps. Calibration selected symmetric BT.709 limited-to-full decoding with accurate_rnd+full_chroma_int: grayscale-ramp Y' bias +0.0328 level. Current reachable path was reproduced with exact slice_video, composite_masked, and trim_edges helpers plus scene CRF0 encode. Proposed copy/lossless transport, common 1/30 filter timebase, plane-aware Y/U/V identity composition, and one final x264 slow CRF16 encode reduced RGB MAE by 61.13%, 56.36%, and 68.95%. SSIM improved by 0.00927-0.01041; residual gradient loss was 0.016%-0.243%; decoded RGB luma bias was +0.0142 to +0.0492. Width, height, SAR/DAR, 30fps, 120-frame count, and PTS matched exactly. BT.709 primaries/transfer/matrix, tv range, yuv420p, 8-bit, chroma location left, and 1/90000 timebase were present in outputs. Harness and copied backend-equivalent outputs were byte-identical for each source and decoded YUV hashes matched the single-encode transport ceiling. Individual removal of slice or trim improved mean MAE only 6.45% or 5.78%; scene CRF0 removal changed no pixels. Global RGB compositor smokes and mismatched-timebase framesync were rejected and preserved. Verdict ACCEPT for the no-AI fidelity hypothesis only. No production integration, B2/model/mask/donor changes, paid GPU, or cloud cost. Actual edited-ROI chroma mask semantics remain an integration gate.",
+  "sources": [
+    "research/experiments/EXPERIMENT_1_FIDELITY_REPORT.md",
+    "research/experiments/experiment1_fidelity.py",
+    "G:/dowloand/teste/experiment-1-fidelity-20260911/metrics-by-stage.json",
+    "G:/dowloand/teste/experiment-1-fidelity-20260911/ffprobe-by-stage.json",
+    "G:/dowloand/teste/experiment-1-fidelity-20260911/decoded-yuv-hashes.json",
+    "G:/dowloand/teste/experiment-1-fidelity-20260911/commands-and-times.json"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-11T05:34:03.943466+00:00",
+  "category": "experiments"
+}

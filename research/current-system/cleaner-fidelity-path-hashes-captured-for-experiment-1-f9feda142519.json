@@ -1,0 +1,12 @@
+{
+  "id": "cleaner-fidelity-path-hashes-captured-for-experiment-1-f9feda142519",
+  "title": "Cleaner fidelity path hashes captured for Experiment 1",
+  "body": "Working-tree hashes used by the Experiment 1 audit: backend/app/utils/video.py b2597226880776420836f53dc41d8366be198785f0a555ff8be75e31e0fd522f; backend/app/services/chunking.py 323146b689e914c0c950f6b8852a96a6db4f0d707bc4688c538869cfc75892fd; backend/app/services/scene_pipeline.py af543244949f4e8ac70678064aca41ff9227ea33a679c936a7cd302ac24c4e5b; backend/app/main.py 39d5eb52544f5d991aed7409bdc488cea1f55211d12eed237452935251216d2b; backend/runpod_handler.py 26fcc138972adf4d36c329c9125a5b29a8ea8ac5f7d8c6f45be3af3d5fb2c194; src/lib/cleaner-chunks.server.ts a37e5eb4c0224121d799ee89a497a926e9330c4d485e0dd06a11f9ed20627434. Deployment remains UNVERIFIED; no remote configuration or secret was inspected.",
+  "sources": [
+    "G:/dowloand/teste/experiment-1-fidelity-20260911/code-hashes.json",
+    "G:/dowloand/teste/experiment-1-fidelity-20260911/ffprobe-by-stage.json"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-11T05:34:16.304531+00:00",
+  "category": "current-system"
+}

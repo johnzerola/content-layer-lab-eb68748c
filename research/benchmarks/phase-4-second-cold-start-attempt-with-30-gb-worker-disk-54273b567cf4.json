@@ -1,0 +1,13 @@
+{
+  "id": "phase-4-second-cold-start-attempt-with-30-gb-worker-disk-54273b567cf4",
+  "title": "Phase 4 second cold-start attempt with 30 GB worker disk",
+  "body": "The same immutable 5.7 GB compressed RealBasicVSR image was retried with temporary container disk increased from 20 GB to 30 GB. The health job again remained queued while one worker stayed initializing until the bounded deadline. No model inference or candidate output occurred. Endpoint and template deletion, zero capacity, and Hostear project deletion were confirmed. The repeated result weakens insufficient worker disk as the primary hypothesis and supports rebuilding without the approximately 10 GB Conda base layer before another paid attempt.",
+  "sources": [
+    "research/experiments/phase4_isolated_sample.py",
+    "research/benchmarks/runs/phase4-isolated-1790272648801346600/report.json",
+    "research/experiments/PHASE4-STATUS-20260910.md"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-10T21:56:46.055151+00:00",
+  "category": "benchmarks"
+}

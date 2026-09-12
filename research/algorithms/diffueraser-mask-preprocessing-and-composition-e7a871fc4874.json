@@ -1,0 +1,11 @@
+{
+  "id": "diffueraser-mask-preprocessing-and-composition-e7a871fc4874",
+  "title": "DiffuEraser mask preprocessing and composition",
+  "body": "CONFIRMED in pinned source: read_mask applies erosion and dilation; blended composition expands the effective alpha boundary. Cleaner implication is a hypothesis: preserve masks before and after inference to attribute halos; do not increase dilation blindly.",
+  "sources": [
+    "https://github.com/lixiaowen-xw/DiffuEraser/blob/8e6f279ac7531e27ad1849c6f8dab5372a8597e7/diffueraser/diffueraser.py"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-10T15:57:01.624564+00:00",
+  "category": "algorithms"
+}

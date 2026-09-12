@@ -1,0 +1,19 @@
+{
+  "id": "microtexture-gap-audit-and-controlled-finishing-experiments-20260910-994345b5956f",
+  "title": "Microtexture gap audit and controlled finishing experiments 20260910",
+  "body": "CONFIRMED static inspection: current restore_inference_region resizes only on output-geometry mismatch and writes RGB lossless; composite_masked adds no blur but encodes YUV420 CRF16; ProPainter adapter has separate legacy MP4 and opt-in PNG/padding preserve-pixels routes. Existing subtitle_finish sharpening requires correlated detail deficit outside the mask and may intentionally remain inactive after exterior source compositing. HYPOTHESIS: avoidable resampling and intermediate codecs may explain some perceived texture gap, but historical v3 stage artifacts are required for attribution. Prioritized controlled experiments: matching per scene on clean image content; lossless stage captures; source identity resize/codec controls; existing native preservation route; bounded luma finishing; temporal donor/model restoration only if needed. LPIPS/SSIM against subtitle-covered source interior do not establish restored-background fidelity. RealBasicVSR phase4 has no accepted real-video candidate; do not count as proven quality failure/success. Full sourced report research/experiments/MICROTEXTURE-RESEARCH-20260910.md. No GPU or production changes.",
+  "sources": [
+    "research/experiments/MICROTEXTURE-RESEARCH-20260910.md",
+    "backend/app/services/inference_region.py",
+    "backend/app/utils/video.py",
+    "backend/app/engines/propainter_official.py",
+    "backend/app/video/subtitle_finish.py",
+    "https://github.com/sczhou/ProPainter/blob/e870e79321c31b733e2031af5aa2fb1fe3ac7eec/inference_propainter.py",
+    "https://arxiv.org/abs/2111.12704",
+    "https://github.com/richzhang/PerceptualSimilarity",
+    "https://ffmpeg.org/ffmpeg-codecs.html#libx264_002c-libx264rgb"
+  ],
+  "evidence": "HYPOTHESIS",
+  "recorded_at": "2026-09-10T23:51:56.149751+00:00",
+  "category": "experiments"
+}

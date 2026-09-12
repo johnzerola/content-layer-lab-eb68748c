@@ -1,0 +1,10 @@
+{
+  "status": "CONTRACT_ONLY_NO_MEDIA_EXPORT",
+  "projectFixture": "editor-v2-project.json",
+  "projectVersion": 2,
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "duration": 12,
+  "note": "A Phase 0 valida serialização, relógio e comandos. Um MP4 de referência exige fixture de mídia licenciada e fluxo autenticado e não foi fabricado como evidência."
+}

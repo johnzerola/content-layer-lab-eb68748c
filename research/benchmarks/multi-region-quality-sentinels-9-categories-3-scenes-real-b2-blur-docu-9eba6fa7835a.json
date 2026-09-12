@@ -1,0 +1,13 @@
+{
+  "id": "multi-region-quality-sentinels-9-categories-3-scenes-real-b2-blur-docu-9eba6fa7835a",
+  "title": "Multi-region quality sentinels: 9 categories, 3 scenes, real B2 blur documented",
+  "body": "Implemented local master RGB sentinel evaluator: FACE HAIR SKIN FABRIC SMOOTH_BACKGROUND TEXTURED_BACKGROUND DARK_AREA BRIGHT_AREA OBJECT_EDGE,25 fixed spatial patches across3scenes plus3inpainting bands.54consecutiveframes total;504region-frame records. SOURCE calibrated709, baseline copy B2masked pixels on sameSOURCE, actual archivedB2 diagnostic role separate. C2 transportcontrol onlysceneC:144externalregion-frames exact, candidateA/B andDiffuEraser null NOT_RUN. Measures Yprime, RGB-derivedCbCr, gradientsXY, GaussianHFenergy, Cannyrecall/precision, exactdelta, source-relative consecutive temporalresidual (no flow, not perceptualflicker). Blur/luma/chromashift controlledrejections passed; temporalshift3 detected.12videosdecoded. Native archivedB2frame34window/chair andframe88belt show rectangular smooth/dark bands beforedelivery. Rootcause mask vsmodel vscomposition not isolated. Buckle insideeditedmask requiresstructuralgate; outsideidentitycannotcertify. NoVmakeasGT,noenhancement,noproduction,nocloud,B2hashunchanged. Neuralcomparison remainsNOT_RUN.",
+  "sources": [
+    "G:/dowloand/teste/multi-region-sentinels-20260911/MULTI_REGION_SENTINEL_REPORT.md",
+    "G:/dowloand/teste/multi-region-sentinels-20260911/measurements.json",
+    "G:/dowloand/teste/multi-region-sentinels-20260911/instrument-controls.json"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-11T15:01:43.971357+00:00",
+  "category": "benchmarks"
+}

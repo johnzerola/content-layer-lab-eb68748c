@@ -1,0 +1,9 @@
+[
+  {"name":"OpenCut","url":"https://github.com/opencut-app/OpenCut","topic":"editor API plugin architecture Rust core MCP headless","license":"MIT per repository page; audit pinned revision before use"},
+  {"name":"OpenCut Classic","url":"https://github.com/opencut-app/opencut-classic","topic":"current public reference implementation","license":"REVIEW_REQUIRED per artifact"},
+  {"name":"Mediabunny","url":"https://mediabunny.dev/","topic":"browser demux mux WebCodecs streaming media","license":"REVIEW_REQUIRED before integration"},
+  {"name":"Remotion","url":"https://www.remotion.dev/docs/licensing","topic":"React composition and server rendering","license":"commercial terms must be checked for company use"},
+  {"name":"WaveSurfer.js","url":"https://wavesurfer.xyz/docs/","topic":"waveform playback regions peaks","license":"verify exact package/version; public pages show inconsistent historic license references"},
+  {"name":"Fabric.js","url":"https://fabricjs.com/","topic":"object canvas editor","license":"REVIEW_REQUIRED"},
+  {"name":"Konva","url":"https://konvajs.org/","topic":"canvas scene graph and transforms","license":"REVIEW_REQUIRED"}
+]

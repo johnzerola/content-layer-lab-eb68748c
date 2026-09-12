@@ -1,0 +1,15 @@
+{
+  "status": "TARGET_COVERAGE_NOT_COMPLETED_DATASET",
+  "available_controls": ["synthetic-static", "synthetic-pan", "synthetic-scene-cut"],
+  "target_real_cases": 100,
+  "real_cases_collected": 0,
+  "dimensions": {
+    "camera": ["static", "pan", "zoom", "shake", "moving"],
+    "content": ["people", "face", "hair", "objects", "cars", "crowd", "nature", "water", "fire", "smoke", "anime"],
+    "quality": ["low-quality", "1080p", "4K"],
+    "fps": [30, 60],
+    "text": ["white", "colored", "outline", "shadow", "glow", "transparent", "karaoke", "moving", "multiple-areas"]
+  },
+  "sampling": "Stratified real cases, tags may overlap; reserve held-out clips. No full Cartesian-product requirement.",
+  "commercial_gate": "Specific permission and applicable terms; Vmake output use to improve another AI service is restricted in reviewed terms."
+}

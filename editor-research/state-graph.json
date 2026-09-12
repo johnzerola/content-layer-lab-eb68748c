@@ -1,0 +1,15 @@
+{
+  "evidence": "STATIC_LOCAL_SOURCE; runtime and deployed behaviour unverified",
+  "nodes": [
+    {"id":"media-input","role":"File/object URL and source duration"},
+    {"id":"preedit","role":"crop, segments, transitions and keyframes"},
+    {"id":"history","role":"VideoStudio document undo/redo"},
+    {"id":"playhead","role":"local preview time"},
+    {"id":"captions","role":"separate caption input/change callback"},
+    {"id":"template-canvas","role":"layer document and visual selection"},
+    {"id":"render","role":"route/worker/server render path"}
+  ],
+  "edges": [["media-input","preedit"],["preedit","history"],["history","playhead"],["captions","render"],["template-canvas","render"],["preedit","render"]],
+  "gaps_to_validate": ["single project clock source-to-output mapping","transactional history across captions/timeline/canvas","same media binding in preview and final render","save revision and render revision"],
+  "proposal_boundary": "Observed surfaces and research targets, not a replacement state architecture."
+}

@@ -1,0 +1,12 @@
+{
+  "id": "a-faixa-do-su-ter-no-b2-ainda-parece-sint-tica-e-a-busca-anterior-de-d-c6a21284a4b4",
+  "title": "A faixa do suéter no B2 ainda parece sintética e a busca anterior de donors/contexto terminou no frame 146, embora a cena continue até 198.",
+  "body": "{\"problem\": \"A faixa do suéter no B2 ainda parece sintética e a busca anterior de donors/contexto terminou no frame 146, embora a cena continue até 198.\", \"hypothesis\": \"Frames 147–198 da mesma cena contêm observações reais alinháveis que aumentam a recuperação validada de microtextura e/ou melhoram a saída do ProPainter para os alvos 104–146.\", \"baseline\": \"B2 finish OFF; donor pool antigo [104,112,116,128,136,145,146]; ProPainter C2 em 104–146, 824x296 padded, fp16, stride 2, neighbor 6, subvideo 43.\", \"change\": \"A: adicionar sistematicamente frames 147–198 ao pool, sem alterar thresholds/máscara/ROI/alinhamento. B somente após A: ampliar apenas a sequência temporal do ProPainter para 104–198, donor blend OFF.\", \"dataset\": \"Cena local autorizada de G:/dowloand/teste/padro-01-001 (15).mp4, alvos 104–146, contexto 147–198; controle GT em tecido limpo da própria cena com máscara sintética.\", \"metrics\": [\"masked MAE GT\", \"SSIM GT\", \"edge preservation\", \"texture descriptor\", \"temporal stability\", \"accepted donor coverage\", \"FB error\", \"occlusion\", \"photometric consistency\", \"outside-mask exactness\", \"runtime\", \"VRAM\"], \"status\": \"DESIGNED\", \"result\": null, \"production_changes\": false}",
+  "sources": [
+    "B2 finish OFF; donor pool antigo [104,112,116,128,136,145,146]; ProPainter C2 em 104–146, 824x296 padded, fp16, stride 2, neighbor 6, subvideo 43.",
+    "Cena local autorizada de G:/dowloand/teste/padro-01-001 (15).mp4, alvos 104–146, contexto 147–198; controle GT em tecido limpo da própria cena com máscara sintética."
+  ],
+  "evidence": "HYPOTHESIS",
+  "recorded_at": "2026-09-11T11:52:28.363575+00:00",
+  "category": "experiments"
+}

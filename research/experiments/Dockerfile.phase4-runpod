@@ -1,0 +1,8 @@
+FROM cleaner-research:phase4-realbasicvsr-20260910
+RUN python -m pip install --no-cache-dir runpod==1.7.7 requests==2.34.2
+COPY phase4_restore.py /opt/phase4/phase4_restore.py
+COPY phase4_handler.py /opt/phase4/phase4_handler.py
+COPY checkpoints/realbasicvsr.pth /opt/phase4/realbasicvsr.pth
+ENV PYTHONUNBUFFERED=1 RUNPOD_INIT_TIMEOUT=800
+ENTRYPOINT []
+CMD ["python", "-u", "/opt/phase4/phase4_handler.py"]

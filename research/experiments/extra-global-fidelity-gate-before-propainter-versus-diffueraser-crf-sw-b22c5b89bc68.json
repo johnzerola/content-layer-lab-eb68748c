@@ -1,0 +1,12 @@
+{
+  "id": "extra-global-fidelity-gate-before-propainter-versus-diffueraser-crf-sw-b22c5b89bc68",
+  "title": "Extra global fidelity gate before ProPainter versus DiffuEraser; CRF sweep and perceptual finish remain blocked until later gates.",
+  "body": "{\"problem\": \"Extra global fidelity gate before ProPainter versus DiffuEraser; CRF sweep and perceptual finish remain blocked until later gates.\", \"hypothesis\": \"Native ROI-only color conversion with per-plane source preservation can preserve external pixels through a real edit under symmetric BT709 decode.\", \"baseline\": \"Experiment1 plane-preserving identity compositor; B2 frozen finishOFF\", \"change\": \"Non-identity native C2 reconstructed ROI + real final mask into original YUV source; one shared lab composition/delivery implementation. Test chroma support guard separately.\", \"dataset\": \"Source frames104-146, C2 raw-output820x294, original approved full-frame masks; additional saturated synthetic ROI as boundary diagnostic only.\", \"metrics\": [\"external YUV identity\", \"external RGB identity\", \"chroma boundary leakage\", \"frame IDs and PTS\", \"padding crop identity\", \"lossless master decode hash\", \"single CRF16 delivery\"], \"status\": \"DESIGNED\", \"result\": null, \"production_changes\": false}",
+  "sources": [
+    "Experiment1 plane-preserving identity compositor; B2 frozen finishOFF",
+    "Source frames104-146, C2 raw-output820x294, original approved full-frame masks; additional saturated synthetic ROI as boundary diagnostic only."
+  ],
+  "evidence": "HYPOTHESIS",
+  "recorded_at": "2026-09-11T14:15:10.070745+00:00",
+  "category": "experiments"
+}

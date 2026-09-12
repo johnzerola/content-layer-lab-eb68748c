@@ -1,0 +1,316 @@
+{
+  "repository": "princeton-vl/RAFT",
+  "revision": "2888e15a51fa41140771d3f498ed8023cff098d1",
+  "source": {
+    "url": "https://api.github.com/repos/princeton-vl/RAFT",
+    "retrieved_at": "2026-09-10T15:40:44.840033+00:00",
+    "sha256": "09427404aa76d714736797b20f95530fe13dbb16bdb3ba84e96508e437746b0a",
+    "cached": false
+  },
+  "commit_source": {
+    "url": "https://api.github.com/repos/princeton-vl/RAFT/commits/master",
+    "retrieved_at": "2026-09-10T15:40:45.316427+00:00",
+    "sha256": "4779fc8454d45d32ee450fed5031da697b311983ed80d085faa84ee0c22c556d",
+    "cached": false
+  },
+  "tree_source": {
+    "url": "https://api.github.com/repos/princeton-vl/RAFT/git/trees/2888e15a51fa41140771d3f498ed8023cff098d1?recursive=1",
+    "retrieved_at": "2026-09-10T15:40:45.669204+00:00",
+    "sha256": "87a0e092e7207956625e265ec6c0f541f15514b207ffc3346c40e5fc939e90f6",
+    "cached": false
+  },
+  "files_in_tree": [
+    ".gitignore",
+    "LICENSE",
+    "RAFT.png",
+    "README.md",
+    "alt_cuda_corr/correlation.cpp",
+    "alt_cuda_corr/correlation_kernel.cu",
+    "alt_cuda_corr/setup.py",
+    "chairs_split.txt",
+    "core/__init__.py",
+    "core/corr.py",
+    "core/datasets.py",
+    "core/extractor.py",
+    "core/raft.py",
+    "core/update.py",
+    "core/utils/__init__.py",
+    "core/utils/augmentor.py",
+    "core/utils/flow_viz.py",
+    "core/utils/frame_utils.py",
+    "core/utils/utils.py",
+    "demo-frames/frame_0016.png",
+    "demo-frames/frame_0017.png",
+    "demo-frames/frame_0018.png",
+    "demo-frames/frame_0019.png",
+    "demo-frames/frame_0020.png",
+    "demo-frames/frame_0021.png",
+    "demo-frames/frame_0022.png",
+    "demo-frames/frame_0023.png",
+    "demo-frames/frame_0024.png",
+    "demo-frames/frame_0025.png",
+    "demo.py",
+    "download_models.sh",
+    "evaluate.py",
+    "train.py",
+    "train_mixed.sh",
+    "train_standard.sh"
+  ],
+  "tree_truncated": false,
+  "files": [
+    {
+      "path": "LICENSE",
+      "source": {
+        "url": "https://raw.githubusercontent.com/princeton-vl/RAFT/2888e15a51fa41140771d3f498ed8023cff098d1/LICENSE",
+        "retrieved_at": "2026-09-10T15:40:46.003119+00:00",
+        "sha256": "399af7e243d625e8dea2b3f81fec676ea19bacf7d9ce8cfd4ce15530d8a66173",
+        "cached": false
+      },
+      "content": "BSD 3-Clause License\n\nCopyright (c) 2020, princeton-vl\nAll rights reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions are met:\n\n* Redistributions of source code must retain the above copyright notice, this\n  list of conditions and the following disclaimer.\n\n* Redistributions in binary form must reproduce the above copyright notice,\n  this list of conditions and the following disclaimer in the documentation\n  and/or other materials provided with the distribution.\n\n* Neither the name of the copyright holder nor the names of its\n  contributors may be used to endorse or promote products derived from\n  this software without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\"\nAND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE\nIMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE\nDISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE\nFOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL\nDAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR\nSERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER\nCAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,\nOR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE\nOF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n",
+      "truncated": false
+    },
+    {
+      "path": "README.md",
+      "source": {
+        "url": "https://raw.githubusercontent.com/princeton-vl/RAFT/2888e15a51fa41140771d3f498ed8023cff098d1/README.md",
+        "retrieved_at": "2026-09-10T15:41:47.762776+00:00",
+        "sha256": "64fe19a2eafcd59075b0e711c8c5e5436ffb20339b302223e6a7954ce74c60d3",
+        "cached": false
+      },
+      "content": "# RAFT\nThis repository contains the source code for our paper:\n\n[RAFT: Recurrent All Pairs Field Transforms for Optical Flow](https://arxiv.org/pdf/2003.12039.pdf)<br/>\nECCV 2020 <br/>\nZachary Teed and Jia Deng<br/>\n\n<img src=\"RAFT.png\">\n\n## Requirements\nThe code has been tested with PyTorch 1.6 and Cuda 10.1.\n```Shell\nconda create --name raft\nconda activate raft\nconda install pytorch=1.6.0 torchvision=0.7.0 cudatoolkit=10.1 matplotlib tensorboard scipy opencv -c pytorch\n```\n\n## Demos\nPretrained models can be downloaded by running\n```Shell\n./download_models.sh\n```\nor downloaded from [google drive](https://drive.google.com/drive/folders/1sWDsfuZ3Up38EUQt7-JDTT1HcGHuJgvT?usp=sharing)\n\nYou can demo a trained model on a sequence of frames\n```Shell\npython demo.py --model=models/raft-things.pth --path=demo-frames\n```\n\n## Required Data\nTo evaluate/train RAFT, you will need to download the required datasets. \n* [FlyingChairs](https://lmb.informatik.uni-freiburg.de/resources/datasets/FlyingChairs.en.html#flyingchairs)\n* [FlyingThings3D](https://lmb.informatik.uni-freiburg.de/resources/datasets/SceneFlowDatasets.en.html)\n* [Sintel](http://sintel.is.tue.mpg.de/)\n* [KITTI](http://www.cvlibs.net/datasets/kitti/eval_scene_flow.php?benchmark=flow)\n* [HD1K](http://hci-benchmark.iwr.uni-heidelberg.de/) (optional)\n\n\nBy default `datasets.py` will search for the datasets in these locations. You can create symbolic links to wherever the datasets were downloaded in the `datasets` folder\n\n```Shell\n├── datasets\n    ├── Sintel\n        ├── test\n        ├── training\n    ├── KITTI\n        ├── testing\n        ├── training\n        ├── devkit\n    ├── FlyingChairs_release\n        ├── data\n    ├── FlyingThings3D\n        ├── frames_cleanpass\n        ├── frames_finalpass\n        ├── optical_flow\n```\n\n## Evaluation\nYou can evaluate a trained model using `evaluate.py`\n```Shell\npython evaluate.py --model=models/raft-things.pth --dataset=sintel --mixed_precision\n```\n\n## Training\nWe used the following training schedule in our paper (2 GPUs). Training logs will be written to the `runs` which can be visualized using tensorboard\n```Shell\n./train_standard.sh\n```\n\nIf you have a RTX GPU, training can be accelerated using mixed precision. You can expect similiar results in this setting (1 GPU)\n```Shell\n./train_mixed.sh\n```\n\n## (Optional) Efficent Implementation\nYou can optionally use our alternate (efficent) implementation by compiling the provided cuda extension\n```Shell\ncd alt_cuda_corr && python setup.py install && cd ..\n```\nand running `demo.py` and `evaluate.py` with the `--alternate_corr` flag Note, this implementation is somewhat slower than all-pairs, but uses significantly less GPU memory during the forward pass.\n",
+      "truncated": false
+    },
+    {
+      "path": "core/raft.py",
+      "source": {
+        "url": "https://raw.githubusercontent.com/princeton-vl/RAFT/2888e15a51fa41140771d3f498ed8023cff098d1/core/raft.py",
+        "retrieved_at": "2026-09-10T15:41:48.075534+00:00",
+        "sha256": "e7280b82d0e224eff760ae8de5e8ea68923a7928c1e34920378b6f3a039a8633",
+        "cached": false
+      },
+      "content": "import numpy as np\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nfrom update import BasicUpdateBlock, SmallUpdateBlock\nfrom extractor import BasicEncoder, SmallEncoder\nfrom corr import CorrBlock, AlternateCorrBlock\nfrom utils.utils import bilinear_sampler, coords_grid, upflow8\n\ntry:\n    autocast = torch.cuda.amp.autocast\nexcept:\n    # dummy autocast for PyTorch < 1.6\n    class autocast:\n        def __init__(self, enabled):\n            pass\n        def __enter__(self):\n            pass\n        def __exit__(self, *args):\n            pass\n\n\nclass RAFT(nn.Module):\n    def __init__(self, args):\n        super(RAFT, self).__init__()\n        self.args = args\n\n        if args.small:\n            self.hidden_dim = hdim = 96\n            self.context_dim = cdim = 64\n            args.corr_levels = 4\n            args.corr_radius = 3\n        \n        else:\n            self.hidden_dim = hdim = 128\n            self.context_dim = cdim = 128\n            args.corr_levels = 4\n            args.corr_radius = 4\n\n        if 'dropout' not in self.args:\n            self.args.dropout = 0\n\n        if 'alternate_corr' not in self.args:\n            self.args.alternate_corr = False\n\n        # feature network, context network, and update block\n        if args.small:\n            self.fnet = SmallEncoder(output_dim=128, norm_fn='instance', dropout=args.dropout)        \n            self.cnet = SmallEncoder(output_dim=hdim+cdim, norm_fn='none', dropout=args.dropout)\n            self.update_block = SmallUpdateBlock(self.args, hidden_dim=hdim)\n\n        else:\n            self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', dropout=args.dropout)        \n            self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_fn='batch', dropout=args.dropout)\n            self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim)\n\n    def freeze_bn(self):\n        for m in self.modules():\n            if isinstance(m, nn.BatchNorm2d):\n                m.eval()\n\n    def initialize_flow(self, img):\n        \"\"\" Flow is represented as difference between two coordinate grids flow = coords1 - coords0\"\"\"\n        N, C, H, W = img.shape\n        coords0 = coords_grid(N, H//8, W//8, device=img.device)\n        coords1 = coords_grid(N, H//8, W//8, device=img.device)\n\n        # optical flow computed as difference: flow = coords1 - coords0\n        return coords0, coords1\n\n    def upsample_flow(self, flow, mask):\n        \"\"\" Upsample flow field [H/8, W/8, 2] -> [H, W, 2] using convex combination \"\"\"\n        N, _, H, W = flow.shape\n        mask = mask.view(N, 1, 9, 8, 8, H, W)\n        mask = torch.softmax(mask, dim=2)\n\n        up_flow = F.unfold(8 * flow, [3,3], padding=1)\n        up_flow = up_flow.view(N, 2, 9, 1, 1, H, W)\n\n        up_flow = torch.sum(mask * up_flow, dim=2)\n        up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)\n        return up_flow.reshape(N, 2, 8*H, 8*W)\n\n\n    def forward(self, image1, image2, iters=12, flow_init=None, upsample=True, test_mode=False):\n        \"\"\" Estimate optical flow between pair of frames \"\"\"\n\n        image1 = 2 * (image1 / 255.0) - 1.0\n        image2 = 2 * (image2 / 255.0) - 1.0\n\n        image1 = image1.contiguous()\n        image2 = image2.contiguous()\n\n        hdim = self.hidden_dim\n        cdim = self.context_dim\n\n        # run the feature network\n        with autocast(enabled=self.args.mixed_precision):\n            fmap1, fmap2 = self.fnet([image1, image2])        \n        \n        fmap1 = fmap1.float()\n        fmap2 = fmap2.float()\n        if self.args.alternate_corr:\n            corr_fn = AlternateCorrBlock(fmap1, fmap2, radius=self.args.corr_radius)\n        else:\n            corr_fn = CorrBlock(fmap1, fmap2, radius=self.args.corr_radius)\n\n        # run the context network\n        with autocast(enabled=self.args.mixed_precision):\n            cnet = self.cnet(image1)\n            net, inp = torch.split(cnet, [hdim, cdim], dim=1)\n            net = torch.tanh(net)\n            inp = torch.relu(inp)\n\n        coords0, coords1 = self.initialize_flow(image1)\n\n        if flow_init is not None:\n            coords1 = coords1 + flow_init\n\n        flow_predictions = []\n        for itr in range(iters):\n            coords1 = coords1.detach()\n            corr = corr_fn(coords1) # index correlation volume\n\n            flow = coords1 - coords0\n            with autocast(enabled=self.args.mixed_precision):\n                net, up_mask, delta_flow = self.update_block(net, inp, corr, flow)\n\n            # F(t+1) = F(t) + \\Delta(t)\n            coords1 = coords1 + delta_flow\n\n            # upsample predictions\n            if up_mask is None:\n                flow_up = upflow8(coords1 - coords0)\n            else:\n                flow_up = self.upsample_flow(coords1 - coords0, up_mask)\n            \n            flow_predictions.append(flow_up)\n\n        if test_mode:\n            return coords1 - coords0, flow_up\n            \n        return flow_predictions\n",
+      "truncated": false
+    },
+    {
+      "path": "core/corr.py",
+      "source": {
+        "url": "https://raw.githubusercontent.com/princeton-vl/RAFT/2888e15a51fa41140771d3f498ed8023cff098d1/core/corr.py",
+        "retrieved_at": "2026-09-10T15:41:48.393784+00:00",
+        "sha256": "66f85489672e8fbf531135b53cda710594cfd1d900e855200e2bf6268dd7264a",
+        "cached": false
+      },
+      "content": "import torch\nimport torch.nn.functional as F\nfrom utils.utils import bilinear_sampler, coords_grid\n\ntry:\n    import alt_cuda_corr\nexcept:\n    # alt_cuda_corr is not compiled\n    pass\n\n\nclass CorrBlock:\n    def __init__(self, fmap1, fmap2, num_levels=4, radius=4):\n        self.num_levels = num_levels\n        self.radius = radius\n        self.corr_pyramid = []\n\n        # all pairs correlation\n        corr = CorrBlock.corr(fmap1, fmap2)\n\n        batch, h1, w1, dim, h2, w2 = corr.shape\n        corr = corr.reshape(batch*h1*w1, dim, h2, w2)\n        \n        self.corr_pyramid.append(corr)\n        for i in range(self.num_levels-1):\n            corr = F.avg_pool2d(corr, 2, stride=2)\n            self.corr_pyramid.append(corr)\n\n    def __call__(self, coords):\n        r = self.radius\n        coords = coords.permute(0, 2, 3, 1)\n        batch, h1, w1, _ = coords.shape\n\n        out_pyramid = []\n        for i in range(self.num_levels):\n            corr = self.corr_pyramid[i]\n            dx = torch.linspace(-r, r, 2*r+1, device=coords.device)\n            dy = torch.linspace(-r, r, 2*r+1, device=coords.device)\n            delta = torch.stack(torch.meshgrid(dy, dx), axis=-1)\n\n            centroid_lvl = coords.reshape(batch*h1*w1, 1, 1, 2) / 2**i\n            delta_lvl = delta.view(1, 2*r+1, 2*r+1, 2)\n            coords_lvl = centroid_lvl + delta_lvl\n\n            corr = bilinear_sampler(corr, coords_lvl)\n            corr = corr.view(batch, h1, w1, -1)\n            out_pyramid.append(corr)\n\n        out = torch.cat(out_pyramid, dim=-1)\n        return out.permute(0, 3, 1, 2).contiguous().float()\n\n    @staticmethod\n    def corr(fmap1, fmap2):\n        batch, dim, ht, wd = fmap1.shape\n        fmap1 = fmap1.view(batch, dim, ht*wd)\n        fmap2 = fmap2.view(batch, dim, ht*wd) \n        \n        corr = torch.matmul(fmap1.transpose(1,2), fmap2)\n        corr = corr.view(batch, ht, wd, 1, ht, wd)\n        return corr  / torch.sqrt(torch.tensor(dim).float())\n\nclass AltCudaCorr(torch.autograd.Function):\n    @staticmethod\n    def forward(ctx, fmap1, fmap2_i, coords, r):\n        ctx.save_for_backward(fmap1, fmap2_i, coords)\n        ctx.r = r\n        corr, = alt_cuda_corr.forward(fmap1, fmap2_i, coords, r)\n        return corr,\n        # this should be different from return alt_cuda_corr.forward(...\n    \n    @staticmethod\n    def backward(ctx, corr_grad):\n        fmap1, fmap2_i, coords = ctx.saved_tensors\n        corr_grad = corr_grad.contiguous()\n        fmap1_grad, fmap2_grad, coords_grad = alt_cuda_corr.backward(fmap1, fmap2_i, coords, corr_grad, ctx.r)\n        return fmap1_grad, fmap2_grad, coords_grad, None\n    \n\n\nclass AlternateCorrBlock:\n    def __init__(self, fmap1, fmap2, num_levels=4, radius=4):\n        self.num_levels = num_levels\n        self.radius = radius\n\n        self.pyramid = [(fmap1, fmap2)]\n        for i in range(self.num_levels):\n            fmap1 = F.avg_pool2d(fmap1, 2, stride=2)\n            fmap2 = F.avg_pool2d(fmap2, 2, stride=2)\n            self.pyramid.append((fmap1, fmap2))\n\n    def __call__(self, coords):\n        coords = coords.permute(0, 2, 3, 1)\n        B, H, W, _ = coords.shape\n        dim = self.pyramid[0][0].shape[1]\n\n        corr_list = []\n        for i in range(self.num_levels):\n            r = self.radius\n            fmap1_i = self.pyramid[0][0].permute(0, 2, 3, 1).contiguous()\n            fmap2_i = self.pyramid[i][1].permute(0, 2, 3, 1).contiguous()\n\n            coords_i = (coords / 2**i).reshape(B, 1, H, W, 2).contiguous()\n            corr, = AltCudaCorr.apply(fmap1_i, fmap2_i, coords_i, r)\n            corr_list.append(corr.squeeze(1))\n\n        corr = torch.stack(corr_list, dim=1)\n        corr = corr.reshape(B, -1, H, W)\n        return corr / torch.sqrt(torch.tensor(dim).float())\n",
+      "truncated": false
+    },
+    {
+      "path": "core/update.py",
+      "source": {
+        "url": "https://raw.githubusercontent.com/princeton-vl/RAFT/2888e15a51fa41140771d3f498ed8023cff098d1/core/update.py",
+        "retrieved_at": "2026-09-10T15:41:48.789555+00:00",
+        "sha256": "7302f91ffc24c85cf739a25feb17d9d1e537f7344a2ddc331daf8ab9db6c3f74",
+        "cached": false
+      },
+      "content": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\n\nclass FlowHead(nn.Module):\n    def __init__(self, input_dim=128, hidden_dim=256):\n        super(FlowHead, self).__init__()\n        self.conv1 = nn.Conv2d(input_dim, hidden_dim, 3, padding=1)\n        self.conv2 = nn.Conv2d(hidden_dim, 2, 3, padding=1)\n        self.relu = nn.ReLU(inplace=True)\n\n    def forward(self, x):\n        return self.conv2(self.relu(self.conv1(x)))\n\nclass ConvGRU(nn.Module):\n    def __init__(self, hidden_dim=128, input_dim=192+128):\n        super(ConvGRU, self).__init__()\n        self.convz = nn.Conv2d(hidden_dim+input_dim, hidden_dim, 3, padding=1)\n        self.convr = nn.Conv2d(hidden_dim+input_dim, hidden_dim, 3, padding=1)\n        self.convq = nn.Conv2d(hidden_dim+input_dim, hidden_dim, 3, padding=1)\n\n    def forward(self, h, x):\n        hx = torch.cat([h, x], dim=1)\n\n        z = torch.sigmoid(self.convz(hx))\n        r = torch.sigmoid(self.convr(hx))\n        q = torch.tanh(self.convq(torch.cat([r*h, x], dim=1)))\n\n        h = (1-z) * h + z * q\n        return h\n\nclass SepConvGRU(nn.Module):\n    def __init__(self, hidden_dim=128, input_dim=192+128):\n        super(SepConvGRU, self).__init__()\n        self.convz1 = nn.Conv2d(hidden_dim+input_dim, hidden_dim, (1,5), padding=(0,2))\n        self.convr1 = nn.Conv2d(hidden_dim+input_dim, hidden_dim, (1,5), padding=(0,2))\n        self.convq1 = nn.Conv2d(hidden_dim+input_dim, hidden_dim, (1,5), padding=(0,2))\n\n        self.convz2 = nn.Conv2d(hidden_dim+input_dim, hidden_dim, (5,1), padding=(2,0))\n        self.convr2 = nn.Conv2d(hidden_dim+input_dim, hidden_dim, (5,1), padding=(2,0))\n        self.convq2 = nn.Conv2d(hidden_dim+input_dim, hidden_dim, (5,1), padding=(2,0))\n\n\n    def forward(self, h, x):\n        # horizontal\n        hx = torch.cat([h, x], dim=1)\n        z = torch.sigmoid(self.convz1(hx))\n        r = torch.sigmoid(self.convr1(hx))\n        q = torch.tanh(self.convq1(torch.cat([r*h, x], dim=1)))        \n        h = (1-z) * h + z * q\n\n        # vertical\n        hx = torch.cat([h, x], dim=1)\n        z = torch.sigmoid(self.convz2(hx))\n        r = torch.sigmoid(self.convr2(hx))\n        q = torch.tanh(self.convq2(torch.cat([r*h, x], dim=1)))       \n        h = (1-z) * h + z * q\n\n        return h\n\nclass SmallMotionEncoder(nn.Module):\n    def __init__(self, args):\n        super(SmallMotionEncoder, self).__init__()\n        cor_planes = args.corr_levels * (2*args.corr_radius + 1)**2\n        self.convc1 = nn.Conv2d(cor_planes, 96, 1, padding=0)\n        self.convf1 = nn.Conv2d(2, 64, 7, padding=3)\n        self.convf2 = nn.Conv2d(64, 32, 3, padding=1)\n        self.conv = nn.Conv2d(128, 80, 3, padding=1)\n\n    def forward(self, flow, corr):\n        cor = F.relu(self.convc1(corr))\n        flo = F.relu(self.convf1(flow))\n        flo = F.relu(self.convf2(flo))\n        cor_flo = torch.cat([cor, flo], dim=1)\n        out = F.relu(self.conv(cor_flo))\n        return torch.cat([out, flow], dim=1)\n\nclass BasicMotionEncoder(nn.Module):\n    def __init__(self, args):\n        super(BasicMotionEncoder, self).__init__()\n        cor_planes = args.corr_levels * (2*args.corr_radius + 1)**2\n        self.convc1 = nn.Conv2d(cor_planes, 256, 1, padding=0)\n        self.convc2 = nn.Conv2d(256, 192, 3, padding=1)\n        self.convf1 = nn.Conv2d(2, 128, 7, padding=3)\n        self.convf2 = nn.Conv2d(128, 64, 3, padding=1)\n        self.conv = nn.Conv2d(64+192, 128-2, 3, padding=1)\n\n    def forward(self, flow, corr):\n        cor = F.relu(self.convc1(corr))\n        cor = F.relu(self.convc2(cor))\n        flo = F.relu(self.convf1(flow))\n        flo = F.relu(self.convf2(flo))\n\n        cor_flo = torch.cat([cor, flo], dim=1)\n        out = F.relu(self.conv(cor_flo))\n        return torch.cat([out, flow], dim=1)\n\nclass SmallUpdateBlock(nn.Module):\n    def __init__(self, args, hidden_dim=96):\n        super(SmallUpdateBlock, self).__init__()\n        self.encoder = SmallMotionEncoder(args)\n        self.gru = ConvGRU(hidden_dim=hidden_dim, input_dim=82+64)\n        self.flow_head = FlowHead(hidden_dim, hidden_dim=128)\n\n    def forward(self, net, inp, corr, flow):\n        motion_features = self.encoder(flow, corr)\n        inp = torch.cat([inp, motion_features], dim=1)\n        net = self.gru(net, inp)\n        delta_flow = self.flow_head(net)\n\n        return net, None, delta_flow\n\nclass BasicUpdateBlock(nn.Module):\n    def __init__(self, args, hidden_dim=128, input_dim=128):\n        super(BasicUpdateBlock, self).__init__()\n        self.args = args\n        self.encoder = BasicMotionEncoder(args)\n        self.gru = SepConvGRU(hidden_dim=hidden_dim, input_dim=128+hidden_dim)\n        self.flow_head = FlowHead(hidden_dim, hidden_dim=256)\n\n        self.mask = nn.Sequential(\n            nn.Conv2d(128, 256, 3, padding=1),\n            nn.ReLU(inplace=True),\n            nn.Conv2d(256, 64*9, 1, padding=0))\n\n    def forward(self, net, inp, corr, flow, upsample=True):\n        motion_features = self.encoder(flow, corr)\n        inp = torch.cat([inp, motion_features], dim=1)\n\n        net = self.gru(net, inp)\n        delta_flow = self.flow_head(net)\n\n        # scale mask to balence gradients\n        mask = .25 * self.mask(net)\n        return net, mask, delta_flow\n\n\n\n",
+      "truncated": false
+    },
+    {
+      "path": "demo.py",
+      "source": {
+        "url": "https://raw.githubusercontent.com/princeton-vl/RAFT/2888e15a51fa41140771d3f498ed8023cff098d1/demo.py",
+        "retrieved_at": "2026-09-10T15:41:49.097017+00:00",
+        "sha256": "23b811268946823705f212bcf6e98cc58989db636fb192703d6b1869730b8e49",
+        "cached": false
+      },
+      "content": "import sys\nsys.path.append('core')\n\nimport argparse\nimport os\nimport cv2\nimport glob\nimport numpy as np\nimport torch\nfrom PIL import Image\n\nfrom raft import RAFT\nfrom utils import flow_viz\nfrom utils.utils import InputPadder\n\n\n\nDEVICE = 'cuda'\n\ndef load_image(imfile):\n    img = np.array(Image.open(imfile)).astype(np.uint8)\n    img = torch.from_numpy(img).permute(2, 0, 1).float()\n    return img[None].to(DEVICE)\n\n\ndef viz(img, flo):\n    img = img[0].permute(1,2,0).cpu().numpy()\n    flo = flo[0].permute(1,2,0).cpu().numpy()\n    \n    # map flow to rgb image\n    flo = flow_viz.flow_to_image(flo)\n    img_flo = np.concatenate([img, flo], axis=0)\n\n    # import matplotlib.pyplot as plt\n    # plt.imshow(img_flo / 255.0)\n    # plt.show()\n\n    cv2.imshow('image', img_flo[:, :, [2,1,0]]/255.0)\n    cv2.waitKey()\n\n\ndef demo(args):\n    model = torch.nn.DataParallel(RAFT(args))\n    model.load_state_dict(torch.load(args.model))\n\n    model = model.module\n    model.to(DEVICE)\n    model.eval()\n\n    with torch.no_grad():\n        images = glob.glob(os.path.join(args.path, '*.png')) + \\\n                 glob.glob(os.path.join(args.path, '*.jpg'))\n        \n        images = sorted(images)\n        for imfile1, imfile2 in zip(images[:-1], images[1:]):\n            image1 = load_image(imfile1)\n            image2 = load_image(imfile2)\n\n            padder = InputPadder(image1.shape)\n            image1, image2 = padder.pad(image1, image2)\n\n            flow_low, flow_up = model(image1, image2, iters=20, test_mode=True)\n            viz(image1, flow_up)\n\n\nif __name__ == '__main__':\n    parser = argparse.ArgumentParser()\n    parser.add_argument('--model', help=\"restore checkpoint\")\n    parser.add_argument('--path', help=\"dataset for evaluation\")\n    parser.add_argument('--small', action='store_true', help='use small model')\n    parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')\n    parser.add_argument('--alternate_corr', action='store_true', help='use efficent correlation implementation')\n    args = parser.parse_args()\n\n    demo(args)\n",
+      "truncated": false
+    }
+  ],
+  "community": {
+    "issues": {
+      "source": {
+        "url": "https://api.github.com/repos/princeton-vl/RAFT/issues?per_page=5",
+        "retrieved_at": "2026-09-10T15:40:46.468742+00:00",
+        "sha256": "20a2b13d5dd9a5bc041a7a23e6b76629d4434a09a4c891b6c1a480bb12fcaa83",
+        "cached": false
+      },
+      "items": [
+        {
+          "number": 195,
+          "title": "Update corr.py",
+          "html_url": "https://github.com/princeton-vl/RAFT/pull/195",
+          "state": "open",
+          "full_name": null,
+          "tag_name": null,
+          "body": null
+        },
+        {
+          "number": 193,
+          "title": "The model has been integrated into torchvision",
+          "html_url": "https://github.com/princeton-vl/RAFT/issues/193",
+          "state": "open",
+          "full_name": null,
+          "tag_name": null,
+          "body": "https://docs.pytorch.org/vision/stable/auto_examples/others/plot_optical_flow.html#sphx-glr-auto-examples-others-plot-optical-flow-py"
+        },
+        {
+          "number": 192,
+          "title": "There is a line of code that is wrong.",
+          "html_url": "https://github.com/princeton-vl/RAFT/issues/192",
+          "state": "open",
+          "full_name": null,
+          "tag_name": null,
+          "body": "In corr.py, there is a line of code is:\ndelta = torch.stack(torch.meshgrid(dy, dx), axis=-1)\n\nShouldn't it be:\ndelta = torch.stack(torch.meshgrid(dx, dy, indexing=\"xy\"), axis=-1)\n?\n\nBecause the function \"def bilinear_sampler(img, coords, mode='bilinear', mask=False)\" looks the first place of the last dimension as x, and it looks the second place as y.\n\nAm I wrong?\n\nI'm confused, thanks very much for replying."
+        },
+        {
+          "number": 189,
+          "title": "Possible misstatement about pixel reference frame in flow definition (Section 3.1 Feature Extraction)",
+          "html_url": "https://github.com/princeton-vl/RAFT/issues/189",
+          "state": "open",
+          "full_name": null,
+          "tag_name": null,
+          "body": "Hi authors, thank you for your excellent work on RAFT.\n\nI’d like to point out a small potential misstatement in the paper (Section 3.1 Feature Extraction). The paper states:\n\n\n> we estimate a dense displacement field (f¹, f²) which maps each pixel (u, v) in I₂ to its corresponding coordinates (u′, v′) = (u + f¹(u), v + f²(v)) in I₂\n\n\n\nThis sentence is a bit confusing because optical flow is typically defined as mapping **from I₁ to I₂**, i.e., each pixel (u, v) I₁ is mapped to a corresponding location in I₂ via:\n\n(u', v') = (u + f^1(u,v), v + f^2(u,v))\n\nThat is, the flow field is defined on pixels in I₁, not in I₂.\n\nTherefore, it seems the sentence should be corrected to something like:\n\n> \"we estimate a dense displacement field (f¹, f²) which maps each pixel (u, v) **in I₁** to its corresponding coordinates (u′, v′) = (u + f¹(u), v + f²(v)) in I₂.\"\n\nPlease let me know if this interpretation is correct or if there's a specific reason why the reference frame was I₂ in this sentence.\n\nThanks again for the great work and for sharing the code!\n"
+        },
+        {
+          "number": 187,
+          "title": "how to run demo.py in multiple gpus",
+          "html_url": "https://github.com/princeton-vl/RAFT/issues/187",
+          "state": "open",
+          "full_name": null,
+          "tag_name": null,
+          "body": "Hi. Can someone help with the script to run demo.py on multiple gpus\n"
+        }
+      ],
+      "coverage": "First page only; investigate topic-specific issues separately"
+    },
+    "pulls": {
+      "source": {
+        "url": "https://api.github.com/repos/princeton-vl/RAFT/pulls?per_page=5",
+        "retrieved_at": "2026-09-10T15:40:46.965519+00:00",
+        "sha256": "d9664d024044658fedc4ddb03a91f8f0f5c83dbddcecf2144267fea8a8a9a3b5",
+        "cached": false
+      },
+      "items": [
+        {
+          "number": 195,
+          "title": "Update corr.py",
+          "html_url": "https://github.com/princeton-vl/RAFT/pull/195",
+          "state": "open",
+          "full_name": null,
+          "tag_name": null,
+          "body": null
+        },
+        {
+          "number": 177,
+          "title": "Fixing model loading on Apple Silicon (when DEVICE is set to \"mps\")",
+          "html_url": "https://github.com/princeton-vl/RAFT/pull/177",
+          "state": "open",
+          "full_name": null,
+          "tag_name": null,
+          "body": "The tensor locality has to be remapped to work with non-cuda devices. Before I was getting the following error (even after setting `DEVICE='mps'`):\r\n\r\n```\r\njonas@Jonass-MacBook-Pro RAFT % python demo.py --model=models/raft-things.pth --path=demo-frames\r\nTraceback (most recent call last):\r\n  File \"/Users/jonas/phd/courses/llvm/RAFT/demo.py\", line 75, in <module>\r\n    demo(args)\r\n  File \"/Users/jonas/phd/courses/llvm/RAFT/demo.py\", line 44, in demo\r\n    model.load_state_dict(torch.load(args.model))\r\n                          ^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"/Users/jonas/venvs/sam/lib/python3.11/site-packages/torch/serialization.py\", line 1014, in load\r\n    return _load(opened_zipfile,\r\n           ^^^^^^^^^^^^^^^^^^^^^\r\n  File \"/Users/jonas/venvs/sam/lib/python3.11/site-packages/torch/serialization.py\", line 1422, in _load\r\n    result = unpickler.load()\r\n             ^^^^^^^^^^^^^^^^\r\n  File \"/Users/jonas/venvs/sam/lib/python3.11/site-packages/torch/serialization.py\", line 1392, in persistent_load\r\n    typed_storage = load_tensor(dtype, nbytes, key, _maybe_decode_ascii(location))\r\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"/Users/jonas/venvs/sam/lib/python3.11/site-packages/torch/serialization.py\", line 1366, in load_tensor\r\n    wrap_storage=restore_location(storage, location),\r\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"/Users/jonas/venvs/sam/lib/python3.11/site-packages/torch/serialization.py\", line 381, in default_restore_location\r\n    result = fn(storage, location)\r\n             ^^^^^^^^^^^^^^^^^^^^^\r\n  File \"/Users/jonas/venvs/sam/lib/python3.11/site-packages/torch/serialization.py\", line 274, in _cuda_deserialize\r\n    device = validate_cuda_device(location)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"/Users/jonas/venvs/sam/lib/python3.11/site-packages/torch/serialization.py\", line 258, in validate_cuda_device\r\n    raise RuntimeError('Attempting to deserialize object on a CUDA '\r\nRuntimeError: Attempting to deserialize object on a CUDA device but torch.cuda.is_available() is False. If you are running on a CPU-only machine, please use torch.load with map_location=torch.device('cpu') to map your storages to the CPU.\r\n```"
+        },
+        {
+          "number": 176,
+          "title": "Prefix top-level modules: * -> raft.*",
+          "html_url": "https://github.com/princeton-vl/RAFT/pull/176",
+          "state": "open",
+          "full_name": null,
+          "tag_name": null,
+          "body": "This change is semi-automated and relies on the python-rope/rope refactoring library:\r\n\r\n```bash\r\n$ nix shell github:SomeoneSerge/pkgs#prefix-python-modules\r\n$ pname=raft\r\n$ find -iname '*.py' -exec \\\r\n  sed -i 's/sys.path.append.*$/pass/' '{}' '+'\r\n$ rm -rf alt_cuda_corr # confuses rope, recover later\r\n$ prefix-python-modules . --prefix \"$pname\"\r\n$ prefix-python-modules . --prefix \"$pname\" \\\r\n    --rename-external 'utils' \"$pname\".core.utils \"**\" \\\r\n    --rename-external 'update' \"$pname\".core.update \"**\" \\\r\n    --rename-external 'extractor' \"$pname\".core.extractor \"**\" \\\r\n    --rename-external 'corr' \"$pname\".core.corr \"**\"\r\n$ git checkout -- alt_cuda_corr\r\n```\r\n\r\nThis change augments generic names like `core` and `utils`, which are unspecific and may cause conflicts when used as top-level, with project name as the prefix. This change makes it easier to just compose `raft` in the same environment with other projects without \"human intervention\" or microservices. In particular, this makes it easier to run comparisons against the exact code, rather than reimplementations. E.g. [`sys.path` manipulations and git-submodules](https://github.com/qianqianwang68/omnimotion/commit/c45d86053d841d55eba5f1209c04649a3f9b6495#diff-1ff2112f03540cf5a6c1d31bac16f21cb39988ec0e557092193fa1cfc0778f4dL8-L19) -> [raft used](https://github.com/SomeoneSerge/pkgs/blob/0d2b35d8704636ffb6538c24b4e5c180d9bb17a3/python-packages/by-name/om/omnimotion/preprocess-dataset.nix#L37-L40) as a [library](https://github.com/SomeoneSerge/pkgs/blob/0d2b35d8704636ffb6538c24b4e5c180d9bb17a3/python-packages/by-name/om/omnimotion/preprocess-dataset.nix#L17)\r\n\r\nOne of the commits also adds `pyproject.toml`: this was just the easiest way to have wheels and entry points automatically generated, both when used with `pip`, and when packaging for other distributions (wheels have been somewhat of an exchange format lately)\r\n\r\nI didn't try restructuring `alt_cuda_corr`, other than prefixing the `.so` and the `.dist-info` with `raft_`, because there are other projects that intend to ship this exact same module, but may actually diverge in the implementation. I thought it reasonable that each project would use its own version of the kernel, because that's safer and not much more expensive\r\n\r\nThe top-level project declares `raft-alt-cuda-corr` as `Requires-dist:`. The intention is that, when used outside the dev environment, the kernel package is just installed first. Cf. an [example](https://github.com/SomeoneSerge/pkgs/blob/0d2b35d8704636ffb6538c24b4e5c180d9bb17a3/python-packages/by-name/ra/raft/package.nix#L75)\r\n\r\nI can revert any particular bit if you like, but it would be nice if you agreed with the prefix thing, because that really makes consumption easier, regardless of distro/environment/etc"
+        },
+        {
+          "number": 170,
+          "title": "Add mask size for more modularity",
+          "html_url": "https://github.com/princeton-vl/RAFT/pull/170",
+          "state": "open",
+          "full_name": null,
+          "tag_name": null,
+          "body": "Hey, I added the possibility of changing the mask size in `update.py` module. This could give more modularity for further testing and development. \r\n\r\nThanks"
+        },
+        {
+          "number": 140,
+          "title": "Package code as a library",
+          "html_url": "https://github.com/princeton-vl/RAFT/pull/140",
+          "state": "open",
+          "full_name": null,
+          "tag_name": null,
+          "body": "Hey! I packaged the code for re-use as a library in other Python code. I am not able to download all the datasets and check training properly - so I would appreciate if someone can do it and verify I didn't forget anything while refactoring. Hope this helps. Thanks!"
+        }
+      ],
+      "coverage": "First page only; investigate topic-specific issues separately"
+    },
+    "releases": {
+      "source": {
+        "url": "https://api.github.com/repos/princeton-vl/RAFT/releases?per_page=5",
+        "retrieved_at": "2026-09-10T15:40:47.327421+00:00",
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "cached": false
+      },
+      "items": [],
+      "coverage": "First page only; investigate topic-specific issues separately"
+    },
+    "forks": {
+      "source": {
+        "url": "https://api.github.com/repos/princeton-vl/RAFT/forks?per_page=5",
+        "retrieved_at": "2026-09-10T15:40:48.034165+00:00",
+        "sha256": "63453f397c321502ba5091c3552b5d96460752ffea9a391a8f58014eb94584ea",
+        "cached": false
+      },
+      "items": [
+        {
+          "number": null,
+          "title": null,
+          "html_url": "https://github.com/gongwk/RAFT",
+          "state": null,
+          "full_name": "gongwk/RAFT",
+          "tag_name": null,
+          "body": null
+        },
+        {
+          "number": null,
+          "title": null,
+          "html_url": "https://github.com/pink-cc123123/RAFT",
+          "state": null,
+          "full_name": "pink-cc123123/RAFT",
+          "tag_name": null,
+          "body": null
+        },
+        {
+          "number": null,
+          "title": null,
+          "html_url": "https://github.com/sudao-he/RAFT",
+          "state": null,
+          "full_name": "sudao-he/RAFT",
+          "tag_name": null,
+          "body": null
+        },
+        {
+          "number": null,
+          "title": null,
+          "html_url": "https://github.com/Nitin-vashishtha/RAFT",
+          "state": null,
+          "full_name": "Nitin-vashishtha/RAFT",
+          "tag_name": null,
+          "body": null
+        },
+        {
+          "number": null,
+          "title": null,
+          "html_url": "https://github.com/sumagic/RAFT",
+          "state": null,
+          "full_name": "sumagic/RAFT",
+          "tag_name": null,
+          "body": null
+        }
+      ],
+      "coverage": "First page only; investigate topic-specific issues separately"
+    }
+  },
+  "analysis_status": "SOURCE_EVIDENCE_READY_FOR_SKILL_REVIEW",
+  "questions": [
+    "architecture and relevant functions",
+    "inputs/preprocessing/core/temporal/output",
+    "engineering decisions",
+    "local adapter differences",
+    "license of every artifact"
+  ]
+}

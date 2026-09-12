@@ -20,6 +20,7 @@ import { Route as ContaRouteImport } from './routes/conta'
 import { Route as ContasRouteImport } from './routes/contas'
 import { Route as CortesRouteImport } from './routes/cortes'
 import { Route as EditorRouteImport } from './routes/editor'
+import { Route as EditorV2RouteImport } from './routes/editor-v2'
 import { Route as EstilosRouteImport } from './routes/estilos'
 import { Route as EstudioRouteImport } from './routes/estudio'
 import { Route as ExclusaoDeDadosRouteImport } from './routes/exclusao-de-dados'
@@ -114,6 +115,11 @@ const CortesRoute = CortesRouteImport.update({
 const EditorRoute = EditorRouteImport.update({
   id: '/editor',
   path: '/editor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EditorV2Route = EditorV2RouteImport.update({
+  id: '/editor-v2',
+  path: '/editor-v2',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EstilosRoute = EstilosRouteImport.update({
@@ -344,6 +350,7 @@ export interface FileRoutesByFullPath {
   '/contas': typeof ContasRoute
   '/cortes': typeof CortesRoute
   '/editor': typeof EditorRoute
+  '/editor-v2': typeof EditorV2Route
   '/estilos': typeof EstilosRoute
   '/estudio': typeof EstudioRoute
   '/exclusao-de-dados': typeof ExclusaoDeDadosRoute
@@ -397,6 +404,7 @@ export interface FileRoutesByTo {
   '/contas': typeof ContasRoute
   '/cortes': typeof CortesRoute
   '/editor': typeof EditorRoute
+  '/editor-v2': typeof EditorV2Route
   '/estilos': typeof EstilosRoute
   '/estudio': typeof EstudioRoute
   '/exclusao-de-dados': typeof ExclusaoDeDadosRoute
@@ -451,6 +459,7 @@ export interface FileRoutesById {
   '/contas': typeof ContasRoute
   '/cortes': typeof CortesRoute
   '/editor': typeof EditorRoute
+  '/editor-v2': typeof EditorV2Route
   '/estilos': typeof EstilosRoute
   '/estudio': typeof EstudioRoute
   '/exclusao-de-dados': typeof ExclusaoDeDadosRoute
@@ -506,6 +515,7 @@ export interface FileRouteTypes {
     | '/contas'
     | '/cortes'
     | '/editor'
+    | '/editor-v2'
     | '/estilos'
     | '/estudio'
     | '/exclusao-de-dados'
@@ -559,6 +569,7 @@ export interface FileRouteTypes {
     | '/contas'
     | '/cortes'
     | '/editor'
+    | '/editor-v2'
     | '/estilos'
     | '/estudio'
     | '/exclusao-de-dados'
@@ -612,6 +623,7 @@ export interface FileRouteTypes {
     | '/contas'
     | '/cortes'
     | '/editor'
+    | '/editor-v2'
     | '/estilos'
     | '/estudio'
     | '/exclusao-de-dados'
@@ -666,6 +678,7 @@ export interface RootRouteChildren {
   ContasRoute: typeof ContasRoute
   CortesRoute: typeof CortesRoute
   EditorRoute: typeof EditorRoute
+  EditorV2Route: typeof EditorV2Route
   EstilosRoute: typeof EstilosRoute
   EstudioRoute: typeof EstudioRoute
   ExclusaoDeDadosRoute: typeof ExclusaoDeDadosRoute
@@ -785,6 +798,13 @@ declare module '@tanstack/react-router' {
       path: '/editor'
       fullPath: '/editor'
       preLoaderRoute: typeof EditorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/editor-v2': {
+      id: '/editor-v2'
+      path: '/editor-v2'
+      fullPath: '/editor-v2'
+      preLoaderRoute: typeof EditorV2RouteImport
       parentRoute: typeof rootRouteImport
     }
     '/estilos': {
@@ -1082,6 +1102,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContasRoute: ContasRoute,
   CortesRoute: CortesRoute,
   EditorRoute: EditorRoute,
+  EditorV2Route: EditorV2Route,
   EstilosRoute: EstilosRoute,
   EstudioRoute: EstudioRoute,
   ExclusaoDeDadosRoute: ExclusaoDeDadosRoute,
