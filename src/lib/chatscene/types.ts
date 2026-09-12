@@ -167,6 +167,7 @@ export const ANIMATION_PRESETS: { id: MessageAnimation; label: string }[] = [
 export type ChatLayoutPreset =
   | "full-chat"
   | "chat-gameplay"
+  | "canal-viral"
   | "creator-split"
   | "phone-centered"
   | "floating-chat"
@@ -190,6 +191,12 @@ export interface ChatSceneLayout {
   backgroundOffsetY: number;
   /** desfoque do fundo, em pixels na referência 1080 */
   backgroundBlur: number;
+  /**
+   * A altura acompanha a conversa: o painel começa pequeno (só o topo e a
+   * primeira mensagem) e cresce até o limite de `height`, como nos vídeos de
+   * conversa animada sobre gameplay.
+   */
+  autoHeight?: boolean;
 }
 
 export const DEFAULT_LAYOUT: ChatSceneLayout = {
@@ -204,6 +211,7 @@ export const DEFAULT_LAYOUT: ChatSceneLayout = {
   backgroundScale: 1,
   backgroundOffsetY: 0,
   backgroundBlur: 0,
+  autoHeight: false,
 };
 
 export const LAYOUT_PRESETS: { id: ChatLayoutPreset; label: string; value: Omit<ChatSceneLayout, "preset"> }[] = [
