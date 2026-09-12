@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Auditar e ativar Skills de Remotion, React, UX/UI, acessibilidade e FFmpeg sem alterar o aplicativo
+- [ ] Verificar e conectar MCPs solicitados com permissões mínimas, deixando autenticações pendentes explícitas
 - [x] Ajustes/efeitos apenas na área do vídeo (fundo desfocado fica natural) — draw.ts
 - [ ] Configurar envs do Instagram OAuth em produção: INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET, INSTAGRAM_REDIRECT_URI (aguardando valores do usuário)
 - [x] Tornar a galeria de Estilos visível e aplicável no painel contextual do editor
