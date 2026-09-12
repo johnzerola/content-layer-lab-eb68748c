@@ -462,6 +462,7 @@ export function createChatSceneProject(init: Partial<ChatSceneProject> = {}): Ch
     layout: init.layout ?? { ...DEFAULT_LAYOUT },
     sound: init.sound ?? { enabled: false, volume: 0.5 },
     branding: init.branding ?? { ...DEFAULT_BRANDING },
+    header: init.header ?? { ...DEFAULT_HEADER },
     voiceMix: init.voiceMix ?? { ...DEFAULT_VOICE_MIX },
     camera: init.camera ?? { ...DEFAULT_CAMERA },
     participants: init.participants ?? [me, other],
