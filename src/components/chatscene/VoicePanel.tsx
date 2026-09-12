@@ -23,10 +23,14 @@ export interface VoicePanelProps {
   onGenerate: () => void;
   previewing: string | null;
   onPreview: (participantId: string, profile: VoiceProfile) => void;
+  failures: { id: string; reason: string }[];
+  onRetry: () => void;
+  onContinue: () => void;
+  onChangeVoice: () => void;
 }
 
 export function VoicePanel(props: VoicePanelProps) {
-  const { project, patch, clipCount, castState, castProgress, onGenerate, previewing, onPreview } = props;
+  const { project, patch, clipCount, castState, castProgress, onGenerate, previewing, onPreview, failures, onRetry, onContinue, onChangeVoice } = props;
   const setProject = (next: ChatSceneProject) => patch(next);
   const updateProfile = (id: string, changes: Partial<VoiceProfile>) => {
     const profiles = (project.voiceProfiles ?? []).map((profile) => profile.id === id ? { ...profile, ...changes } : profile);
@@ -115,6 +119,17 @@ export function VoicePanel(props: VoicePanelProps) {
           {castState === "running" ? <><Loader2 className="size-4 animate-spin" /> Gerando {castProgress.done}/{castProgress.total}</> : <><Volume2 className="size-4" /> Gerar vozes ausentes</>}
         </Button>
         {clipCount > 0 ? <p className="mt-1.5 text-[11px] text-muted-foreground">{clipCount} falas em cache nesta sessão.</p> : null}
+        {failures.length ? (
+          <div className="mt-2 rounded-md border border-destructive/40 bg-destructive/5 p-2">
+            <p className="text-[11px] font-medium text-destructive">Falha ao gerar {failures.length === 1 ? "uma voz" : `${failures.length} vozes`}.</p>
+            <p className="mt-0.5 line-clamp-2 text-[10px] text-muted-foreground">{failures[0]?.reason}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <Button size="sm" variant="secondary" className="h-7 text-[10px]" onClick={onRetry}>Tentar novamente</Button>
+              <Button size="sm" variant="ghost" className="h-7 text-[10px]" onClick={onChangeVoice}>Trocar voz</Button>
+              <Button size="sm" variant="ghost" className="h-7 text-[10px]" onClick={onContinue}>Continuar sem voz</Button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={project.voiceMix?.normalize ?? true} onChange={(e) => patch({ voiceMix: { ...DEFAULT_VOICE_MIX, ...project.voiceMix, normalize: e.target.checked } })} /> normalizar volume sem achatar a dinâmica</label>

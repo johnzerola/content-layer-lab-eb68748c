@@ -135,9 +135,9 @@ export async function mixConversationAudio(input: MixInput): Promise<AudioBuffer
     const gain = ctx.createGain();
     const base = Math.max(0, Math.min(1, input.settings.musicGain ?? 0.25));
     const curve = duckingCurve(schedule, input.settings.ducking !== false, {
-      amount: input.settings.duckingAmount,
-      attackMs: input.settings.duckingAttackMs,
-      releaseMs: input.settings.duckingReleaseMs,
+      ...(input.settings.duckingAmount === undefined ? {} : { amount: input.settings.duckingAmount }),
+      ...(input.settings.duckingAttackMs === undefined ? {} : { attackMs: input.settings.duckingAttackMs }),
+      ...(input.settings.duckingReleaseMs === undefined ? {} : { releaseMs: input.settings.duckingReleaseMs }),
     });
     gain.gain.setValueAtTime(base * (curve[0]?.value ?? 1), 0);
     for (const point of curve) {

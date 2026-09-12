@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { computeMessageTimings } from "../timing";
 import { planScroll } from "../scroll-planner";
 import { attachPreset, effectiveVoice } from "../voice-resolution";
-import { voiceKey } from "../voice";
+import { DEFAULT_VOICE, voiceKey } from "../voice";
+import { createGatewayVoiceProvider } from "../voice-cast";
 import { createChatSceneProject, createMessage, createParticipant, normalizeChatSceneProject } from "../types";
 
 const projectWithCast = () => {
@@ -48,6 +49,16 @@ describe("Voice Cast System", () => {
     const timing = computeMessageTimings(project)[0]!;
     expect(timing.leadInMs).toBe(300);
     expect(timing.pauseAfterMs).toBe(project.timing.gapMs + 500);
+  });
+
+  it("envia a voz persistida ao provider real", async () => {
+    let sentVoice = "";
+    const provider = createGatewayVoiceProvider(async (input) => {
+      sentVoice = input.voice;
+      throw new Error("parar antes da decodificação");
+    });
+    await expect(provider.synthesize("Olá", { ...DEFAULT_VOICE, providerVoiceId: "ash" })).rejects.toThrow();
+    expect(sentVoice).toBe("ash");
   });
 });
 

@@ -139,6 +139,7 @@ export function ChatSceneStudio() {
   const [clips, setClips] = useState<Map<string, VoiceClip>>(new Map());
   const [castState, setCastState] = useState<"idle" | "running">("idle");
   const [castProgress, setCastProgress] = useState({ done: 0, total: 0 });
+  const [castFailures, setCastFailures] = useState<{ id: string; reason: string }[]>([]);
   /** fala tocando agora no painel de vozes */
   const [playingClip, setPlayingClip] = useState<string | null>(null);
 
@@ -454,6 +455,7 @@ export function ChatSceneStudio() {
       return;
     }
     setPlaying(false);
+    setCastFailures([]);
     setCastState("running");
     setCastProgress({ done: 0, total: withVoice.length });
     try {
@@ -468,6 +470,7 @@ export function ChatSceneStudio() {
       });
       setProject((prev) => applyVoiceDurations(prev, result.durations));
       if (result.failures.length) {
+        setCastFailures(result.failures);
         toast.warning(
           `${result.generated} falas prontas, ${result.failures.length} não saíram: ${result.failures[0]!.reason}`,
         );
@@ -1115,6 +1118,10 @@ export function ChatSceneStudio() {
                 onGenerate={() => void handleGenerateVoices()}
                 previewing={previewingVoice}
                 onPreview={(id, profile) => void handlePreviewVoice(id, profile)}
+                failures={castFailures}
+                onRetry={() => void handleGenerateVoices()}
+                onContinue={() => setCastFailures([])}
+                onChangeVoice={() => setCastFailures([])}
               />
               <VoiceUploadPanel
                 project={project}
