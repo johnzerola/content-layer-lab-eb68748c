@@ -16,6 +16,7 @@
 - [x] Documentação em docs/chatscene/ (skill, mcp, repository, knowledge, license)
 - [ ] Context7: indisponível neste ambiente; reavaliar com o app de desktop
 - [ ] Figma MCP: exige app de desktop; opcional
-- [ ] Implementar Fase 0/1 do ChatScene
+- [x] Fase 1 do ChatScene: documento, relógio, temas, prévia 9:16, exportação MP4 e salvamento
+- [ ] Fase 2 do ChatScene: vozes por participante, notas de voz, reações e respostas
 - [x] Benchmark de concorrentes e matriz de funcionalidades do ChatScene
 - [x] Gap analysis e escopo MUST/SHOULD/V2/FUTURE/DONT
