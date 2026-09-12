@@ -799,6 +799,16 @@ export function paintFrame(
   ctx.globalAlpha = 1;
   ctx.restore();
 
+  if (inset) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.lineWidth = Math.max(1, Math.round(width * 0.0018));
+    roundRect(ctx, rect.x, rect.y, rect.w, rect.h, rect.radius);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+
   if (moving) ctx.restore();
 
   drawBranding(ctx, project, width, height, media);
