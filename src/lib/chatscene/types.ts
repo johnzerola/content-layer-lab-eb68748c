@@ -189,8 +189,13 @@ export function createChatSceneProject(init: Partial<ChatSceneProject> = {}): Ch
     id: init.id ?? chatSceneId("cs"),
     version: CHATSCENE_PROJECT_VERSION,
     title: init.title ?? "Nova conversa",
-    themeId: init.themeId ?? "noite",
-    dark: init.dark ?? true,
+    themeId: init.themeId ?? "zap",
+    dark: init.dark ?? false,
+    chatKind: init.chatKind ?? "direct",
+    groupName: init.groupName ?? null,
+    groupAvatarUrl: init.groupAvatarUrl ?? null,
+    startClock: init.startClock ?? "21:14",
+    receipts: init.receipts ?? true,
     participants: init.participants ?? [me, other],
     messages:
       init.messages ??
