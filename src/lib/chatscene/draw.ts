@@ -815,7 +815,8 @@ function paintConversation(
 ) {
   const m = metricsFor(width, height);
   const media = options.media;
-  const headerH = showHeader ? m.headerH : 0;
+  const headerVisible = showHeader && (project.header?.style ?? "messenger") !== "none";
+  const headerH = headerVisible ? m.headerH : 0;
 
   drawWallpaper(ctx, theme, width, height, m, project.background, media, frame / plan.fps);
 
