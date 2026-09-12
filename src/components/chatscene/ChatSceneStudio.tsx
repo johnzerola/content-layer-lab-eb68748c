@@ -6,6 +6,7 @@
  * Todo estado vive no documento `ChatSceneProject`; nenhuma cópia paralela.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowDown,
   ArrowUp,
@@ -294,6 +295,53 @@ export function ChatSceneStudio() {
     }
   }, [project, recordId]);
 
+  const speakFn = useServerFn(synthesizeVoice);
+  const voiceProvider = useMemo(
+    () => createGatewayVoiceProvider((input) => speakFn({ data: input })),
+    [speakFn],
+  );
+
+  /** Gera (ou reaproveita) a fala de todas as mensagens com voz escolhida. */
+  const handleGenerateVoices = useCallback(async () => {
+    const withVoice = speakingMessages(project).filter(
+      (m) => project.participants.find((p) => p.id === m.message.participantId)?.voice,
+    );
+    if (!withVoice.length) {
+      toast.error("Escolha uma voz para pelo menos uma pessoa da conversa.");
+      return;
+    }
+    setPlaying(false);
+    setCastState("running");
+    setCastProgress({ done: 0, total: withVoice.length });
+    try {
+      const result = await generateCast(project, voiceProvider, {
+        batch: 3,
+        onProgress: (p) => setCastProgress({ done: p.done, total: p.total }),
+      });
+      setClips((prev) => {
+        const next = new Map(prev);
+        for (const [id, clip] of result.clips) next.set(id, clip);
+        return next;
+      });
+      setProject((prev) => applyVoiceDurations(prev, result.durations));
+      if (result.failures.length) {
+        toast.warning(
+          `${result.generated} falas prontas, ${result.failures.length} não saíram: ${result.failures[0]!.reason}`,
+        );
+      } else {
+        toast.success(
+          result.reused
+            ? `${result.generated} falas novas e ${result.reused} reaproveitadas.`
+            : `${result.generated} falas prontas. O ritmo já acompanha a duração real.`,
+        );
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível gerar as vozes.");
+    } finally {
+      setCastState("idle");
+    }
+  }, [project, voiceProvider]);
+
   const handleExport = useCallback(async () => {
     if (!frameEncoderSupported()) {
       toast.error("Este navegador não exporta vídeo. Use o Chrome ou o Edge no computador.");
@@ -312,6 +360,19 @@ export function ChatSceneStudio() {
       const renderer = new CanvasConversationRenderer({ safeZones: false });
       await renderer.prepare(project);
       const { width, height } = renderSize(project.render);
+
+      // trilha: falas no tempo de cada bolha + música opcional por baixo
+      let audio: AudioBuffer | null = null;
+      const mix = project.voiceMix ?? DEFAULT_VOICE_MIX;
+      if (clips.size || mix.musicUrl) {
+        try {
+          const music = mix.musicUrl ? await loadMusic(mix.musicUrl) : null;
+          audio = await mixConversationAudio({ project, plan, clips, settings: mix, music });
+        } catch {
+          toast.warning("O vídeo sai sem som: não foi possível montar a trilha.");
+        }
+      }
+
       const blob = await encodeFrameSequence({
         width,
         height,
@@ -319,6 +380,7 @@ export function ChatSceneStudio() {
         totalFrames: plan.totalFrames,
         signal: controller.signal,
         onProgress: setProgress,
+        audio,
         draw: (ctx, index) => renderer.drawFrame(ctx, { width, height, frame: index, plan }),
       });
       const url = URL.createObjectURL(blob);
@@ -336,7 +398,7 @@ export function ChatSceneStudio() {
       setExporting(false);
       setProgress(0);
     }
-  }, [project, plan]);
+  }, [project, plan, clips]);
 
   const selectedMessage = project.messages.find((m) => m.id === selected) ?? null;
   const { width, height } = renderSize(project.render);
@@ -1033,15 +1095,17 @@ export function ChatSceneStudio() {
               <div>
                 <p className="mb-1 text-muted-foreground">Qualidade do vídeo</p>
                 <select
-                  value={project.render.height}
-                  onChange={(e) =>
-                    patch({ render: { ...project.render, height: Number(e.target.value) } })
-                  }
+                  value={`${project.render.height}x${project.render.fps}`}
+                  onChange={(e) => {
+                    const [h, f] = e.target.value.split("x").map(Number);
+                    patch({ render: { ...project.render, height: h!, fps: f! } });
+                  }}
                   className="w-full rounded-md border border-border bg-background px-2 py-1.5"
                   aria-label="Qualidade do vídeo"
                 >
-                  <option value={1280}>720p — rápido</option>
-                  <option value={1920}>1080p — recomendado</option>
+                  <option value="1280x30">720p 30 — mais rápido</option>
+                  <option value="1920x30">1080p 30 — recomendado</option>
+                  <option value="1920x60">1080p 60 — movimento mais suave</option>
                 </select>
               </div>
             </div>
