@@ -235,6 +235,22 @@ export const LAYOUT_PRESETS: { id: ChatLayoutPreset; label: string; value: Omit<
     },
   },
   {
+    id: "canal-viral",
+    label: "Conversa sobre gameplay",
+    value: {
+      ...DEFAULT_LAYOUT,
+      x: 0.035,
+      width: 0.93,
+      y: 0.035,
+      height: 0.66,
+      radius: 0.03,
+      opacity: 1,
+      header: true,
+      backgroundScale: 1.08,
+      autoHeight: true,
+    },
+  },
+  {
     id: "creator-split",
     label: "Creator Split",
     value: {
