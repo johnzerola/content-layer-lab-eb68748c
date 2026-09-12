@@ -673,6 +673,48 @@ function clampUnit(v: number | undefined, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
+/**
+ * Altura do painel quando ele acompanha a conversa: começa com o topo e a
+ * primeira mensagem e cresce, com transição suave, até o limite do
+ * enquadramento. Determinística: depende só do quadro atual.
+ */
+export function autoPanelHeight(
+  ctx: Ctx2D,
+  project: ChatSceneProject,
+  theme: ChatTheme,
+  plan: ConversationPlan,
+  frame: number,
+  width: number,
+  maxHeight: number,
+  media?: Map<string, LoadedMedia>,
+): number {
+  const m = metricsFor(width, maxHeight);
+  const headerVisible = (project.header?.style ?? "messenger") !== "none";
+  const headerH = headerVisible ? m.headerH : 0;
+  const appeared = project.messages.filter((msg) => frame >= (plan.byId[msg.id]?.appearFrame ?? Infinity));
+  const typing = typingAt(project, plan, frame);
+  const typingH = typing ? Math.round(72 * m.scale) + m.gap : 0;
+
+  const heightFor = (list: ChatMessage[]) => {
+    const content = list.length ? layoutMessages(ctx, project, theme, list, width, maxHeight, media, maxHeight).contentH : 0;
+    const total = headerH + content + typingH + m.pad * 2;
+    return Math.max(headerH + m.pad * 2, Math.min(maxHeight, Math.round(total)));
+  };
+
+  const target = heightFor(appeared);
+  const last = appeared[appeared.length - 1];
+  const lastEntry = last ? plan.byId[last.id] : undefined;
+  if (!lastEntry) return target;
+  const growFrames = Math.max(1, Math.round(plan.fps * 0.24));
+  const p = Math.max(0, Math.min(1, (frame - lastEntry.appearFrame) / growFrames));
+  if (p >= 1) return target;
+  const previous = heightFor(appeared.slice(0, -1));
+  const ease = 1 - Math.pow(1 - p, 3);
+  return Math.round(previous + (target - previous) * ease);
+}
+
+
+
 /** Pinta um quadro completo da conversa. */
 export function paintFrame(
   ctx: Ctx2D,
