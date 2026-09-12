@@ -101,6 +101,9 @@ export function ChatSceneStudio() {
     setLibrary(readLibrary());
   }, []);
   const abortRef = useRef<AbortController | null>(null);
+  const [exportUrl, setExportUrl] = useState<string | null>(null);
+  const [exportName, setExportName] = useState("chatscene.mp4");
+
 
   const plan = useMemo(() => buildPlan(project), [project]);
   const isGroup = (project.chatKind ?? "direct") === "group";
@@ -384,12 +387,18 @@ export function ChatSceneStudio() {
         draw: (ctx, index) => renderer.drawFrame(ctx, { width, height, frame: index, plan }),
       });
       const url = URL.createObjectURL(blob);
+      const name = `${slugify(project.title)}.mp4`;
+      setExportUrl((old) => {
+        if (old) URL.revokeObjectURL(old);
+        return url;
+      });
+      setExportName(name);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${slugify(project.title)}.mp4`;
+      a.download = name;
       a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 8000);
-      toast.success("Vídeo pronto. O download começou.");
+      toast.success("Vídeo pronto. Baixou e já dá para assistir aqui.");
+
     } catch (err) {
       if ((err as DOMException)?.name === "AbortError") toast("Exportação cancelada.");
       else toast.error(err instanceof Error ? err.message : "A exportação falhou.");
@@ -440,6 +449,39 @@ export function ChatSceneStudio() {
           )}
         </div>
       </header>
+
+      {exportUrl && (
+        <section className="mb-5 rounded-xl border border-border bg-background/40 p-4">
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <p className="mono-label text-muted-foreground">Vídeo pronto</p>
+            <a
+              href={exportUrl}
+              download={exportName}
+              className="ml-auto text-sm text-primary underline-offset-4 hover:underline"
+            >
+              Baixar de novo
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                URL.revokeObjectURL(exportUrl);
+                setExportUrl(null);
+              }}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Fechar
+            </button>
+          </div>
+          <video
+            src={exportUrl}
+            controls
+            playsInline
+            aria-label="Vídeo exportado"
+            className="mx-auto max-h-[70vh] w-auto rounded-lg border border-border bg-black"
+          />
+        </section>
+      )}
+
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_400px_300px]">
         {/* ---------------------------------------------------------- roteiro */}
