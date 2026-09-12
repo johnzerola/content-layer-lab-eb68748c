@@ -118,7 +118,7 @@ export function VoicePanel(props: VoicePanelProps) {
         <Button size="sm" className="w-full gap-1.5" disabled={castState === "running" || missing === 0} onClick={onGenerate}>
           {castState === "running" ? <><Loader2 className="size-4 animate-spin" /> Gerando {castProgress.done}/{castProgress.total}</> : <><Volume2 className="size-4" /> Gerar vozes ausentes</>}
         </Button>
-        {clipCount > 0 ? <p className="mt-1.5 text-[11px] text-muted-foreground">{clipCount} falas em cache nesta sessão.</p> : null}
+        {clipCount > 0 ? <p className="mt-1.5 text-[11px] text-muted-foreground">{clipCount} falas prontas nesta cena; o cache também permanece neste navegador.</p> : null}
         {failures.length ? (
           <div className="mt-2 rounded-md border border-destructive/40 bg-destructive/5 p-2">
             <p className="text-[11px] font-medium text-destructive">Falha ao gerar {failures.length === 1 ? "uma voz" : `${failures.length} vozes`}.</p>

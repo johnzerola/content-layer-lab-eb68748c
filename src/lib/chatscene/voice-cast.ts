@@ -38,6 +38,37 @@ export interface VoiceProvider {
 
 const cache = new Map<string, VoiceClip>();
 let audioCtx: AudioContext | null = null;
+const CACHE_DB = "chatscene-voice-cache-v1";
+
+function openCacheDb(): Promise<IDBDatabase | null> {
+  if (typeof indexedDB === "undefined") return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const request = indexedDB.open(CACHE_DB, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore("clips");
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+  });
+}
+
+async function persistedBlob(key: string): Promise<Blob | null> {
+  const db = await openCacheDb();
+  if (!db) return null;
+  return new Promise((resolve) => {
+    const request = db.transaction("clips", "readonly").objectStore("clips").get(key);
+    request.onsuccess = () => resolve(request.result instanceof Blob ? request.result : null);
+    request.onerror = () => resolve(null);
+  });
+}
+
+async function persistBlob(key: string, blob: Blob): Promise<void> {
+  const db = await openCacheDb();
+  if (!db) return;
+  await new Promise<void>((resolve) => {
+    const request = db.transaction("clips", "readwrite").objectStore("clips").put(blob, key);
+    request.onsuccess = () => resolve();
+    request.onerror = () => resolve();
+  });
+}
 
 function context(): AudioContext {
   const Ctor =
@@ -131,6 +162,12 @@ export function createGatewayVoiceProvider(
       const key = voiceKey(text, profile, direction);
       const hit = cache.get(key);
       if (hit) return hit;
+      const stored = await persistedBlob(key);
+      if (stored) {
+        const clip = await decodeClip(key, stored);
+        cache.set(key, clip);
+        return clip;
+      }
 
       const preset = voicePreset(profile.presetId);
       const { audio, mime } = await call({
@@ -143,6 +180,7 @@ export function createGatewayVoiceProvider(
       const blob = new Blob([bytes], { type: mime || "audio/mpeg" });
       const clip = await decodeClip(key, blob);
       cache.set(key, clip);
+      void persistBlob(key, blob);
       return clip;
     },
   };
@@ -189,7 +227,7 @@ export async function generateCast(
   provider: VoiceProvider,
   options: { batch?: number; onProgress?: (p: CastProgress) => void; signal?: AbortSignal } = {},
 ): Promise<CastResult> {
-  const items = missingSpeakingMessages(project);
+  const items = speakingMessages(project);
   const batch = Math.max(1, options.batch ?? 3);
   const result: CastResult = {
     clips: new Map(),
@@ -212,7 +250,17 @@ export async function generateCast(
         const hit = cachedClip(key);
         options.onProgress?.({ done, total: items.length, current: message.id });
         try {
-          const clip = hit ?? (await provider.synthesize(text, profile, direction, options.signal));
+          let clip = hit;
+          let lastError: unknown;
+          for (let attempt = 0; !clip && attempt < 3; attempt += 1) {
+            try {
+              clip = await provider.synthesize(text, profile, direction, options.signal);
+            } catch (error) {
+              lastError = error;
+              if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 350 * 2 ** attempt));
+            }
+          }
+          if (!clip) throw lastError ?? new Error("falhou");
           if (hit) result.reused += 1;
           else result.generated += 1;
           result.clips.set(message.id, clip);

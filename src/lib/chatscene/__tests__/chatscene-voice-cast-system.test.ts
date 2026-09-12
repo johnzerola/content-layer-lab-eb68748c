@@ -60,6 +60,25 @@ describe("Voice Cast System", () => {
     await expect(provider.synthesize("Olá", { ...DEFAULT_VOICE, providerVoiceId: "ash" })).rejects.toThrow();
     expect(sentVoice).toBe("ash");
   });
+
+  it("repete falha transitória antes de desistir", async () => {
+    const project = createChatSceneProject();
+    let calls = 0;
+    const provider = {
+      id: "retry-test",
+      listVoices: async () => [],
+      getCapabilities: () => ({ languages: ["pt-BR"], maxCharacters: 600, controls: { speed: true, pitch: true, energy: false, expressiveness: true, roughness: false, warmth: false, brightness: false, emotion: true }, costEstimate: false, local: false }),
+      previewVoice: async () => { throw new Error("não usado"); },
+      synthesize: async () => {
+        calls += 1;
+        if (calls < 3) throw new Error("temporário");
+        return { key: "ok", blob: new Blob(), durationSec: 1, buffer: {} as AudioBuffer };
+      },
+    };
+    const result = await generateCast(project, provider);
+    expect(calls).toBeGreaterThanOrEqual(3);
+    expect(result.failures).toHaveLength(0);
+  });
 });
 
 describe("ScrollPlanner", () => {
