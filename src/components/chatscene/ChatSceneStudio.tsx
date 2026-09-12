@@ -1033,6 +1033,7 @@ export function ChatSceneStudio() {
                   const active =
                     (project.background?.kind ?? "theme") === b.value.kind &&
                     (project.background?.color ?? null) === (b.value.color ?? null) &&
+                    (project.background?.imageUrl ?? null) === (b.value.imageUrl ?? null) &&
                     (project.background?.videoUrl ?? null) === (b.value.videoUrl ?? null);
                   return (
                     <button
