@@ -728,6 +728,57 @@ function clampUnit(v: number | undefined, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
+export interface ThreadFrame {
+  threadId: string;
+  thread: ChatSceneThread;
+  /** mensagens já visíveis da conversa no ar */
+  messages: ChatMessage[];
+  /** conversa que está saindo durante o corte */
+  previousThread: ChatSceneThread | null;
+  previousMessages: ChatMessage[];
+  /** andamento do corte entre conversas (1 = já terminou) */
+  cut: number;
+}
+
+/**
+ * Qual conversa está no ar neste quadro e como está o corte para ela.
+ * Determinístico: depende só do documento e do quadro.
+ */
+export function threadFrame(project: ChatSceneProject, plan: ConversationPlan, frame: number): ThreadFrame {
+  const appeared = project.messages.filter((msg) => frame >= (plan.byId[msg.id]?.appearFrame ?? Infinity));
+  const reference = appeared[appeared.length - 1] ?? project.messages[0] ?? null;
+  const threadId = reference ? threadIdOf(project, reference) : threadsOf(project)[0]!.id;
+
+  let start = appeared.length - 1;
+  while (start > 0 && threadIdOf(project, appeared[start - 1]!) === threadId) start -= 1;
+  const switched = appeared.length > 0 && start > 0;
+  const messages = appeared.filter((msg) => threadIdOf(project, msg) === threadId);
+
+  if (!switched) {
+    return {
+      threadId,
+      thread: threadOf(project, threadId),
+      messages,
+      previousThread: null,
+      previousMessages: [],
+      cut: 1,
+    };
+  }
+
+  const switchFrame = plan.byId[appeared[start]!.id]?.appearFrame ?? frame;
+  const cutFrames = Math.max(1, Math.round(plan.fps * 0.42));
+  const cut = Math.max(0, Math.min(1, (frame - switchFrame) / cutFrames));
+  const previousId = threadIdOf(project, appeared[start - 1]!);
+  return {
+    threadId,
+    thread: threadOf(project, threadId),
+    messages,
+    previousThread: threadOf(project, previousId),
+    previousMessages: appeared.slice(0, start).filter((msg) => threadIdOf(project, msg) === previousId),
+    cut,
+  };
+}
+
 /**
  * Altura do painel quando ele acompanha a conversa: começa com o topo e a
  * primeira mensagem e cresce, com transição suave, até o limite do
