@@ -133,7 +133,13 @@ export const ANIMATION_PRESETS: { id: MessageAnimation; label: string }[] = [
 ];
 
 /** Enquadramento da conversa dentro do vídeo. */
-export type ChatLayoutPreset = "full-chat" | "creator-split" | "phone-centered" | "floating-chat" | "custom";
+export type ChatLayoutPreset =
+  | "full-chat"
+  | "chat-gameplay"
+  | "creator-split"
+  | "phone-centered"
+  | "floating-chat"
+  | "custom";
 
 export interface ChatSceneLayout {
   preset: ChatLayoutPreset;
@@ -176,9 +182,31 @@ export const LAYOUT_PRESETS: { id: ChatLayoutPreset; label: string; value: Omit<
     value: { ...DEFAULT_LAYOUT },
   },
   {
+    id: "chat-gameplay",
+    label: "Chat + Gameplay",
+    value: {
+      ...DEFAULT_LAYOUT,
+      x: 0.04,
+      width: 0.92,
+      y: 0.04,
+      height: 0.5,
+      radius: 0.05,
+      opacity: 0.97,
+      backgroundScale: 1.05,
+    },
+  },
+  {
     id: "creator-split",
-    label: "Split do criador",
-    value: { ...DEFAULT_LAYOUT, y: 0.02, height: 0.56, x: 0.04, width: 0.92, radius: 0.05, backgroundScale: 1.1 },
+    label: "Creator Split",
+    value: {
+      ...DEFAULT_LAYOUT,
+      x: 0.04,
+      width: 0.92,
+      y: 0.42,
+      height: 0.54,
+      radius: 0.05,
+      backgroundScale: 1.1,
+    },
   },
   {
     id: "phone-centered",
@@ -199,6 +227,33 @@ export const LAYOUT_PRESETS: { id: ChatLayoutPreset; label: string; value: Omit<
       header: false,
       backgroundBlur: 8,
     },
+  },
+];
+
+/** Os três layouts principais de criador, mostrados com prévia no estúdio. */
+export const CREATOR_LAYOUTS: {
+  id: ChatLayoutPreset;
+  label: string;
+  hint: string;
+  value: Omit<ChatSceneLayout, "preset">;
+}[] = [
+  {
+    id: "chat-gameplay",
+    label: "Chat + Gameplay",
+    hint: "Conversa em cima, gameplay aparecendo embaixo.",
+    value: LAYOUT_PRESETS.find((l) => l.id === "chat-gameplay")!.value,
+  },
+  {
+    id: "full-chat",
+    label: "Full Screen Chat",
+    hint: "Conversa ocupando a tela toda.",
+    value: LAYOUT_PRESETS.find((l) => l.id === "full-chat")!.value,
+  },
+  {
+    id: "creator-split",
+    label: "Creator Split",
+    hint: "Espaço em cima para o criador, conversa embaixo.",
+    value: LAYOUT_PRESETS.find((l) => l.id === "creator-split")!.value,
   },
 ];
 
