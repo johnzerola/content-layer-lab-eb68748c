@@ -7,6 +7,7 @@ import { CanvasConversationRenderer, paintPreview } from "@/lib/chatscene/render
 import type { ChatSceneProject } from "@/lib/chatscene/types";
 import { renderSize } from "@/lib/chatscene/types";
 import { voiceSchedule } from "@/lib/chatscene/audio-mix";
+import { renderSoundEffect, sfxSchedule } from "@/lib/chatscene/sfx";
 import type { VoiceClip } from "@/lib/chatscene/voice-cast";
 
 interface Props {
@@ -73,7 +74,8 @@ export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPla
 
   // som da prévia: as falas tocam no mesmo instante em que a bolha aparece
   useEffect(() => {
-    if (!playing || !clips?.size) return;
+    const effects = sfxSchedule(project, plan);
+    if (!playing || (!clips?.size && !effects.length)) return;
     const Ctor =
       (globalThis as unknown as { AudioContext?: typeof AudioContext }).AudioContext ??
       (globalThis as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -82,19 +84,39 @@ export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPla
     void ctx.resume().catch(() => {});
     const fromSec = frameRef.current / plan.fps;
     const sources: AudioBufferSourceNode[] = [];
-    for (const item of voiceSchedule(project, plan, clips)) {
-      const delay = item.startSec - fromSec;
-      if (delay + item.durationSec <= 0) continue;
+    if (clips?.size) {
+      for (const item of voiceSchedule(project, plan, clips)) {
+        const delay = item.startSec - fromSec;
+        if (delay + item.durationSec <= 0) continue;
+        const source = ctx.createBufferSource();
+        source.buffer = item.clip.buffer;
+        source.playbackRate.value = item.rate;
+        const gain = ctx.createGain();
+        gain.gain.value = item.gain;
+        source.connect(gain).connect(ctx.destination);
+        if (delay >= 0) source.start(ctx.currentTime + delay);
+        else source.start(ctx.currentTime, -delay * item.rate);
+        sources.push(source);
+      }
+    }
+    // sons curtos de envio e recebimento
+    const volume = Math.max(0, Math.min(1, project.sound?.volume ?? 0.5));
+    const cache = new Map<string, AudioBuffer>();
+    for (const fx of effects) {
+      const delay = fx.startSec - fromSec;
+      if (delay < 0) continue;
+      let buffer = cache.get(fx.effect);
+      if (!buffer) {
+        buffer = renderSoundEffect(ctx, fx.effect, volume);
+        cache.set(fx.effect, buffer);
+      }
       const source = ctx.createBufferSource();
-      source.buffer = item.clip.buffer;
-      source.playbackRate.value = item.rate;
-      const gain = ctx.createGain();
-      gain.gain.value = item.gain;
-      source.connect(gain).connect(ctx.destination);
-      if (delay >= 0) source.start(ctx.currentTime + delay);
-      else source.start(ctx.currentTime, -delay * item.rate);
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(ctx.currentTime + delay);
       sources.push(source);
     }
+
     return () => {
       for (const s of sources) {
         try {

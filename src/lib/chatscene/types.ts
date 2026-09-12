@@ -140,6 +140,8 @@ export interface ChatMessage {
   pauseAfterMs?: number | null;
   /** momento de peso na história: leitura um pouco mais longa */
   emphasis?: boolean;
+  /** som curto tocado quando a mensagem entra; vazio usa o som automático */
+  soundEffect?: "send" | "receive" | "alert" | null;
   /** duração da fala quando houver voz (preenchido na fase de vozes) */
   voiceMs?: number | null;
   /** duração mostrada no áudio/recado de voz, em segundos */

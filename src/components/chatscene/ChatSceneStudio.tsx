@@ -1167,6 +1167,47 @@ export function ChatSceneStudio() {
               </div>
             </div>
 
+            {/* sons curtos de envio e recebimento */}
+            <div className="mt-3">
+              <p className="mono-label mb-1.5 text-muted-foreground">Sons da conversa</p>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={project.sound?.enabled ?? false}
+                  onChange={(e) =>
+                    patch({
+                      sound: {
+                        enabled: e.target.checked,
+                        volume: project.sound?.volume ?? 0.5,
+                      },
+                    })
+                  }
+                />
+                Tocar som quando a mensagem chega
+              </label>
+              {project.sound?.enabled ? (
+                <label className="mt-1.5 block text-[11px] text-muted-foreground">
+                  Volume dos sons
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={project.sound?.volume ?? 0.5}
+                    onChange={(e) =>
+                      patch({
+                        sound: { enabled: true, volume: Number(e.target.value) },
+                      })
+                    }
+                    className="mt-1 w-full"
+                    aria-label="Volume dos sons"
+                  />
+                </label>
+              ) : null}
+            </div>
+
+
+
 
 
             <div className="mt-3">
