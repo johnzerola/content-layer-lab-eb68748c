@@ -82,6 +82,47 @@ export function ChatSceneStudio() {
     }));
   }, []);
 
+  /** Envia um arquivo do computador e aponta a mensagem para ele. */
+  const handleUpload = useCallback(
+    async (messageId: string, file: File) => {
+      setUploading(messageId);
+      try {
+        const { url, aspect, temporary } = await uploadChatSceneMedia(file);
+        updateMessage(messageId, { mediaUrl: url, mediaAspect: aspect });
+        if (temporary) {
+          toast.warning("O arquivo ficou só nesta sessão; salve a conversa depois de enviá-lo de novo.");
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Não foi possível usar este arquivo.");
+      } finally {
+        setUploading(null);
+      }
+    },
+    [updateMessage],
+  );
+
+  /** Foto de um participante ou do grupo. */
+  const handleAvatarUpload = useCallback(async (target: string, file: File) => {
+    setUploading(target);
+    try {
+      const { url } = await uploadChatSceneMedia(file);
+      setProject((prev) =>
+        target === "group"
+          ? { ...prev, groupAvatarUrl: url }
+          : {
+              ...prev,
+              participants: prev.participants.map((p) =>
+                p.id === target ? { ...p, avatarUrl: url } : p,
+              ),
+            },
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível usar esta foto.");
+    } finally {
+      setUploading(null);
+    }
+  }, []);
+
   const addMessage = useCallback(() => {
     setProject((prev) => {
       const last = prev.messages.at(-1);
