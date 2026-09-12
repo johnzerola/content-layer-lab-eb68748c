@@ -70,7 +70,7 @@ export async function saveChatSceneProject(
     user_id: userId,
     mode: CHATSCENE_PROJECT_MODE,
     name: doc.title || "Conversa sem título",
-    data: doc as unknown as Record<string, unknown>,
+    data: JSON.parse(JSON.stringify(doc)) as never,
   };
 
   if (recordId) {
