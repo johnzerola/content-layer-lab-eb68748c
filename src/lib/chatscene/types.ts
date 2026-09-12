@@ -65,6 +65,37 @@ export const DEFAULT_BRANDING: ChatSceneBranding = {
   size: 0.05,
 };
 
+/** Estilos de cabeçalho do vídeo (topo da conversa). */
+export type HeaderStyle = "messenger" | "minimal" | "banner" | "none";
+
+export const HEADER_STYLES: { id: HeaderStyle; label: string; hint: string }[] = [
+  { id: "messenger", label: "Conversa", hint: "Como um app de mensagens: foto, nome e ícones." },
+  { id: "minimal", label: "Simples", hint: "Só a foto e o nome, sem ícones." },
+  { id: "banner", label: "Faixa", hint: "Faixa larga com logo e título grande." },
+  { id: "none", label: "Sem topo", hint: "Esconde o cabeçalho." },
+];
+
+/** Cabeçalho personalizado do criador (logo, texto e estilo). */
+export interface ChatSceneHeader {
+  style: HeaderStyle;
+  title?: string | null;
+  subtitle?: string | null;
+  logoUrl?: string | null;
+  bgImageUrl?: string | null;
+  bgColor?: string | null;
+  textColor?: string | null;
+}
+
+export const DEFAULT_HEADER: ChatSceneHeader = {
+  style: "messenger",
+  title: null,
+  subtitle: null,
+  logoUrl: null,
+  bgImageUrl: null,
+  bgColor: null,
+  textColor: null,
+};
+
 export const DEFAULT_BACKGROUND: ChatSceneBackground = { kind: "theme" };
 
 /** Fundos prontos, para escolher com um clique. */
