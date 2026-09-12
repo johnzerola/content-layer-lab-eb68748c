@@ -227,12 +227,40 @@ export function layoutMessages(
     }
 
     const withMedia = isMedia(message.kind);
+    const isVoice = message.kind === "voice";
     const maxTextW = m.bubbleMaxW - padX * 2 - avatarLane;
     const lines = message.text ? wrapText(ctx, message.text, maxTextW) : [];
     const textW = lines.reduce((w, l) => Math.max(w, ctx.measureText(l).width), 0);
 
     const mediaW = withMedia ? m.bubbleMaxW - padX * 2 - avatarLane : 0;
     const mediaH = withMedia ? Math.round(mediaW / (aspect || 1.4)) : 0;
+
+    // recado de voz: barra de largura fixa com onda e duração
+    const voiceH = isVoice ? Math.round(78 * m.scale) : 0;
+    const voiceW = isVoice ? Math.round(m.bubbleMaxW * 0.86) - avatarLane : 0;
+
+    // citação da mensagem respondida
+    let reply: LaidOutMessage["reply"] = null;
+    if (message.replyToId) {
+      const quoted = project.messages.find((q) => q.id === message.replyToId);
+      if (quoted) {
+        const quotedAuthor = participantOf(project, quoted.participantId);
+        ctx.font = `400 ${Math.round(m.fontSize * 0.74)}px ${theme.fontFamily}`;
+        const snippet = ellipsize(
+          ctx,
+          quoted.text || quotedKindLabel(quoted.kind),
+          maxTextW - Math.round(20 * m.scale),
+        );
+        reply = {
+          name: quotedAuthor.name,
+          color: quotedAuthor.color,
+          text: snippet,
+          height: Math.round(m.fontSize * 1.85),
+        };
+      }
+      ctx.font = `${big ? 400 : 500} ${fontSize}px ${theme.fontFamily}`;
+    }
+    const replyH = reply ? reply.height + Math.round(10 * m.scale) : 0;
 
     const showName = isGroup && !isSelf && author.id !== lastAuthor;
     const nameH = showName ? Math.round(m.fontSize * 0.9) : 0;
@@ -243,10 +271,12 @@ export function layoutMessages(
 
     const bubbleW = Math.min(
       m.bubbleMaxW - avatarLane,
-      Math.max(mediaW, textW, lines.length ? 0 : metaW) + padX * 2,
+      Math.max(mediaW, voiceW, textW, lines.length ? 0 : metaW) + padX * 2,
     );
     const bubbleH =
       padY * 2 +
+      replyH +
+      voiceH +
       lines.length * lineH +
       metaH +
       (mediaH ? mediaH + (lines.length ? Math.round(12 * m.scale) : 0) : 0);
@@ -271,6 +301,8 @@ export function layoutMessages(
       mediaW,
       bare: false,
       clock: messageClock(project, index, message),
+      reply,
+      voiceH,
     });
 
     y += nameH + bubbleH + reactionH + m.gap;
