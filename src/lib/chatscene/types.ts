@@ -363,6 +363,7 @@ export function createChatSceneProject(init: Partial<ChatSceneProject> = {}): Ch
     animation: init.animation ?? "soft-spring",
     layout: init.layout ?? { ...DEFAULT_LAYOUT },
     sound: init.sound ?? { enabled: false, volume: 0.5 },
+    branding: init.branding ?? { ...DEFAULT_BRANDING },
     participants: init.participants ?? [me, other],
     messages:
       init.messages ??
@@ -414,6 +415,7 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
     animation: raw.animation ?? base.animation ?? "soft-spring",
     layout: { ...DEFAULT_LAYOUT, ...(raw.layout ?? {}) },
     sound: { enabled: false, volume: 0.5, ...(raw.sound ?? {}) },
+    branding: { ...DEFAULT_BRANDING, ...(raw.branding ?? {}) },
   };
 }
 
