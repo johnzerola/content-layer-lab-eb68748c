@@ -1,4 +1,5 @@
 import { fullscreenAt } from './template-timeline';
+import { isStorageRef, peekMediaUrl, resolveMediaUrl } from "./media-store";
 import {
   CANVAS_H,
   CANVAS_W,
