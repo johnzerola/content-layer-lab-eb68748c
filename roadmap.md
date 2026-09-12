@@ -17,3 +17,5 @@
 - [ ] Context7: indisponível neste ambiente; reavaliar com o app de desktop
 - [ ] Figma MCP: exige app de desktop; opcional
 - [ ] Implementar Fase 0/1 do ChatScene
+- [x] Benchmark de concorrentes e matriz de funcionalidades do ChatScene
+- [x] Gap analysis e escopo MUST/SHOULD/V2/FUTURE/DONT
