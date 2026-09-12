@@ -700,6 +700,47 @@ export function ChatSceneStudio() {
             </div>
 
             <div className="mt-3">
+              <p className="mono-label mb-1.5 text-muted-foreground">Enquadramento</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {LAYOUT_PRESETS.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => patch({ layout: { ...l.value, preset: l.id } })}
+                    className={`rounded-lg border px-2 py-1.5 text-xs transition ${
+                      (project.layout?.preset ?? "full-chat") === l.id
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <p className="mono-label mb-1.5 text-muted-foreground">Entrada das bolhas</p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {ANIMATION_PRESETS.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => patch({ animation: a.id })}
+                    className={`rounded-lg border px-2 py-1.5 text-xs transition ${
+                      (project.animation ?? "soft-spring") === a.id
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    {a.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+
+            <div className="mt-3">
               <label className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
                 Velocidade
                 <span className="mono-label">{project.timing.speed.toFixed(1)}×</span>
