@@ -7,6 +7,7 @@
  */
 import { buildPlan, type ConversationPlan } from "./clock";
 import { paintFrame } from "./draw";
+import { loadMedia, type LoadedMedia } from "./media";
 import { resolveTheme } from "./theme";
 import { renderSize, type ChatSceneProject } from "./types";
 
