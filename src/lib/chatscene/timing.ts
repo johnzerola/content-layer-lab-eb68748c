@@ -6,7 +6,7 @@
  * Função pura e determinística: mesmo documento, mesmo resultado — é o que
  * garante que a prévia e o vídeo exportado batem quadro a quadro.
  */
-import { participantOf, type ChatMessage, type ChatSceneProject } from "./types";
+import { participantOf, threadIdOf, type ChatMessage, type ChatSceneProject } from "./types";
 
 /** Jeito de digitar de uma pessoa (ritmo, pausas e variação). */
 export interface HumanTypingProfile {
@@ -180,6 +180,7 @@ export function computeMessageTimings(project: ChatSceneProject): MessageTiming[
 
     cursor = endMs;
     previousAuthor = message.kind === "system" || message.kind === "card" ? "" : author.id;
+    previousThread = thread;
   });
 
   return out;
