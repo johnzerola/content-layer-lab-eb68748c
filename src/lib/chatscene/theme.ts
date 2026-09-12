@@ -87,7 +87,7 @@ const FAMILIES: ThemeFamily[] = [
       fontFamily: FONT,
       radius: 0.42,
     },
-  } as unknown as ThemeFamily,
+  },
   {
     id: "menta",
     label: "Menta",
