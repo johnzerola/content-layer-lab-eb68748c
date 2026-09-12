@@ -123,17 +123,19 @@ export function VoicePanel({
                   </span>
                   <Button
                     size="sm"
-                    variant="ghost"
-                    className="h-7 px-2"
+                    variant="secondary"
+                    className="h-7 gap-1 px-2 text-[11px]"
                     disabled={previewing === p.id}
                     onClick={() => onPreview(p.id, { ...DEFAULT_VOICE, ...voice })}
                     aria-label={`Ouvir a voz de ${p.name}`}
+                    title="Ouvir uma amostra com esta voz, jeito, velocidade e tom"
                   >
                     {previewing === p.id ? (
                       <Loader2 className="size-3.5 animate-spin" />
                     ) : (
                       <Volume2 className="size-3.5" />
                     )}
+                    Ouvir
                   </Button>
                 </div>
               )}
