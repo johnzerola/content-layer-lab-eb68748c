@@ -879,6 +879,136 @@ export function ChatSceneStudio() {
             </div>
 
             <div className="mt-3">
+              <p className="mono-label mb-1.5 text-muted-foreground">Vozes</p>
+              <p className="mb-2 text-[11px] text-muted-foreground">
+                Vozes sintéticas genéricas. Nada de imitar a voz de pessoas reais.
+              </p>
+              <div className="space-y-2">
+                {project.participants.map((p) => {
+                  const voice = p.voice ?? null;
+                  const setVoice = (changes: Partial<VoiceProfile> | null) =>
+                    patch({
+                      participants: project.participants.map((x) =>
+                        x.id === p.id
+                          ? { ...x, voice: changes ? { ...DEFAULT_VOICE, ...x.voice, ...changes } : null }
+                          : x,
+                      ),
+                    });
+                  return (
+                    <div key={p.id} className="rounded-lg border border-border bg-background/40 p-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="size-2.5 shrink-0 rounded-full" style={{ background: p.color }} />
+                        <span className="text-xs font-medium">{p.name}</span>
+                        <select
+                          value={voice?.presetId ?? ""}
+                          onChange={(e) => setVoice(e.target.value ? { presetId: e.target.value } : null)}
+                          className="ml-auto rounded-md border border-border bg-background px-1.5 py-1 text-xs"
+                          aria-label={`Voz de ${p.name}`}
+                        >
+                          <option value="">sem voz</option>
+                          {VOICE_PRESETS.map((v) => (
+                            <option key={v.id} value={v.id}>
+                              {v.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {voice && (
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                          <select
+                            value={voice.style}
+                            onChange={(e) => setVoice({ style: e.target.value as VoiceProfile["style"] })}
+                            className="flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs"
+                            aria-label={`Jeito de falar de ${p.name}`}
+                          >
+                            {VOICE_STYLES.map((v) => (
+                              <option key={v.id} value={v.id}>
+                                {v.label}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="range"
+                            min={0.8}
+                            max={1.2}
+                            step={0.05}
+                            value={voice.speed}
+                            onChange={(e) => setVoice({ speed: Number(e.target.value) })}
+                            className="w-20"
+                            aria-label={`Velocidade da fala de ${p.name}`}
+                          />
+                          <span className="w-10 text-right text-[11px] text-muted-foreground">
+                            {voice.speed.toFixed(2)}x
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <Button
+                size="sm"
+                variant="secondary"
+                className="mt-2 w-full"
+                disabled={castState === "running"}
+                onClick={() => void handleGenerateVoices()}
+              >
+                {castState === "running" ? (
+                  <>
+                    <Loader2 className="mr-1.5 size-4 animate-spin" />
+                    Gerando {castProgress.done}/{castProgress.total}
+                  </>
+                ) : (
+                  "Gerar as falas"
+                )}
+              </Button>
+              {clips.size > 0 && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {clips.size} falas prontas — elas entram no vídeo exportado.
+                </p>
+              )}
+
+              <div className="mt-2 space-y-1.5 text-xs">
+                <input
+                  value={project.voiceMix?.musicUrl ?? ""}
+                  onChange={(e) =>
+                    patch({
+                      voiceMix: { ...DEFAULT_VOICE_MIX, ...project.voiceMix, musicUrl: e.target.value || null },
+                    })
+                  }
+                  placeholder="música de fundo (endereço, uso permitido)"
+                  className="w-full rounded-md border border-border bg-background/60 px-2 py-1 text-xs outline-none focus:border-primary"
+                  aria-label="Música de fundo"
+                />
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={project.voiceMix?.ducking ?? true}
+                    onChange={(e) =>
+                      patch({
+                        voiceMix: { ...DEFAULT_VOICE_MIX, ...project.voiceMix, ducking: e.target.checked },
+                      })
+                    }
+                  />
+                  abaixar a música enquanto alguém fala
+                </label>
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={project.voiceMix?.normalize ?? true}
+                    onChange={(e) =>
+                      patch({
+                        voiceMix: { ...DEFAULT_VOICE_MIX, ...project.voiceMix, normalize: e.target.checked },
+                      })
+                    }
+                  />
+                  deixar tudo no mesmo volume
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-3">
               <p className="mono-label mb-1.5 text-muted-foreground">Sua marca</p>
               <label className="flex items-center gap-1.5 text-xs">
                 <input
