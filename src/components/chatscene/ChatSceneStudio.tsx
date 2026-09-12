@@ -581,11 +581,11 @@ export function ChatSceneStudio() {
                   onFocus={() => setSelected(m.id)}
                   onClick={() => setSelected(m.id)}
                 >
-                  <div className="mb-1.5 flex items-center gap-1.5">
+                  <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                     <select
                       value={m.participantId}
                       onChange={(e) => updateMessage(m.id, { participantId: e.target.value })}
-                      className="rounded-md border border-border bg-background px-1.5 py-1 text-xs"
+                      className="min-w-0 max-w-[7.5rem] flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs"
                       aria-label="Quem envia"
                       style={{ color: author.color }}
                     >
@@ -598,7 +598,7 @@ export function ChatSceneStudio() {
                     <select
                       value={m.kind}
                       onChange={(e) => updateMessage(m.id, { kind: e.target.value as ChatMessage["kind"] })}
-                      className="rounded-md border border-border bg-background px-1.5 py-1 text-xs text-muted-foreground"
+                      className="min-w-0 max-w-[7.5rem] flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs text-muted-foreground"
                       aria-label="Tipo de mensagem"
                     >
                       {MESSAGE_KINDS.map((k) => (
@@ -607,7 +607,8 @@ export function ChatSceneStudio() {
                         </option>
                       ))}
                     </select>
-                    <span className="ml-auto flex items-center gap-0.5">
+                    <span className="ml-auto flex shrink-0 items-center gap-0.5">
+
                       <button
                         type="button"
                         onClick={() => moveMessage(m.id, -1)}
