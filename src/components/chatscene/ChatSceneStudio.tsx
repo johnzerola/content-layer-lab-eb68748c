@@ -27,6 +27,7 @@ import { buildPlan } from "@/lib/chatscene/clock";
 import { encodeFrameSequence, frameEncoderSupported } from "@/lib/chatscene/encode-frames";
 import { CanvasConversationRenderer } from "@/lib/chatscene/renderer";
 import { saveChatSceneProject } from "@/lib/chatscene/project.service";
+import { uploadChatSceneMedia } from "@/lib/chatscene/upload";
 import { CHAT_THEMES } from "@/lib/chatscene/theme";
 import {
   createChatSceneProject,
