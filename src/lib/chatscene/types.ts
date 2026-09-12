@@ -220,6 +220,12 @@ export interface ChatSceneProject {
   receipts?: boolean;
   /** fundo da cena */
   background?: ChatSceneBackground;
+  /** estilo de entrada das bolhas */
+  animation?: MessageAnimation;
+  /** enquadramento da conversa dentro do vídeo */
+  layout?: ChatSceneLayout;
+  /** sons curtos de envio/recebimento na prévia */
+  sound?: { enabled: boolean; volume: number };
 }
 
 export const DEFAULT_TIMING: ChatSceneTiming = {
@@ -230,6 +236,8 @@ export const DEFAULT_TIMING: ChatSceneTiming = {
   maxReadMs: 4200,
   typing: true,
   typingMs: 900,
+  humanTyping: true,
+  senderSwitchMs: 180,
   tailMs: 1400,
 };
 
