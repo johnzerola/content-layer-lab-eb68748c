@@ -70,7 +70,9 @@ export async function resetPassword(email: string) {
 export async function pushTemplates(list: Template[]) {
   const user = await currentUser();
   if (!user) throw new Error("Faça login para sincronizar.");
-  const rows = list.map((t) => ({
+  // imagens coladas dentro do template vão para o armazenamento antes de salvar
+  const clean = await Promise.all(list.map((t) => externalizeDataUrls("template", t)));
+  const rows = clean.map((t) => ({
     user_id: user.id,
     local_id: t.id,
     name: t.name,

@@ -127,3 +127,24 @@ export function peekMediaUrl(value: string): string | null {
   const cached = urlCache.get(value);
   return cached && Date.now() - cached.at < CACHE_MS ? cached.url : null;
 }
+
+/**
+ * Percorre um objeto salvo e troca toda mídia embutida (data URL) por
+ * referência de armazenamento. Usado ao sincronizar conteúdo antigo.
+ */
+export async function externalizeDataUrls<T>(kind: string, value: T): Promise<T> {
+  if (typeof value === "string") {
+    return (isDataUrl(value) ? await uploadDataUrl(kind, value) : value) as T;
+  }
+  if (Array.isArray(value)) {
+    return (await Promise.all(value.map((v) => externalizeDataUrls(kind, v)))) as T;
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = await externalizeDataUrls(kind, v);
+    }
+    return out as T;
+  }
+  return value;
+}
