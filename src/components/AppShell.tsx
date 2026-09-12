@@ -22,6 +22,7 @@ import {
   Images,
   Users,
   Menu,
+  MessageSquare,
   X,
 } from "lucide-react";
 
