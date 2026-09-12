@@ -23,6 +23,27 @@ export type MessageStatus = "sent" | "delivered" | "read";
 
 export type ChatKind = "direct" | "group";
 
+/** Fundo da cena: o papel de parede do tema, uma cor, um degradê ou uma foto. */
+export interface ChatSceneBackground {
+  kind: "theme" | "solid" | "gradient" | "image";
+  color?: string | null;
+  /** segunda cor do degradê */
+  colorB?: string | null;
+  imageUrl?: string | null;
+}
+
+export const DEFAULT_BACKGROUND: ChatSceneBackground = { kind: "theme" };
+
+/** Fundos prontos, para escolher com um clique. */
+export const BACKGROUND_PRESETS: { id: string; label: string; value: ChatSceneBackground }[] = [
+  { id: "theme", label: "Do tema", value: { kind: "theme" } },
+  { id: "noite", label: "Noite", value: { kind: "gradient", color: "#141428", colorB: "#2b1b4d" } },
+  { id: "aurora", label: "Aurora", value: { kind: "gradient", color: "#0d2b3e", colorB: "#1f6f6b" } },
+  { id: "pessego", label: "Pêssego", value: { kind: "gradient", color: "#ffd9c0", colorB: "#ff9db0" } },
+  { id: "carvao", label: "Carvão", value: { kind: "solid", color: "#111318" } },
+  { id: "papel", label: "Papel", value: { kind: "solid", color: "#f3efe6" } },
+];
+
 export interface ChatParticipant {
   id: string;
   /** nome exibido no cabeçalho e acima das bolhas em conversa de grupo */
@@ -103,6 +124,8 @@ export interface ChatSceneProject {
   startClock?: string;
   /** mostrar os tiques de entregue/lido nas mensagens de quem escreve */
   receipts?: boolean;
+  /** fundo da cena */
+  background?: ChatSceneBackground;
 }
 
 export const DEFAULT_TIMING: ChatSceneTiming = {
@@ -196,6 +219,7 @@ export function createChatSceneProject(init: Partial<ChatSceneProject> = {}): Ch
     groupAvatarUrl: init.groupAvatarUrl ?? null,
     startClock: init.startClock ?? "21:14",
     receipts: init.receipts ?? true,
+    background: init.background ?? { ...DEFAULT_BACKGROUND },
     participants: init.participants ?? [me, other],
     messages:
       init.messages ??
@@ -243,5 +267,35 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
     messages,
     timing: { ...DEFAULT_TIMING, ...(raw.timing ?? {}) },
     render: { ...DEFAULT_RENDER, ...(raw.render ?? {}) },
+    background: { ...DEFAULT_BACKGROUND, ...(raw.background ?? {}) },
   };
+}
+
+/**
+ * Conversa de demonstração: grupo com quatro pessoas, para o usuário ver tudo
+ * funcionando (cabeçalho de grupo, avatares, "digitando…", rolagem e ritmo).
+ */
+export function createDemoChatSceneProject(): ChatSceneProject {
+  const eu = createParticipant({ name: "Você", isSelf: true, color: "#7c5cff" });
+  const ana = createParticipant({ name: "Ana", color: "#ff5c8a" });
+  const joao = createParticipant({ name: "João", color: "#22c08a" });
+  const vo = createParticipant({ name: "Vô Chico", color: "#f2b705" });
+  const line = (p: ChatParticipant, text: string, extra: Partial<ChatMessage> = {}) =>
+    createMessage(p.id, { text, ...extra });
+  return createChatSceneProject({
+    title: "Grupo da Família",
+    chatKind: "group",
+    groupName: "Grupo da Família",
+    participants: [eu, ana, joao, vo],
+    messages: [
+      createMessage(eu.id, { kind: "system", text: "Ana criou o grupo “Grupo da Família”" }),
+      line(ana, "gente, o almoço de domingo vai ser na minha casa"),
+      line(joao, "eu levo a sobremesa 🍮"),
+      line(vo, "eu levo fome"),
+      line(eu, "kkkkk combinado então"),
+      line(ana, "só não atrasem como da última vez"),
+      line(joao, "isso foi o João de 2019, outra pessoa"),
+      line(vo, "meio-dia em ponto. quem chegar depois lava a louça"),
+    ],
+  });
 }
