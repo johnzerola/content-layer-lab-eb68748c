@@ -814,8 +814,10 @@ function paintConversation(
   height: number,
   showHeader: boolean,
   options: PaintOptions = {},
+  /** painel de altura variável: tamanhos fixos e conversa colada embaixo */
+  fit?: { metricsH: number },
 ) {
-  const m = metricsFor(width, height);
+  const m = metricsFor(width, fit?.metricsH ?? height);
   const media = options.media;
   const headerVisible = showHeader && (project.header?.style ?? "messenger") !== "none";
   const headerH = headerVisible ? m.headerH : 0;
@@ -824,12 +826,12 @@ function paintConversation(
 
   const appeared = project.messages.filter((msg) => frame >= (plan.byId[msg.id]?.appearFrame ?? Infinity));
 
-  const layout = layoutMessages(ctx, project, theme, appeared, width, height, media);
+  const layout = layoutMessages(ctx, project, theme, appeared, width, height, media, fit?.metricsH);
   const typing = typingAt(project, plan, frame);
   const typingH = typing ? Math.round(72 * m.scale) + m.gap : 0;
 
   // deixa a margem inferior livre para a interface das plataformas
-  const areaBottom = height - Math.max(m.pad, Math.round(height * 0.1));
+  const areaBottom = fit ? height - m.pad : height - Math.max(m.pad, Math.round(height * 0.1));
   // ScrollPlanner: a conversa fica ancorada embaixo, mas a rolagem entre uma
   // mensagem e a seguinte é suavizada — e continua determinística, porque só
   // depende do quadro atual.
