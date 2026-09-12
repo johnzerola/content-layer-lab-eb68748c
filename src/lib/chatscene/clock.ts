@@ -1,11 +1,15 @@
 /**
- * ConversationClock — o tempo da conversa, calculado uma vez.
+ * ConversationClock — o tempo da conversa, convertido em quadros.
  *
- * Função pura: mesmo documento, mesma tabela de tempo. Prévia e exportação leem
- * exatamente a mesma tabela, então o vídeo exportado é igual ao que o usuário
- * viu. Nada de setTimeout espalhado pela interface.
+ * O ritmo em milissegundos vem do ConversationTimingEngine (./timing). Aqui ele
+ * vira uma tabela de quadros usada pela prévia e pela exportação, então o vídeo
+ * final é igual ao que o usuário viu. Nada de setTimeout espalhado pela tela.
  */
-import { participantOf, type ChatMessage, type ChatSceneProject } from "./types";
+import { computeMessageTimings, totalDurationMs, readingMs, typingMsOf } from "./timing";
+import type { MessageTiming } from "./timing";
+import type { ChatMessage, ChatSceneProject } from "./types";
+
+export { typingMsOf } from "./timing";
 
 export interface ClockEntry {
   messageId: string;
@@ -13,8 +17,12 @@ export interface ClockEntry {
   appearFrame: number;
   /** quadro em que o "digitando…" começa; igual a appearFrame quando não há */
   typingFrame: number;
+  /** quadros que a animação de entrada dura */
+  entranceFrames: number;
   /** quadro em que a mensagem já está totalmente lida (fim da leitura) */
   endFrame: number;
+  /** tempos em milissegundos, para a interface mostrar */
+  timing: MessageTiming;
 }
 
 export interface ConversationPlan {
@@ -25,25 +33,9 @@ export interface ConversationPlan {
   byId: Record<string, ClockEntry>;
 }
 
-const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
-
 /** Tempo de leitura estimado de uma mensagem, em milissegundos. */
-export function readMs(message: ChatMessage, timing: ChatSceneProject["timing"]): number {
-  const chars = message.kind === "image" ? Math.max(24, message.text.length) : message.text.length;
-  return clamp(chars * timing.msPerChar, timing.minReadMs, timing.maxReadMs);
-}
-
-/** Duração do "digitando…" desta mensagem, em milissegundos (0 = sem). */
-export function typingMsOf(
-  message: ChatMessage,
-  project: ChatSceneProject,
-): number {
-  if (typeof message.typingMs === "number") return Math.max(0, message.typingMs);
-  if (!project.timing.typing) return 0;
-  if (message.kind === "system") return 0;
-  const author = participantOf(project, message.participantId);
-  // quem escreve a história não "digita" na tela: a bolha dele entra direto
-  return author.isSelf ? 0 : project.timing.typingMs;
+export function readMs(message: ChatMessage, project: ChatSceneProject): number {
+  return readingMs(message, project);
 }
 
 /** Constrói a tabela de tempo do projeto inteiro. */
@@ -52,25 +44,17 @@ export function buildPlan(project: ChatSceneProject): ConversationPlan {
   const speed = project.timing.speed > 0 ? project.timing.speed : 1;
   const toFrame = (ms: number) => Math.round((ms / speed / 1000) * fps);
 
-  const entries: ClockEntry[] = [];
-  let cursorMs = 0;
+  const timings = computeMessageTimings(project);
+  const entries: ClockEntry[] = timings.map((t) => ({
+    messageId: t.messageId,
+    typingFrame: toFrame(t.typingStartMs),
+    appearFrame: toFrame(t.appearMs),
+    entranceFrames: Math.max(1, toFrame(t.entranceMs)),
+    endFrame: toFrame(t.endMs),
+    timing: t,
+  }));
 
-  for (const message of project.messages) {
-    cursorMs += Math.max(0, message.delayMs ?? 0);
-    const typing = typingMsOf(message, project);
-    const typingFrame = toFrame(cursorMs);
-    cursorMs += typing;
-    const appearFrame = toFrame(cursorMs);
-    cursorMs += readMs(message, project.timing) + project.timing.gapMs;
-    entries.push({
-      messageId: message.id,
-      appearFrame,
-      typingFrame,
-      endFrame: toFrame(cursorMs),
-    });
-  }
-
-  const durationMs = cursorMs + project.timing.tailMs;
+  const durationMs = totalDurationMs(project, timings);
   const totalFrames = Math.max(1, toFrame(durationMs));
   const byId: Record<string, ClockEntry> = {};
   for (const e of entries) byId[e.messageId] = e;
@@ -101,3 +85,15 @@ export function typingAt(
   }
   return null;
 }
+
+/** Índice da mensagem que está no ar neste quadro (para a mini timeline). */
+export function activeIndexAt(plan: ConversationPlan, frame: number): number {
+  let index = -1;
+  plan.entries.forEach((e, i) => {
+    if (frame >= e.appearFrame) index = i;
+  });
+  return index;
+}
+
+export type { MessageTiming };
+export { typingMsOf as typingDurationOf };
