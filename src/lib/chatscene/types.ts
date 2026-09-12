@@ -95,6 +95,14 @@ export interface ChatSceneProject {
   messages: ChatMessage[];
   timing: ChatSceneTiming;
   render: ChatSceneRenderSettings;
+  /** conversa entre duas pessoas ou grupo com nome e foto próprios */
+  chatKind?: ChatKind;
+  groupName?: string | null;
+  groupAvatarUrl?: string | null;
+  /** hora inicial mostrada nas bolhas (HH:MM) */
+  startClock?: string;
+  /** mostrar os tiques de entregue/lido nas mensagens de quem escreve */
+  receipts?: boolean;
 }
 
 export const DEFAULT_TIMING: ChatSceneTiming = {
