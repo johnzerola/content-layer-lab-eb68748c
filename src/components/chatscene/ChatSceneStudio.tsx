@@ -650,6 +650,24 @@ export function ChatSceneStudio() {
                 />
                 mostrar “digitando…”
               </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={project.receipts ?? true}
+                  onChange={(e) => patch({ receipts: e.target.checked })}
+                />
+                tiques de mensagem lida
+              </label>
+              <div>
+                <p className="mb-1 text-muted-foreground">Hora inicial da conversa</p>
+                <input
+                  value={project.startClock ?? "21:14"}
+                  onChange={(e) => patch({ startClock: e.target.value })}
+                  placeholder="21:14"
+                  className="w-full rounded-md border border-border bg-background px-2 py-1.5"
+                  aria-label="Hora inicial da conversa"
+                />
+              </div>
               <div>
                 <p className="mb-1 text-muted-foreground">Qualidade do vídeo</p>
                 <select
