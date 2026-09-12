@@ -17,7 +17,8 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     z
       .object({
-        text: z.string().min(1).max(MAX_CHARS),
+        // bolhas muito longas são cortadas em vez de derrubar a geração
+        text: z.string().min(1).transform((t) => t.slice(0, MAX_CHARS)),
         voice: z.string().min(1).max(40),
         direction: z.string().max(300).optional(),
         speed: z.number().min(0.7).max(1.3).optional(),
@@ -45,6 +46,12 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
       const body = await res.text().catch(() => "");
       if (res.status === 402) {
         throw new Error("Seus créditos de IA acabaram. Adicione créditos para gerar as vozes.");
+      }
+      if (res.status === 403) {
+        throw new Error("A geração de voz está bloqueada nas configurações desta conta.");
+      }
+      if (res.status === 401) {
+        throw new Error("A geração de voz não está configurada neste projeto.");
       }
       if (res.status === 429) {
         throw new Error("Muitas vozes ao mesmo tempo. Espere alguns segundos e tente de novo.");
