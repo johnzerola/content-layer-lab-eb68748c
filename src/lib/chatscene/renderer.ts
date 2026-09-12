@@ -81,7 +81,7 @@ export class CanvasConversationRenderer implements ConversationRenderer {
   ): void {
     const project = this.project;
     if (!project) return;
-    const theme = resolveTheme(project.themeId, project.dark);
+    const theme = resolveTheme(project.themeId, project.dark, project.themeOverrides);
     paintFrame(target, project, theme, ctx.plan, ctx.frame, ctx.width, ctx.height, {
       media: this.media,
       safeZones: this.options.safeZones ?? false,
