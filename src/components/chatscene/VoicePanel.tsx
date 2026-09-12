@@ -43,7 +43,8 @@ export function VoicePanel({
     <div>
       <p className="mono-label mb-1.5 text-muted-foreground">Vozes</p>
       <p className="mb-2 text-[11px] text-muted-foreground">
-        Vozes sintéticas genéricas. Nada de imitar a voz de pessoas reais.
+        Vozes sintéticas genéricas. Nada de imitar a voz de pessoas reais. Toque em{" "}
+        <strong>Ouvir</strong> para escutar uma amostra antes de gerar.
       </p>
       <div className="space-y-2">
         {project.participants.map((p) => {
