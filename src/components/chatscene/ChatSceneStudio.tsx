@@ -1528,6 +1528,19 @@ export function ChatSceneStudio() {
           </section>
         )}
 
+        {/* ------------------------------------------ layouts de criador */}
+        <div className="lg:col-span-2 xl:col-span-3">
+          <CreatorLayouts
+            project={project}
+            plan={plan}
+            frame={frame}
+            onSelect={(preset) => {
+              const option = CREATOR_LAYOUTS.find((l) => l.id === preset);
+              if (option) patch({ layout: { ...option.value, preset } });
+            }}
+          />
+        </div>
+
         {/* ------------------------------------------------ linha do tempo */}
         <div className="lg:col-span-2 xl:col-span-3">
           <ChatSceneTimeline
