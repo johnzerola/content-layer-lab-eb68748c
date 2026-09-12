@@ -986,7 +986,7 @@ export function ChatSceneStudio() {
           {tab === "fundo" && (
             <div>
               <p className="mono-label mb-1.5 text-muted-foreground">Galeria de fundos</p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="list" aria-label="Fundos prontos">
                 {BACKGROUND_PRESETS.map((b) => {
                   const active =
                     (project.background?.kind ?? "theme") === b.value.kind &&
@@ -997,13 +997,16 @@ export function ChatSceneStudio() {
                       key={b.id}
                       type="button"
                       onClick={() => patch({ background: { ...b.value } })}
+                      aria-pressed={active}
+                      aria-label={`Usar fundo ${b.label}`}
+                      role="listitem"
                       className={`group overflow-hidden rounded-lg border text-left text-xs transition ${
-                        active ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
+                        active ? "border-primary bg-primary/10 ring-1 ring-primary/40" : "border-border hover:border-primary/50"
                       }`}
                     >
-                      <span className="relative block aspect-[9/12] overflow-hidden bg-muted">
+                      <span className="relative block aspect-[9/16] overflow-hidden bg-muted">
                         {b.value.kind === "video" && b.value.videoUrl ? (
-                          <video src={b.value.videoUrl} muted loop autoPlay playsInline preload="metadata" className="size-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                          <video src={b.value.videoUrl} muted loop autoPlay playsInline preload="auto" className="size-full object-cover transition-transform duration-300 group-hover:scale-105" />
                         ) : b.value.kind === "gradient" ? (
                           <span className="block size-full" style={{ background: `linear-gradient(145deg, ${b.value.color}, ${b.value.colorB})` }} />
                         ) : b.value.kind === "solid" ? (
@@ -1011,6 +1014,7 @@ export function ChatSceneStudio() {
                         ) : (
                           <span className="grid size-full place-items-center bg-secondary text-muted-foreground">Tema</span>
                         )}
+                        {b.value.kind === "video" ? <span className="absolute bottom-1.5 left-1.5 rounded bg-background/80 px-1.5 py-0.5 text-[9px] font-medium text-foreground">LOOP</span> : null}
                         {active ? <span className="absolute right-1.5 top-1.5 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold text-primary-foreground">ATIVO</span> : null}
                       </span>
                       <span className="block px-2 py-1.5 font-medium">{b.label}</span>
