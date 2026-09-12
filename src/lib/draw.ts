@@ -1,5 +1,21 @@
 import { fullscreenAt } from './template-timeline';
-import { isStorageRef, peekMediaUrl, resolveMediaUrl } from "./media-store";
+/** O cliente de armazenamento só é carregado no navegador, nunca no worker. */
+const STORAGE_PREFIX = "storage:";
+const isStorageRef = (v: string) => v.startsWith(STORAGE_PREFIX);
+type MediaStore = typeof import("./media-store");
+let mediaStore: MediaStore | null = null;
+async function loadMediaStore(): Promise<MediaStore> {
+  mediaStore ??= await import("./media-store");
+  return mediaStore;
+}
+function peekMediaUrl(ref: string): string | null {
+  return mediaStore?.peekMediaUrl(ref) ?? null;
+}
+async function resolveMediaUrl(value: string): Promise<string> {
+  if (!isStorageRef(value)) return value;
+  const store = await loadMediaStore();
+  return store.resolveMediaUrl(value);
+}
 import {
   CANVAS_H,
   CANVAS_W,
