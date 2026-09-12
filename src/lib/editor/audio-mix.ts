@@ -81,7 +81,8 @@ export async function renderEditorAudio(
   }
   for (const clip of audio.tracks) {
     if (clip.muted || clip.volume <= 0) continue;
-    const response = await fetch(clip.url, { signal: AbortSignal.timeout(30_000) });
+    const clipUrl = await resolveMediaUrl(clip.url);
+    const response = await fetch(clipUrl, { signal: AbortSignal.timeout(30_000) });
     if (!response.ok) throw new Error(`Não consegui carregar a trilha ${clip.name}.`);
     const buffer = await ctx.decodeAudioData(await response.arrayBuffer());
     for (const window of clipWindows(clip, buffer.duration, segments)) {
