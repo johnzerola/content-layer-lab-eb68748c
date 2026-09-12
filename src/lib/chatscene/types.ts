@@ -51,6 +51,10 @@ export interface ChatMessage {
   typingMs?: number | null;
   /** id da mensagem citada (reservado para a próxima fase) */
   replyToId?: string | null;
+  /** hora mostrada dentro da bolha; null usa o relógio automático da cena */
+  time?: string | null;
+  /** emoji de reação preso na base da bolha */
+  reaction?: string | null;
 }
 
 export interface ChatSceneTiming {
