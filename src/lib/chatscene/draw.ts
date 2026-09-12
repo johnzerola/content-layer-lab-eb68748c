@@ -1026,11 +1026,17 @@ function paintConversation(
       ctx.fillText(item.name, item.x + Math.round(8 * m.scale), y - Math.round(8 * m.scale));
     }
 
-    // bolha com rabinho apontando para o autor
+    // bolha com rabinho apontando para o autor, com sombra suave
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.28)";
+    ctx.shadowBlur = Math.round(10 * m.scale);
+    ctx.shadowOffsetY = Math.round(3 * m.scale);
     ctx.fillStyle = item.isSelf ? theme.selfBubble : theme.peerBubble;
     const radius = Math.min(item.height, Math.round(70 * m.scale)) * theme.radius * 1.6;
     roundRect(ctx, item.x, y, item.width, item.height, radius);
     ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = item.isSelf ? theme.selfBubble : theme.peerBubble;
     if (theme.tail) {
       const tw = Math.round(16 * m.scale);
       ctx.beginPath();
