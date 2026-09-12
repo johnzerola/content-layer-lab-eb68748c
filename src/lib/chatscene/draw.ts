@@ -369,6 +369,7 @@ function drawWallpaper(
   m: Metrics,
   background?: ChatSceneBackground,
   media?: Map<string, LoadedMedia>,
+  seconds = 0,
 ) {
   const bg = background ?? { kind: "theme" as const };
   if (bg.kind === "solid" && bg.color) {
