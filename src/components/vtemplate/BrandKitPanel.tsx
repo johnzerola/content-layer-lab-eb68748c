@@ -4,6 +4,8 @@ import { Button, Input } from "@/components/ui/base";
 import { Label } from "@/components/ui/label";
 import { BRAND_FONTS, extractBrandFromLogo, loadBrandKit, saveBrandKit, type BrandKit } from "@/lib/brand-kit";
 import type { TemplateDoc, TemplateLayer } from "@/lib/video-template/types";
+import { resolveMediaUrl, uploadFileOrInline } from "@/lib/media-store";
+import { useMediaUrl } from "@/hooks/useMediaUrl";
 
 function ColorRow({
   label,
