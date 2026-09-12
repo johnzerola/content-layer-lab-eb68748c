@@ -23,14 +23,44 @@ export type MessageStatus = "sent" | "delivered" | "read";
 
 export type ChatKind = "direct" | "group";
 
-/** Fundo da cena: o papel de parede do tema, uma cor, um degradê ou uma foto. */
+/**
+ * Fundo da cena: o papel de parede do tema, uma cor, um degradê, uma foto ou
+ * um vídeo em laço (gameplay, paisagem, textura própria ou licenciada).
+ */
 export interface ChatSceneBackground {
-  kind: "theme" | "solid" | "gradient" | "image";
+  kind: "theme" | "solid" | "gradient" | "image" | "video";
   color?: string | null;
   /** segunda cor do degradê */
   colorB?: string | null;
   imageUrl?: string | null;
+  /** endereço do vídeo de fundo quando kind === "video" */
+  videoUrl?: string | null;
+  /** repetir o vídeo do começo quando ele acabar */
+  loop?: boolean;
 }
+
+/**
+ * Marca do criador sobre a cena: um @ e/ou uma logo, sempre do próprio
+ * usuário. Fica fora da conversa, nunca dentro das bolhas.
+ */
+export interface ChatSceneBranding {
+  enabled: boolean;
+  handle: string;
+  logoUrl?: string | null;
+  position: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+  opacity: number;
+  /** tamanho relativo à largura do vídeo (0.02–0.12) */
+  size: number;
+}
+
+export const DEFAULT_BRANDING: ChatSceneBranding = {
+  enabled: false,
+  handle: "",
+  logoUrl: null,
+  position: "bottom-right",
+  opacity: 0.85,
+  size: 0.05,
+};
 
 export const DEFAULT_BACKGROUND: ChatSceneBackground = { kind: "theme" };
 
