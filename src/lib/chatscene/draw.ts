@@ -114,6 +114,10 @@ interface LaidOutMessage {
   /** figurinha: sem bolha, fundo transparente */
   bare: boolean;
   clock: string;
+  /** citação da mensagem respondida, desenhada no topo da bolha */
+  reply?: { name: string; color: string; text: string; height: number } | null;
+  /** altura da barra do recado de voz (0 quando não é voz) */
+  voiceH?: number;
 }
 
 interface Layout {
