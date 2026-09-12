@@ -710,6 +710,35 @@ export function ChatSceneStudio() {
                   suffix="ms"
                   onChange={(v) => updateMessage(selectedMessage.id, { typingMs: v })}
                 />
+                <div>
+                  <p className="mb-1 text-muted-foreground">Reação nesta mensagem</p>
+                  <div className="flex flex-wrap gap-1">
+                    {["", "❤️", "😂", "😮", "😢", "👍", "🔥"].map((emoji) => (
+                      <button
+                        key={emoji || "none"}
+                        type="button"
+                        onClick={() => updateMessage(selectedMessage.id, { reaction: emoji || null })}
+                        className={`rounded-md border px-2 py-1 ${
+                          (selectedMessage.reaction ?? "") === emoji
+                            ? "border-primary bg-primary/10"
+                            : "border-border"
+                        }`}
+                      >
+                        {emoji || "nenhuma"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-1 text-muted-foreground">Hora desta mensagem</p>
+                  <input
+                    value={selectedMessage.time ?? ""}
+                    onChange={(e) => updateMessage(selectedMessage.id, { time: e.target.value || null })}
+                    placeholder="automática"
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5"
+                    aria-label="Hora desta mensagem"
+                  />
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
