@@ -190,8 +190,7 @@ export type ProjectRow = {
   mode: string;
   name: string;
   updated_at: string;
-  /** quantidade de vídeos do projeto, lida direto no banco (sem baixar o conteúdo) */
-  itemCount: number;
+
 };
 
 /** Salva (ou atualiza) o projeto de uma ferramenta na conta do usuário. */
@@ -220,23 +219,14 @@ export async function listProjects(mode?: string, limit = 50): Promise<ProjectRo
   if (!user) return [];
   let q = supabase
     .from("projects")
-    .select("id,mode,name,updated_at,items:data->items")
+    .select("id,mode,name,updated_at")
     .eq("user_id", user.id)
     .order("updated_at", { ascending: false })
     .limit(limit);
   if (mode) q = q.eq("mode", mode);
   const { data, error } = await q;
   if (error) throw error;
-  return (data ?? []).map((r) => {
-    const row = r as unknown as { id: string; mode: string; name: string; updated_at: string; items?: unknown };
-    return {
-      id: row.id,
-      mode: row.mode,
-      name: row.name,
-      updated_at: row.updated_at,
-      itemCount: Array.isArray(row.items) ? row.items.length : 0,
-    };
-  });
+  return (data ?? []) as ProjectRow[];
 }
 
 /** Conteúdo completo de um projeto, carregado só na hora de abrir. */
