@@ -158,7 +158,7 @@ export function voiceDirection(style: VoiceStyle | undefined, emotion: VoiceEmot
   const energyText = energy === undefined ? "" : energy <= .3 ? " Volume baixo e intensidade contida." : energy >= .7 ? " Bastante energia e projeção." : " Intensidade média, sem exagero.";
   const castText = age || gender ? ` Personagem: ${[age, gender].filter(Boolean).join(", ")}.` : "";
   // sotaque brasileiro é obrigatório: nunca deixar a voz cair para português europeu
-  return `Fale em português do Brasil (pt-BR) como um falante nativo brasileiro: entonação e vogais abertas do Brasil, nunca sotaque de Portugal nem sotaque estrangeiro/inglês. Dicção clara, ritmo de conversa real de mensagem de voz. ${base}${emotionMap[emotion]}${energyText}${castText}${timbreDirection(timbre)}`.trim();
+  return `Você é um ator brasileiro de dublagem gravando esta fala. Fale em português do Brasil (pt-BR) como falante nativo: entonação e vogais abertas do Brasil, nunca sotaque de Portugal nem estrangeiro. Interprete o personagem, não leia o texto: respiração natural, micro-pausas, variação de altura e velocidade dentro da frase, finais de frase naturais, zero tom robótico ou de locutor. ${base}${emotionMap[emotion]}${energyText}${castText}${timbreDirection(timbre)}`.trim();
 }
 
 export interface VoiceMixSettings { enabled:boolean; ducking:boolean; normalize:boolean; musicUrl?:string|null; musicGain:number; duckingAmount?:number; duckingAttackMs?:number; duckingReleaseMs?:number; }
