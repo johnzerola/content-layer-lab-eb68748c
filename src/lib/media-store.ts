@@ -115,9 +115,9 @@ export async function uploadMediaBlob(kind: string, blob: Blob): Promise<string 
   const ext = extFromMime(compressed.type || "application/octet-stream");
   const name = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const path = `${userId}/${kind}/${name}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
+  const { error } = await supabase.storage.from(BUCKET).upload(path, compressed, {
     upsert: false,
-    contentType: blob.type || "application/octet-stream",
+    contentType: compressed.type || "application/octet-stream",
   });
   if (error) return null;
   return `${PREFIX}${path}`;
