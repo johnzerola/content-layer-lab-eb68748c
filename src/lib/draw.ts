@@ -22,6 +22,8 @@ import {
   type CaptionStyle,
   type CleanupRegion,
   type ImageLayer,
+  type LayerAnim,
+
   type Template,
   type TextLayer,
 } from "./template";
