@@ -200,26 +200,32 @@ export function computeMessageTimings(project: ChatSceneProject): MessageTiming[
       (message.pauseAfterMs ?? t.gapMs) + Math.max(0, message.voiceDirection?.pauseAfterMs ?? 0),
     );
 
-    const typingStartMs = cursor + leadIn;
-    const appearMs = typingStartMs + typing;
+    const initial = message.initial === true;
+    const typingStartMs = initial ? 0 : cursor + leadIn;
+    const appearMs = initial ? 0 : typingStartMs + typing;
+    const hesitation = initial ? null : typingHesitation(message, author, typing);
     // a leitura só termina depois da fala, quando houver áudio
-    const hold = Math.max(reading, voice);
-    const endMs = appearMs + entrance + hold + pauseAfter;
+    const hold = initial ? 0 : Math.max(reading, voice);
+    const endMs = initial ? cursor : appearMs + entrance + hold + pauseAfter;
 
     out.push({
       messageId: message.id,
-      leadInMs: leadIn,
-      typingMs: typing,
-      entranceMs: entrance,
-      voiceMs: voice,
+      leadInMs: initial ? 0 : leadIn,
+      typingMs: initial ? 0 : typing,
+      typingGapStartMs: hesitation?.gapStartMs ?? 0,
+      typingGapMs: hesitation?.gapMs ?? 0,
+      initial,
+      entranceMs: initial ? 0 : entrance,
+      voiceMs: initial ? 0 : voice,
       readingMs: hold,
-      pauseAfterMs: pauseAfter,
+      pauseAfterMs: initial ? 0 : pauseAfter,
       typingStartMs,
       appearMs,
       endMs,
     });
 
     cursor = endMs;
+    if (initial) return;
     previousAuthor = message.kind === "system" || message.kind === "card" ? "" : author.id;
     previousThread = thread;
   });
