@@ -244,6 +244,8 @@ export interface ChatSceneLayout {
   autoHeight?: boolean;
 }
 
+import { PERSONALITY_PRESETS } from "./personality";
+
 export const DEFAULT_LAYOUT: ChatSceneLayout = {
   preset: "full-chat",
   x: 0,
@@ -692,10 +694,14 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
  * funcionando (cabeçalho de grupo, avatares, "digitando…", rolagem e ritmo).
  */
 export function createDemoChatSceneProject(): ChatSceneProject {
-  const chefe = createParticipant({ id: "chefe", name: "Chefe", color: "#f2b705", voiceProfileId: "voice_chefe" });
-  const pedro = createParticipant({ id: "pedro", name: "Pedro", isSelf: true, color: "#7c5cff", voiceProfileId: "voice_pedro" });
-  const colega = createParticipant({ id: "colega", name: "Colega", color: "#22c08a", voiceProfileId: "voice_colega" });
-  const mae = createParticipant({ id: "mae", name: "Mãe", color: "#ff5c8a", voiceProfileId: "voice_mae" });
+  const persona = (id: string) => {
+    const preset = PERSONALITY_PRESETS.find((x) => x.id === id);
+    return { personalityPresetId: preset?.id ?? null, personality: preset?.value ?? null };
+  };
+  const chefe = createParticipant({ id: "chefe", name: "Chefe", color: "#f2b705", voiceProfileId: "voice_chefe", ...persona("chefe") });
+  const pedro = createParticipant({ id: "pedro", name: "Pedro", isSelf: true, color: "#7c5cff", voiceProfileId: "voice_pedro", ...persona("filho") });
+  const colega = createParticipant({ id: "colega", name: "Colega", color: "#22c08a", voiceProfileId: "voice_colega", ...persona("neutro") });
+  const mae = createParticipant({ id: "mae", name: "Mãe", color: "#ff5c8a", voiceProfileId: "voice_mae", ...persona("mae") });
   const line = (p: ChatParticipant, text: string, extra: Partial<ChatMessage> = {}) =>
     createMessage(p.id, { text, ...extra });
   return createChatSceneProject({
@@ -722,6 +728,8 @@ export function createDemoChatSceneProject(): ChatSceneProject {
     // ritmo de short: cortes rápidos, como nos canais de conversa animada
     timing: { ...DEFAULT_TIMING, speed: 1.12, gapMs: 380, senderSwitchMs: 140 },
     messages: [
+      // histórico: já está na tela quando o vídeo começa
+      createMessage(colega.id, { text: "Bom diaaa", threadId: "trabalho", initial: true }),
       createMessage(chefe.id, { kind: "card", text: "Primeiro dia do Pedro", threadId: "trabalho" }),
       createMessage(chefe.id, { kind: "system", text: "Pedro entrou na equipe", threadId: "trabalho" }),
       line(chefe, "Bom dia, Pedro. Preparado para o primeiro dia?", { threadId: "trabalho", voiceDirection: { emotion: "serious" } }),
