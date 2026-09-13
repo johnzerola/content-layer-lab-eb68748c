@@ -43,7 +43,10 @@ export async function renderEditorAudio(
   audio: EditorAudio,
   speech: AudioRange[] = [],
 ): Promise<AudioTrack | null> {
-  const duration = segments.reduce((sum, s) => sum + Math.max(0, s.end - s.start), 0);
+  const duration = segments.reduce(
+    (sum, s) => sum + Math.max(0, s.end - s.start) / Math.max(0.05, s.speed ?? 1),
+    0,
+  );
   if (duration <= 0) return null;
   const sampleRate = 48000;
   const ctx = new OfflineAudioContext(2, Math.ceil(duration * sampleRate), sampleRate);

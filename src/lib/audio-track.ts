@@ -45,7 +45,7 @@ export function decodeSourceAudio(file: File): Promise<AudioBuffer | null> {
 /** Remonta os trechos mantidos com a velocidade/tom/EQ desta variação. */
 export async function renderAudioTrack(
   file: File,
-  segments: { start: number; end: number }[],
+  segments: { start: number; end: number; speed?: number }[],
   speed: number,
   pitchCents = 0,
   eqDb = 0,
@@ -54,19 +54,27 @@ export async function renderAudioTrack(
     const decoded = await decodeSourceAudio(file);
     if (!decoded) return null;
 
+    /** Velocidade global da variação combinada com a velocidade do trecho. */
+    const rateOf = (seg: { speed?: number }) =>
+      Math.max(0.05, speed) * Math.max(0.05, seg.speed ?? 1);
+
     const sampleRate = 48000;
     const channels = Math.min(2, decoded.numberOfChannels);
-    const dur = segments.reduce((a, s) => a + Math.max(0, s.end - s.start), 0);
-    const outLen = Math.max(1, Math.floor((dur / speed) * sampleRate));
+    const dur = segments.reduce(
+      (a, s) => a + Math.max(0, s.end - s.start) / rateOf(s),
+      0,
+    );
+    const outLen = Math.max(1, Math.floor(dur * sampleRate));
     const off = new OfflineAudioContext(channels, outLen, sampleRate);
 
     let cursor = 0;
     for (const seg of segments) {
       const len = Math.max(0, seg.end - seg.start);
       if (len <= 0.01) continue;
+      const rate = rateOf(seg);
       const src = off.createBufferSource();
       src.buffer = decoded;
-      src.playbackRate.value = speed;
+      src.playbackRate.value = rate;
       if (pitchCents) {
         try {
           src.detune.value = pitchCents;
@@ -85,7 +93,7 @@ export async function renderAudioTrack(
       }
       node.connect(off.destination);
       src.start(cursor, seg.start, len);
-      cursor += len / speed;
+      cursor += len / rate;
     }
 
     const rendered = await off.startRendering();
