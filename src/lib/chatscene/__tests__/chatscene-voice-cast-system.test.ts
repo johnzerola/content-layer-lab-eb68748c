@@ -3,7 +3,7 @@ import { computeMessageTimings } from "../timing";
 import { planScroll } from "../scroll-planner";
 import { attachPreset, effectiveVoice } from "../voice-resolution";
 import { DEFAULT_VOICE, voiceKey } from "../voice";
-import { createGatewayVoiceProvider, generateCast } from "../voice-cast";
+import { applyVoiceDurations, createGatewayVoiceProvider, generateCast } from "../voice-cast";
 import { createChatSceneProject, createMessage, createParticipant, normalizeChatSceneProject } from "../types";
 
 const projectWithCast = () => {
@@ -90,5 +90,19 @@ describe("ScrollPlanner", () => {
 
   it("interpola sem salto no início da mensagem", () => {
     expect(planScroll({ frame: 10, appearFrame: 10, fps: 30, currentContentHeight: 800, previousContentHeight: 600, typingHeight: 0, viewportBottom: 1000 })).toBe(400);
+  });
+});
+
+describe("Timbre e sincronia", () => {
+  it("muda a chave de cache quando o timbre muda", () => {
+    const base = { ...DEFAULT_VOICE, warmth: 0.2, brightness: 0.3, roughness: 0 };
+    expect(voiceKey("Oi", base)).not.toBe(voiceKey("Oi", { ...base, warmth: 0.9 }));
+    expect(voiceKey("Oi", base)).not.toBe(voiceKey("Oi", { ...base, roughness: 0.8 }));
+  });
+
+  it("aplica a duração real da fala no relógio da cena", () => {
+    const project = projectWithCast();
+    const synced = applyVoiceDurations(project, { m1: 2400 });
+    expect(computeMessageTimings(synced)[0]!.voiceMs).toBe(2400);
   });
 });
