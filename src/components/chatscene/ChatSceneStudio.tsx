@@ -797,6 +797,10 @@ export function ChatSceneStudio() {
             })}
           </nav>
 
+          {tab === "historia" && (
+            <StoryPanel busy={storyBusy} onGenerate={(brief) => void handleGenerateStory(brief)} />
+          )}
+
           {tab === "participantes" && (
             <ParticipantsPanel
               project={project}
