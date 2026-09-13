@@ -1231,7 +1231,7 @@ function paintConversation(
 
     if (item.showName) {
       ctx.fillStyle = item.nameColor;
-      ctx.font = `600 ${Math.round(m.fontSize * 0.68)}px ${theme.fontFamily}`;
+      ctx.font = fontOf(item.style, 600, m.fontSize * 0.68);
       ctx.fillText(item.name, item.x + Math.round(8 * m.scale), y - Math.round(8 * m.scale));
     }
 
@@ -1240,12 +1240,12 @@ function paintConversation(
     ctx.shadowColor = "rgba(0,0,0,0.28)";
     ctx.shadowBlur = Math.round(10 * m.scale);
     ctx.shadowOffsetY = Math.round(3 * m.scale);
-    ctx.fillStyle = item.isSelf ? theme.selfBubble : theme.peerBubble;
+    ctx.fillStyle = item.style.bubble ?? (item.isSelf ? theme.selfBubble : theme.peerBubble);
     const radius = Math.min(item.height, Math.round(70 * m.scale)) * theme.radius * 1.6;
     roundRect(ctx, item.x, y, item.width, item.height, radius);
     ctx.fill();
     ctx.restore();
-    ctx.fillStyle = item.isSelf ? theme.selfBubble : theme.peerBubble;
+    ctx.fillStyle = item.style.bubble ?? (item.isSelf ? theme.selfBubble : theme.peerBubble);
     if (theme.tail && item.showTail !== false) {
       const tw = Math.round(16 * m.scale);
       ctx.beginPath();
@@ -1291,7 +1291,7 @@ function paintConversation(
       const r = Math.round(vh * 0.36);
       const cx = item.x + padX + r;
       const cy = cursorY + vh / 2;
-      ctx.fillStyle = item.isSelf ? theme.selfText : theme.peerText;
+      ctx.fillStyle = item.style.text ?? (item.isSelf ? theme.selfText : theme.peerText);
       ctx.globalAlpha = ctx.globalAlpha * 0.85;
       ctx.beginPath();
       ctx.moveTo(cx - r * 0.3, cy - r * 0.45);
@@ -1356,10 +1356,10 @@ function paintConversation(
     }
 
     const big = item.message.kind === "emoji" || emojiOnly(item.message.text);
-    const fontSize = big ? m.fontSize * 2.1 : m.fontSize;
-    const lineH = big ? m.lineH * 2.1 : m.lineH;
-    ctx.font = `${big ? 400 : 500} ${fontSize}px ${theme.fontFamily}`;
-    ctx.fillStyle = item.isSelf ? theme.selfText : theme.peerText;
+    const fontSize = (big ? m.fontSize * 2.1 : m.fontSize) * item.style.scale;
+    const lineH = (big ? m.lineH * 2.1 : m.lineH) * item.style.scale;
+    ctx.font = fontOf(item.style, big ? 400 : item.style.weight, fontSize);
+    ctx.fillStyle = item.style.text ?? (item.isSelf ? theme.selfText : theme.peerText);
     item.lines.forEach((line, i) => {
       ctx.fillText(line, item.x + padX, cursorY + (i + 1) * lineH - lineH * 0.3);
     });
