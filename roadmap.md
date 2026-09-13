@@ -32,4 +32,5 @@
 - [x] Entregue/lido com tempo, bolhas agrupadas e rabinho só na última
 - [x] Desfazer/refazer do documento (Ctrl+Z / Ctrl+Shift+Z)
 - [x] Altura da janela de conversa 40/50/60%
-- [ ] Pendente: gerador de história, motor de gameplay, editor avançado completo
+- [x] Fase E: gerador de história por IA (tema, tom, duração, personagens) com vozes e personalidades automáticas
+- [ ] Pendente: motor de gameplay (biblioteca inteligente de fundos), editor avançado completo
