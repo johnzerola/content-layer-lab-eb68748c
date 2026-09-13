@@ -90,6 +90,8 @@ function mergeRows(metrics: PostInsight[], posts: PublishedPostRef[]): Row[] {
       clicks: m?.clicks ?? 0,
       shares: m?.shares ?? 0,
       likes: m?.likes ?? 0,
+      comments: m?.comments ?? 0,
+      saves: m?.saves ?? 0,
       fetchedAt: m?.fetched_at ?? null,
     };
   });
