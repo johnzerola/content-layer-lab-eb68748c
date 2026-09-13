@@ -240,6 +240,9 @@ function MetricsPage() {
           </CardContent>
         </Card>
 
+        <ChannelCards rows={rows} />
+        <VideoRanking rows={rows} />
+
         {PLATFORMS.filter((p) => rows.some((r) => r.platform === p.id)).map((platform) => {
           const list = rows.filter((r) => r.platform === platform.id);
           const Icon = platform.icon;
