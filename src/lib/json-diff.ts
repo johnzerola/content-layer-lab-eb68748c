@@ -49,7 +49,7 @@ export function diffJson(base: Json, next: Json): JsonPatch | null {
       }
     }
     if (!changed) return null;
-    if (deleted.length) patch.$d = deleted;
+    if (deleted.length) patch["$d"] = deleted;
     return patch;
   }
   if (Array.isArray(base) && Array.isArray(next)) {
@@ -70,9 +70,9 @@ export function diffJson(base: Json, next: Json): JsonPatch | null {
 
 /** Aplica um patch sobre o valor base e devolve o JSON completo. */
 export function applyJsonPatch(base: Json, patch: JsonPatch): Json {
-  if ("$s" in patch) return (patch.$s ?? null) as Json;
+  if ("$s" in patch) return (patch["$s"] ?? null) as Json;
   if ("$a" in patch && Array.isArray(base)) {
-    const items = (patch.$a ?? {}) as Record<string, JsonPatch>;
+    const items = (patch["$a"] ?? {}) as Record<string, JsonPatch>;
     const out = [...base] as Json[];
     for (const idx of Object.keys(items)) {
       const i = Number(idx);
@@ -84,7 +84,7 @@ export function applyJsonPatch(base: Json, patch: JsonPatch): Json {
   }
   if (!isPlainObject(base)) return base;
   const out: Record<string, Json> = { ...base };
-  for (const key of (patch.$d as string[] | undefined) ?? []) delete out[key];
+  for (const key of (patch["$d"] as string[] | undefined) ?? []) delete out[key];
   for (const key of Object.keys(patch)) {
     if (key === "$d" || key === "$s" || key === "$a") continue;
     const sub = patch[key];
