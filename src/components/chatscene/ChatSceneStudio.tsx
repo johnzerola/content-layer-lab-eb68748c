@@ -101,6 +101,7 @@ import {
 const PALETTE = ["#7c5cff", "#ff5c8a", "#22c08a", "#f2b705", "#4ec3ff", "#ff8a4c"];
 
 type StudioTab =
+  | "historia"
   | "participantes"
   | "mensagens"
   | "tempo"
@@ -111,6 +112,7 @@ type StudioTab =
 
 /** Abas do editor: cada assunto em uma tela, com a prévia sempre ao lado. */
 const STUDIO_TABS: { id: StudioTab; label: string; icon: typeof Palette }[] = [
+  { id: "historia", label: "História", icon: Wand2 },
   { id: "participantes", label: "Participantes", icon: Users },
   { id: "mensagens", label: "Mensagens", icon: MessageSquare },
   { id: "tempo", label: "Linha do tempo", icon: Clock },
