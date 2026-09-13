@@ -695,6 +695,17 @@ function drawTypingBubble(
 export function entranceTransform(
   animation: ChatSceneProject["animation"],
   t: number,
+  /** força do efeito: 1 = padrão, 0.2 discreto, 2 exagerado */
+  intensity = 1,
+): { alpha: number; dy: number; scale: number } {
+  const k = Math.max(0.2, Math.min(2, intensity));
+  const raw = baseEntrance(animation, t);
+  return { alpha: raw.alpha, dy: raw.dy * k, scale: 1 + (raw.scale - 1) * k };
+}
+
+function baseEntrance(
+  animation: ChatSceneProject["animation"],
+  t: number,
 ): { alpha: number; dy: number; scale: number } {
   const p = Math.max(0, Math.min(1, t));
   const easeOut = 1 - Math.pow(1 - p, 3);
@@ -1084,7 +1095,7 @@ function paintConversation(
     const entry = plan.byId[item.message.id];
     const age = entry ? frame - entry.appearFrame : 0;
     const t = entry ? age / Math.max(1, entry.entranceFrames) : 1;
-    const anim = entranceTransform(project.animation, t);
+    const anim = entranceTransform(project.animation, t, project.motion?.intensity ?? 1);
     const rise = anim.dy * Math.round(34 * m.scale);
     const y = offsetY + item.y + rise;
     const seconds = Math.max(0, age) / plan.fps;

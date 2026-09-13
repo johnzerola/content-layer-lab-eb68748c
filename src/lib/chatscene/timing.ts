@@ -158,6 +158,10 @@ export function typingMsOf(message: ChatMessage, project: ChatSceneProject): num
 
 /** Duração da animação de entrada da bolha, em ms. */
 export function entranceMsOf(project: ChatSceneProject): number {
+  const custom = project.motion?.enterMs;
+  if (typeof custom === "number" && Number.isFinite(custom)) {
+    return Math.max(80, Math.min(1200, custom));
+  }
   switch (project.animation ?? "soft-spring") {
     case "fast-pop":
       return 160;
