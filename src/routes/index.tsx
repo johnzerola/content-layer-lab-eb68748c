@@ -85,6 +85,7 @@ import {
 } from "@/lib/template";
 import { downloadBlob, grabPoster, outputIsWebm, renderVideo } from "@/lib/render";
 import { poolSize } from "@/lib/render-pool";
+import { withRenderSlot } from "@/lib/render-gate";
 import { webCodecsSupported } from "@/lib/encode";
 import {
   MOTION_PRESETS,
