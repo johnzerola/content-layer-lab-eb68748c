@@ -144,7 +144,7 @@ async function decodeVideo(blob: Blob, options: LoadMediaOptions = {}): Promise<
       video.onerror = () => reject(new Error("vídeo inválido"));
       setTimeout(() => reject(new Error("tempo esgotado ao ler o vídeo")), 20000);
     });
-    const duration = Math.min(video.duration || 0, MAX_ANIMATION_SECONDS);
+    const duration = Math.min(video.duration || 0, maxSeconds);
     if (!duration) return null;
     const vw = video.videoWidth || 720;
     const vh = video.videoHeight || 1280;
@@ -158,9 +158,10 @@ async function decodeVideo(blob: Blob, options: LoadMediaOptions = {}): Promise<
     if (!ctx) return null;
 
     const frames: CanvasImageSource[] = [];
-    const total = Math.max(1, Math.round(duration * ANIMATED_SAMPLE_FPS));
+    const total = Math.max(1, Math.round(duration * sampleFps));
     for (let i = 0; i < total; i++) {
-      const t = (i / ANIMATED_SAMPLE_FPS) % duration;
+      if (frames.length > 0 && Date.now() - startedAt > decodeBudgetMs) break;
+      const t = (i / sampleFps) % duration;
       await new Promise<void>((resolve) => {
         const done = () => {
           video.removeEventListener("seeked", done);
