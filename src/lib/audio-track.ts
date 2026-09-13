@@ -93,7 +93,7 @@ export async function renderAudioTrack(
       }
       node.connect(off.destination);
       src.start(cursor, seg.start, len);
-      cursor += len / speed;
+      cursor += len / rate;
     }
 
     const rendered = await off.startRendering();
