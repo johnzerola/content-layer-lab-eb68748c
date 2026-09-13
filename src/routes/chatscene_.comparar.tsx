@@ -187,7 +187,7 @@ function CompareScreen() {
               </li>
               <li>
                 Vozes:{" "}
-                {item.project.voiceProfiles
+                {(item.project.voiceProfiles ?? [])
                   .map((v) => `${v.providerVoiceId ?? v.presetId} (${v.style})`)
                   .join(", ")}
               </li>

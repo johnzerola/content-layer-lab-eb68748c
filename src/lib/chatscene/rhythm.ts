@@ -27,12 +27,12 @@ export interface RhythmRow {
   typing: string | null;
 }
 
-export function backgroundLabel(bg: ChatSceneBackground): string {
-  switch (bg.kind) {
+export function backgroundLabel(bg: ChatSceneBackground | undefined): string {
+  switch (bg?.kind) {
     case "video":
-      return `Vídeo — ${fileLabel(bg.videoUrl)}`;
+      return `Vídeo — ${fileLabel(bg!.videoUrl)}`;
     case "image":
-      return `Imagem — ${fileLabel(bg.imageUrl)}`;
+      return `Imagem — ${fileLabel(bg!.imageUrl)}`;
     case "gradient":
       return "Degradê";
     case "solid":
