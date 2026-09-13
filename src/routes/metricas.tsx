@@ -40,6 +40,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { AppShell } from '@/components/AppShell';
+import { ChannelCards, VideoRanking, type MetricRow } from '@/components/metrics/ChannelPerformance';
 
 export const Route = createFileRoute('/metricas')({
   component: GuardedMetricsPage,
