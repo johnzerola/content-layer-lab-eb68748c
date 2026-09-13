@@ -707,6 +707,9 @@ export function ChatSceneStudio() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="ghost" size="sm" asChild>
+            <a href="/chatscene/comparar">Comparar com referência</a>
+          </Button>
           <Button variant="secondary" size="sm" onClick={() => void handleSave()} disabled={saving}>
             {saving ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : <Save className="mr-1.5 size-4" />}
             Salvar

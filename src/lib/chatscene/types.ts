@@ -743,7 +743,7 @@ export function createDemoChatSceneProjectB(): ChatSceneProject {
     title: "Primeiro dia no trabalho — versão B",
     background: { kind: "video", videoUrl: "/chatscene/backgrounds/forest-run.mp4", loop: true },
     timing: { ...base.timing, speed: 1, gapMs: 520, senderSwitchMs: 220 },
-    voiceProfiles: base.voiceProfiles.map((v) => ({ ...v, ...(swap[v.id] ?? {}) })),
+    voiceProfiles: (base.voiceProfiles ?? []).map((v) => ({ ...v, ...(v.id ? swap[v.id] ?? {} : {}) })),
   };
 }
 
