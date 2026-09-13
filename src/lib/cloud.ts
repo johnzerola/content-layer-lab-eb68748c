@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { migrate, registerQuotaFallback, type Template } from "@/lib/template";
 import { externalizeDataUrls, isDataUrl, uploadDataUrl } from "@/lib/media-store";
+import { applyJsonPatch, diffJson, jsonSize, type JsonPatch } from "@/lib/json-diff";
 
 export type CloudUser = { id: string; email: string | null };
 
@@ -132,15 +133,27 @@ async function insertTemplateVersions(
     )
     .order("created_at", { ascending: false })
     .limit(500);
-  const latestByTemplate = new Map<string, VersionRow>();
-  for (const row of (latestRows ?? []) as unknown as (VersionRow & { created_at: string })[]) {
-    if (!latestByTemplate.has(row.template_id)) latestByTemplate.set(row.template_id, row);
+  // por template: última versão COMPLETA e quantos diffs já pendurados nela
+  const fullByTemplate = new Map<string, VersionRow>();
+  const diffCountByTemplate = new Map<string, number>();
+  const rowsDesc = (latestRows ?? []) as unknown as (VersionRow & { created_at: string })[];
+  for (const row of rowsDesc) {
+    if (row.format === "full") {
+      if (!fullByTemplate.has(row.template_id)) fullByTemplate.set(row.template_id, row);
+    }
+  }
+  for (const [templateId, full] of fullByTemplate) {
+    const count = rowsDesc.filter(
+      (r) => r.template_id === templateId && r.format === "diff" && r.base_id === full.id,
+    ).length;
+    diffCountByTemplate.set(templateId, count);
   }
 
   const rows = items.map((item) => {
-    const latest = latestByTemplate.get(item.templateId);
-    if (latest?.format === "full") {
-      const patch = diffJson(latest.data as never, item.data as never);
+    const base = fullByTemplate.get(item.templateId);
+    const diffsOnBase = diffCountByTemplate.get(item.templateId) ?? 0;
+    if (base && diffsOnBase < 8) {
+      const patch = diffJson(base.data as never, item.data as never);
       if (patch && jsonSize(patch) < jsonSize(item.data) * 0.7) {
         return {
           user_id: userId,
@@ -148,7 +161,7 @@ async function insertTemplateVersions(
           label,
           data: {},
           format: "diff",
-          base_id: latest.id,
+          base_id: base.id,
           patch: patch as unknown as Json,
         };
       }
