@@ -43,6 +43,16 @@ export function TemplateTimeline({ template: t, onChange, selected, onSelect, ti
     onSelect(`extra:${id}`); setFullId(null);
   };
   const number = (label: string, value: number, max: number, update: (n: number) => void, min = 0) => <label className="space-y-1 text-xs text-muted-foreground">{label}<input aria-label={label} className="field w-full text-sm" type="number" min={min} max={max} step="0.1" value={Number(value.toFixed(2))} onChange={e => { if (e.target.value !== '' && Number.isFinite(e.target.valueAsNumber)) update(Math.max(min, Math.min(max, e.target.valueAsNumber))); }} /></label>;
+  const effects = (label: string, active: LayerAnim, current: number, update: (anim: LayerAnim, dur?: number) => void) =>
+    <div className="space-y-1.5">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {ANIMS.map(a => <button key={a.id} type="button" aria-pressed={active === a.id}
+          onClick={() => update(a.id, current > 0 ? undefined : 0.4)}
+          className={`rounded-full border px-2.5 py-1 text-[11px] transition hover:border-primary ${active === a.id ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground'}`}>{a.label}</button>)}
+      </div>
+    </div>;
+
   const rows = selectableIds(t).filter(id => layerOf(t, id)?.visible).map(id => {
     const l = layerOf(t, id) as BoxLayer;
     return { id, label: id.startsWith('extra:') ? (t.extras?.find(e => `extra:${e.id}` === id)?.label ?? 'Frase') : LAYER_LABELS[id as keyof typeof LAYER_LABELS], start: l.tStart ?? 0, end: l.tEnd ?? duration, full: false };
