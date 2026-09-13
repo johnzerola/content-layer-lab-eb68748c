@@ -24,3 +24,12 @@
 - [x] ChatScene: corrigir vídeo de fundo atrás da conversa e incluir efeitos sonoros no download sem vozes
 - [x] ChatScene: integrar galeria de fundos 9:16 com troca em tempo real, loop e desfoque
 - [ ] ChatScene: validar em navegador a fala real sincronizada com chat e fundo animado (aguardando login na prévia)
+
+## ChatScene V5 — Fases B/C/D (concluídas)
+- [x] Personalidade de escrita por personagem (presets) e ritmo de digitação derivado
+- [x] Histórico inicial (`initial`) visível no quadro zero
+- [x] Linha de eventos + `getStateAt` (estado único do relógio)
+- [x] Entregue/lido com tempo, bolhas agrupadas e rabinho só na última
+- [x] Desfazer/refazer do documento (Ctrl+Z / Ctrl+Shift+Z)
+- [x] Altura da janela de conversa 40/50/60%
+- [ ] Pendente: gerador de história, motor de gameplay, editor avançado completo
