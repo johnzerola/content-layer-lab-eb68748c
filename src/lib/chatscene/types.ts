@@ -168,6 +168,8 @@ export interface ChatParticipant {
   personalityPresetId?: string | null;
   /** humor de base, usado como emoção padrão das falas */
   emotionalBaseline?: import("./voice").VoiceEmotion | null;
+  /** aparência do balão deste personagem (cor, fonte, negrito/itálico) */
+  style?: ParticipantStyle;
   /** emoji que esta pessoa costuma usar ao reagir */
   reactionStyle?: string | null;
 }
@@ -210,6 +212,29 @@ export interface ChatMessage {
   initial?: boolean;
 }
 
+/** Aparência do balão de um personagem, por cima do tema da conversa. */
+export interface ParticipantStyle {
+  /** cor de fundo do balão (vazio = usa o tema) */
+  bubbleColor?: string | null;
+  /** cor do texto dentro do balão */
+  textColor?: string | null;
+  /** fonte do texto (vazio = fonte do tema) */
+  fontFamily?: string | null;
+  bold?: boolean;
+  italic?: boolean;
+  /** tamanho do texto: 0.8 = menor, 1.3 = maior */
+  fontScale?: number;
+}
+
+/** Fontes oferecidas na tela de estilo por personagem. */
+export const PARTICIPANT_FONTS: { id: string; label: string }[] = [
+  { id: "", label: "Fonte do tema" },
+  { id: "Figtree, system-ui, sans-serif", label: "Figtree" },
+  { id: "Outfit, system-ui, sans-serif", label: "Outfit" },
+  { id: "'JetBrains Mono', monospace", label: "Mono" },
+  { id: "Georgia, 'Times New Roman', serif", label: "Serifada" },
+];
+
 /** Estilo de entrada das bolhas. */
 export type MessageAnimation = "bubble-pop" | "slide-up" | "fade" | "soft-spring" | "fast-pop";
 
@@ -220,6 +245,47 @@ export const ANIMATION_PRESETS: { id: MessageAnimation; label: string }[] = [
   { id: "fade", label: "Suave" },
   { id: "fast-pop", label: "Rápido" },
 ];
+
+/** Como a cena inteira sai no fim do vídeo. */
+export type SceneExit = "none" | "fade" | "up" | "down" | "zoom";
+
+export const SCENE_EXIT_PRESETS: { id: SceneExit; label: string }[] = [
+  { id: "fade", label: "Suave" },
+  { id: "up", label: "Subindo" },
+  { id: "down", label: "Descendo" },
+  { id: "zoom", label: "Zoom" },
+  { id: "none", label: "Sem saída" },
+];
+
+/**
+ * Efeitos de entrada das bolhas e de saída da cena, com duração e intensidade
+ * ajustáveis pelas alças da linha do tempo. `enter` é a mesma coisa que
+ * `project.animation` (mantido para documentos antigos).
+ */
+export interface ChatSceneMotion {
+  enter: MessageAnimation;
+  /** duração da entrada de cada bolha (ms) */
+  enterMs: number;
+  /** força do deslocamento/escala do efeito (0.2 = discreto, 2 = exagerado) */
+  intensity: number;
+  exit: SceneExit;
+  /** duração da saída da cena, no fim do vídeo (ms) */
+  exitMs: number;
+}
+
+export const DEFAULT_MOTION: ChatSceneMotion = {
+  enter: "soft-spring",
+  enterMs: 340,
+  intensity: 1,
+  exit: "fade",
+  exitMs: 700,
+};
+
+export const MOTION_LIMITS = {
+  enterMs: { min: 80, max: 1200 },
+  exitMs: { min: 0, max: 2500 },
+  intensity: { min: 0.2, max: 2 },
+};
 
 /** Enquadramento da conversa dentro do vídeo. */
 export type ChatLayoutPreset =
@@ -464,6 +530,8 @@ export interface ChatSceneProject {
   background?: ChatSceneBackground;
   /** estilo de entrada das bolhas */
   animation?: MessageAnimation;
+  /** efeitos de entrada e saída, com duração e intensidade */
+  motion?: ChatSceneMotion;
   /** enquadramento da conversa dentro do vídeo */
   layout?: ChatSceneLayout;
   /** sons curtos de envio/recebimento na prévia */
@@ -534,6 +602,7 @@ export function createParticipant(init: Partial<ChatParticipant> = {}): ChatPart
     personality: init.personality ?? null,
     personalityPresetId: init.personalityPresetId ?? null,
     emotionalBaseline: init.emotionalBaseline ?? null,
+    ...(init.style ? { style: init.style } : {}),
     reactionStyle: init.reactionStyle ?? null,
   };
 }
@@ -587,7 +656,8 @@ export function createChatSceneProject(init: Partial<ChatSceneProject> = {}): Ch
     startClock: init.startClock ?? "21:14",
     receipts: init.receipts ?? true,
     background: init.background ?? { ...DEFAULT_BACKGROUND },
-    animation: init.animation ?? "soft-spring",
+    animation: init.animation ?? init.motion?.enter ?? "soft-spring",
+    motion: { ...DEFAULT_MOTION, ...(init.motion ?? {}), enter: init.motion?.enter ?? init.animation ?? DEFAULT_MOTION.enter },
     layout: init.layout ?? { ...DEFAULT_LAYOUT },
     sound: init.sound ?? { enabled: false, volume: 0.5 },
     branding: init.branding ?? { ...DEFAULT_BRANDING },
@@ -690,7 +760,12 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
     timing: { ...DEFAULT_TIMING, ...(raw.timing ?? {}) },
     render: { ...DEFAULT_RENDER, ...(raw.render ?? {}) },
     background: { ...DEFAULT_BACKGROUND, ...(raw.background ?? {}) },
-    animation: raw.animation ?? base.animation ?? "soft-spring",
+    animation: raw.motion?.enter ?? raw.animation ?? base.animation ?? "soft-spring",
+    motion: {
+      ...DEFAULT_MOTION,
+      ...(raw.motion ?? {}),
+      enter: raw.motion?.enter ?? raw.animation ?? DEFAULT_MOTION.enter,
+    },
     layout: { ...DEFAULT_LAYOUT, ...(raw.layout ?? {}) },
     sound: { enabled: false, volume: 0.5, ...(raw.sound ?? {}) },
     branding: { ...DEFAULT_BRANDING, ...(raw.branding ?? {}) },

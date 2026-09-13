@@ -12,6 +12,7 @@ import {
   signOut,
   signUp,
   deleteProject,
+  getProjectSnapshot,
   listExports,
   listProjects,
   saveProject,
@@ -216,7 +217,7 @@ export function CloudPanel({ templates, onClose, onChangeList, mode, buildSnapsh
                   {projects.map((p) => (
                     <li key={p.id} className="flex items-center justify-between gap-2 rounded-md bg-background px-2 py-1">
                       <span className="min-w-0 truncate text-[11px] text-muted-foreground">
-                        [{p.mode}] {p.name} · {p.data?.items?.length ?? 0} vídeo(s) ·{" "}
+                        [{p.mode}] {p.name} ·{" "}
                         {new Date(p.updated_at).toLocaleDateString("pt-BR")}
                       </span>
                       <span className="flex shrink-0 gap-1">
@@ -226,7 +227,7 @@ export function CloudPanel({ templates, onClose, onChangeList, mode, buildSnapsh
                           disabled={busy}
                           onClick={() =>
                             void run(async () => {
-                              await onRestore(p.data);
+                              await onRestore(await getProjectSnapshot(p.id));
                               setMsg("Projeto restaurado.");
                             })
                           }

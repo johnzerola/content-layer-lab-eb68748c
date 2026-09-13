@@ -6,7 +6,7 @@
  * baseada em Remotion pode entrar depois sem tocar no documento nem na UI.
  */
 import { buildPlan, type ConversationPlan } from "./clock";
-import { paintFrame } from "./draw";
+import { paintFrame, sceneExitAt } from "./draw";
 import { loadMedia, type LoadedMedia } from "./media";
 import { resolveTheme } from "./theme";
 import { renderSize, type ChatSceneProject } from "./types";
@@ -99,10 +99,25 @@ export class CanvasConversationRenderer implements ConversationRenderer {
     const project = this.project;
     if (!project) return;
     const theme = resolveTheme(project.themeId, project.dark, project.themeOverrides);
+    const out = sceneExitAt(project, ctx.plan, ctx.frame);
+    const leaving = out.alpha < 1 || out.dy !== 0 || out.scale !== 1;
+    if (leaving) {
+      // pinta o fundo preto antes de esmaecer, para não sobrar o quadro anterior
+      target.save();
+      target.fillStyle = "#000";
+      target.fillRect(0, 0, ctx.width, ctx.height);
+      target.restore();
+      target.save();
+      target.globalAlpha = Math.max(0, out.alpha);
+      target.translate(ctx.width / 2, ctx.height / 2);
+      target.scale(out.scale, out.scale);
+      target.translate(-ctx.width / 2, -ctx.height / 2 + out.dy);
+    }
     paintFrame(target, project, theme, ctx.plan, ctx.frame, ctx.width, ctx.height, {
       media: this.media,
       safeZones: this.options.safeZones ?? false,
     });
+    if (leaving) target.restore();
   }
 }
 

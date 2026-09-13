@@ -32,6 +32,7 @@ import { VoicePanel } from "@/components/chatscene/VoicePanel";
 import { VoiceUploadPanel } from "@/components/chatscene/VoiceUploadPanel";
 import { MessagesPanel } from "@/components/chatscene/MessagesPanel";
 import { ParticipantsPanel } from "@/components/chatscene/ParticipantsPanel";
+import { ParticipantStylePanel } from "@/components/chatscene/ParticipantStylePanel";
 import { BrandPanel } from "@/components/chatscene/BrandPanel";
 import { ThemePanel } from "@/components/chatscene/ThemePanel";
 import { MusicPanel } from "@/components/chatscene/MusicPanel";
@@ -1416,7 +1417,8 @@ export function ChatSceneStudio() {
 
           {tab === "estilo" && (
             <div>
-              <p className="mono-label mb-2 text-muted-foreground">Visual</p>
+              <ParticipantStylePanel project={project} patch={patch} />
+              <p className="mono-label mb-2 mt-4 text-muted-foreground">Visual</p>
               <div className="grid grid-cols-2 gap-1.5">
                 {CHAT_THEMES.map((t) => (
                   <button

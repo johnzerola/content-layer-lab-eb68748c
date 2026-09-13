@@ -103,6 +103,34 @@ export function wrapText(ctx: Ctx2D, text: string, maxWidth: number): string[] {
   return out.length ? out : [""];
 }
 
+/** Estilo já resolvido do autor, usado na medição e na pintura. */
+interface BubbleStyle {
+  bubble: string | null;
+  text: string | null;
+  fontFamily: string;
+  weight: number;
+  italic: boolean;
+  scale: number;
+}
+
+/** Resolve o estilo do personagem por cima do tema (sem alterar o tema). */
+function bubbleStyleOf(author: { style?: import("./types").ParticipantStyle }, theme: ChatTheme): BubbleStyle {
+  const st = author.style ?? {};
+  return {
+    bubble: st.bubbleColor || null,
+    text: st.textColor || null,
+    fontFamily: st.fontFamily || theme.fontFamily,
+    weight: st.bold ? 700 : 500,
+    italic: !!st.italic,
+    scale: Math.max(0.7, Math.min(1.4, st.fontScale ?? 1)),
+  };
+}
+
+/** Monta a string de fonte respeitando itálico e família do personagem. */
+function fontOf(style: BubbleStyle, weight: number, size: number): string {
+  return `${style.italic ? "italic " : ""}${weight} ${Math.round(size)}px ${style.fontFamily}`;
+}
+
 interface LaidOutMessage {
   message: ChatMessage;
   lines: string[];
@@ -115,6 +143,7 @@ interface LaidOutMessage {
   showAvatar: boolean;
   name: string;
   nameColor: string;
+  style: BubbleStyle;
   avatarUrl: string | null;
   /** altura da mídia dentro da bolha (0 quando não há) */
   mediaH: number;
@@ -188,9 +217,10 @@ export function layoutMessages(
     const author = participantOf(project, message.participantId);
     const isSelf = author.isSelf;
     const big = message.kind === "emoji" || emojiOnly(message.text);
-    const fontSize = big ? m.fontSize * 2.1 : m.fontSize;
-    const lineH = big ? m.lineH * 2.1 : m.lineH;
-    ctx.font = `${big ? 400 : 500} ${fontSize}px ${theme.fontFamily}`;
+    const style = bubbleStyleOf(author, theme);
+    const fontSize = (big ? m.fontSize * 2.1 : m.fontSize) * style.scale;
+    const lineH = (big ? m.lineH * 2.1 : m.lineH) * style.scale;
+    ctx.font = fontOf(style, big ? 400 : style.weight, fontSize);
 
     if (message.kind === "system") {
       const lines = wrapText(ctx, message.text, width - m.pad * 4);
@@ -207,6 +237,7 @@ export function layoutMessages(
         showAvatar: false,
         name: "",
         nameColor: theme.systemText,
+        style: bubbleStyleOf(author, theme),
         avatarUrl: null,
         mediaH: 0,
         mediaW: 0,
@@ -236,6 +267,7 @@ export function layoutMessages(
         showAvatar: false,
         name: "",
         nameColor: theme.systemText,
+        style: bubbleStyleOf(author, theme),
         avatarUrl: null,
         mediaH: 0,
         mediaW: 0,
@@ -272,6 +304,7 @@ export function layoutMessages(
         showAvatar: showName,
         name: author.name,
         nameColor: author.color,
+        style: bubbleStyleOf(author, theme),
         avatarUrl: author.avatarUrl ?? null,
         mediaH: sh,
         mediaW: sw,
@@ -302,7 +335,7 @@ export function layoutMessages(
       const quoted = project.messages.find((q) => q.id === message.replyToId);
       if (quoted) {
         const quotedAuthor = participantOf(project, quoted.participantId);
-        ctx.font = `400 ${Math.round(m.fontSize * 0.74)}px ${theme.fontFamily}`;
+        ctx.font = fontOf(style, 400, m.fontSize * 0.74);
         const snippet = ellipsize(
           ctx,
           quoted.text || quotedKindLabel(quoted.kind),
@@ -315,7 +348,7 @@ export function layoutMessages(
           height: Math.round(m.fontSize * 1.85),
         };
       }
-      ctx.font = `${big ? 400 : 500} ${fontSize}px ${theme.fontFamily}`;
+      ctx.font = fontOf(style, big ? 400 : style.weight, fontSize);
     }
     const replyH = reply ? reply.height + Math.round(10 * m.scale) : 0;
 
@@ -325,6 +358,7 @@ export function layoutMessages(
     if (author.id === lastAuthor) y -= Math.round(m.gap * 0.55);
 
     ctx.font = `400 ${m.metaSize}px ${theme.fontFamily}`;
+    void style;
     const metaW = ctx.measureText(`${messageClock(project, index, message)}  `).width + (isSelf ? m.metaSize * 1.6 : 0);
     const metaH = Math.round(m.metaSize * 1.35);
 
@@ -355,6 +389,7 @@ export function layoutMessages(
       showAvatar: showName,
       name: author.name,
       nameColor: author.color,
+      style,
       avatarUrl: author.avatarUrl ?? null,
       mediaH,
       mediaW,
@@ -693,6 +728,17 @@ function drawTypingBubble(
 
 /** Transformação de entrada da bolha: transparência, deslocamento e escala. */
 export function entranceTransform(
+  animation: ChatSceneProject["animation"],
+  t: number,
+  /** força do efeito: 1 = padrão, 0.2 discreto, 2 exagerado */
+  intensity = 1,
+): { alpha: number; dy: number; scale: number } {
+  const k = Math.max(0.2, Math.min(2, intensity));
+  const raw = baseEntrance(animation, t);
+  return { alpha: raw.alpha, dy: raw.dy * k, scale: 1 + (raw.scale - 1) * k };
+}
+
+function baseEntrance(
   animation: ChatSceneProject["animation"],
   t: number,
 ): { alpha: number; dy: number; scale: number } {
@@ -1084,7 +1130,7 @@ function paintConversation(
     const entry = plan.byId[item.message.id];
     const age = entry ? frame - entry.appearFrame : 0;
     const t = entry ? age / Math.max(1, entry.entranceFrames) : 1;
-    const anim = entranceTransform(project.animation, t);
+    const anim = entranceTransform(project.animation, t, project.motion?.intensity ?? 1);
     const rise = anim.dy * Math.round(34 * m.scale);
     const y = offsetY + item.y + rise;
     const seconds = Math.max(0, age) / plan.fps;
@@ -1185,7 +1231,7 @@ function paintConversation(
 
     if (item.showName) {
       ctx.fillStyle = item.nameColor;
-      ctx.font = `600 ${Math.round(m.fontSize * 0.68)}px ${theme.fontFamily}`;
+      ctx.font = fontOf(item.style, 600, m.fontSize * 0.68);
       ctx.fillText(item.name, item.x + Math.round(8 * m.scale), y - Math.round(8 * m.scale));
     }
 
@@ -1194,12 +1240,12 @@ function paintConversation(
     ctx.shadowColor = "rgba(0,0,0,0.28)";
     ctx.shadowBlur = Math.round(10 * m.scale);
     ctx.shadowOffsetY = Math.round(3 * m.scale);
-    ctx.fillStyle = item.isSelf ? theme.selfBubble : theme.peerBubble;
+    ctx.fillStyle = item.style.bubble ?? (item.isSelf ? theme.selfBubble : theme.peerBubble);
     const radius = Math.min(item.height, Math.round(70 * m.scale)) * theme.radius * 1.6;
     roundRect(ctx, item.x, y, item.width, item.height, radius);
     ctx.fill();
     ctx.restore();
-    ctx.fillStyle = item.isSelf ? theme.selfBubble : theme.peerBubble;
+    ctx.fillStyle = item.style.bubble ?? (item.isSelf ? theme.selfBubble : theme.peerBubble);
     if (theme.tail && item.showTail !== false) {
       const tw = Math.round(16 * m.scale);
       ctx.beginPath();
@@ -1245,7 +1291,7 @@ function paintConversation(
       const r = Math.round(vh * 0.36);
       const cx = item.x + padX + r;
       const cy = cursorY + vh / 2;
-      ctx.fillStyle = item.isSelf ? theme.selfText : theme.peerText;
+      ctx.fillStyle = item.style.text ?? (item.isSelf ? theme.selfText : theme.peerText);
       ctx.globalAlpha = ctx.globalAlpha * 0.85;
       ctx.beginPath();
       ctx.moveTo(cx - r * 0.3, cy - r * 0.45);
@@ -1310,10 +1356,10 @@ function paintConversation(
     }
 
     const big = item.message.kind === "emoji" || emojiOnly(item.message.text);
-    const fontSize = big ? m.fontSize * 2.1 : m.fontSize;
-    const lineH = big ? m.lineH * 2.1 : m.lineH;
-    ctx.font = `${big ? 400 : 500} ${fontSize}px ${theme.fontFamily}`;
-    ctx.fillStyle = item.isSelf ? theme.selfText : theme.peerText;
+    const fontSize = (big ? m.fontSize * 2.1 : m.fontSize) * item.style.scale;
+    const lineH = (big ? m.lineH * 2.1 : m.lineH) * item.style.scale;
+    ctx.font = fontOf(item.style, big ? 400 : item.style.weight, fontSize);
+    ctx.fillStyle = item.style.text ?? (item.isSelf ? theme.selfText : theme.peerText);
     item.lines.forEach((line, i) => {
       ctx.fillText(line, item.x + padX, cursorY + (i + 1) * lineH - lineH * 0.3);
     });
@@ -1389,3 +1435,28 @@ function paintConversation(
   }
 }
 
+
+/**
+ * Saída da cena: nos últimos milissegundos do vídeo a conversa some com o
+ * efeito escolhido (suave, subindo, descendo ou zoom).
+ */
+export function sceneExitAt(
+  project: ChatSceneProject,
+  plan: ConversationPlan,
+  frame: number,
+): { alpha: number; dy: number; scale: number } {
+  const motion = project.motion;
+  const idle = { alpha: 1, dy: 0, scale: 1 };
+  if (!motion || motion.exit === "none" || motion.exitMs <= 0) return idle;
+  const frames = Math.max(1, Math.round((motion.exitMs / 1000) * plan.fps));
+  const start = plan.totalFrames - frames;
+  if (frame < start) return idle;
+  const p = Math.max(0, Math.min(1, (frame - start) / frames));
+  const ease = p * p;
+  const k = Math.max(0.2, Math.min(2, motion.intensity ?? 1));
+  const alpha = 1 - ease;
+  if (motion.exit === "up") return { alpha, dy: -ease * 220 * k, scale: 1 };
+  if (motion.exit === "down") return { alpha, dy: ease * 220 * k, scale: 1 };
+  if (motion.exit === "zoom") return { alpha, dy: 0, scale: 1 + ease * 0.18 * k };
+  return { alpha, dy: 0, scale: 1 };
+}
