@@ -85,6 +85,7 @@ import {
 } from "@/lib/template";
 import { downloadBlob, grabPoster, outputIsWebm, renderVideo } from "@/lib/render";
 import { poolSize } from "@/lib/render-pool";
+import { withRenderSlot } from "@/lib/render-gate";
 import { webCodecsSupported } from "@/lib/encode";
 import {
   MOTION_PRESETS,
@@ -1427,7 +1428,7 @@ function Home() {
               stage: stageLabel,
               meta: autoScheduleConfig ? { nextAction: autoScheduleConfig } : {},
             });
-            const { blob, ext } = await renderVideo(sourceFile, tpl, {
+            const { blob, ext } = await withRenderSlot(() => renderVideo(sourceFile, tpl, {
               variation: variationOf(item, k),
               offsetX: item.offsetX,
               offsetY: item.offsetY,
@@ -1459,7 +1460,7 @@ function Home() {
                 taskProgress.set(at, p);
                 pushProgress();
               },
-            });
+            }));
             taskProgress.set(at, 1);
             pushProgress();
             const label = [outs.length > 1 ? plat.short : "", n > 1 ? `v${k + 1}` : ""]

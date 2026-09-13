@@ -239,7 +239,7 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
     frameIndex++;
 
     if (encoderError) throw encoderError;
-    if (encoder.encodeQueueSize > 6) await waitForEncoderCapacity(encoder, abort, () => encoderError);
+    if (encoder.encodeQueueSize > 12) await waitForEncoderCapacity(encoder, abort, () => encoderError, 12);
   };
 
   let cur: DecodedFrame | null = null;
