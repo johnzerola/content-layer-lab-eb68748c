@@ -1427,7 +1427,7 @@ function Home() {
               stage: stageLabel,
               meta: autoScheduleConfig ? { nextAction: autoScheduleConfig } : {},
             });
-            const { blob, ext } = await renderVideo(sourceFile, tpl, {
+            const { blob, ext } = await withRenderSlot(() => renderVideo(sourceFile, tpl, {
               variation: variationOf(item, k),
               offsetX: item.offsetX,
               offsetY: item.offsetY,
