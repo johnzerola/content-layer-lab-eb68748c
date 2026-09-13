@@ -59,7 +59,13 @@ export class CanvasConversationRenderer implements ConversationRenderer {
       [...urls]
         .filter((u) => !this.media.has(u))
         .map(async (u) => {
-          const item = await loadMedia(u);
+          // fundo em vídeo é decorativo: amostra mais leve e nunca segura a
+          // prévia — se demorar ou falhar, o restante abre mesmo assim
+          const isBgVideo = u === bgVideoUrl;
+          const item = await withTimeout(
+            loadMedia(u, isBgVideo ? { sampleFps: 6, maxSeconds: 8, decodeBudgetMs: 9000 } : {}),
+            isBgVideo ? 20000 : 30000,
+          );
           if (item) this.media.set(u, item);
         }),
     );
