@@ -301,8 +301,9 @@ export function BulkScheduleModal({
                   {groupAccountsByOwner(accounts).map((group) => (
                     <optgroup key={group.key} label={group.name}>
                       {group.accounts.map((a) => (
-                        <option key={a.id} value={a.id}>
+                        <option key={a.id} value={a.id} disabled={a.platform === "tiktok"}>
                           {a.display_name || `@${a.username}`} · {a.platform}
+                          {a.platform === "tiktok" ? " (em breve)" : ""}
                         </option>
                       ))}
                     </optgroup>
