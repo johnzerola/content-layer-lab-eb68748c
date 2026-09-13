@@ -493,6 +493,30 @@ export function ChatSceneStudio() {
   }, [project, recordId]);
 
   const speakFn = useServerFn(synthesizeVoice);
+  const storyFn = useServerFn(generateStory);
+
+  /** Modo simples: a IA escreve a história e o documento inteiro é remontado. */
+  const handleGenerateStory = useCallback(
+    async (brief: StoryBrief) => {
+      setStoryBusy(true);
+      try {
+        const script = await storyFn({ data: brief });
+        setProject((prev) =>
+          storyToProject({ ...prev, timing: timingForDuration(brief.durationSec) }, script),
+        );
+        setSelected(null);
+        setFrame(0);
+        setPlaying(false);
+        setTab("mensagens");
+        toast.success("História criada. Ajuste o que quiser nas abas.");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Não foi possível criar a história.");
+      } finally {
+        setStoryBusy(false);
+      }
+    },
+    [storyFn],
+  );
   const voiceProvider = useMemo(
     () => createGatewayVoiceProvider((input) => speakFn({ data: input })),
     [speakFn],
