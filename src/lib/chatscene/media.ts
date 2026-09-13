@@ -25,6 +25,15 @@ const ANIMATED_SAMPLE_FPS = 12;
 const MAX_ANIMATION_SECONDS = 10;
 const MAX_SIDE = 720;
 
+export interface LoadMediaOptions {
+  /** quadros por segundo ao amostrar vídeo/animação (padrão 12) */
+  sampleFps?: number;
+  /** teto de segundos amostrados (padrão 10) */
+  maxSeconds?: number;
+  /** orçamento de tempo de decodificação em ms; ao estourar, usa o que já tem */
+  decodeBudgetMs?: number;
+}
+
 function sizeOf(source: CanvasImageSource): { width: number; height: number } {
   const any = source as { width?: number; height?: number; videoWidth?: number; videoHeight?: number };
   const width = any.videoWidth || any.width || 1;
@@ -115,7 +124,13 @@ async function decodeAnimatedImage(blob: Blob): Promise<LoadedMedia | null> {
 }
 
 /** Vídeo (meme, clipe curto): amostrado em quadros para entrar na conversa. */
-async function decodeVideo(blob: Blob): Promise<LoadedMedia | null> {
+async function decodeVideo(blob: Blob, options: LoadMediaOptions = {}): Promise<LoadedMedia | null> {
+  const sampleFps = Math.max(2, options.sampleFps ?? ANIMATED_SAMPLE_FPS);
+  const maxSeconds = Math.max(1, options.maxSeconds ?? MAX_ANIMATION_SECONDS);
+  // vídeos grandes do usuário não podem segurar a prévia: decodifica no
+  // máximo ~12s de relógio e segue com os quadros que já saíram
+  const decodeBudgetMs = Math.max(3000, options.decodeBudgetMs ?? 12000);
+  const startedAt = Date.now();
   if (typeof document === "undefined") return null;
   const url = URL.createObjectURL(blob);
   const video = document.createElement("video");
