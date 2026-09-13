@@ -21,6 +21,7 @@ export function ChatSceneTimeline({
   selected,
   onSeek,
   onSelect,
+  onAdjust,
 }: {
   project: ChatSceneProject;
   plan: ConversationPlan;
@@ -28,11 +29,34 @@ export function ChatSceneTimeline({
   selected: string | null;
   onSeek: (frame: number) => void;
   onSelect: (id: string | null) => void;
+  /** arrastar as pontas da barra ajusta início (delayMs) e fim (pauseAfterMs) */
+  onAdjust?: (id: string, patch: { delayMs?: number | null; pauseAfterMs?: number | null }) => void;
 }) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const total = Math.max(1, plan.totalFrames);
   const durationSec = plan.durationMs / 1000;
   const pct = (f: number) => `${Math.min(100, (f / total) * 100)}%`;
+
+  const dragEdge = useCallback(
+    (edge: "start" | "end", messageId: string, baseMs: number, startX: number) => {
+      const el = trackRef.current;
+      if (!el || !onAdjust) return;
+      const width = el.getBoundingClientRect().width || 1;
+      const msPerPx = plan.durationMs / width;
+      const move = (ev: PointerEvent) => {
+        const deltaMs = (ev.clientX - startX) * msPerPx;
+        const next = Math.round(Math.max(0, Math.min(8000, baseMs + (edge === "start" ? deltaMs : deltaMs))) / 50) * 50;
+        onAdjust(messageId, edge === "start" ? { delayMs: next || null } : { pauseAfterMs: next });
+      };
+      const up = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    },
+    [onAdjust, plan.durationMs],
+  );
 
   const seekFromPointer = useCallback(
     (clientX: number) => {
