@@ -1400,3 +1400,28 @@ function paintConversation(
   }
 }
 
+
+/**
+ * Saída da cena: nos últimos milissegundos do vídeo a conversa some com o
+ * efeito escolhido (suave, subindo, descendo ou zoom).
+ */
+export function sceneExitAt(
+  project: ChatSceneProject,
+  plan: ConversationPlan,
+  frame: number,
+): { alpha: number; dy: number; scale: number } {
+  const motion = project.motion;
+  const idle = { alpha: 1, dy: 0, scale: 1 };
+  if (!motion || motion.exit === "none" || motion.exitMs <= 0) return idle;
+  const frames = Math.max(1, Math.round((motion.exitMs / 1000) * plan.fps));
+  const start = plan.totalFrames - frames;
+  if (frame < start) return idle;
+  const p = Math.max(0, Math.min(1, (frame - start) / frames));
+  const ease = p * p;
+  const k = Math.max(0.2, Math.min(2, motion.intensity ?? 1));
+  const alpha = 1 - ease;
+  if (motion.exit === "up") return { alpha, dy: -ease * 220 * k, scale: 1 };
+  if (motion.exit === "down") return { alpha, dy: ease * 220 * k, scale: 1 };
+  if (motion.exit === "zoom") return { alpha, dy: 0, scale: 1 + ease * 0.18 * k };
+  return { alpha, dy: 0, scale: 1 };
+}
