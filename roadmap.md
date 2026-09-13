@@ -39,3 +39,10 @@
 - [x] ChatScene: efeitos de entrada/saída com alças de duração e intensidade na linha do tempo
 - [x] ChatScene: estilo por personagem (cor do balão, cor/fonte/tamanho do texto, negrito e itálico)
 - [x] Banco: índices e listagens leves em projetos, transcrições e lotes
+
+## Lançamento
+- [x] Biblioteca: botão Baixar para os vídeos guardados na conta (link temporário)
+- [x] TikTok bloqueado no agendamento com aviso "em breve"
+- [x] Tela inicial: estúdios carregam sob demanda
+- [ ] Pagamento real (Paddle) — aguardando confirmação do usuário para ativar
+- [ ] Retenção de arquivos por plano com aviso antes de apagar

@@ -45,6 +45,7 @@ export function ResultLibrary() {
   const [search, setSearch] = useState("");
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [preparing, setPreparing] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
   const [publishItem, setPublishItem] = useState<BulkScheduleItem | null>(null);
 
   useEffect(() => {
@@ -54,6 +55,29 @@ export function ResultLibrary() {
       .finally(() => setLoading(false));
     listAccounts().then(setAccounts).catch(() => undefined);
   }, []);
+
+  /** Baixa o arquivo guardado na conta usando um link temporário. */
+  const download = async (row: ExportRow) => {
+    if (!row.storage_path) return;
+    setDownloading(row.id);
+    try {
+      const { data, error } = await supabase.storage
+        .from("posts")
+        .createSignedUrl(row.storage_path, 60 * 10, { download: row.file_name });
+      if (error || !data?.signedUrl) throw error ?? new Error("Link indisponível.");
+      const a = document.createElement("a");
+      a.href = data.signedUrl;
+      a.download = row.file_name;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível baixar o arquivo.");
+    } finally {
+      setDownloading(null);
+    }
+  };
 
   const openPublish = async (row: ExportRow) => {
     if (!row.storage_path) return;
@@ -185,19 +209,35 @@ export function ResultLibrary() {
                 </div>
 
                 {e.storage_path ? (
-                  <Button
-                    size="sm"
-                    className="h-9 w-full gap-2"
-                    onClick={() => void openPublish(e)}
-                    disabled={preparing === e.id}
-                  >
-                    {preparing === e.id ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Send className="size-4" />
-                    )}
-                    Publicar
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-2"
+                      onClick={() => void download(e)}
+                      disabled={downloading === e.id}
+                    >
+                      {downloading === e.id ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Download className="size-4" />
+                      )}
+                      Baixar
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-9 gap-2"
+                      onClick={() => void openPublish(e)}
+                      disabled={preparing === e.id}
+                    >
+                      {preparing === e.id ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Send className="size-4" />
+                      )}
+                      Publicar
+                    </Button>
+                  </div>
                 ) : (
                   <Button
                     variant="outline"

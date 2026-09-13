@@ -1,5 +1,5 @@
 ﻿import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Upload,
   Link as LinkIcon,
@@ -52,10 +52,35 @@ import {
   logExports,
   type ProjectSnapshot,
 } from "@/lib/cloud";
-import { ClipStudio } from "@/components/ClipStudio";
-import { VideoStudio } from "@/components/VideoStudio";
+// estúdios pesados carregam só quando aparecem na tela
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function deferred<T extends React.ComponentType<any>>(load: () => Promise<{ default: T }>): T {
+  const Lazy = lazy(load);
+  const Deferred = (props: React.ComponentProps<T>) => {
+    return (
+      <Suspense
+        fallback={
+          <div className="rounded-xl border border-border bg-surface-2 p-6 text-sm text-muted-foreground">
+            Carregando…
+          </div>
+        }
+      >
+        <Lazy {...(props as React.ComponentProps<typeof Lazy>)} />
+      </Suspense>
+    );
+  };
+  return Deferred as unknown as T;
+}
+const ClipStudio = deferred(() =>
+  import("@/components/ClipStudio").then((m) => ({ default: m.ClipStudio })),
+);
+const VideoStudio = deferred(() =>
+  import("@/components/VideoStudio").then((m) => ({ default: m.VideoStudio })),
+);
 import { AuthGate } from "@/components/AuthGate";
-import { AITemplateStudio } from "@/components/AITemplateStudio";
+const AITemplateStudio = deferred(() =>
+  import("@/components/AITemplateStudio").then((m) => ({ default: m.AITemplateStudio })),
+);
 import { applyLook } from "@/lib/looks";
 
 import { currentUser, onAuth, pullTemplates, type CloudUser } from "@/lib/cloud";
@@ -115,7 +140,9 @@ import { batchPolicy } from "@/lib/batch-policy";
 
 import { cuesToSrt, cuesToText, demoCues, generateCaptions, type CaptionCue } from "@/lib/captions";
 import { registerFonts } from "@/lib/fonts";
-import { CaptionStudio } from "@/components/CaptionStudio";
+const CaptionStudio = deferred(() =>
+  import("@/components/CaptionStudio").then((m) => ({ default: m.CaptionStudio })),
+);
 import { CaptionTimeline } from "@/components/CaptionTimeline";
 import { canBrowserDecode, guessMime, isVideoFile, VIDEO_ACCEPT, VIDEO_EXT_RE } from "@/lib/media";
 import { toast } from "sonner";
