@@ -78,6 +78,7 @@ import { loadLocalDraft, saveLocalDraft } from "@/lib/chatscene/serialize";
 import { parseConversationScript } from "@/lib/chatscene/import-script";
 import {
   ANIMATION_PRESETS,
+  BACKGROUND_CATEGORY_LABELS,
   BACKGROUND_PRESETS,
   DEFAULT_BRANDING,
   DEFAULT_LAYOUT,
