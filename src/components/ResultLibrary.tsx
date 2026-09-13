@@ -185,19 +185,35 @@ export function ResultLibrary() {
                 </div>
 
                 {e.storage_path ? (
-                  <Button
-                    size="sm"
-                    className="h-9 w-full gap-2"
-                    onClick={() => void openPublish(e)}
-                    disabled={preparing === e.id}
-                  >
-                    {preparing === e.id ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Send className="size-4" />
-                    )}
-                    Publicar
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-2"
+                      onClick={() => void download(e)}
+                      disabled={downloading === e.id}
+                    >
+                      {downloading === e.id ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Download className="size-4" />
+                      )}
+                      Baixar
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-9 gap-2"
+                      onClick={() => void openPublish(e)}
+                      disabled={preparing === e.id}
+                    >
+                      {preparing === e.id ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Send className="size-4" />
+                      )}
+                      Publicar
+                    </Button>
+                  </div>
                 ) : (
                   <Button
                     variant="outline"
