@@ -45,6 +45,7 @@ export function ResultLibrary() {
   const [search, setSearch] = useState("");
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [preparing, setPreparing] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
   const [publishItem, setPublishItem] = useState<BulkScheduleItem | null>(null);
 
   useEffect(() => {
