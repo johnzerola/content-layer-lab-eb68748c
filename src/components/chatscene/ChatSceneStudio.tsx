@@ -82,9 +82,12 @@ import {
   createParticipant,
   participantOf,
   renderSize,
+  createThread,
+  threadsOf,
   type ChatSceneAspect,
   type ChatMessage,
   type ChatSceneProject,
+  type ChatSceneThread,
 } from "@/lib/chatscene/types";
 
 const PALETTE = ["#7c5cff", "#ff5c8a", "#22c08a", "#f2b705", "#4ec3ff", "#ff8a4c"];
@@ -767,6 +770,9 @@ export function ChatSceneStudio() {
               duplicateMessage={duplicateMessage}
               reorderMessage={reorderMessage}
               addMessage={addMessage}
+              addThread={addThread}
+              updateThread={updateThread}
+              removeThread={removeThread}
               loadDemo={() => {
                 setProject(createDemoChatSceneProject());
                 setSelected(null);
