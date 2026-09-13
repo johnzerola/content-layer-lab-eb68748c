@@ -80,6 +80,15 @@ export function typingAt(
     const entry = plan.byId[m.id];
     if (!entry) continue;
     if (entry.typingFrame < entry.appearFrame && frame >= entry.typingFrame && frame < entry.appearFrame) {
+      // hesitação: o "digitando…" some por um instante e volta
+      const gapMs = entry.timing.typingGapMs;
+      if (gapMs > 0) {
+        const speed = project.timing.speed > 0 ? project.timing.speed : 1;
+        const toFrames = (ms: number) => Math.round((ms / speed / 1000) * plan.fps);
+        const gapStart = entry.typingFrame + toFrames(entry.timing.typingGapStartMs);
+        const gapEnd = gapStart + toFrames(gapMs);
+        if (frame >= gapStart && frame < gapEnd) return null;
+      }
       return m;
     }
   }
