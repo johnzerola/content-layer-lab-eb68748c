@@ -36,3 +36,6 @@
 - [x] Altura da janela de conversa 40/50/60%
 - [x] Fase E: gerador de história por IA (tema, tom, duração, personagens) com vozes e personalidades automáticas
 - [ ] Pendente: motor de gameplay (biblioteca inteligente de fundos), editor avançado completo
+- [x] ChatScene: efeitos de entrada/saída com alças de duração e intensidade na linha do tempo
+- [x] ChatScene: estilo por personagem (cor do balão, cor/fonte/tamanho do texto, negrito e itálico)
+- [x] Banco: índices e listagens leves em projetos, transcrições e lotes
