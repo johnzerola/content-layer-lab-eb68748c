@@ -44,5 +44,5 @@
 - [x] Biblioteca: botão Baixar para os vídeos guardados na conta (link temporário)
 - [x] TikTok bloqueado no agendamento com aviso "em breve"
 - [x] Tela inicial: estúdios carregam sob demanda
-- [ ] Pagamento real (Paddle) — aguardando confirmação do usuário para ativar
+- [ ] Pagamento real (Paddle ou Stripe) — adiado por decisão do usuário
 - [ ] Retenção de arquivos por plano com aviso antes de apagar
