@@ -30,6 +30,7 @@ export class VoiceProviderRegistry {
   private providers=new Map<string,VoiceProvider>();
   register(provider:VoiceProvider){this.providers.set(provider.id,provider);return this;}
   get(id:string){return this.providers.get(id);}
-  resolve(mode:VoiceProviderMode){ if(mode==="local")return this.get("mock"); if(mode==="premium")return this.get("lovable-ai"); return this.get("lovable-ai")??this.get("mock"); }
+  /** O provedor real é sempre a primeira escolha; o simulador só existe para testes. */
+  resolve(_mode:VoiceProviderMode){ return this.get("lovable-ai")??this.get("mock"); }
   list(){return [...this.providers.values()];}
 }
