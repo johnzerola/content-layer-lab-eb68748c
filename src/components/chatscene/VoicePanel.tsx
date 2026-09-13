@@ -77,7 +77,7 @@ export function VoicePanel(props: VoicePanelProps) {
                 <div className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase text-muted-foreground">
                   <Sparkles className="size-3" aria-hidden /> Presets de atuação
                 </div>
-                <div className="grid grid-cols-2 gap-1.5" role="list" aria-label={`Presets de atuação para ${participant.name}`}>
+                <div className="grid grid-cols-2 gap-1.5">
                   {actingPresets.map((actingPreset) => {
                     const active = voice?.presetId === actingPreset.id;
                     return (
@@ -125,7 +125,7 @@ export function VoicePanel(props: VoicePanelProps) {
                     <details className="group flex-1">
                       <summary className="flex h-8 cursor-pointer list-none items-center justify-center gap-1.5 rounded-md border border-border bg-secondary px-3 text-xs font-medium"><SlidersHorizontal className="size-3.5" /> Editar</summary>
                       <div className="mt-2 space-y-2 border-t border-border pt-2">
-                        <VoiceRange label="Velocidade" value={voice.speed} min={.7} max={1.3} step={.05} suffix="×" onChange={(speed) => updateProfile(voice.id!, { speed })} />
+                        <VoiceRange label="Velocidade" value={voice.speed} min={.7} max={1.3} step={.05} suffix="×" onChange={(speed) => voice.id && updateProfile(voice.id, { speed })} />
                         {caps?.controls.energy ? <VoiceRange label="Energia" value={voice.energy ?? .5} min={0} max={1} step={.05} onChange={(energy) => voice.id && updateProfile(voice.id, { energy })} /> : null}
                         {caps?.controls.pitch ? <VoiceRange label="Tom" value={voice.pitch ?? 0} min={PITCH_MIN} max={PITCH_MAX} step={.5} onChange={(pitch) => voice.id && updateProfile(voice.id, { pitch })} /> : null}
                         {caps?.controls.expressiveness ? <VoiceRange label="Expressividade" value={voice.expressiveness ?? .5} min={0} max={1} step={.05} onChange={(expressiveness) => voice.id && updateProfile(voice.id, { expressiveness })} /> : null}

@@ -4,6 +4,7 @@ import { planScroll } from "../scroll-planner";
 import { attachPreset, effectiveVoice } from "../voice-resolution";
 import { DEFAULT_VOICE, voiceKey } from "../voice";
 import { applyVoiceDurations, createGatewayVoiceProvider, generateCast } from "../voice-cast";
+import { deserializeChatSceneProject, serializeChatSceneProject } from "../serialize";
 import { createChatSceneProject, createMessage, createParticipant, normalizeChatSceneProject } from "../types";
 
 const projectWithCast = () => {
@@ -33,6 +34,8 @@ describe("Voice Cast System", () => {
     expect(updated.voiceProfiles?.find((profile) => profile.id === "voice_pedro")?.presetId).toBe("acting-adult-sad");
     expect(updated.messages.find((message) => message.id === "p1")?.voiceMs).toBeNull();
     expect(updated.messages.find((message) => message.id === "a1")?.voiceMs).toBe(800);
+    const reopened = deserializeChatSceneProject(serializeChatSceneProject(updated));
+    expect(reopened.voiceProfiles?.find((profile) => profile.id === "voice_pedro")?.presetId).toBe("acting-adult-sad");
   });
 
   it("mantém identidade e aplica emoção por mensagem", () => {
