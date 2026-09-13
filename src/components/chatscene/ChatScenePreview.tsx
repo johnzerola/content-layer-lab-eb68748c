@@ -6,7 +6,8 @@ import type { ConversationPlan } from "@/lib/chatscene/clock";
 import { CanvasConversationRenderer, paintPreview } from "@/lib/chatscene/renderer";
 import type { ChatSceneProject } from "@/lib/chatscene/types";
 import { renderSize } from "@/lib/chatscene/types";
-import { voiceSchedule } from "@/lib/chatscene/audio-mix";
+import { duckingCurve, voiceSchedule } from "@/lib/chatscene/audio-mix";
+import { DEFAULT_VOICE_MIX } from "@/lib/chatscene/voice";
 import { renderSoundEffect, sfxSchedule } from "@/lib/chatscene/sfx";
 import type { VoiceClip } from "@/lib/chatscene/voice-cast";
 
@@ -19,9 +20,11 @@ interface Props {
   onPlaying: (playing: boolean) => void;
   /** falas já geradas, para ouvir a conversa na própria prévia */
   clips?: Map<string, VoiceClip>;
+  /** trilha de fundo já decodificada, para tocar junto da linha do tempo */
+  music?: AudioBuffer | null;
 }
 
-export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPlaying, clips }: Props) {
+export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPlaying, clips, music }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [ready, setReady] = useState(false);
   const frameRef = useRef(frame);
@@ -75,7 +78,7 @@ export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPla
   // som da prévia: as falas tocam no mesmo instante em que a bolha aparece
   useEffect(() => {
     const effects = sfxSchedule(project, plan);
-    if (!playing || (!clips?.size && !effects.length)) return;
+    if (!playing || (!clips?.size && !effects.length && !music)) return;
     const Ctor =
       (globalThis as unknown as { AudioContext?: typeof AudioContext }).AudioContext ??
       (globalThis as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -84,8 +87,10 @@ export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPla
     void ctx.resume().catch(() => {});
     const fromSec = frameRef.current / plan.fps;
     const sources: AudioBufferSourceNode[] = [];
+    const mix = { ...DEFAULT_VOICE_MIX, ...project.voiceMix };
+    const schedule = clips?.size ? voiceSchedule(project, plan, clips) : [];
     if (clips?.size) {
-      for (const item of voiceSchedule(project, plan, clips)) {
+      for (const item of schedule) {
         const delay = item.startSec - fromSec;
         if (delay + item.durationSec <= 0) continue;
         const source = ctx.createBufferSource();
@@ -99,6 +104,31 @@ export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPla
         sources.push(source);
       }
     }
+    // trilha de fundo: entra no mesmo instante da linha do tempo e abaixa
+    // automaticamente enquanto alguém fala, para não cobrir as vozes
+    if (music && music.duration > 0) {
+      const source = ctx.createBufferSource();
+      source.buffer = music;
+      source.loop = true;
+      const gain = ctx.createGain();
+      const base = Math.max(0, Math.min(1, mix.musicGain ?? 0.25));
+      const curve = duckingCurve(schedule, mix.ducking !== false, {
+        ...(mix.duckingAmount === undefined ? {} : { amount: mix.duckingAmount }),
+        ...(mix.duckingAttackMs === undefined ? {} : { attackMs: mix.duckingAttackMs }),
+        ...(mix.duckingReleaseMs === undefined ? {} : { releaseMs: mix.duckingReleaseMs }),
+      });
+      let current = curve[0]?.value ?? 1;
+      for (const point of curve) if (point.time <= fromSec) current = point.value;
+      gain.gain.setValueAtTime(base * current, ctx.currentTime);
+      for (const point of curve) {
+        if (point.time <= fromSec) continue;
+        gain.gain.linearRampToValueAtTime(base * point.value, ctx.currentTime + (point.time - fromSec));
+      }
+      source.connect(gain).connect(ctx.destination);
+      source.start(ctx.currentTime, fromSec % music.duration);
+      sources.push(source);
+    }
+
     // sons curtos de envio e recebimento
     const volume = Math.max(0, Math.min(1, project.sound?.volume ?? 0.5));
     const cache = new Map<string, AudioBuffer>();
@@ -128,7 +158,7 @@ export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPla
       void ctx.close().catch(() => {});
     };
     // a lista de falas só muda quando o documento ou o plano muda
-  }, [playing, clips, project, plan]);
+  }, [playing, clips, project, plan, music]);
 
 
 
