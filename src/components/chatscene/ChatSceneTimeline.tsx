@@ -187,6 +187,52 @@ export function ChatSceneTimeline({
                 <span className="absolute right-1 top-0 z-10 text-[9px] leading-6 text-muted-foreground">
                   {fmt(startSec)}–{fmt(endSec)}
                 </span>
+                {isSelected && onAdjust ? (
+                  <>
+                    <span
+                      role="slider"
+                      tabIndex={0}
+                      aria-label={`Ajustar o início da fala de ${author?.name ?? "sistema"}`}
+                      aria-valuemin={0}
+                      aria-valuemax={8000}
+                      aria-valuenow={message.delayMs ?? 0}
+                      aria-valuetext={`${((message.delayMs ?? 0) / 1000).toFixed(1)} segundos de espera antes`}
+                      className="absolute top-0 z-20 h-6 w-2 -translate-x-1/2 cursor-ew-resize rounded bg-primary"
+                      style={{ left: pct(entry.appearFrame) }}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        dragEdge("start", message.id, message.delayMs ?? 0, e.clientX);
+                      }}
+                      onKeyDown={(e) => {
+                        const base = message.delayMs ?? 0;
+                        if (e.key === "ArrowLeft") onAdjust(message.id, { delayMs: Math.max(0, base - 100) || null });
+                        if (e.key === "ArrowRight") onAdjust(message.id, { delayMs: Math.min(8000, base + 100) });
+                      }}
+                    />
+                    <span
+                      role="slider"
+                      tabIndex={0}
+                      aria-label={`Ajustar o fim da fala de ${author?.name ?? "sistema"}`}
+                      aria-valuemin={0}
+                      aria-valuemax={8000}
+                      aria-valuenow={message.pauseAfterMs ?? project.timing.gapMs}
+                      aria-valuetext={`${((message.pauseAfterMs ?? project.timing.gapMs) / 1000).toFixed(1)} segundos na tela depois`}
+                      className="absolute top-0 z-20 h-6 w-2 -translate-x-1/2 cursor-ew-resize rounded bg-primary"
+                      style={{ left: pct(entry.endFrame) }}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        dragEdge("end", message.id, message.pauseAfterMs ?? project.timing.gapMs, e.clientX);
+                      }}
+                      onKeyDown={(e) => {
+                        const base = message.pauseAfterMs ?? project.timing.gapMs;
+                        if (e.key === "ArrowLeft") onAdjust(message.id, { pauseAfterMs: Math.max(0, base - 100) });
+                        if (e.key === "ArrowRight") onAdjust(message.id, { pauseAfterMs: Math.min(8000, base + 100) });
+                      }}
+                    />
+                  </>
+                ) : null}
               </button>
             );
           })}
