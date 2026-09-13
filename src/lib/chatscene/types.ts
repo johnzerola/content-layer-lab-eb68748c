@@ -149,6 +149,14 @@ export interface ChatParticipant {
   voice?: import("./voice").VoiceProfile | null;
   /** identidade vocal reutilizável; `voice` continua aceito para projetos antigos */
   voiceProfileId?: string | null;
+  /** jeito de escrever desta pessoa (tamanho de frase, emoji, ritmo) */
+  personality?: Partial<import("./personality").TextingPersonality> | null;
+  /** preset de personalidade escolhido no estúdio */
+  personalityPresetId?: string | null;
+  /** humor de base, usado como emoção padrão das falas */
+  emotionalBaseline?: import("./voice").VoiceEmotion | null;
+  /** emoji que esta pessoa costuma usar ao reagir */
+  reactionStyle?: string | null;
 }
 
 export interface ChatMessage {
@@ -185,6 +193,8 @@ export interface ChatMessage {
   voiceDirection?: Partial<import("./voice").MessageVoiceDirection> | null;
   /** conversa a que esta mensagem pertence; vazio = conversa principal */
   threadId?: string | null;
+  /** mensagem do histórico: já está na tela quando o vídeo começa */
+  initial?: boolean;
 }
 
 /** Estilo de entrada das bolhas. */
@@ -506,6 +516,10 @@ export function createParticipant(init: Partial<ChatParticipant> = {}): ChatPart
     avatarUrl: init.avatarUrl ?? null,
     voice: init.voice ?? null,
     voiceProfileId: init.voiceProfileId ?? null,
+    personality: init.personality ?? null,
+    personalityPresetId: init.personalityPresetId ?? null,
+    emotionalBaseline: init.emotionalBaseline ?? null,
+    reactionStyle: init.reactionStyle ?? null,
   };
 }
 
@@ -528,6 +542,7 @@ export function createMessage(participantId: string, init: Partial<ChatMessage> 
     reaction: init.reaction ?? null,
     voiceDirection: init.voiceDirection ?? null,
     threadId: init.threadId ?? null,
+    initial: init.initial ?? false,
   };
 }
 
