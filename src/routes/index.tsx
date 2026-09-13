@@ -138,7 +138,7 @@ import { batchPolicy } from "@/lib/batch-policy";
 
 import { cuesToSrt, cuesToText, demoCues, generateCaptions, type CaptionCue } from "@/lib/captions";
 import { registerFonts } from "@/lib/fonts";
-const CaptionStudio = lazy(() =>
+const CaptionStudio = deferred(() =>
   import("@/components/CaptionStudio").then((m) => ({ default: m.CaptionStudio })),
 );
 import { CaptionTimeline } from "@/components/CaptionTimeline";
