@@ -177,6 +177,20 @@ export function MessagesPanel({
                     </option>
                   ))}
                 </select>
+                {threads.length > 1 && (
+                  <select
+                    value={threadIdOf(project, m)}
+                    onChange={(e) => updateMessage(m.id, { threadId: e.target.value })}
+                    className="min-w-0 max-w-[7.5rem] flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs text-muted-foreground"
+                    aria-label="Conversa da mensagem"
+                  >
+                    {threads.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <span className="ml-auto flex shrink-0 items-center gap-0.5">
                   <button
                     type="button"
