@@ -52,8 +52,13 @@ import {
   logExports,
   type ProjectSnapshot,
 } from "@/lib/cloud";
-import { ClipStudio } from "@/components/ClipStudio";
-import { VideoStudio } from "@/components/VideoStudio";
+// estúdios pesados carregam só quando aparecem na tela
+const ClipStudio = lazy(() =>
+  import("@/components/ClipStudio").then((m) => ({ default: m.ClipStudio })),
+);
+const VideoStudio = lazy(() =>
+  import("@/components/VideoStudio").then((m) => ({ default: m.VideoStudio })),
+);
 import { AuthGate } from "@/components/AuthGate";
 import { AITemplateStudio } from "@/components/AITemplateStudio";
 import { applyLook } from "@/lib/looks";
