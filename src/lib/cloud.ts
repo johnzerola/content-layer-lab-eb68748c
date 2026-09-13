@@ -106,7 +106,7 @@ type VersionRow = {
 /** Reconstrói o snapshot completo de uma versão (diff ou completa). */
 export function materializeVersion(row: VersionRow, base?: VersionRow | null): Json {
   if (row.format === "diff" && row.patch && base) {
-    return applyJsonPatch(base.data, row.patch as unknown as JsonPatch) as Json;
+    return applyJsonPatch(base.data as never, row.patch as unknown as JsonPatch) as Json;
   }
   return row.data;
 }
