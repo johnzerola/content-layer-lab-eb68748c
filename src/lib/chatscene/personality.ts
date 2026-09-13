@@ -4,7 +4,6 @@
  * Só dados e funções puras: o ritmo de digitação e a quebra de mensagens
  * derivam daqui, sem estado próprio. O documento continua sendo a fonte única.
  */
-import { DEFAULT_TYPING_PROFILE, type HumanTypingProfile } from "./timing";
 import type { ChatParticipant } from "./types";
 
 export type MessageLength = "curta" | "media" | "longa";
@@ -116,24 +115,6 @@ export const PERSONALITY_PRESETS: PersonalityPreset[] = [
 
 export function personalityOf(participant: ChatParticipant): TextingPersonality {
   return { ...DEFAULT_PERSONALITY, ...(participant.personality ?? {}) };
-}
-
-/** Converte a personalidade no perfil de digitação usado pelo relógio. */
-export function typingProfileFor(
-  participant: ChatParticipant,
-  base: Partial<HumanTypingProfile> = {},
-): HumanTypingProfile {
-  const p = personalityOf(participant);
-  const merged = { ...DEFAULT_TYPING_PROFILE, ...base };
-  const pausa = p.punctuationStyle === "nenhuma" ? 0.4 : p.punctuationStyle === "correta" ? 1.2 : 1;
-  return {
-    ...merged,
-    baseCps: Math.max(1, p.typingSpeed),
-    punctuationPause: Math.round(merged.punctuationPause * pausa),
-    sentencePause: Math.round(merged.sentencePause * pausa),
-    burstiness: p.responseStyle === "rapida" ? 0.45 : p.responseStyle === "pensada" ? 0.15 : merged.burstiness,
-    variance: Math.min(1, merged.variance + p.hesitationLevel * 0.3),
-  };
 }
 
 /** Número estável entre 0 e 1 — mesma entrada, mesmo resultado. */
