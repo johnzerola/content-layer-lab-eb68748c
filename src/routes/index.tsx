@@ -60,7 +60,9 @@ const VideoStudio = lazy(() =>
   import("@/components/VideoStudio").then((m) => ({ default: m.VideoStudio })),
 );
 import { AuthGate } from "@/components/AuthGate";
-import { AITemplateStudio } from "@/components/AITemplateStudio";
+const AITemplateStudio = lazy(() =>
+  import("@/components/AITemplateStudio").then((m) => ({ default: m.AITemplateStudio })),
+);
 import { applyLook } from "@/lib/looks";
 
 import { currentUser, onAuth, pullTemplates, type CloudUser } from "@/lib/cloud";
@@ -120,7 +122,9 @@ import { batchPolicy } from "@/lib/batch-policy";
 
 import { cuesToSrt, cuesToText, demoCues, generateCaptions, type CaptionCue } from "@/lib/captions";
 import { registerFonts } from "@/lib/fonts";
-import { CaptionStudio } from "@/components/CaptionStudio";
+const CaptionStudio = lazy(() =>
+  import("@/components/CaptionStudio").then((m) => ({ default: m.CaptionStudio })),
+);
 import { CaptionTimeline } from "@/components/CaptionTimeline";
 import { canBrowserDecode, guessMime, isVideoFile, VIDEO_ACCEPT, VIDEO_EXT_RE } from "@/lib/media";
 import { toast } from "sonner";
