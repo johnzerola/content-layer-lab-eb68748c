@@ -17,7 +17,9 @@ import {
   Download,
   Image as ImageIcon,
   Loader2,
+  Redo2,
   Save,
+  Undo2,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
