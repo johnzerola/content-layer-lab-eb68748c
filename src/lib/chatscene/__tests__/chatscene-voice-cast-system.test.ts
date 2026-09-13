@@ -4,6 +4,7 @@ import { planScroll } from "../scroll-planner";
 import { attachPreset, effectiveVoice } from "../voice-resolution";
 import { DEFAULT_VOICE, voiceKey } from "../voice";
 import { applyVoiceDurations, createGatewayVoiceProvider, generateCast } from "../voice-cast";
+import { deserializeChatSceneProject, serializeChatSceneProject } from "../serialize";
 import { createChatSceneProject, createMessage, createParticipant, normalizeChatSceneProject } from "../types";
 
 const projectWithCast = () => {
@@ -16,6 +17,25 @@ describe("Voice Cast System", () => {
     const project = projectWithCast();
     expect(project.participants[0]?.voiceProfileId).toBe("voice_pedro");
     expect(effectiveVoice(project, project.messages[0]!)?.profile.presetId).toBe("teen-boy-casual");
+  });
+
+  it("salva o preset de atuação no perfil e invalida apenas as falas do personagem", () => {
+    const pedro = createParticipant({ id: "pedro", name: "Pedro" });
+    const ana = createParticipant({ id: "ana", name: "Ana" });
+    const project = createChatSceneProject({
+      participants: [pedro, ana],
+      messages: [
+        createMessage(pedro.id, { id: "p1", text: "Oi", voiceMs: 900 }),
+        createMessage(ana.id, { id: "a1", text: "Olá", voiceMs: 800 }),
+      ],
+    });
+    const updated = attachPreset(project, pedro.id, "acting-adult-sad");
+    expect(updated.participants[0]?.voiceProfileId).toBe("voice_pedro");
+    expect(updated.voiceProfiles?.find((profile) => profile.id === "voice_pedro")?.presetId).toBe("acting-adult-sad");
+    expect(updated.messages.find((message) => message.id === "p1")?.voiceMs).toBeNull();
+    expect(updated.messages.find((message) => message.id === "a1")?.voiceMs).toBe(800);
+    const reopened = deserializeChatSceneProject(serializeChatSceneProject(updated));
+    expect(reopened.voiceProfiles?.find((profile) => profile.id === "voice_pedro")?.presetId).toBe("acting-adult-sad");
   });
 
   it("mantém identidade e aplica emoção por mensagem", () => {
