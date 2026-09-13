@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildPlan } from "../clock";
-import { chatRect, entranceTransform } from "../draw";
+import { chatRect, entranceTransform, sceneExitAt } from "../draw";
 import { computeMessageTimings, humanTypingMs, DEFAULT_TYPING_PROFILE } from "../timing";
 import {
   createChatSceneProject,
@@ -108,5 +108,25 @@ describe("cartão de cena", () => {
     expect(t.typingMs).toBe(0);
     expect(t.readingMs).toBeGreaterThanOrEqual(1500);
     expect(speakableText("card", "Momentos antes")).toBe("");
+  });
+});
+
+describe("efeitos de entrada e saída", () => {
+  it("aplica a intensidade no deslocamento da entrada", () => {
+    const soft = entranceTransform("slide-up", 0, 1);
+    const strong = entranceTransform("slide-up", 0, 2);
+    expect(Math.abs(strong.dy)).toBeGreaterThan(Math.abs(soft.dy));
+  });
+
+  it("respeita a duração de entrada escolhida", () => {
+    const base = createDemoChatSceneProject();
+    expect(entranceMsOf({ ...base, motion: { ...DEFAULT_MOTION, enterMs: 520 } })).toBe(520);
+  });
+
+  it("esmaece a cena só no fim, conforme a duração da saída", () => {
+    const project = { ...createDemoChatSceneProject(), motion: { ...DEFAULT_MOTION, exit: "fade" as const, exitMs: 1000 } };
+    const plan = buildPlan(project);
+    expect(sceneExitAt(project, plan, 0).alpha).toBe(1);
+    expect(sceneExitAt(project, plan, plan.totalFrames - 1).alpha).toBeLessThan(0.2);
   });
 });
