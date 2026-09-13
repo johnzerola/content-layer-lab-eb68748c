@@ -16,6 +16,8 @@ interface Props {
   plan: ConversationPlan;
   clips: Map<string, VoiceClip>;
   frame: number;
+  /** trilha de fundo carregada (música) */
+  hasMusic?: boolean;
   onSeek: (frame: number) => void;
 }
 
@@ -30,7 +32,7 @@ const Playhead = memo(function Playhead({ ratio }: { ratio: number }) {
   );
 });
 
-export const RenderTracks = memo(function RenderTracks({ project, plan, clips, frame, onSeek }: Props) {
+export const RenderTracks = memo(function RenderTracks({ project, plan, clips, frame, hasMusic, onSeek }: Props) {
   const areaRef = useRef<HTMLDivElement | null>(null);
   const durationSec = plan.durationMs / 1000;
   const pct = (sec: number) => `${Math.min(100, Math.max(0, (sec / Math.max(0.001, durationSec)) * 100))}%`;
@@ -68,6 +70,7 @@ export const RenderTracks = memo(function RenderTracks({ project, plan, clips, f
           <span className="flex h-7 items-center">Fundo</span>
           <span className="flex h-9 items-center">Mensagens</span>
           <span className="flex h-9 items-center">Vozes</span>
+          <span className="flex h-7 items-center">Trilha</span>
         </div>
 
         <div
@@ -161,6 +164,13 @@ export const RenderTracks = memo(function RenderTracks({ project, plan, clips, f
                 </div>
               );
             })}
+          </div>
+
+          {/* trilha de fundo */}
+          <div className="mt-2 h-7 rounded-md border border-border bg-muted/40">
+            <div className="flex h-full items-center px-2 text-[11px] text-muted-foreground">
+              {hasMusic ? "Música tocando do início ao fim, em loop" : "Sem trilha de fundo"}
+            </div>
           </div>
 
           <Playhead ratio={frame / Math.max(1, plan.totalFrames - 1)} />
