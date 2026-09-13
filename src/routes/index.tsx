@@ -1,5 +1,5 @@
 ﻿import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Upload,
   Link as LinkIcon,
