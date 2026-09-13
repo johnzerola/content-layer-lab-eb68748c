@@ -39,6 +39,7 @@ import { Route as VendasRouteImport } from './routes/vendas'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as ChatsceneCompararRouteImport } from './routes/chatscene_.comparar'
+import { Route as ChatsceneRenderRouteImport } from './routes/chatscene_.render'
 import { Route as TemplatesIndexRouteImport } from './routes/templates.index'
 import { Route as TemplatesNewRouteImport } from './routes/templates.new'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
@@ -215,6 +216,11 @@ const ChatsceneCompararRoute = ChatsceneCompararRouteImport.update({
   path: '/chatscene/comparar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChatsceneRenderRoute = ChatsceneRenderRouteImport.update({
+  id: '/chatscene_/render',
+  path: '/chatscene/render',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TemplatesIndexRoute = TemplatesIndexRouteImport.update({
   id: '/templates/',
   path: '/templates/',
@@ -375,6 +381,7 @@ export interface FileRoutesByFullPath {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/chatscene/comparar': typeof ChatsceneCompararRoute
+  '/chatscene/render': typeof ChatsceneRenderRoute
   '/templates/new': typeof TemplatesNewRoute
   '/templates/': typeof TemplatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -430,6 +437,7 @@ export interface FileRoutesByTo {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/chatscene/comparar': typeof ChatsceneCompararRoute
+  '/chatscene/render': typeof ChatsceneRenderRoute
   '/templates/new': typeof TemplatesNewRoute
   '/templates': typeof TemplatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -486,6 +494,7 @@ export interface FileRoutesById {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/chatscene_/comparar': typeof ChatsceneCompararRoute
+  '/chatscene_/render': typeof ChatsceneRenderRoute
   '/templates/new': typeof TemplatesNewRoute
   '/templates/': typeof TemplatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -543,6 +552,7 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/chatscene/comparar'
+    | '/chatscene/render'
     | '/templates/new'
     | '/templates/'
     | '/.lovable/oauth/consent'
@@ -598,6 +608,7 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/chatscene/comparar'
+    | '/chatscene/render'
     | '/templates/new'
     | '/templates'
     | '/.lovable/oauth/consent'
@@ -653,6 +664,7 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/chatscene_/comparar'
+    | '/chatscene_/render'
     | '/templates/new'
     | '/templates/'
     | '/.lovable/oauth/consent'
@@ -709,6 +721,7 @@ export interface RootRouteChildren {
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   ChatsceneCompararRoute: typeof ChatsceneCompararRoute
+  ChatsceneRenderRoute: typeof ChatsceneRenderRoute
   TemplatesNewRoute: typeof TemplatesNewRoute
   TemplatesIndexRoute: typeof TemplatesIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
@@ -946,6 +959,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatsceneCompararRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/chatscene_/render': {
+      id: '/chatscene_/render'
+      path: '/chatscene/render'
+      fullPath: '/chatscene/render'
+      preLoaderRoute: typeof ChatsceneRenderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/templates/': {
       id: '/templates/'
       path: '/templates'
@@ -1142,6 +1162,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   ChatsceneCompararRoute: ChatsceneCompararRoute,
+  ChatsceneRenderRoute: ChatsceneRenderRoute,
   TemplatesNewRoute: TemplatesNewRoute,
   TemplatesIndexRoute: TemplatesIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
