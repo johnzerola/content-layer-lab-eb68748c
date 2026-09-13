@@ -53,9 +53,10 @@ import {
   type ProjectSnapshot,
 } from "@/lib/cloud";
 // estúdios pesados carregam só quando aparecem na tela
-function deferred<P extends object>(load: () => Promise<{ default: React.ComponentType<P> }>) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function deferred<T extends React.ComponentType<any>>(load: () => Promise<{ default: T }>): T {
   const Lazy = lazy(load);
-  return function Deferred(props: P) {
+  const Deferred = (props: React.ComponentProps<T>) => {
     return (
       <Suspense
         fallback={
