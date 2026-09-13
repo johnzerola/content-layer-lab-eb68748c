@@ -65,10 +65,11 @@ function deferred<T extends React.ComponentType<any>>(load: () => Promise<{ defa
           </div>
         }
       >
-        <Lazy {...props} />
+        <Lazy {...(props as React.ComponentProps<typeof Lazy>)} />
       </Suspense>
     );
   };
+  return Deferred as unknown as T;
 }
 const ClipStudio = deferred(() =>
   import("@/components/ClipStudio").then((m) => ({ default: m.ClipStudio })),
