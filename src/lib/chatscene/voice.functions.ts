@@ -20,7 +20,8 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
         // bolhas muito longas são cortadas em vez de derrubar a geração
         text: z.string().min(1).transform((t) => t.slice(0, MAX_CHARS)),
         voice: z.string().min(1).max(40),
-        direction: z.string().max(300).optional(),
+        // direção muito longa é cortada em vez de derrubar a geração
+        direction: z.string().transform((d) => d.slice(0, 480)).optional(),
         speed: z.number().min(0.7).max(1.3).optional(),
       })
       .parse(input),
