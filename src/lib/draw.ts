@@ -22,6 +22,8 @@ import {
   type CaptionStyle,
   type CleanupRegion,
   type ImageLayer,
+  type LayerAnim,
+
   type Template,
   type TextLayer,
 } from "./template";
@@ -1148,33 +1150,54 @@ export function drawFrame(
     ctx.translate(-W / 2, -H / 2);
   }
 
-  // janela de tempo por camada (aparece/some com fade)
+  // janela de tempo por camada (aparece/some com efeito de entrada e saída)
   const layerTime = Math.max(0, (opts?.time ?? 0) - (opts?.clip?.start ?? 0));
-  const timeAlpha = (l: {
-    tStart?: number;
-    tEnd?: number | null;
-    fadeIn?: number;
-    fadeOut?: number;
-  }) => {
+  type TimedLayer = {
+    x?: number; y?: number; w?: number; h?: number;
+    tStart?: number; tEnd?: number | null; fadeIn?: number; fadeOut?: number;
+    animIn?: LayerAnim; animOut?: LayerAnim;
+  };
+  type Motion = { alpha: number; dx: number; dy: number; scale: number };
+  const easeOut = (p: number) => 1 - Math.pow(1 - p, 3);
+  const layerMotion = (l: TimedLayer): Motion => {
+    const m: Motion = { alpha: 1, dx: 0, dy: 0, scale: 1 };
     const start = l.tStart ?? 0;
     const end = l.tEnd != null && l.tEnd > start ? l.tEnd : null;
-    if (layerTime < start) return 0;
-    if (end != null && layerTime > end) return 0;
-    let a = 1;
+    if (layerTime < start || (end != null && layerTime > end)) return { ...m, alpha: 0 };
+    const bw = Math.max(80, l.w ?? 400);
+    const bh = Math.max(60, l.h ?? 200);
+    const apply = (kind: LayerAnim, raw: number, dir: 1 | -1) => {
+      const p = Math.max(0, Math.min(1, raw));
+      const e = easeOut(p);
+      const rest = 1 - e;
+      m.alpha = Math.min(m.alpha, p);
+      if (kind === "up") m.dy += dir * rest * bh * 0.85;
+      else if (kind === "down") m.dy -= dir * rest * bh * 0.85;
+      else if (kind === "left") m.dx -= dir * rest * bw * 0.9;
+      else if (kind === "right") m.dx += dir * rest * bw * 0.9;
+      else if (kind === "zoom") m.scale *= 1 - dir * rest * 0.35;
+      else if (kind === "pop") m.scale *= 1 - dir * (rest * 0.45 - Math.sin(p * Math.PI) * 0.12);
+    };
     const fi = l.fadeIn ?? 0;
-    if (fi > 0) a = Math.min(a, (layerTime - start) / fi);
+    if (fi > 0 && layerTime < start + fi) apply(l.animIn ?? "fade", (layerTime - start) / fi, 1);
     const fo = l.fadeOut ?? 0;
-    if (fo > 0 && end != null) a = Math.min(a, (end - layerTime) / fo);
-    return Math.max(0, Math.min(1, a));
+    if (fo > 0 && end != null && layerTime > end - fo) apply(l.animOut ?? "fade", (end - layerTime) / fo, -1);
+    return m;
   };
 
   // ordem de empilhamento configurável (z-index por camada)
-  const jobs: { z: number; i: number; alpha: number; run: () => void }[] = [];
-  const push = (
-    layer: { z?: number; tStart?: number; tEnd?: number | null; fadeIn?: number; fadeOut?: number },
-    fallback: number,
-    run: () => void,
-  ) => jobs.push({ z: layer.z ?? fallback, i: jobs.length, alpha: timeAlpha(layer) * (layer === t.video ? 1 : 1 - fullscreen.amount), run });
+  const jobs: { z: number; i: number; alpha: number; motion: Motion; box: TimedLayer; run: () => void }[] = [];
+  const push = (layer: TimedLayer & { z?: number }, fallback: number, run: () => void) => {
+    const motion = layerMotion(layer);
+    jobs.push({
+      z: layer.z ?? fallback,
+      i: jobs.length,
+      alpha: motion.alpha * (layer === (t.video as unknown as TimedLayer) ? 1 : 1 - fullscreen.amount),
+      motion,
+      box: layer,
+      run,
+    });
+  };
 
   push(t.video, 0, () => drawVideoLayer(ctx, t, source, opts));
   push(t.watermark, 10, () => drawImageLayer(ctx, t.watermark));
@@ -1201,12 +1224,21 @@ export function drawFrame(
       if (j.alpha <= 0) return;
       ctx.save();
       if (j.alpha < 1) ctx.globalAlpha *= j.alpha;
+      const { dx, dy, scale } = j.motion;
+      if (dx !== 0 || dy !== 0 || scale !== 1) {
+        const cx = (j.box.x ?? 0) + (j.box.w ?? W) / 2;
+        const cy = (j.box.y ?? 0) + (j.box.h ?? H) / 2;
+        ctx.translate(cx + dx, cy + dy);
+        ctx.scale(scale, scale);
+        ctx.translate(-cx, -cy);
+      }
       try {
         j.run();
       } finally {
         ctx.restore();
       }
     });
+
 
   if (animating) ctx.restore();
   ctx.restore();

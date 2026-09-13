@@ -1,7 +1,18 @@
 import { useState } from 'react';
 import { Pause, Play, Plus, Scissors, Maximize, Trash2 } from 'lucide-react';
-import type { BoxLayer, SelId, Template, TextLayer } from '@/lib/template';
+import type { BoxLayer, LayerAnim, SelId, Template, TextLayer } from '@/lib/template';
 import { layerOf, LAYER_LABELS, selectableIds } from './TemplateCanvas';
+
+const PALETTE = ['#ffffff', '#000000', '#ffd166', '#ff5c8a', '#7c5cff', '#38bdf8', '#34d399', '#f97316'];
+const ANIMS: { id: LayerAnim; label: string }[] = [
+  { id: 'fade', label: 'Fade' },
+  { id: 'up', label: 'Subindo' },
+  { id: 'down', label: 'Descendo' },
+  { id: 'left', label: 'Pela esquerda' },
+  { id: 'right', label: 'Pela direita' },
+  { id: 'zoom', label: 'Zoom' },
+  { id: 'pop', label: 'Pop' },
+];
 
 const keys: Record<string, string> = { name: 'name_' };
 function patchLayer(t: Template, id: string, patch: Partial<BoxLayer>): Template {
@@ -9,6 +20,7 @@ function patchLayer(t: Template, id: string, patch: Partial<BoxLayer>): Template
   const key = keys[id] ?? id;
   return { ...t, [key]: { ...(t[key as keyof Template] as BoxLayer), ...patch } };
 }
+
 
 export function TemplateTimeline({ template: t, onChange, selected, onSelect, time, onSeek, playing, onPlay, duration, onDuration }: {
   template: Template; onChange: (t: Template) => void; selected: SelId | null; onSelect: (id: SelId) => void;
@@ -31,6 +43,16 @@ export function TemplateTimeline({ template: t, onChange, selected, onSelect, ti
     onSelect(`extra:${id}`); setFullId(null);
   };
   const number = (label: string, value: number, max: number, update: (n: number) => void, min = 0) => <label className="space-y-1 text-xs text-muted-foreground">{label}<input aria-label={label} className="field w-full text-sm" type="number" min={min} max={max} step="0.1" value={Number(value.toFixed(2))} onChange={e => { if (e.target.value !== '' && Number.isFinite(e.target.valueAsNumber)) update(Math.max(min, Math.min(max, e.target.valueAsNumber))); }} /></label>;
+  const effects = (label: string, active: LayerAnim, current: number, update: (anim: LayerAnim, dur?: number) => void) =>
+    <div className="space-y-1.5">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {ANIMS.map(a => <button key={a.id} type="button" aria-pressed={active === a.id}
+          onClick={() => update(a.id, current > 0 ? undefined : 0.4)}
+          className={`rounded-full border px-2.5 py-1 text-[11px] transition hover:border-primary ${active === a.id ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground'}`}>{a.label}</button>)}
+      </div>
+    </div>;
+
   const rows = selectableIds(t).filter(id => layerOf(t, id)?.visible).map(id => {
     const l = layerOf(t, id) as BoxLayer;
     return { id, label: id.startsWith('extra:') ? (t.extras?.find(e => `extra:${e.id}` === id)?.label ?? 'Frase') : LAYER_LABELS[id as keyof typeof LAYER_LABELS], start: l.tStart ?? 0, end: l.tEnd ?? duration, full: false };
@@ -77,10 +99,40 @@ export function TemplateTimeline({ template: t, onChange, selected, onSelect, ti
         </div></div>)}
       </div>
     </div>
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-      {full ? <>{number('Início (s)', full.start, full.end - 0.1, n => changeFull({ start: n }))}{number('Fim (s)', full.end, duration, n => changeFull({ end: n }), full.start + 0.1)}{number('Transição suave (s)', full.fade, (full.end - full.start) / 2, n => changeFull({ fade: n }))}<button className="btn-ghost text-xs" onClick={() => { onChange({ ...t, fullscreenClips: (t.fullscreenClips ?? []).filter(c => c.id !== full.id) }); setFullId(null); }}><Trash2 size={14} /> Remover trecho</button></> : layer ? <>{number('Início (s)', layer.tStart ?? 0, (layer.tEnd ?? duration) - 0.1, n => changeLayer({ tStart: n }))}{number('Fim (s)', layer.tEnd ?? duration, duration, n => changeLayer({ tEnd: n }), (layer.tStart ?? 0) + 0.1)}{number('Fade de entrada (s)', layer.fadeIn ?? 0, ((layer.tEnd ?? duration) - (layer.tStart ?? 0)) / 2, n => changeLayer({ fadeIn: n }))}{number('Fade de saída (s)', layer.fadeOut ?? 0, ((layer.tEnd ?? duration) - (layer.tStart ?? 0)) / 2, n => changeLayer({ fadeOut: n }))}</> : null}
-    </div>
-    {!full && layer && 'text' in layer && <label className="block text-xs text-muted-foreground">Texto da frase<input className="field mt-1 w-full" value={String(layer.text)} onChange={e => changeLayer({ text: e.target.value } as Partial<TextLayer>)} /></label>}
+    {full ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {number('Início (s)', full.start, full.end - 0.1, n => changeFull({ start: n }))}
+      {number('Fim (s)', full.end, duration, n => changeFull({ end: n }), full.start + 0.1)}
+      {number('Transição suave (s)', full.fade, (full.end - full.start) / 2, n => changeFull({ fade: n }))}
+      <button className="btn-ghost self-end text-xs" onClick={() => { onChange({ ...t, fullscreenClips: (t.fullscreenClips ?? []).filter(c => c.id !== full.id) }); setFullId(null); }}><Trash2 size={14} /> Remover trecho</button>
+    </div> : layer ? <div className="space-y-3 rounded-lg border border-border bg-background/40 p-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {number('Início (s)', layer.tStart ?? 0, (layer.tEnd ?? duration) - 0.1, n => changeLayer({ tStart: n }))}
+        {number('Fim (s)', layer.tEnd ?? duration, duration, n => changeLayer({ tEnd: n }), (layer.tStart ?? 0) + 0.1)}
+        {number('Duração da entrada (s)', layer.fadeIn ?? 0, ((layer.tEnd ?? duration) - (layer.tStart ?? 0)) / 2, n => changeLayer({ fadeIn: n }))}
+        {number('Duração da saída (s)', layer.fadeOut ?? 0, ((layer.tEnd ?? duration) - (layer.tStart ?? 0)) / 2, n => changeLayer({ fadeOut: n }))}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {effects('Efeito de entrada', layer.animIn ?? 'fade', layer.fadeIn ?? 0, (animIn, fadeIn) => changeLayer({ animIn, ...(fadeIn != null ? { fadeIn } : {}) }))}
+        {effects('Efeito de saída', layer.animOut ?? 'fade', layer.fadeOut ?? 0, (animOut, fadeOut) => changeLayer({ animOut, ...(fadeOut != null ? { fadeOut } : {}) }))}
+      </div>
+      {'text' in layer && <div className="space-y-2">
+        <label className="block text-xs text-muted-foreground">Texto da frase
+          <input className="field mt-1 w-full" value={String(layer.text)} onChange={e => changeLayer({ text: e.target.value } as Partial<TextLayer>)} />
+        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Cor do texto</span>
+          {PALETTE.map(c => <button key={c} aria-label={`Cor ${c}`} aria-pressed={(layer as TextLayer).color?.toLowerCase() === c}
+            onClick={() => changeLayer({ color: c } as Partial<TextLayer>)}
+            className={`size-6 rounded-full border-2 transition hover:scale-110 ${(layer as TextLayer).color?.toLowerCase() === c ? 'border-primary ring-2 ring-primary/40' : 'border-border'}`}
+            style={{ background: c }} />)}
+          <input type="color" aria-label="Cor personalizada do texto" className="size-7 cursor-pointer rounded-md border border-border bg-transparent"
+            value={(layer as TextLayer).color || '#ffffff'} onChange={e => changeLayer({ color: e.target.value } as Partial<TextLayer>)} />
+          <input aria-label="Código da cor" className="field w-24 font-mono text-xs" value={(layer as TextLayer).color ?? ''}
+            onChange={e => { const v = e.target.value.trim(); if (/^#[0-9a-fA-F]{0,6}$/.test(v)) changeLayer({ color: v } as Partial<TextLayer>); }} />
+        </div>
+      </div>}
+    </div> : <p className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">Selecione uma camada na linha do tempo para ajustar tempos, efeitos e cores.</p>}
     <div className="flex items-end gap-3">{number('Duração de referência (s)', duration, 7200, onDuration, 0.1)}<p className="pb-2 text-[11px] text-muted-foreground">Arraste os blocos para mover. Selecione para ajustar os tempos. Tela cheia oculta as outras camadas e retorna ao layout no fim do trecho. Transição 0 = corte seco.</p></div>
   </section>;
 }
+

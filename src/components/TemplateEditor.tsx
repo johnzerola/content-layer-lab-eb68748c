@@ -582,7 +582,7 @@ export function TemplateEditor({
             </div>
             <div className="grid place-items-center rounded-2xl border border-border bg-[repeating-conic-gradient(var(--color-surface-2)_0%_25%,transparent_0%_50%)] bg-[length:22px_22px] p-4">
               <TemplateCanvas
-                frameClassName="h-[min(62vh,660px)] w-auto max-w-full shadow-[0_24px_60px_-24px_rgba(0,0,0,0.8)]"
+                frameClassName="aspect-[9/16] h-[min(68vh,720px)] w-auto max-w-full shadow-[0_24px_60px_-24px_rgba(0,0,0,0.8)]"
                 template={t}
                 previewFile={previewFile ?? null}
                 timelineTime={time}

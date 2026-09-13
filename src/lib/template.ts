@@ -35,7 +35,22 @@ export interface BoxLayer {
   fadeIn?: number;
   /** duração do fade de saída, em segundos */
   fadeOut?: number;
+  /** efeito de entrada da camada */
+  animIn?: LayerAnim;
+  /** efeito de saída da camada */
+  animOut?: LayerAnim;
 }
+
+/** Efeitos de entrada/saída aplicados no intervalo de fade da camada. */
+export type LayerAnim =
+  | "fade"
+  | "up"
+  | "down"
+  | "left"
+  | "right"
+  | "zoom"
+  | "pop";
+
 
 
 export interface TextLayer extends BoxLayer {
