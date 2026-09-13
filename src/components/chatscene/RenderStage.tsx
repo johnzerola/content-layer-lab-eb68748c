@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Download, Loader2, Mic, Music, Sparkles } from "lucide-react";
+import { Download, Loader2, Mic, Music, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/base";
 import { ChatScenePreview } from "@/components/chatscene/ChatScenePreview";
@@ -17,7 +17,16 @@ import { loadMusic, mixConversationAudio } from "@/lib/chatscene/audio-mix";
 import { encodeFrameSequence, frameEncoderSupported } from "@/lib/chatscene/encode-frames";
 import { CanvasConversationRenderer } from "@/lib/chatscene/renderer";
 import { loadLocalDraft } from "@/lib/chatscene/serialize";
-import { createDemoChatSceneProject, renderSize, type ChatSceneProject } from "@/lib/chatscene/types";
+import {
+  ANIMATION_PRESETS,
+  createDemoChatSceneProject,
+  DEFAULT_MOTION,
+  MOTION_LIMITS,
+  renderSize,
+  SCENE_EXIT_PRESETS,
+  type ChatSceneMotion,
+  type ChatSceneProject,
+} from "@/lib/chatscene/types";
 import { DEFAULT_VOICE_MIX } from "@/lib/chatscene/voice";
 import { synthesizeVoice } from "@/lib/chatscene/voice.functions";
 import {
@@ -92,6 +101,8 @@ export function RenderStage() {
       setProject((prev) => ({ ...prev, voiceMix: { ...DEFAULT_VOICE_MIX, ...prev.voiceMix, ...changes } })),
     [],
   );
+
+  const motion: ChatSceneMotion = { ...DEFAULT_MOTION, ...(project.motion ?? {}) };
 
   const setMotion = useCallback(
     (patch: Partial<ChatSceneMotion>) =>
