@@ -602,7 +602,7 @@ export function createParticipant(init: Partial<ChatParticipant> = {}): ChatPart
     personality: init.personality ?? null,
     personalityPresetId: init.personalityPresetId ?? null,
     emotionalBaseline: init.emotionalBaseline ?? null,
-    style: init.style ?? undefined,
+    ...(init.style ? { style: init.style } : {}),
     reactionStyle: init.reactionStyle ?? null,
   };
 }
