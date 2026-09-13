@@ -103,6 +103,16 @@ export function wrapText(ctx: Ctx2D, text: string, maxWidth: number): string[] {
   return out.length ? out : [""];
 }
 
+/** Estilo já resolvido do autor, usado na medição e na pintura. */
+interface BubbleStyle {
+  bubble: string | null;
+  text: string | null;
+  fontFamily: string;
+  weight: number;
+  italic: boolean;
+  scale: number;
+}
+
 interface LaidOutMessage {
   message: ChatMessage;
   lines: string[];
@@ -115,6 +125,7 @@ interface LaidOutMessage {
   showAvatar: boolean;
   name: string;
   nameColor: string;
+  style: BubbleStyle;
   avatarUrl: string | null;
   /** altura da mídia dentro da bolha (0 quando não há) */
   mediaH: number;

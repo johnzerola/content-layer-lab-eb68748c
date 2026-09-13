@@ -168,6 +168,8 @@ export interface ChatParticipant {
   personalityPresetId?: string | null;
   /** humor de base, usado como emoção padrão das falas */
   emotionalBaseline?: import("./voice").VoiceEmotion | null;
+  /** aparência do balão deste personagem (cor, fonte, negrito/itálico) */
+  style?: ParticipantStyle;
   /** emoji que esta pessoa costuma usar ao reagir */
   reactionStyle?: string | null;
 }
@@ -209,6 +211,29 @@ export interface ChatMessage {
   /** mensagem do histórico: já está na tela quando o vídeo começa */
   initial?: boolean;
 }
+
+/** Aparência do balão de um personagem, por cima do tema da conversa. */
+export interface ParticipantStyle {
+  /** cor de fundo do balão (vazio = usa o tema) */
+  bubbleColor?: string | null;
+  /** cor do texto dentro do balão */
+  textColor?: string | null;
+  /** fonte do texto (vazio = fonte do tema) */
+  fontFamily?: string | null;
+  bold?: boolean;
+  italic?: boolean;
+  /** tamanho do texto: 0.8 = menor, 1.3 = maior */
+  fontScale?: number;
+}
+
+/** Fontes oferecidas na tela de estilo por personagem. */
+export const PARTICIPANT_FONTS: { id: string; label: string }[] = [
+  { id: "", label: "Fonte do tema" },
+  { id: "Figtree, system-ui, sans-serif", label: "Figtree" },
+  { id: "Outfit, system-ui, sans-serif", label: "Outfit" },
+  { id: "'JetBrains Mono', monospace", label: "Mono" },
+  { id: "Georgia, 'Times New Roman', serif", label: "Serifada" },
+];
 
 /** Estilo de entrada das bolhas. */
 export type MessageAnimation = "bubble-pop" | "slide-up" | "fade" | "soft-spring" | "fast-pop";
@@ -577,6 +602,7 @@ export function createParticipant(init: Partial<ChatParticipant> = {}): ChatPart
     personality: init.personality ?? null,
     personalityPresetId: init.personalityPresetId ?? null,
     emotionalBaseline: init.emotionalBaseline ?? null,
+    style: init.style ?? undefined,
     reactionStyle: init.reactionStyle ?? null,
   };
 }
