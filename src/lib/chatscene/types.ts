@@ -118,21 +118,34 @@ export const DEFAULT_HEADER: ChatSceneHeader = {
 
 export const DEFAULT_BACKGROUND: ChatSceneBackground = { kind: "theme" };
 
-/** Fundos prontos, para escolher com um clique. */
-export const BACKGROUND_PRESETS: { id: string; label: string; value: ChatSceneBackground }[] = [
-  { id: "theme", label: "Do tema", value: { kind: "theme" } },
-  { id: "neon-city", label: "Cidade Neon", value: { kind: "video", videoUrl: "/chatscene/backgrounds/neon-city.mp4", loop: true } },
-  { id: "forest-run", label: "Floresta", value: { kind: "video", videoUrl: "/chatscene/backgrounds/forest-run.mp4", loop: true } },
-  { id: "lava-cave", label: "Caverna Lava", value: { kind: "video", videoUrl: "/chatscene/backgrounds/lava-cave.mp4", loop: true } },
-  { id: "ocean-drift", label: "Oceano", value: { kind: "video", videoUrl: "/chatscene/backgrounds/ocean-drift.mp4", loop: true } },
-  { id: "neon-city-still", label: "Cidade Neon (parada)", value: { kind: "image", imageUrl: "/chatscene/backgrounds/neon-city-still.jpg" } },
-  { id: "forest-run-still", label: "Floresta (parada)", value: { kind: "image", imageUrl: "/chatscene/backgrounds/forest-run-still.jpg" } },
-  { id: "lava-cave-still", label: "Caverna (parada)", value: { kind: "image", imageUrl: "/chatscene/backgrounds/lava-cave-still.jpg" } },
-  { id: "noite", label: "Noite", value: { kind: "gradient", color: "#141428", colorB: "#2b1b4d" } },
-  { id: "aurora", label: "Aurora", value: { kind: "gradient", color: "#0d2b3e", colorB: "#1f6f6b" } },
-  { id: "pessego", label: "Pêssego", value: { kind: "gradient", color: "#ffd9c0", colorB: "#ff9db0" } },
-  { id: "carvao", label: "Carvão", value: { kind: "solid", color: "#111318" } },
-  { id: "papel", label: "Papel", value: { kind: "solid", color: "#f3efe6" } },
+/** Categorias da galeria de fundos. */
+export type BackgroundCategory = "gameplay" | "satisfatorio" | "cenario" | "cor";
+
+export const BACKGROUND_CATEGORY_LABELS: Record<BackgroundCategory, string> = {
+  gameplay: "Gameplay (livre de direitos)",
+  satisfatorio: "Satisfatório",
+  cenario: "Cenários",
+  cor: "Cores e degradês",
+};
+
+/** Fundos prontos, para escolher com um clique. Vídeos gerados por IA = livres de direitos autorais. */
+export const BACKGROUND_PRESETS: { id: string; label: string; category: BackgroundCategory; value: ChatSceneBackground }[] = [
+  { id: "theme", label: "Do tema", category: "cor", value: { kind: "theme" } },
+  { id: "block-parkour", label: "Parkour de Blocos", category: "gameplay", value: { kind: "video", videoUrl: "/__l5e/assets-v1/e8658151-859d-4fde-92b7-ee2a5cb486db/block-parkour.mp4", loop: true } },
+  { id: "subway-runner", label: "Corrida no Metrô", category: "gameplay", value: { kind: "video", videoUrl: "/__l5e/assets-v1/e610568a-8c0a-40ed-8f70-bed5b420ec4c/subway-runner.mp4", loop: true } },
+  { id: "satisfying-mix", label: "Slime & Areia", category: "satisfatorio", value: { kind: "video", videoUrl: "/__l5e/assets-v1/4a7793cd-3f27-4528-bf75-ebbbbe12fe0b/satisfying-mix.mp4", loop: true } },
+  { id: "neon-city", label: "Cidade Neon", category: "cenario", value: { kind: "video", videoUrl: "/chatscene/backgrounds/neon-city.mp4", loop: true } },
+  { id: "forest-run", label: "Floresta", category: "cenario", value: { kind: "video", videoUrl: "/chatscene/backgrounds/forest-run.mp4", loop: true } },
+  { id: "lava-cave", label: "Caverna Lava", category: "cenario", value: { kind: "video", videoUrl: "/chatscene/backgrounds/lava-cave.mp4", loop: true } },
+  { id: "ocean-drift", label: "Oceano", category: "cenario", value: { kind: "video", videoUrl: "/chatscene/backgrounds/ocean-drift.mp4", loop: true } },
+  { id: "neon-city-still", label: "Cidade Neon (parada)", category: "cenario", value: { kind: "image", imageUrl: "/chatscene/backgrounds/neon-city-still.jpg" } },
+  { id: "forest-run-still", label: "Floresta (parada)", category: "cenario", value: { kind: "image", imageUrl: "/chatscene/backgrounds/forest-run-still.jpg" } },
+  { id: "lava-cave-still", label: "Caverna (parada)", category: "cenario", value: { kind: "image", imageUrl: "/chatscene/backgrounds/lava-cave-still.jpg" } },
+  { id: "noite", label: "Noite", category: "cor", value: { kind: "gradient", color: "#141428", colorB: "#2b1b4d" } },
+  { id: "aurora", label: "Aurora", category: "cor", value: { kind: "gradient", color: "#0d2b3e", colorB: "#1f6f6b" } },
+  { id: "pessego", label: "Pêssego", category: "cor", value: { kind: "gradient", color: "#ffd9c0", colorB: "#ff9db0" } },
+  { id: "carvao", label: "Carvão", category: "cor", value: { kind: "solid", color: "#111318" } },
+  { id: "papel", label: "Papel", category: "cor", value: { kind: "solid", color: "#f3efe6" } },
 ];
 
 export interface ChatParticipant {
