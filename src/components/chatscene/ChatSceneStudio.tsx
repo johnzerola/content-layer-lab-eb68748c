@@ -1204,6 +1204,34 @@ export function ChatSceneStudio() {
                 </label>
               </div>
 
+              <div className="mt-3 rounded-lg border border-border bg-background/35 p-3">
+                <p className="mono-label mb-2 text-muted-foreground">Altura da janela de conversa</p>
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Altura da janela de conversa">
+                  {[0.4, 0.5, 0.6].map((ratio) => {
+                    const active = Math.abs((project.layout?.height ?? 1) - ratio) < 0.02;
+                    return (
+                      <button
+                        key={ratio}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() =>
+                          patch({
+                            layout: { ...(project.layout ?? DEFAULT_LAYOUT), height: ratio, autoHeight: false },
+                          })
+                        }
+                        className={`rounded-md border px-2.5 py-1 text-xs ${
+                          active
+                            ? "border-primary bg-primary/15 text-foreground"
+                            : "border-border text-muted-foreground hover:border-primary"
+                        }`}
+                      >
+                        {Math.round(ratio * 100)}%
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="mt-2 space-y-2">
                 <label className="block text-[11px] text-muted-foreground">
                   Aproximar fundo
