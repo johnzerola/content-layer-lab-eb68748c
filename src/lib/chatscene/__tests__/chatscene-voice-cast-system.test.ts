@@ -18,6 +18,23 @@ describe("Voice Cast System", () => {
     expect(effectiveVoice(project, project.messages[0]!)?.profile.presetId).toBe("teen-boy-casual");
   });
 
+  it("salva o preset de atuação no perfil e invalida apenas as falas do personagem", () => {
+    const pedro = createParticipant({ id: "pedro", name: "Pedro" });
+    const ana = createParticipant({ id: "ana", name: "Ana" });
+    const project = createChatSceneProject({
+      participants: [pedro, ana],
+      messages: [
+        createMessage(pedro.id, { id: "p1", text: "Oi", voiceMs: 900 }),
+        createMessage(ana.id, { id: "a1", text: "Olá", voiceMs: 800 }),
+      ],
+    });
+    const updated = attachPreset(project, pedro.id, "acting-adult-sad");
+    expect(updated.participants[0]?.voiceProfileId).toBe("voice_pedro");
+    expect(updated.voiceProfiles?.find((profile) => profile.id === "voice_pedro")?.presetId).toBe("acting-adult-sad");
+    expect(updated.messages.find((message) => message.id === "p1")?.voiceMs).toBeNull();
+    expect(updated.messages.find((message) => message.id === "a1")?.voiceMs).toBe(800);
+  });
+
   it("mantém identidade e aplica emoção por mensagem", () => {
     const project = projectWithCast();
     const message = { ...project.messages[0]!, voiceDirection: { emotion: "annoyed" as const, speedMultiplier: 1.1 } };

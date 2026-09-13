@@ -1,10 +1,11 @@
-import { ChevronDown, Loader2, Play, RotateCcw, SlidersHorizontal, Volume2 } from "lucide-react";
+import { Check, ChevronDown, Loader2, Play, RotateCcw, SlidersHorizontal, Sparkles, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/base";
 import { attachPreset, voiceProfileOf } from "@/lib/chatscene/voice-resolution";
 import { PROVIDER_CAPABILITIES } from "@/lib/chatscene/voice-providers";
 import { missingSpeakingMessages } from "@/lib/chatscene/voice-cast";
 import {
   DEFAULT_VOICE_MIX,
+  FEATURED_ACTING_PRESET_IDS,
   PITCH_MAX,
   PITCH_MIN,
   VOICE_PRESETS,
@@ -44,6 +45,7 @@ export function VoicePanel(props: VoicePanelProps) {
   const missingItems = missingSpeakingMessages(project);
   const missing = missingItems.length;
   const characters = missingItems.reduce((sum, item) => sum + item.text.length, 0);
+  const actingPresets = FEATURED_ACTING_PRESET_IDS.map((id) => voicePreset(id));
 
   return (
     <div className="space-y-3">
@@ -71,7 +73,32 @@ export function VoicePanel(props: VoicePanelProps) {
                 {voice ? <span className="size-2 rounded-full bg-emerald-400" title="Voz configurada" /> : null}
               </div>
 
-              <label className="mt-2 block text-[10px] font-medium uppercase text-muted-foreground">Personagem vocal</label>
+              <div className="mt-3 border-t border-border pt-3">
+                <div className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase text-muted-foreground">
+                  <Sparkles className="size-3" aria-hidden /> Presets de atuação
+                </div>
+                <div className="grid grid-cols-2 gap-1.5" role="list" aria-label={`Presets de atuação para ${participant.name}`}>
+                  {actingPresets.map((actingPreset) => {
+                    const active = voice?.presetId === actingPreset.id;
+                    return (
+                      <Button
+                        key={actingPreset.id}
+                        type="button"
+                        size="sm"
+                        variant={active ? "secondary" : "ghost"}
+                        className={`h-auto min-h-10 justify-start whitespace-normal px-2 py-1.5 text-left text-[10px] leading-tight ${active ? "border border-primary/50 bg-primary/10 text-foreground" : "border border-transparent"}`}
+                        aria-pressed={active}
+                        onClick={() => setProject(attachPreset(project, participant.id, actingPreset.id))}
+                      >
+                        {active ? <Check className="size-3 shrink-0 text-primary" aria-hidden /> : <span className="size-3 shrink-0" />}
+                        <span>{actingPreset.label}</span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <label className="mt-3 block text-[10px] font-medium uppercase text-muted-foreground">Catálogo completo</label>
               <div className="relative mt-1">
                 <select
                   value={voice?.presetId ?? ""}

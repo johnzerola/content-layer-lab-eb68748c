@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_VOICE,
   DEFAULT_VOICE_MIX,
+  FEATURED_ACTING_PRESET_IDS,
   speakableText,
   voiceDirection,
   voiceKey,
@@ -24,6 +25,19 @@ describe("elenco de vozes", () => {
   it("cada jeito de falar tem uma direção em português", () => {
     expect(voiceDirection("assustada")).toMatch(/português/i);
     expect(voiceDirection(undefined)).toMatch(/português/i);
+  });
+
+  it("oferece presets reutilizáveis de atuação sem pessoas reais", () => {
+    expect(FEATURED_ACTING_PRESET_IDS).toHaveLength(8);
+    const featured = FEATURED_ACTING_PRESET_IDS.map((id) => voicePreset(id));
+    expect(featured.every((item) => item.group === "Presets de atuação")).toBe(true);
+    expect(featured.map((item) => item.label)).toContain("Narrador grave e melancólico");
+    expect(featured.map((item) => item.label)).toContain("Criança sintética triste");
+    expect(featured.every((item) => Math.abs(item.profile.pitch ?? 0) <= 2)).toBe(true);
+  });
+
+  it("protege a interpretação juvenil contra pitch caricato", () => {
+    expect(voiceDirection("calma", "sad", .25, "juvenil", "neutra")).toMatch(/sem caricatura/i);
   });
 
   it("o mesmo texto com a mesma voz gera a mesma chave (não sintetiza duas vezes)", () => {

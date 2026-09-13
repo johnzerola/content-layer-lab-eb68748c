@@ -25,5 +25,6 @@ export function attachPreset(project: ChatSceneProject, participantId: string, p
     ...project,
     voiceProfiles: [...(project.voiceProfiles ?? []).filter((p) => p.id !== id), profile],
     participants: project.participants.map((p) => p.id === participantId ? { ...p, voiceProfileId: id, voice: profile } : p),
+    messages: project.messages.map((message) => message.participantId === participantId ? { ...message, voiceMs: null } : message),
   };
 }
