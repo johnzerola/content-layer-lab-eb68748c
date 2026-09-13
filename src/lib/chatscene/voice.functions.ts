@@ -40,9 +40,9 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
         response_format: "mp3",
         speed: data.speed ?? 1,
         // o idioma nunca é opcional: o estilo pedido é somado ao português do Brasil
-        instructions: `Fale em português do Brasil (pt-BR), com pronúncia brasileira natural e dicção clara. ${
-          data.direction ?? "Use tom de conversa real, sem soar robótico."
-        }`,
+        instructions:
+          data.direction ??
+          "Você é um ator brasileiro de dublagem. Fale em português do Brasil (pt-BR) com pronúncia brasileira natural, interpretando a fala com respiração, micro-pausas e variação de entonação, sem soar robótico ou de locutor.",
       }),
     });
 
