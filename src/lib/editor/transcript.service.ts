@@ -31,7 +31,7 @@ function toDoc(row: Row): TranscriptDoc {
 export async function loadTranscript(videoId: string, language = "pt-BR"): Promise<TranscriptDoc | null> {
   const { data, error } = await supabase
     .from(TABLE)
-    .select("*")
+    .select("id,video_id,language,duration,words,scenes,speakers")
     .eq("video_id", videoId)
     .eq("language", language)
     .maybeSingle();
@@ -61,7 +61,7 @@ export async function saveTranscript(doc: TranscriptDoc, projectId?: string | nu
   const { data, error } = await supabase
     .from(TABLE)
     .upsert(payload as never, { onConflict: "user_id,video_id,language" })
-    .select("*")
+    .select("id,video_id,language,duration,words,scenes,speakers")
     .single();
   if (error) throw error;
   return toDoc(data as Row);
