@@ -68,6 +68,41 @@ export function dataUrlToBlob(dataUrl: string): Blob | null {
 }
 
 /**
+ * Comprime imagens grandes antes do envio: redimensiona para no máximo
+ * 1920px no maior lado e converte para WebP (qualidade 0.85). Só troca
+ * quando o resultado fica menor que o original; qualquer falha devolve
+ * o blob original. SVG/GIF animado e imagens pequenas passam direto.
+ */
+const MAX_IMAGE_SIDE = 1920;
+const MIN_COMPRESS_BYTES = 200 * 1024;
+
+async function compressImageIfWorthIt(blob: Blob): Promise<Blob> {
+  if (typeof document === "undefined" || typeof createImageBitmap !== "function") return blob;
+  if (blob.type !== "image/png" && blob.type !== "image/jpeg") return blob;
+  if (blob.size < MIN_COMPRESS_BYTES) return blob;
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return blob;
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close();
+    const out = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob((b) => resolve(b), "image/webp", 0.85),
+    );
+    if (out && out.size < blob.size) return out;
+  } catch {
+    /* mantém o original */
+  }
+  return blob;
+}
+
+/**
  * Envia um Blob e devolve a referência `storage:assets/...`.
  * Devolve null quando não há sessão, o arquivo é grande demais ou o envio falha.
  */
@@ -76,12 +111,13 @@ export async function uploadMediaBlob(kind: string, blob: Blob): Promise<string 
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth.user?.id;
   if (!userId) return null;
-  const ext = extFromMime(blob.type || "application/octet-stream");
+  const compressed = await compressImageIfWorthIt(blob);
+  const ext = extFromMime(compressed.type || "application/octet-stream");
   const name = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const path = `${userId}/${kind}/${name}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
+  const { error } = await supabase.storage.from(BUCKET).upload(path, compressed, {
     upsert: false,
-    contentType: blob.type || "application/octet-stream",
+    contentType: compressed.type || "application/octet-stream",
   });
   if (error) return null;
   return `${PREFIX}${path}`;

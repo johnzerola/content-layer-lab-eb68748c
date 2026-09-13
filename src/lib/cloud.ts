@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { migrate, registerQuotaFallback, type Template } from "@/lib/template";
 import { externalizeDataUrls, isDataUrl, uploadDataUrl } from "@/lib/media-store";
+import { applyJsonPatch, diffJson, jsonSize, type JsonPatch } from "@/lib/json-diff";
 
 export type CloudUser = { id: string; email: string | null };
 
@@ -84,15 +85,98 @@ export async function pushTemplates(list: Template[]) {
     .select("id,local_id,data");
   if (error) throw error;
 
-  // guarda também uma versão no histórico da nuvem
-  const versions = (data ?? []).map((r) => ({
-    user_id: user.id,
-    template_id: r.id,
-    label: new Date().toLocaleString("pt-BR"),
-    data: r.data,
-  }));
-  if (versions.length) await supabase.from("template_versions").insert(versions);
+  // guarda também uma versão no histórico da nuvem — como diff sempre que compensar
+  await insertTemplateVersions(
+    user.id,
+    (data ?? []).map((r) => ({ templateId: r.id, data: r.data })),
+    new Date().toLocaleString("pt-BR"),
+  );
   return rows.length;
+}
+
+type VersionRow = {
+  id: string;
+  template_id: string;
+  data: Json;
+  format: string;
+  base_id: string | null;
+  patch: Json | null;
+};
+
+/** Reconstrói o snapshot completo de uma versão (diff ou completa). */
+export function materializeVersion(row: VersionRow, base?: VersionRow | null): Json {
+  if (row.format === "diff" && row.patch && base) {
+    return applyJsonPatch(base.data, row.patch as unknown as JsonPatch) as Json;
+  }
+  return row.data;
+}
+
+/**
+ * Insere versões no histórico economizando espaço: quando a diferença em
+ * relação à última versão COMPLETA do mesmo template for menor que o
+ * snapshot inteiro, grava só o diff. A cada 8 versões parciais (ou quando
+ * o diff não compensa) grava uma versão completa de novo — assim nunca
+ * existe uma corrente de diffs para reconstruir.
+ */
+async function insertTemplateVersions(
+  userId: string,
+  items: { templateId: string; data: Json }[],
+  label: string,
+) {
+  if (!items.length) return;
+  const { data: latestRows } = await supabase
+    .from("template_versions")
+    .select("id,template_id,data,format,base_id,patch,created_at")
+    .in(
+      "template_id",
+      items.map((i) => i.templateId),
+    )
+    .order("created_at", { ascending: false })
+    .limit(500);
+  // por template: última versão COMPLETA e quantos diffs já pendurados nela
+  const fullByTemplate = new Map<string, VersionRow>();
+  const diffCountByTemplate = new Map<string, number>();
+  const rowsDesc = (latestRows ?? []) as unknown as (VersionRow & { created_at: string })[];
+  for (const row of rowsDesc) {
+    if (row.format === "full") {
+      if (!fullByTemplate.has(row.template_id)) fullByTemplate.set(row.template_id, row);
+    }
+  }
+  for (const [templateId, full] of fullByTemplate) {
+    const count = rowsDesc.filter(
+      (r) => r.template_id === templateId && r.format === "diff" && r.base_id === full.id,
+    ).length;
+    diffCountByTemplate.set(templateId, count);
+  }
+
+  const rows = items.map((item) => {
+    const base = fullByTemplate.get(item.templateId);
+    const diffsOnBase = diffCountByTemplate.get(item.templateId) ?? 0;
+    if (base && diffsOnBase < 8) {
+      const patch = diffJson(base.data as never, item.data as never);
+      if (patch && jsonSize(patch) < jsonSize(item.data) * 0.7) {
+        return {
+          user_id: userId,
+          template_id: item.templateId,
+          label,
+          data: {},
+          format: "diff",
+          base_id: base.id,
+          patch: patch as unknown as Json,
+        };
+      }
+    }
+    return {
+      user_id: userId,
+      template_id: item.templateId,
+      label,
+      data: item.data,
+      format: "full",
+      base_id: null,
+      patch: null,
+    };
+  });
+  await supabase.from("template_versions").insert(rows);
 }
 
 /** Traz os templates da nuvem e mescla com os locais (a nuvem vence por id). */
