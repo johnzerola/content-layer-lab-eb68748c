@@ -169,7 +169,7 @@ async function decodeVideo(blob: Blob, options: LoadMediaOptions = {}): Promise<
         };
         video.addEventListener("seeked", done);
         video.currentTime = t;
-        setTimeout(done, 1200);
+        setTimeout(done, 600);
       });
       ctx.drawImage(video, 0, 0, w, h);
       frames.push(
@@ -187,7 +187,7 @@ async function decodeVideo(blob: Blob, options: LoadMediaOptions = {}): Promise<
     if (!frames.length) return null;
     return {
       frames,
-      fps: ANIMATED_SAMPLE_FPS,
+      fps: sampleFps,
       width: w,
       height: h,
       aspect: w / h,
@@ -202,11 +202,11 @@ async function decodeVideo(blob: Blob, options: LoadMediaOptions = {}): Promise<
 }
 
 /** Carrega qualquer mídia suportada; devolve null quando não dá para usar. */
-export async function loadMedia(url: string): Promise<LoadedMedia | null> {
+export async function loadMedia(url: string, options: LoadMediaOptions = {}): Promise<LoadedMedia | null> {
   const blob = await toBlob(url);
   if (!blob) return null;
   if (blob.type.startsWith("video/")) {
-    return (await decodeVideo(blob)) ?? null;
+    return (await decodeVideo(blob, options)) ?? null;
   }
   const animated = await decodeAnimatedImage(blob);
   if (animated) return animated;
