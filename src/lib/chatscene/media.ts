@@ -25,6 +25,15 @@ const ANIMATED_SAMPLE_FPS = 12;
 const MAX_ANIMATION_SECONDS = 10;
 const MAX_SIDE = 720;
 
+export interface LoadMediaOptions {
+  /** quadros por segundo ao amostrar vídeo/animação (padrão 12) */
+  sampleFps?: number;
+  /** teto de segundos amostrados (padrão 10) */
+  maxSeconds?: number;
+  /** orçamento de tempo de decodificação em ms; ao estourar, usa o que já tem */
+  decodeBudgetMs?: number;
+}
+
 function sizeOf(source: CanvasImageSource): { width: number; height: number } {
   const any = source as { width?: number; height?: number; videoWidth?: number; videoHeight?: number };
   const width = any.videoWidth || any.width || 1;
@@ -115,7 +124,13 @@ async function decodeAnimatedImage(blob: Blob): Promise<LoadedMedia | null> {
 }
 
 /** Vídeo (meme, clipe curto): amostrado em quadros para entrar na conversa. */
-async function decodeVideo(blob: Blob): Promise<LoadedMedia | null> {
+async function decodeVideo(blob: Blob, options: LoadMediaOptions = {}): Promise<LoadedMedia | null> {
+  const sampleFps = Math.max(2, options.sampleFps ?? ANIMATED_SAMPLE_FPS);
+  const maxSeconds = Math.max(1, options.maxSeconds ?? MAX_ANIMATION_SECONDS);
+  // vídeos grandes do usuário não podem segurar a prévia: decodifica no
+  // máximo ~12s de relógio e segue com os quadros que já saíram
+  const decodeBudgetMs = Math.max(3000, options.decodeBudgetMs ?? 12000);
+  const startedAt = Date.now();
   if (typeof document === "undefined") return null;
   const url = URL.createObjectURL(blob);
   const video = document.createElement("video");
@@ -127,9 +142,9 @@ async function decodeVideo(blob: Blob): Promise<LoadedMedia | null> {
     await new Promise<void>((resolve, reject) => {
       video.onloadeddata = () => resolve();
       video.onerror = () => reject(new Error("vídeo inválido"));
-      setTimeout(() => reject(new Error("tempo esgotado ao ler o vídeo")), 20000);
+      setTimeout(() => reject(new Error("tempo esgotado ao ler o vídeo")), 12000);
     });
-    const duration = Math.min(video.duration || 0, MAX_ANIMATION_SECONDS);
+    const duration = Math.min(video.duration || 0, maxSeconds);
     if (!duration) return null;
     const vw = video.videoWidth || 720;
     const vh = video.videoHeight || 1280;
@@ -143,9 +158,10 @@ async function decodeVideo(blob: Blob): Promise<LoadedMedia | null> {
     if (!ctx) return null;
 
     const frames: CanvasImageSource[] = [];
-    const total = Math.max(1, Math.round(duration * ANIMATED_SAMPLE_FPS));
+    const total = Math.max(1, Math.round(duration * sampleFps));
     for (let i = 0; i < total; i++) {
-      const t = (i / ANIMATED_SAMPLE_FPS) % duration;
+      if (frames.length > 0 && Date.now() - startedAt > decodeBudgetMs) break;
+      const t = (i / sampleFps) % duration;
       await new Promise<void>((resolve) => {
         const done = () => {
           video.removeEventListener("seeked", done);
@@ -153,7 +169,7 @@ async function decodeVideo(blob: Blob): Promise<LoadedMedia | null> {
         };
         video.addEventListener("seeked", done);
         video.currentTime = t;
-        setTimeout(done, 1200);
+        setTimeout(done, 600);
       });
       ctx.drawImage(video, 0, 0, w, h);
       frames.push(
@@ -171,7 +187,7 @@ async function decodeVideo(blob: Blob): Promise<LoadedMedia | null> {
     if (!frames.length) return null;
     return {
       frames,
-      fps: ANIMATED_SAMPLE_FPS,
+      fps: sampleFps,
       width: w,
       height: h,
       aspect: w / h,
@@ -186,11 +202,11 @@ async function decodeVideo(blob: Blob): Promise<LoadedMedia | null> {
 }
 
 /** Carrega qualquer mídia suportada; devolve null quando não dá para usar. */
-export async function loadMedia(url: string): Promise<LoadedMedia | null> {
+export async function loadMedia(url: string, options: LoadMediaOptions = {}): Promise<LoadedMedia | null> {
   const blob = await toBlob(url);
   if (!blob) return null;
   if (blob.type.startsWith("video/")) {
-    return (await decodeVideo(blob)) ?? null;
+    return (await decodeVideo(blob, options)) ?? null;
   }
   const animated = await decodeAnimatedImage(blob);
   if (animated) return animated;

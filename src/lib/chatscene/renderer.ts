@@ -31,6 +31,16 @@ export interface CanvasRendererOptions {
   safeZones?: boolean;
 }
 
+/** Nunca deixa uma mídia travar o preparo: estourado o prazo, segue sem ela. */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    promise,
+    new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), ms);
+    }),
+  ]);
+}
+
 /** Implementação padrão: canvas 2D, determinística e sem dependências extras. */
 export class CanvasConversationRenderer implements ConversationRenderer {
   readonly id = "canvas-2d";
@@ -49,8 +59,9 @@ export class CanvasConversationRenderer implements ConversationRenderer {
     for (const p of project.participants) if (p.avatarUrl) urls.add(p.avatarUrl);
     if (project.groupAvatarUrl) urls.add(project.groupAvatarUrl);
     const bg = project.background;
+    const bgVideoUrl = bg?.kind === "video" ? (bg.videoUrl || bg.imageUrl) : undefined;
     if (bg?.kind === "image" && bg.imageUrl) urls.add(bg.imageUrl);
-    if (bg?.kind === "video" && (bg.videoUrl || bg.imageUrl)) urls.add((bg.videoUrl || bg.imageUrl)!);
+    if (bgVideoUrl) urls.add(bgVideoUrl);
     if (project.branding?.enabled && project.branding.logoUrl) urls.add(project.branding.logoUrl);
     if (project.header?.logoUrl) urls.add(project.header.logoUrl);
     if (project.header?.bgImageUrl) urls.add(project.header.bgImageUrl);
@@ -58,7 +69,13 @@ export class CanvasConversationRenderer implements ConversationRenderer {
       [...urls]
         .filter((u) => !this.media.has(u))
         .map(async (u) => {
-          const item = await loadMedia(u);
+          // fundo em vídeo é decorativo: amostra mais leve e nunca segura a
+          // prévia — se demorar ou falhar, o restante abre mesmo assim
+          const isBgVideo = u === bgVideoUrl;
+          const item = await withTimeout(
+            loadMedia(u, isBgVideo ? { sampleFps: 6, maxSeconds: 8, decodeBudgetMs: 9000 } : {}),
+            isBgVideo ? 20000 : 30000,
+          );
           if (item) this.media.set(u, item);
         }),
     );
