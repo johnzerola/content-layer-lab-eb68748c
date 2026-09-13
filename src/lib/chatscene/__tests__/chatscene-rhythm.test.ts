@@ -32,7 +32,7 @@ describe("segundo demo", () => {
     const b = createDemoChatSceneProjectB();
     expect(b.messages.length).toBe(a.messages.length);
     expect(b.participants.map((p) => p.name)).toEqual(a.participants.map((p) => p.name));
-    expect(b.background.videoUrl).not.toBe(a.background.videoUrl);
+    expect(b.background?.videoUrl).not.toBe(a.background?.videoUrl);
     const voicesA = (a.voiceProfiles ?? []).map((v) => v.providerVoiceId);
     const voicesB = (b.voiceProfiles ?? []).map((v) => v.providerVoiceId);
     voicesB.forEach((v, i) => expect(v).not.toBe(voicesA[i]));
