@@ -21,6 +21,7 @@ import {
   Save,
   Undo2,
   Users,
+  Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Input } from "@/components/ui/base";
@@ -34,6 +35,9 @@ import { ParticipantsPanel } from "@/components/chatscene/ParticipantsPanel";
 import { BrandPanel } from "@/components/chatscene/BrandPanel";
 import { ThemePanel } from "@/components/chatscene/ThemePanel";
 import { MusicPanel } from "@/components/chatscene/MusicPanel";
+import { StoryPanel } from "@/components/chatscene/StoryPanel";
+import { generateStory } from "@/lib/chatscene/story.functions";
+import { storyToProject, timingForDuration, type StoryBrief } from "@/lib/chatscene/story";
 
 import { buildPlan } from "@/lib/chatscene/clock";
 import { encodeFrameSequence, frameEncoderSupported } from "@/lib/chatscene/encode-frames";
