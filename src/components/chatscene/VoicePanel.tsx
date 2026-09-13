@@ -61,14 +61,14 @@ export function VoicePanel(props: VoicePanelProps) {
         {project.participants.map((participant) => {
           const voice = voiceProfileOf(project, participant);
           const selectedPreset = voice ? voicePreset(voice.presetId) : null;
-          const caps = PROVIDER_CAPABILITIES["lovable-ai"] ?? PROVIDER_CAPABILITIES["mock"];
+          const caps = PROVIDER_CAPABILITIES["lovable-ai"];
           return (
             <article key={participant.id} className="rounded-lg border border-border bg-background/45 p-3">
               <div className="flex items-center gap-2">
                 <span className="grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold text-primary-foreground" style={{ backgroundColor: participant.color }}>{participant.name.slice(0, 1).toUpperCase()}</span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{participant.name}</p>
-                  <p className="truncate text-[11px] text-muted-foreground">{selectedPreset?.description ?? "Sem voz definida"}</p>
+                  <p className="truncate text-[11px] text-muted-foreground">{voice?.name ?? selectedPreset?.description ?? "Sem voz definida"}</p>
                 </div>
                 {voice ? <span className="size-2 rounded-full bg-emerald-400" title="Voz configurada" /> : null}
               </div>

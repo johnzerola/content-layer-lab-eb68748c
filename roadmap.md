@@ -25,6 +25,7 @@
 - [x] ChatScene: integrar galeria de fundos 9:16 com troca em tempo real, loop e desfoque
 - [ ] ChatScene: validar em navegador a fala real sincronizada com chat e fundo animado (aguardando login na prévia)
 - [x] ChatScene: presets reutilizáveis de atuação vocal em pt-BR, salvos por personagem
+- [x] ChatScene: história completa gera elenco nomeado e falas reais pt-BR, sem fallback mock
 
 ## ChatScene V5 — Fases B/C/D (concluídas)
 - [x] Personalidade de escrita por personagem (presets) e ritmo de digitação derivado

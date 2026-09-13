@@ -733,10 +733,10 @@ export function createDemoChatSceneProject(): ChatSceneProject {
       { id: "familia", name: "Mãe", kind: "direct", subtitle: "online" },
     ],
     voiceProfiles: [
-      { ...importVoicePreset("adult-male-boss"), id: "voice_chefe" },
-      { ...importVoicePreset("teen-boy-shy"), id: "voice_pedro" },
-      { ...importVoicePreset("adult-male-casual"), id: "voice_colega" },
-      { ...importVoicePreset("mother-warm"), id: "voice_mae" },
+      { ...importVoicePreset("adult-male-boss"), id: "voice_chefe", name: "Chefe — firme e autoritário" },
+      { ...importVoicePreset("teen-boy-shy"), id: "voice_pedro", name: "Pedro — jovem e tímido" },
+      { ...importVoicePreset("adult-male-casual"), id: "voice_colega", name: "Colega — casual e bem-humorado" },
+      { ...importVoicePreset("mother-warm"), id: "voice_mae", name: "Mãe — calorosa e acolhedora" },
     ],
     // ritmo de short: cortes rápidos, como nos canais de conversa animada
     timing: { ...DEFAULT_TIMING, speed: 1.12, gapMs: 380, senderSwitchMs: 140 },
@@ -756,6 +756,18 @@ export function createDemoChatSceneProject(): ChatSceneProject {
       line(pedro, "Valeu, mãe. Agora a empresa inteira sabe do meu almoço.", { threadId: "familia" }),
       createMessage(chefe.id, { kind: "card", text: "De volta ao trabalho", threadId: "trabalho" }),
       line(chefe, "Pedro, a reunião começa em cinco minutos.", { threadId: "trabalho", voiceDirection: { emotion: "serious" } }),
+      line(pedro, "Só preciso abrir a apresentação que preparei ontem.", { threadId: "trabalho", voiceDirection: { emotion: "nervous" } }),
+      line(colega, "Você salvou na pasta da equipe, né?", { threadId: "trabalho", voiceDirection: { emotion: "serious" } }),
+      line(pedro, "Pasta da equipe?", { threadId: "trabalho", emphasis: true, voiceDirection: { emotion: "surprised" } }),
+      createMessage(chefe.id, { kind: "card", text: "Quatro minutos depois", threadId: "trabalho" }),
+      line(mae, "Pedro, achei um arquivo chamado APRESENTAÇÃO FINAL no computador de casa.", { threadId: "familia", voiceDirection: { emotion: "serious" } }),
+      line(pedro, "Mãe, manda agora. Por favor!", { threadId: "familia", voiceDirection: { emotion: "nervous" } }),
+      line(mae, "Já mandei para o seu e-mail. E coloquei um bilhetinho no almoço.", { threadId: "familia", voiceDirection: { emotion: "happy" } }),
+      createMessage(chefe.id, { kind: "card", text: "Na sala de reunião", threadId: "trabalho" }),
+      line(chefe, "Essa apresentação ficou excelente, Pedro.", { threadId: "trabalho", voiceDirection: { emotion: "surprised" } }),
+      line(colega, "Primeiro dia e já salvou a reunião.", { threadId: "trabalho", voiceDirection: { emotion: "excited" } }),
+      line(pedro, "O mérito é da minha mãe... e do almoço na mochila.", { threadId: "trabalho", voiceDirection: { emotion: "happy" } }),
+      line(chefe, "Então agradeça a ela. E traga almoço para a equipe amanhã.", { threadId: "trabalho", voiceDirection: { emotion: "sarcastic" } }),
     ],
   });
 }

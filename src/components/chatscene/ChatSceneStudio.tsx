@@ -495,32 +495,51 @@ export function ChatSceneStudio() {
 
   const speakFn = useServerFn(synthesizeVoice);
   const storyFn = useServerFn(generateStory);
-
-  /** Modo simples: a IA escreve a história e o documento inteiro é remontado. */
-  const handleGenerateStory = useCallback(
-    async (brief: StoryBrief) => {
-      setStoryBusy(true);
-      try {
-        const script = await storyFn({ data: brief });
-        setProject((prev) =>
-          storyToProject({ ...prev, timing: timingForDuration(brief.durationSec) }, script),
-        );
-        setSelected(null);
-        setFrame(0);
-        setPlaying(false);
-        setTab("mensagens");
-        toast.success("História criada. Ajuste o que quiser nas abas.");
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível criar a história.");
-      } finally {
-        setStoryBusy(false);
-      }
-    },
-    [storyFn],
-  );
   const voiceProvider = useMemo(
     () => createGatewayVoiceProvider((input) => speakFn({ data: input })),
     [speakFn],
+  );
+
+  /** Modo simples: cria roteiro, elenco e falas reais, já sincronizadas no documento. */
+  const handleGenerateStory = useCallback(
+    async (brief: StoryBrief) => {
+      setStoryBusy(true);
+      setCastFailures([]);
+      try {
+        const script = await storyFn({ data: brief });
+        const nextProject = storyToProject(
+          { ...project, timing: timingForDuration(brief.durationSec) },
+          script,
+        );
+        setProject(nextProject);
+        setSelected(null);
+        setFrame(0);
+        setPlaying(false);
+        setTab("vozes");
+
+        const spoken = speakingMessages(nextProject).length;
+        setCastState("running");
+        setCastProgress({ done: 0, total: spoken });
+        const cast = await generateCast(nextProject, voiceProvider, {
+          batch: 3,
+          onProgress: (progress) => setCastProgress({ done: progress.done, total: progress.total }),
+        });
+        setClips(cast.clips);
+        setProject(applyVoiceDurations(nextProject, cast.durations));
+        setCastFailures(cast.failures);
+        if (cast.failures.length) {
+          toast.warning(`História pronta, mas ${cast.failures.length} falas precisam ser tentadas novamente.`);
+        } else {
+          toast.success(`História completa com ${nextProject.participants.length} personagens e ${cast.clips.size} falas reais.`);
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Não foi possível criar a história.");
+      } finally {
+        setCastState("idle");
+        setStoryBusy(false);
+      }
+    },
+    [project, storyFn, voiceProvider],
   );
   const effectiveClips = useMemo(() => {
     const next = new Map<string, VoiceClip>();

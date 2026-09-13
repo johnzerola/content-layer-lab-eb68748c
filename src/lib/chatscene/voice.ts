@@ -4,7 +4,7 @@ export type VoiceAge = "juvenil" | "teen" | "adulta" | "madura";
 export type VoiceStyle =
   | "natural" | "animada" | "calma" | "seria" | "sussurro" | "nervosa"
   | "sarcastica" | "assustada" | "brava" | "autoritaria" | "dramatic" | "comedy";
-export type VoiceProviderId = "mock" | "lovable-ai" | "kokoro" | "elevenlabs";
+export type VoiceProviderId = "lovable-ai" | "kokoro" | "elevenlabs";
 export type VoiceProviderMode = "auto" | "local" | "premium";
 export type VoiceEmotion =
   | "neutral" | "happy" | "excited" | "serious" | "nervous" | "annoyed"
