@@ -105,7 +105,12 @@ export const generateStory = createServerFn({ method: "POST" })
             text: z.string().default(""),
             kind: z.enum(["text", "card", "system"]).optional(),
             thread: z.string().optional(),
-            emotion: z.string().optional(),
+            emotion: z
+              .enum([
+                "neutral", "happy", "excited", "serious", "nervous", "annoyed",
+                "angry-theatrical", "sad", "sarcastic", "surprised", "whisper-like",
+              ])
+              .optional(),
             initial: z.boolean().optional(),
           }),
         )
