@@ -6,6 +6,8 @@
  * Todo estado vive no documento `ChatSceneProject`; nenhuma cópia paralela.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { useProjectHistory } from "./useProjectHistory";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Clock,
@@ -15,7 +17,9 @@ import {
   Download,
   Image as ImageIcon,
   Loader2,
+  Redo2,
   Save,
+  Undo2,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -177,6 +181,8 @@ export function ChatSceneStudio() {
   useEffect(() => {
     if (frame > plan.totalFrames - 1) setFrame(plan.totalFrames - 1);
   }, [plan.totalFrames, frame]);
+
+  const { undo, redo, canUndo, canRedo } = useProjectHistory(project, setProject);
 
   const patch = useCallback((changes: Partial<ChatSceneProject>) => {
     setProject((prev) => ({ ...prev, ...changes }));
@@ -707,6 +713,14 @@ export function ChatSceneStudio() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={undo} disabled={!canUndo} aria-label="Desfazer">
+            <Undo2 className="mr-1.5 size-4" />
+            Desfazer
+          </Button>
+          <Button variant="ghost" size="sm" onClick={redo} disabled={!canRedo} aria-label="Refazer">
+            <Redo2 className="mr-1.5 size-4" />
+            Refazer
+          </Button>
           <Button variant="ghost" size="sm" asChild>
             <a href="/chatscene/comparar">Comparar com referência</a>
           </Button>
@@ -1188,6 +1202,34 @@ export function ChatSceneStudio() {
                     onChange={(e) => project.background?.kind === "video" && patch({ background: { ...project.background, loop: e.target.checked } })}
                   />
                 </label>
+              </div>
+
+              <div className="mt-3 rounded-lg border border-border bg-background/35 p-3">
+                <p className="mono-label mb-2 text-muted-foreground">Altura da janela de conversa</p>
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Altura da janela de conversa">
+                  {[0.4, 0.5, 0.6].map((ratio) => {
+                    const active = Math.abs((project.layout?.height ?? 1) - ratio) < 0.02;
+                    return (
+                      <button
+                        key={ratio}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() =>
+                          patch({
+                            layout: { ...(project.layout ?? DEFAULT_LAYOUT), height: ratio, autoHeight: false },
+                          })
+                        }
+                        className={`rounded-md border px-2.5 py-1 text-xs ${
+                          active
+                            ? "border-primary bg-primary/15 text-foreground"
+                            : "border-border text-muted-foreground hover:border-primary"
+                        }`}
+                      >
+                        {Math.round(ratio * 100)}%
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="mt-2 space-y-2">

@@ -6,7 +6,8 @@
  * Função pura e determinística: mesmo documento, mesmo resultado — é o que
  * garante que a prévia e o vídeo exportado batem quadro a quadro.
  */
-import { participantOf, threadIdOf, type ChatMessage, type ChatSceneProject } from "./types";
+import { participantOf, threadIdOf, type ChatMessage, type ChatParticipant, type ChatSceneProject } from "./types";
+import { personalityOf, stableChance } from "./personality";
 
 /** Jeito de digitar de uma pessoa (ritmo, pausas e variação). */
 export interface HumanTypingProfile {
@@ -50,6 +51,11 @@ export interface MessageTiming {
   readingMs: number;
   /** respiro antes da próxima mensagem (ms) */
   pauseAfterMs: number;
+  /** pausa dentro do "digitando…" (hesitação); 0 quando não há */
+  typingGapStartMs: number;
+  typingGapMs: number;
+  /** mensagem do histórico: já visível no começo do vídeo */
+  initial: boolean;
   /** marcos absolutos desde o início da cena (ms) */
   typingStartMs: number;
   appearMs: number;
@@ -87,6 +93,41 @@ export function humanTypingMs(text: string, profile: HumanTypingProfile, seed = 
   return Math.max(220, Math.round(ms * (1 + jitter)));
 }
 
+/** Perfil de digitação derivado da personalidade do personagem. */
+export function typingProfileFor(
+  participant: ChatParticipant,
+  base: Partial<HumanTypingProfile> = {},
+): HumanTypingProfile {
+  const p = personalityOf(participant);
+  const merged = { ...DEFAULT_TYPING_PROFILE, ...base };
+  const pausa = p.punctuationStyle === "nenhuma" ? 0.4 : p.punctuationStyle === "correta" ? 1.2 : 1;
+  return {
+    ...merged,
+    baseCps: Math.max(1, p.typingSpeed),
+    punctuationPause: Math.round(merged.punctuationPause * pausa),
+    sentencePause: Math.round(merged.sentencePause * pausa),
+    burstiness: p.responseStyle === "rapida" ? 0.45 : p.responseStyle === "pensada" ? 0.15 : merged.burstiness,
+    variance: Math.min(1, merged.variance + p.hesitationLevel * 0.3),
+  };
+}
+
+/**
+ * Hesitação humana: quando a pessoa hesita, o "digitando…" some por um instante
+ * e volta antes da mensagem chegar. Determinístico pelo id da mensagem.
+ */
+export function typingHesitation(
+  message: ChatMessage,
+  participant: ChatParticipant,
+  typingMs: number,
+): { gapStartMs: number; gapMs: number } | null {
+  const level = personalityOf(participant).hesitationLevel;
+  if (level <= 0.05 || typingMs < 900) return null;
+  if (stableChance(`hesita:${message.id}`) > level) return null;
+  const gapMs = Math.round(Math.min(900, 260 + level * 700));
+  const gapStartMs = Math.round(typingMs * 0.45);
+  return { gapStartMs, gapMs };
+}
+
 /** Tempo de leitura de uma mensagem já na tela, em ms. */
 export function readingMs(message: ChatMessage, project: ChatSceneProject): number {
   const t = project.timing;
@@ -108,7 +149,7 @@ export function typingMsOf(message: ChatMessage, project: ChatSceneProject): num
   // quem escreve a história não "digita" na tela: a bolha dele entra direto
   if (author.isSelf) return 0;
   if (project.timing.humanTyping) {
-    const profile = { ...DEFAULT_TYPING_PROFILE, ...(project.timing.typingProfile ?? {}) };
+    const profile = typingProfileFor(author, project.timing.typingProfile ?? {});
     const text = message.text || "…";
     return clamp(humanTypingMs(text, profile, message.id), 350, 6000);
   }
@@ -159,26 +200,32 @@ export function computeMessageTimings(project: ChatSceneProject): MessageTiming[
       (message.pauseAfterMs ?? t.gapMs) + Math.max(0, message.voiceDirection?.pauseAfterMs ?? 0),
     );
 
-    const typingStartMs = cursor + leadIn;
-    const appearMs = typingStartMs + typing;
+    const initial = message.initial === true;
+    const typingStartMs = initial ? 0 : cursor + leadIn;
+    const appearMs = initial ? 0 : typingStartMs + typing;
+    const hesitation = initial ? null : typingHesitation(message, author, typing);
     // a leitura só termina depois da fala, quando houver áudio
-    const hold = Math.max(reading, voice);
-    const endMs = appearMs + entrance + hold + pauseAfter;
+    const hold = initial ? 0 : Math.max(reading, voice);
+    const endMs = initial ? cursor : appearMs + entrance + hold + pauseAfter;
 
     out.push({
       messageId: message.id,
-      leadInMs: leadIn,
-      typingMs: typing,
-      entranceMs: entrance,
-      voiceMs: voice,
+      leadInMs: initial ? 0 : leadIn,
+      typingMs: initial ? 0 : typing,
+      typingGapStartMs: hesitation?.gapStartMs ?? 0,
+      typingGapMs: hesitation?.gapMs ?? 0,
+      initial,
+      entranceMs: initial ? 0 : entrance,
+      voiceMs: initial ? 0 : voice,
       readingMs: hold,
-      pauseAfterMs: pauseAfter,
+      pauseAfterMs: initial ? 0 : pauseAfter,
       typingStartMs,
       appearMs,
       endMs,
     });
 
     cursor = endMs;
+    if (initial) return;
     previousAuthor = message.kind === "system" || message.kind === "card" ? "" : author.id;
     previousThread = thread;
   });

@@ -8,6 +8,7 @@
 import { cameraAt } from "./camera";
 import type { ConversationPlan } from "./clock";
 import { typingAt } from "./clock";
+import { deliveryStateAt } from "./events";
 import { mediaFrameAt, type LoadedMedia } from "./media";
 import { durationLabel, voiceSeconds, voiceWave } from "./message-kinds";
 import { planScroll } from "./scroll-planner";
@@ -125,6 +126,8 @@ interface LaidOutMessage {
   reply?: { name: string; color: string; text: string; height: number } | null;
   /** altura da barra do recado de voz (0 quando não é voz) */
   voiceH?: number;
+  /** rabinho da bolha: só na última mensagem seguida do mesmo remetente */
+  showTail?: boolean;
 }
 
 interface Layout {
@@ -318,6 +321,8 @@ export function layoutMessages(
 
     const showName = isGroup && !isSelf && author.id !== lastAuthor;
     const nameH = showName ? Math.round(m.fontSize * 0.9) : 0;
+    // mensagens seguidas da mesma pessoa ficam mais juntas, como no messenger
+    if (author.id === lastAuthor) y -= Math.round(m.gap * 0.55);
 
     ctx.font = `400 ${m.metaSize}px ${theme.fontFamily}`;
     const metaW = ctx.measureText(`${messageClock(project, index, message)}  `).width + (isSelf ? m.metaSize * 1.6 : 0);
@@ -361,6 +366,15 @@ export function layoutMessages(
 
     y += nameH + bubbleH + reactionH + m.gap;
     lastAuthor = author.id;
+  });
+
+  items.forEach((item, i) => {
+    const next = items[i + 1];
+    item.showTail =
+      !next ||
+      next.message.participantId !== item.message.participantId ||
+      next.message.kind === "system" ||
+      next.message.kind === "card";
   });
 
   return { items, contentH: y, metrics: m };
@@ -635,13 +649,13 @@ function ellipsize(ctx: Ctx2D, text: string, maxWidth: number): string {
 }
 
 /** Tiques de entregue/lido desenhados à mão, ao lado da hora. */
-function drawChecks(ctx: Ctx2D, x: number, y: number, size: number, color: string) {
+function drawChecks(ctx: Ctx2D, x: number, y: number, size: number, color: string, count = 2) {
   ctx.save();
   ctx.strokeStyle = color;
   ctx.lineWidth = Math.max(1.5, size * 0.14);
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  for (const offset of [0, size * 0.42]) {
+  for (const offset of count === 1 ? [size * 0.2] : [0, size * 0.42]) {
     ctx.beginPath();
     ctx.moveTo(x + offset, y);
     ctx.lineTo(x + offset + size * 0.26, y + size * 0.28);
@@ -1186,7 +1200,7 @@ function paintConversation(
     ctx.fill();
     ctx.restore();
     ctx.fillStyle = item.isSelf ? theme.selfBubble : theme.peerBubble;
-    if (theme.tail) {
+    if (theme.tail && item.showTail !== false) {
       const tw = Math.round(16 * m.scale);
       ctx.beginPath();
       if (item.isSelf) {
@@ -1308,6 +1322,7 @@ function paintConversation(
     ctx.font = `400 ${m.metaSize}px ${theme.fontFamily}`;
     ctx.fillStyle = item.isSelf ? theme.metaSelf : theme.meta;
     const showChecks = item.isSelf && (project.receipts ?? true);
+    const status = showChecks ? deliveryStateAt(project, plan, item.message, frame) : "sent";
     const checkW = showChecks ? m.metaSize * 1.7 : 0;
     const clockW = ctx.measureText(item.clock).width;
     const metaX = item.x + item.width - padX - clockW - checkW;
@@ -1319,7 +1334,8 @@ function paintConversation(
         metaX + clockW + m.metaSize * 0.4,
         metaY - m.metaSize * 0.35,
         m.metaSize,
-        theme.check,
+        status === "read" ? theme.check : item.isSelf ? theme.metaSelf : theme.meta,
+        status === "sent" ? 1 : 2,
       );
     }
 

@@ -3,6 +3,7 @@
  */
 import { Image as ImageIcon, Loader2, Trash2, Upload, UserPlus, Users } from "lucide-react";
 import { Button } from "@/components/ui/base";
+import { PERSONALITY_PRESETS } from "@/lib/chatscene/personality";
 import type { ChatSceneProject } from "@/lib/chatscene/types";
 
 export interface ParticipantsPanelProps {
@@ -115,6 +116,28 @@ export function ParticipantsPanel({
             >
               eu
             </button>
+            <select
+              value={p.personalityPresetId ?? "neutro"}
+              onChange={(e) => {
+                const preset = PERSONALITY_PRESETS.find((x) => x.id === e.target.value);
+                patch({
+                  participants: project.participants.map((x) =>
+                    x.id === p.id
+                      ? { ...x, personalityPresetId: preset?.id ?? null, personality: preset?.value ?? null }
+                      : x,
+                  ),
+                });
+              }}
+              className="rounded-md border border-border bg-background px-1 py-0.5 text-[10px] text-muted-foreground"
+              aria-label={`Jeito de escrever de ${p.name}`}
+              title={PERSONALITY_PRESETS.find((x) => x.id === (p.personalityPresetId ?? "neutro"))?.hint}
+            >
+              {PERSONALITY_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
             <label className="cursor-pointer text-muted-foreground hover:text-primary" title={`Foto de ${p.name}`}>
               {uploading === p.id ? (
                 <Loader2 className="size-3.5 animate-spin" />
