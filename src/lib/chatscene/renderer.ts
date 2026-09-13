@@ -31,6 +31,16 @@ export interface CanvasRendererOptions {
   safeZones?: boolean;
 }
 
+/** Nunca deixa uma mídia travar o preparo: estourado o prazo, segue sem ela. */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    promise,
+    new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), ms);
+    }),
+  ]);
+}
+
 /** Implementação padrão: canvas 2D, determinística e sem dependências extras. */
 export class CanvasConversationRenderer implements ConversationRenderer {
   readonly id = "canvas-2d";
