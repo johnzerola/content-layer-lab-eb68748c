@@ -53,14 +53,30 @@ import {
   type ProjectSnapshot,
 } from "@/lib/cloud";
 // estúdios pesados carregam só quando aparecem na tela
-const ClipStudio = lazy(() =>
+function deferred<P extends object>(load: () => Promise<{ default: React.ComponentType<P> }>) {
+  const Lazy = lazy(load);
+  return function Deferred(props: P) {
+    return (
+      <Suspense
+        fallback={
+          <div className="rounded-xl border border-border bg-surface-2 p-6 text-sm text-muted-foreground">
+            Carregando…
+          </div>
+        }
+      >
+        <Lazy {...props} />
+      </Suspense>
+    );
+  };
+}
+const ClipStudio = deferred(() =>
   import("@/components/ClipStudio").then((m) => ({ default: m.ClipStudio })),
 );
-const VideoStudio = lazy(() =>
+const VideoStudio = deferred(() =>
   import("@/components/VideoStudio").then((m) => ({ default: m.VideoStudio })),
 );
 import { AuthGate } from "@/components/AuthGate";
-const AITemplateStudio = lazy(() =>
+const AITemplateStudio = deferred(() =>
   import("@/components/AITemplateStudio").then((m) => ({ default: m.AITemplateStudio })),
 );
 import { applyLook } from "@/lib/looks";
