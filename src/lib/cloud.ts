@@ -190,7 +190,8 @@ export type ProjectRow = {
   mode: string;
   name: string;
   updated_at: string;
-  data: ProjectSnapshot;
+  /** quantidade de vídeos do projeto, lida direto no banco (sem baixar o conteúdo) */
+  itemCount: number;
 };
 
 /** Salva (ou atualiza) o projeto de uma ferramenta na conta do usuário. */
@@ -210,14 +211,39 @@ export async function saveProject(mode: string, name: string, snap: ProjectSnaps
   if (error) throw error;
 }
 
-export async function listProjects(mode?: string): Promise<ProjectRow[]> {
+/**
+ * Lista leve: traz só o cabeçalho de cada projeto. O conteúdo (que pode ter
+ * megabytes) só é lido quando o usuário abre o projeto, com `getProjectSnapshot`.
+ */
+export async function listProjects(mode?: string, limit = 50): Promise<ProjectRow[]> {
   const user = await currentUser();
   if (!user) return [];
-  let q = supabase.from("projects").select("id,mode,name,updated_at,data").order("updated_at", { ascending: false });
+  let q = supabase
+    .from("projects")
+    .select("id,mode,name,updated_at,items:data->items")
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false })
+    .limit(limit);
   if (mode) q = q.eq("mode", mode);
   const { data, error } = await q;
   if (error) throw error;
-  return (data ?? []).map((r) => ({ ...r, data: (r.data ?? { items: [] }) as unknown as ProjectSnapshot }));
+  return (data ?? []).map((r) => {
+    const row = r as unknown as { id: string; mode: string; name: string; updated_at: string; items?: unknown };
+    return {
+      id: row.id,
+      mode: row.mode,
+      name: row.name,
+      updated_at: row.updated_at,
+      itemCount: Array.isArray(row.items) ? row.items.length : 0,
+    };
+  });
+}
+
+/** Conteúdo completo de um projeto, carregado só na hora de abrir. */
+export async function getProjectSnapshot(id: string): Promise<ProjectSnapshot> {
+  const { data, error } = await supabase.from("projects").select("data").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return ((data?.data as unknown as ProjectSnapshot) ?? { items: [] }) as ProjectSnapshot;
 }
 
 export async function deleteProject(id: string) {
