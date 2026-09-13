@@ -724,6 +724,29 @@ export function createDemoChatSceneProject(): ChatSceneProject {
   });
 }
 
+/**
+ * Segunda versão do mesmo exemplo: a mesma família e as mesmas falas, mas com
+ * outro fundo e outra voz para cada personagem — feita para comparar lado a
+ * lado qual combinação soa melhor.
+ */
+export function createDemoChatSceneProjectB(): ChatSceneProject {
+  const base = createDemoChatSceneProject();
+  const swap: Record<string, Partial<import("./voice").VoiceProfile>> = {
+    voice_chefe: { providerVoiceId: "verse", style: "seria", speed: 1.02, pitch: -0.5, energy: .74 },
+    voice_pedro: { providerVoiceId: "alloy", style: "animada", speed: 1.06, pitch: 2.5, energy: .58 },
+    voice_colega: { providerVoiceId: "ballad", style: "divertida", speed: 1.0, pitch: .5, energy: .7 },
+    voice_mae: { providerVoiceId: "shimmer", style: "calma", speed: .94, pitch: 1.5, energy: .46 },
+  };
+  return {
+    ...base,
+    id: chatSceneId("scene"),
+    title: "Primeiro dia no trabalho — versão B",
+    background: { kind: "video", videoUrl: "/chatscene/backgrounds/forest-run.mp4", loop: true },
+    timing: { ...base.timing, speed: 1, gapMs: 520, senderSwitchMs: 220 },
+    voiceProfiles: base.voiceProfiles.map((v) => ({ ...v, ...(swap[v.id] ?? {}) })),
+  };
+}
+
 function importVoicePreset(id: string): import("./voice").VoiceProfile {
   const defaults: Record<string, Partial<import("./voice").VoiceProfile>> = {
     // ritmo e tom calibrados para soar como conversa brasileira, sem sotaque importado
