@@ -18,7 +18,14 @@ import {
 import { Button } from "@/components/ui/base";
 import { MESSAGE_KINDS, messageKind } from "@/lib/chatscene/message-kinds";
 import type { LibraryAsset } from "@/lib/chatscene/assets";
-import { participantOf, type ChatMessage, type ChatSceneProject } from "@/lib/chatscene/types";
+import {
+  participantOf,
+  threadIdOf,
+  threadsOf,
+  type ChatMessage,
+  type ChatSceneProject,
+  type ChatSceneThread,
+} from "@/lib/chatscene/types";
 
 export interface MessagesPanelProps {
   project: ChatSceneProject;
@@ -37,6 +44,9 @@ export interface MessagesPanelProps {
   script: string;
   onScript: (value: string) => void;
   onImportScript: () => void;
+  addThread: () => void;
+  updateThread: (id: string, changes: Partial<ChatSceneThread>) => void;
+  removeThread: (id: string) => void;
 }
 
 export function MessagesPanel({
