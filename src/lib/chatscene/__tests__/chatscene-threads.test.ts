@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { threadFrame } from "../draw";
-import { buildConversationPlan } from "../clock";
+import { buildPlan } from "../clock";
 import {
   createChatSceneProject,
   createMessage,
@@ -18,9 +18,9 @@ function twoThreadProject(): ChatSceneProject {
     ...base,
     threads: [work, friend],
     messages: [
-      createMessage({ participantId: a!.id, text: "Bom dia, chefe", threadId: work.id }),
-      createMessage({ participantId: b!.id, text: "Chegou o dia", threadId: work.id }),
-      createMessage({ participantId: a!.id, text: "E aí, Pedro", threadId: friend.id }),
+      createMessage(a!.id, { text: "Bom dia, chefe", threadId: work.id }),
+      createMessage(b!.id, { text: "Chegou o dia", threadId: work.id }),
+      createMessage(a!.id, { text: "E aí, Pedro", threadId: friend.id }),
     ],
   };
 }
@@ -32,7 +32,7 @@ describe("conversas paralelas", () => {
 
   it("mostra só as mensagens da conversa no ar", () => {
     const project = twoThreadProject();
-    const plan = buildConversationPlan(project);
+    const plan = buildPlan(project);
     const last = plan.byId[project.messages[2]!.id]!;
     const view = threadFrame(project, plan, last.endFrame);
     expect(view.messages).toHaveLength(1);
@@ -41,7 +41,7 @@ describe("conversas paralelas", () => {
 
   it("faz o corte entre conversas com a anterior saindo", () => {
     const project = twoThreadProject();
-    const plan = buildConversationPlan(project);
+    const plan = buildPlan(project);
     const cutStart = plan.byId[project.messages[2]!.id]!.appearFrame;
     const view = threadFrame(project, plan, cutStart);
     expect(view.cut).toBeLessThan(1);
