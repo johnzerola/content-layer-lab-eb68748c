@@ -113,13 +113,13 @@ export function StoryPanel({ busy, onGenerate }: StoryPanelProps) {
         className="w-full"
       >
         {busy ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
-        {busy ? "Escrevendo a história…" : "Criar história"}
+        {busy ? "Criando história e vozes…" : "Criar história completa com vozes"}
       </Button>
 
       <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
         <Sparkles className="mt-0.5 size-3.5 shrink-0" />
-        A história substitui os participantes e as mensagens atuais. Dá para desfazer com Ctrl+Z e ajustar tudo nas
-        outras abas.
+        Cria roteiro, personagens com identidade vocal própria e falas reais em português brasileiro. Substitui a
+        conversa atual, mas dá para desfazer com Ctrl+Z.
       </p>
     </div>
   );

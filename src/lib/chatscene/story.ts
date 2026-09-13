@@ -126,7 +126,10 @@ export function storyToProject(base: ChatSceneProject, script: StoryScript): Cha
     });
     const profile = profileFromPreset(suggestVoicePresetId(character), {
       id: `voice_${participant.id}`,
-      name: participant.name,
+      name: `${participant.name} — ${character.role.trim() || "personagem"}`,
+      provider: "lovable-ai",
+      language: "pt",
+      locale: "pt-BR",
     });
     participant.voiceProfileId = profile.id!;
     participant.voice = profile;

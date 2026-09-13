@@ -25,6 +25,12 @@ describe("story engine", () => {
     expect(project.participants[0]!.isSelf).toBe(true);
     expect(project.voiceProfiles).toHaveLength(3);
     expect(project.participants.every((p) => p.voiceProfileId)).toBe(true);
+    expect(project.voiceProfiles?.every((voice) => voice.provider === "lovable-ai" && voice.locale === "pt-BR")).toBe(true);
+    expect(project.voiceProfiles?.map((voice) => voice.name)).toEqual([
+      "Gabriel — funcionário",
+      "Chefe — chefe",
+      "Mãe — mãe",
+    ]);
     expect(project.threads?.map((t) => t.name)).toEqual(["Chefe", "Grupo da família"]);
     expect(project.threads?.[0]!.id).toBe(MAIN_THREAD_ID);
     expect(project.threads?.[1]!.kind).toBe("group");

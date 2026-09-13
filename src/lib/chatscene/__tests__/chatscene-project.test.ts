@@ -25,6 +25,8 @@ describe("documento da conversa", () => {
     expect(demo.chatKind).toBe("group");
     expect(demo.participants).toHaveLength(4);
     expect(demo.messages.length).toBeGreaterThan(5);
+    expect(demo.voiceProfiles?.every((voice) => voice.provider === "lovable-ai")).toBe(true);
+    expect(new Set(demo.voiceProfiles?.map((voice) => voice.name)).size).toBe(4);
   });
 
   it("mantém ordem ao inserir e remover mensagens", () => {

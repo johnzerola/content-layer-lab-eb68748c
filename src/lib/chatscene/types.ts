@@ -733,10 +733,10 @@ export function createDemoChatSceneProject(): ChatSceneProject {
       { id: "familia", name: "Mãe", kind: "direct", subtitle: "online" },
     ],
     voiceProfiles: [
-      { ...importVoicePreset("adult-male-boss"), id: "voice_chefe" },
-      { ...importVoicePreset("teen-boy-shy"), id: "voice_pedro" },
-      { ...importVoicePreset("adult-male-casual"), id: "voice_colega" },
-      { ...importVoicePreset("mother-warm"), id: "voice_mae" },
+      { ...importVoicePreset("adult-male-boss"), id: "voice_chefe", name: "Chefe — firme e autoritário" },
+      { ...importVoicePreset("teen-boy-shy"), id: "voice_pedro", name: "Pedro — jovem e tímido" },
+      { ...importVoicePreset("adult-male-casual"), id: "voice_colega", name: "Colega — casual e bem-humorado" },
+      { ...importVoicePreset("mother-warm"), id: "voice_mae", name: "Mãe — calorosa e acolhedora" },
     ],
     // ritmo de short: cortes rápidos, como nos canais de conversa animada
     timing: { ...DEFAULT_TIMING, speed: 1.12, gapMs: 380, senderSwitchMs: 140 },
