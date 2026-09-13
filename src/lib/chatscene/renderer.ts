@@ -49,8 +49,9 @@ export class CanvasConversationRenderer implements ConversationRenderer {
     for (const p of project.participants) if (p.avatarUrl) urls.add(p.avatarUrl);
     if (project.groupAvatarUrl) urls.add(project.groupAvatarUrl);
     const bg = project.background;
+    const bgVideoUrl = bg?.kind === "video" ? (bg.videoUrl || bg.imageUrl) : undefined;
     if (bg?.kind === "image" && bg.imageUrl) urls.add(bg.imageUrl);
-    if (bg?.kind === "video" && (bg.videoUrl || bg.imageUrl)) urls.add((bg.videoUrl || bg.imageUrl)!);
+    if (bgVideoUrl) urls.add(bgVideoUrl);
     if (project.branding?.enabled && project.branding.logoUrl) urls.add(project.branding.logoUrl);
     if (project.header?.logoUrl) urls.add(project.header.logoUrl);
     if (project.header?.bgImageUrl) urls.add(project.header.bgImageUrl);

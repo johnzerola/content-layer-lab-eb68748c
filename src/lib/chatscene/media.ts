@@ -142,7 +142,7 @@ async function decodeVideo(blob: Blob, options: LoadMediaOptions = {}): Promise<
     await new Promise<void>((resolve, reject) => {
       video.onloadeddata = () => resolve();
       video.onerror = () => reject(new Error("vídeo inválido"));
-      setTimeout(() => reject(new Error("tempo esgotado ao ler o vídeo")), 20000);
+      setTimeout(() => reject(new Error("tempo esgotado ao ler o vídeo")), 12000);
     });
     const duration = Math.min(video.duration || 0, maxSeconds);
     if (!duration) return null;
