@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { buildPlan } from "../clock";
 import { chatRect, entranceTransform, sceneExitAt } from "../draw";
-import { computeMessageTimings, humanTypingMs, DEFAULT_TYPING_PROFILE } from "../timing";
+import { computeMessageTimings, entranceMsOf, humanTypingMs, DEFAULT_TYPING_PROFILE } from "../timing";
 import {
   createChatSceneProject,
   createMessage,
+  createDemoChatSceneProject,
   createParticipant,
   DEFAULT_LAYOUT,
+  DEFAULT_MOTION,
   LAYOUT_PRESETS,
 } from "../types";
 
