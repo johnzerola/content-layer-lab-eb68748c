@@ -93,6 +93,15 @@ export function RenderStage() {
     [],
   );
 
+  const setMotion = useCallback(
+    (patch: Partial<ChatSceneMotion>) =>
+      setProject((prev) => {
+        const motion = { ...DEFAULT_MOTION, ...(prev.motion ?? {}), ...patch };
+        return { ...prev, motion, animation: motion.enter };
+      }),
+    [],
+  );
+
   /** Prepara as falas em segundo plano: a prévia continua respondendo. */
   const prepareVoices = useCallback(async () => {
     if (!speaking) {
@@ -272,7 +281,74 @@ export function RenderStage() {
             frame={frame}
             hasMusic={!!music}
             onSeek={setFrame}
+            onMotion={setMotion}
           />
+
+          <section className="glass rounded-2xl border border-border p-4 text-xs" aria-label="Efeitos de entrada e saída">
+            <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
+              <Wand2 className="size-4" />
+              Efeitos
+            </p>
+            <p className="mb-2 text-[11px] text-muted-foreground">
+              Arraste as alças na trilha “Efeitos” para mudar a duração e a força.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-1">
+                <span className="mono-label text-[10px] text-muted-foreground">Entrada das mensagens</span>
+                <select
+                  className="rounded-md border border-border bg-background/60 px-2 py-1"
+                  value={motion.enter}
+                  onChange={(e) => setMotion({ enter: e.target.value as ChatSceneMotion["enter"] })}
+                >
+                  {ANIMATION_PRESETS.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="mono-label text-[10px] text-muted-foreground">Saída da cena</span>
+                <select
+                  className="rounded-md border border-border bg-background/60 px-2 py-1"
+                  value={motion.exit}
+                  onChange={(e) => setMotion({ exit: e.target.value as ChatSceneMotion["exit"] })}
+                >
+                  {SCENE_EXIT_PRESETS.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="mono-label text-[10px] text-muted-foreground">
+                  Força do efeito · {motion.intensity.toFixed(1)}×
+                </span>
+                <input
+                  type="range"
+                  min={MOTION_LIMITS.intensity.min}
+                  max={MOTION_LIMITS.intensity.max}
+                  step={0.1}
+                  value={motion.intensity}
+                  onChange={(e) => setMotion({ intensity: Number(e.target.value) })}
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="mono-label text-[10px] text-muted-foreground">
+                  Duração da saída · {Math.round(motion.exitMs)} ms
+                </span>
+                <input
+                  type="range"
+                  min={MOTION_LIMITS.exitMs.min}
+                  max={MOTION_LIMITS.exitMs.max}
+                  step={50}
+                  value={motion.exitMs}
+                  onChange={(e) => setMotion({ exitMs: Number(e.target.value) })}
+                />
+              </label>
+            </div>
+          </section>
 
           <section className="glass rounded-2xl border border-border p-4 text-xs" aria-label="Trilha de fundo">
             <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
