@@ -113,6 +113,24 @@ interface BubbleStyle {
   scale: number;
 }
 
+/** Resolve o estilo do personagem por cima do tema (sem alterar o tema). */
+function bubbleStyleOf(author: { style?: import("./types").ParticipantStyle }, theme: ChatTheme): BubbleStyle {
+  const st = author.style ?? {};
+  return {
+    bubble: st.bubbleColor || null,
+    text: st.textColor || null,
+    fontFamily: st.fontFamily || theme.fontFamily,
+    weight: st.bold ? 700 : 500,
+    italic: !!st.italic,
+    scale: Math.max(0.7, Math.min(1.4, st.fontScale ?? 1)),
+  };
+}
+
+/** Monta a string de fonte respeitando itálico e família do personagem. */
+function fontOf(style: BubbleStyle, weight: number, size: number): string {
+  return `${style.italic ? "italic " : ""}${weight} ${Math.round(size)}px ${style.fontFamily}`;
+}
+
 interface LaidOutMessage {
   message: ChatMessage;
   lines: string[];
@@ -199,9 +217,10 @@ export function layoutMessages(
     const author = participantOf(project, message.participantId);
     const isSelf = author.isSelf;
     const big = message.kind === "emoji" || emojiOnly(message.text);
-    const fontSize = big ? m.fontSize * 2.1 : m.fontSize;
-    const lineH = big ? m.lineH * 2.1 : m.lineH;
-    ctx.font = `${big ? 400 : 500} ${fontSize}px ${theme.fontFamily}`;
+    const style = bubbleStyleOf(author, theme);
+    const fontSize = (big ? m.fontSize * 2.1 : m.fontSize) * style.scale;
+    const lineH = (big ? m.lineH * 2.1 : m.lineH) * style.scale;
+    ctx.font = fontOf(style, big ? 400 : style.weight, fontSize);
 
     if (message.kind === "system") {
       const lines = wrapText(ctx, message.text, width - m.pad * 4);
@@ -218,6 +237,7 @@ export function layoutMessages(
         showAvatar: false,
         name: "",
         nameColor: theme.systemText,
+        style: bubbleStyleOf(author, theme),
         avatarUrl: null,
         mediaH: 0,
         mediaW: 0,
@@ -247,6 +267,7 @@ export function layoutMessages(
         showAvatar: false,
         name: "",
         nameColor: theme.systemText,
+        style: bubbleStyleOf(author, theme),
         avatarUrl: null,
         mediaH: 0,
         mediaW: 0,
@@ -283,6 +304,7 @@ export function layoutMessages(
         showAvatar: showName,
         name: author.name,
         nameColor: author.color,
+        style: bubbleStyleOf(author, theme),
         avatarUrl: author.avatarUrl ?? null,
         mediaH: sh,
         mediaW: sw,
@@ -313,7 +335,7 @@ export function layoutMessages(
       const quoted = project.messages.find((q) => q.id === message.replyToId);
       if (quoted) {
         const quotedAuthor = participantOf(project, quoted.participantId);
-        ctx.font = `400 ${Math.round(m.fontSize * 0.74)}px ${theme.fontFamily}`;
+        ctx.font = fontOf(style, 400, m.fontSize * 0.74);
         const snippet = ellipsize(
           ctx,
           quoted.text || quotedKindLabel(quoted.kind),
@@ -326,7 +348,7 @@ export function layoutMessages(
           height: Math.round(m.fontSize * 1.85),
         };
       }
-      ctx.font = `${big ? 400 : 500} ${fontSize}px ${theme.fontFamily}`;
+      ctx.font = fontOf(style, big ? 400 : style.weight, fontSize);
     }
     const replyH = reply ? reply.height + Math.round(10 * m.scale) : 0;
 
@@ -336,6 +358,7 @@ export function layoutMessages(
     if (author.id === lastAuthor) y -= Math.round(m.gap * 0.55);
 
     ctx.font = `400 ${m.metaSize}px ${theme.fontFamily}`;
+    void style;
     const metaW = ctx.measureText(`${messageClock(project, index, message)}  `).width + (isSelf ? m.metaSize * 1.6 : 0);
     const metaH = Math.round(m.metaSize * 1.35);
 
@@ -366,6 +389,7 @@ export function layoutMessages(
       showAvatar: showName,
       name: author.name,
       nameColor: author.color,
+      style,
       avatarUrl: author.avatarUrl ?? null,
       mediaH,
       mediaW,
