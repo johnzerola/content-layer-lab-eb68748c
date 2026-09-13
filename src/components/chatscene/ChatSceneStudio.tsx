@@ -82,9 +82,12 @@ import {
   createParticipant,
   participantOf,
   renderSize,
+  createThread,
+  threadsOf,
   type ChatSceneAspect,
   type ChatMessage,
   type ChatSceneProject,
+  type ChatSceneThread,
 } from "@/lib/chatscene/types";
 
 const PALETTE = ["#7c5cff", "#ff5c8a", "#22c08a", "#f2b705", "#4ec3ff", "#ff8a4c"];
@@ -356,6 +359,38 @@ export function ChatSceneStudio() {
     setScript("");
     toast.success("Conversa adicionada.");
   }, [script]);
+
+  const addThread = useCallback(() => {
+    setProject((prev) => {
+      const threads = threadsOf(prev);
+      return {
+        ...prev,
+        threads: [...threads, createThread({ name: `Conversa ${threads.length + 1}` })],
+      };
+    });
+  }, []);
+
+  const updateThread = useCallback((id: string, changes: Partial<ChatSceneThread>) => {
+    setProject((prev) => ({
+      ...prev,
+      threads: threadsOf(prev).map((t) => (t.id === id ? { ...t, ...changes } : t)),
+    }));
+  }, []);
+
+  const removeThread = useCallback((id: string) => {
+    setProject((prev) => {
+      const threads = threadsOf(prev);
+      if (threads.length < 2) return prev;
+      const rest = threads.filter((t) => t.id !== id);
+      const fallback = rest[0]!.id;
+      return {
+        ...prev,
+        threads: rest,
+        messages: prev.messages.map((m) => (m.threadId === id ? { ...m, threadId: fallback } : m)),
+      };
+    });
+  }, []);
+
 
   const removeMessage = useCallback((id: string) => {
     setProject((prev) => ({ ...prev, messages: prev.messages.filter((m) => m.id !== id) }));
@@ -735,6 +770,9 @@ export function ChatSceneStudio() {
               duplicateMessage={duplicateMessage}
               reorderMessage={reorderMessage}
               addMessage={addMessage}
+              addThread={addThread}
+              updateThread={updateThread}
+              removeThread={removeThread}
               loadDemo={() => {
                 setProject(createDemoChatSceneProject());
                 setSelected(null);

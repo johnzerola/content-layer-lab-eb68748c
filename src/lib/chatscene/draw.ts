@@ -797,7 +797,7 @@ export function autoPanelHeight(
   const m = metricsFor(width, maxHeight);
   const headerVisible = (project.header?.style ?? "messenger") !== "none";
   const headerH = headerVisible ? m.headerH : 0;
-  const appeared = project.messages.filter((msg) => frame >= (plan.byId[msg.id]?.appearFrame ?? Infinity));
+  const appeared = threadFrame(project, plan, frame).messages;
   const typing = typingAt(project, plan, frame);
   const typingH = typing ? Math.round(72 * m.scale) + m.gap : 0;
 

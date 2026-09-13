@@ -18,7 +18,14 @@ import {
 import { Button } from "@/components/ui/base";
 import { MESSAGE_KINDS, messageKind } from "@/lib/chatscene/message-kinds";
 import type { LibraryAsset } from "@/lib/chatscene/assets";
-import { participantOf, type ChatMessage, type ChatSceneProject } from "@/lib/chatscene/types";
+import {
+  participantOf,
+  threadIdOf,
+  threadsOf,
+  type ChatMessage,
+  type ChatSceneProject,
+  type ChatSceneThread,
+} from "@/lib/chatscene/types";
 
 export interface MessagesPanelProps {
   project: ChatSceneProject;
@@ -37,6 +44,9 @@ export interface MessagesPanelProps {
   script: string;
   onScript: (value: string) => void;
   onImportScript: () => void;
+  addThread: () => void;
+  updateThread: (id: string, changes: Partial<ChatSceneThread>) => void;
+  removeThread: (id: string) => void;
 }
 
 export function MessagesPanel({
@@ -56,12 +66,54 @@ export function MessagesPanel({
   script,
   onScript,
   onImportScript,
+  addThread,
+  updateThread,
+  removeThread,
 }: MessagesPanelProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
+  const threads = threadsOf(project);
 
   return (
     <div>
+      <div className="mb-3 rounded-xl border border-border bg-background/30 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold">Conversas da história</p>
+          <button
+            type="button"
+            onClick={addThread}
+            className="rounded-md border border-border px-2 py-1 text-xs hover:border-primary"
+          >
+            Nova conversa
+          </button>
+        </div>
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+          Cada mensagem pertence a uma conversa. Quando a história muda de conversa, a cena corta para o outro
+          chat com transição automática.
+        </p>
+        <ul className="mt-2 flex flex-col gap-1.5">
+          {threads.map((t) => (
+            <li key={t.id} className="flex items-center gap-1.5">
+              <input
+                value={t.name}
+                onChange={(e) => updateThread(t.id, { name: e.target.value })}
+                className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs"
+                aria-label="Nome da conversa"
+              />
+              <button
+                type="button"
+                onClick={() => removeThread(t.id)}
+                disabled={threads.length < 2}
+                className="rounded p-1 text-muted-foreground hover:text-destructive disabled:opacity-30"
+                aria-label={`Apagar conversa ${t.name}`}
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+
       <ul className="flex max-h-[56vh] flex-col gap-2 overflow-y-auto pr-1">
         {project.messages.map((m, i) => {
           const author = participantOf(project, m.participantId);
@@ -125,6 +177,20 @@ export function MessagesPanel({
                     </option>
                   ))}
                 </select>
+                {threads.length > 1 && (
+                  <select
+                    value={threadIdOf(project, m)}
+                    onChange={(e) => updateMessage(m.id, { threadId: e.target.value })}
+                    className="min-w-0 max-w-[7.5rem] flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs text-muted-foreground"
+                    aria-label="Conversa da mensagem"
+                  >
+                    {threads.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <span className="ml-auto flex shrink-0 items-center gap-0.5">
                   <button
                     type="button"
