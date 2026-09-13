@@ -505,6 +505,8 @@ export interface ChatSceneProject {
   background?: ChatSceneBackground;
   /** estilo de entrada das bolhas */
   animation?: MessageAnimation;
+  /** efeitos de entrada e saída, com duração e intensidade */
+  motion?: ChatSceneMotion;
   /** enquadramento da conversa dentro do vídeo */
   layout?: ChatSceneLayout;
   /** sons curtos de envio/recebimento na prévia */
@@ -628,7 +630,8 @@ export function createChatSceneProject(init: Partial<ChatSceneProject> = {}): Ch
     startClock: init.startClock ?? "21:14",
     receipts: init.receipts ?? true,
     background: init.background ?? { ...DEFAULT_BACKGROUND },
-    animation: init.animation ?? "soft-spring",
+    animation: init.animation ?? init.motion?.enter ?? "soft-spring",
+    motion: { ...DEFAULT_MOTION, ...(init.motion ?? {}), enter: init.motion?.enter ?? init.animation ?? DEFAULT_MOTION.enter },
     layout: init.layout ?? { ...DEFAULT_LAYOUT },
     sound: init.sound ?? { enabled: false, volume: 0.5 },
     branding: init.branding ?? { ...DEFAULT_BRANDING },
@@ -731,7 +734,12 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
     timing: { ...DEFAULT_TIMING, ...(raw.timing ?? {}) },
     render: { ...DEFAULT_RENDER, ...(raw.render ?? {}) },
     background: { ...DEFAULT_BACKGROUND, ...(raw.background ?? {}) },
-    animation: raw.animation ?? base.animation ?? "soft-spring",
+    animation: raw.motion?.enter ?? raw.animation ?? base.animation ?? "soft-spring",
+    motion: {
+      ...DEFAULT_MOTION,
+      ...(raw.motion ?? {}),
+      enter: raw.motion?.enter ?? raw.animation ?? DEFAULT_MOTION.enter,
+    },
     layout: { ...DEFAULT_LAYOUT, ...(raw.layout ?? {}) },
     sound: { enabled: false, volume: 0.5, ...(raw.sound ?? {}) },
     branding: { ...DEFAULT_BRANDING, ...(raw.branding ?? {}) },
