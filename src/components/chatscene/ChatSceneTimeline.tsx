@@ -246,7 +246,8 @@ export function ChatSceneTimeline({
       </div>
 
       <p className="mt-2 text-[11px] text-muted-foreground">
-        Clique em uma barra para pular a prévia para aquela mensagem; o trecho listrado é o
+        Clique em uma barra para selecionar a mensagem e arraste as pontas roxas para mudar quando a
+        fala entra e quanto tempo ela fica; o trecho listrado é o
         “digitando…” e a linha clara mostra a fala real sincronizada. Use as setas do teclado para andar de 1 em 1 segundo.
       </p>
     </section>
