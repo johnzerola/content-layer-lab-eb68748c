@@ -853,6 +853,7 @@ export function ChatSceneStudio() {
                   setFrame(f);
                 }}
                 onSelect={setSelected}
+                onAdjust={(id, patch) => updateMessage(id, patch)}
               />
 
               <div className="flex flex-col gap-3 text-xs">

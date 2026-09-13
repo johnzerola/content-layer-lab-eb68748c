@@ -21,6 +21,7 @@ export function ChatSceneTimeline({
   selected,
   onSeek,
   onSelect,
+  onAdjust,
 }: {
   project: ChatSceneProject;
   plan: ConversationPlan;
@@ -28,11 +29,34 @@ export function ChatSceneTimeline({
   selected: string | null;
   onSeek: (frame: number) => void;
   onSelect: (id: string | null) => void;
+  /** arrastar as pontas da barra ajusta início (delayMs) e fim (pauseAfterMs) */
+  onAdjust?: (id: string, patch: { delayMs?: number | null; pauseAfterMs?: number | null }) => void;
 }) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const total = Math.max(1, plan.totalFrames);
   const durationSec = plan.durationMs / 1000;
   const pct = (f: number) => `${Math.min(100, (f / total) * 100)}%`;
+
+  const dragEdge = useCallback(
+    (edge: "start" | "end", messageId: string, baseMs: number, startX: number) => {
+      const el = trackRef.current;
+      if (!el || !onAdjust) return;
+      const width = el.getBoundingClientRect().width || 1;
+      const msPerPx = plan.durationMs / width;
+      const move = (ev: PointerEvent) => {
+        const deltaMs = (ev.clientX - startX) * msPerPx;
+        const next = Math.round(Math.max(0, Math.min(8000, baseMs + (edge === "start" ? deltaMs : deltaMs))) / 50) * 50;
+        onAdjust(messageId, edge === "start" ? { delayMs: next || null } : { pauseAfterMs: next });
+      };
+      const up = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    },
+    [onAdjust, plan.durationMs],
+  );
 
   const seekFromPointer = useCallback(
     (clientX: number) => {
@@ -163,6 +187,52 @@ export function ChatSceneTimeline({
                 <span className="absolute right-1 top-0 z-10 text-[9px] leading-6 text-muted-foreground">
                   {fmt(startSec)}–{fmt(endSec)}
                 </span>
+                {isSelected && onAdjust ? (
+                  <>
+                    <span
+                      role="slider"
+                      tabIndex={0}
+                      aria-label={`Ajustar o início da fala de ${author?.name ?? "sistema"}`}
+                      aria-valuemin={0}
+                      aria-valuemax={8000}
+                      aria-valuenow={message.delayMs ?? 0}
+                      aria-valuetext={`${((message.delayMs ?? 0) / 1000).toFixed(1)} segundos de espera antes`}
+                      className="absolute top-0 z-20 h-6 w-2 -translate-x-1/2 cursor-ew-resize rounded bg-primary"
+                      style={{ left: pct(entry.appearFrame) }}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        dragEdge("start", message.id, message.delayMs ?? 0, e.clientX);
+                      }}
+                      onKeyDown={(e) => {
+                        const base = message.delayMs ?? 0;
+                        if (e.key === "ArrowLeft") onAdjust(message.id, { delayMs: Math.max(0, base - 100) || null });
+                        if (e.key === "ArrowRight") onAdjust(message.id, { delayMs: Math.min(8000, base + 100) });
+                      }}
+                    />
+                    <span
+                      role="slider"
+                      tabIndex={0}
+                      aria-label={`Ajustar o fim da fala de ${author?.name ?? "sistema"}`}
+                      aria-valuemin={0}
+                      aria-valuemax={8000}
+                      aria-valuenow={message.pauseAfterMs ?? project.timing.gapMs}
+                      aria-valuetext={`${((message.pauseAfterMs ?? project.timing.gapMs) / 1000).toFixed(1)} segundos na tela depois`}
+                      className="absolute top-0 z-20 h-6 w-2 -translate-x-1/2 cursor-ew-resize rounded bg-primary"
+                      style={{ left: pct(entry.endFrame) }}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        dragEdge("end", message.id, message.pauseAfterMs ?? project.timing.gapMs, e.clientX);
+                      }}
+                      onKeyDown={(e) => {
+                        const base = message.pauseAfterMs ?? project.timing.gapMs;
+                        if (e.key === "ArrowLeft") onAdjust(message.id, { pauseAfterMs: Math.max(0, base - 100) });
+                        if (e.key === "ArrowRight") onAdjust(message.id, { pauseAfterMs: Math.min(8000, base + 100) });
+                      }}
+                    />
+                  </>
+                ) : null}
               </button>
             );
           })}
@@ -176,7 +246,8 @@ export function ChatSceneTimeline({
       </div>
 
       <p className="mt-2 text-[11px] text-muted-foreground">
-        Clique em uma barra para pular a prévia para aquela mensagem; o trecho listrado é o
+        Clique em uma barra para selecionar a mensagem e arraste as pontas roxas para mudar quando a
+        fala entra e quanto tempo ela fica; o trecho listrado é o
         “digitando…” e a linha clara mostra a fala real sincronizada. Use as setas do teclado para andar de 1 em 1 segundo.
       </p>
     </section>
