@@ -357,6 +357,38 @@ export function ChatSceneStudio() {
     toast.success("Conversa adicionada.");
   }, [script]);
 
+  const addThread = useCallback(() => {
+    setProject((prev) => {
+      const threads = threadsOf(prev);
+      return {
+        ...prev,
+        threads: [...threads, createThread({ name: `Conversa ${threads.length + 1}` })],
+      };
+    });
+  }, []);
+
+  const updateThread = useCallback((id: string, changes: Partial<ChatSceneThread>) => {
+    setProject((prev) => ({
+      ...prev,
+      threads: threadsOf(prev).map((t) => (t.id === id ? { ...t, ...changes } : t)),
+    }));
+  }, []);
+
+  const removeThread = useCallback((id: string) => {
+    setProject((prev) => {
+      const threads = threadsOf(prev);
+      if (threads.length < 2) return prev;
+      const rest = threads.filter((t) => t.id !== id);
+      const fallback = rest[0]!.id;
+      return {
+        ...prev,
+        threads: rest,
+        messages: prev.messages.map((m) => (m.threadId === id ? { ...m, threadId: fallback } : m)),
+      };
+    });
+  }, []);
+
+
   const removeMessage = useCallback((id: string) => {
     setProject((prev) => ({ ...prev, messages: prev.messages.filter((m) => m.id !== id) }));
   }, []);
