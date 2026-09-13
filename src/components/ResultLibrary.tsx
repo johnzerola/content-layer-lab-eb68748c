@@ -55,6 +55,29 @@ export function ResultLibrary() {
     listAccounts().then(setAccounts).catch(() => undefined);
   }, []);
 
+  /** Baixa o arquivo guardado na conta usando um link temporário. */
+  const download = async (row: ExportRow) => {
+    if (!row.storage_path) return;
+    setDownloading(row.id);
+    try {
+      const { data, error } = await supabase.storage
+        .from("posts")
+        .createSignedUrl(row.storage_path, 60 * 10, { download: row.file_name });
+      if (error || !data?.signedUrl) throw error ?? new Error("Link indisponível.");
+      const a = document.createElement("a");
+      a.href = data.signedUrl;
+      a.download = row.file_name;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível baixar o arquivo.");
+    } finally {
+      setDownloading(null);
+    }
+  };
+
   const openPublish = async (row: ExportRow) => {
     if (!row.storage_path) return;
     setPreparing(row.id);
