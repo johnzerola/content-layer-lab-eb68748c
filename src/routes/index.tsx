@@ -1459,7 +1459,7 @@ function Home() {
                 taskProgress.set(at, p);
                 pushProgress();
               },
-            });
+            }));
             taskProgress.set(at, 1);
             pushProgress();
             const label = [outs.length > 1 ? plat.short : "", n > 1 ? `v${k + 1}` : ""]
