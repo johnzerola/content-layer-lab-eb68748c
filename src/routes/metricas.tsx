@@ -40,6 +40,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { AppShell } from '@/components/AppShell';
+import { ChannelCards, VideoRanking, type MetricRow } from '@/components/metrics/ChannelPerformance';
 
 export const Route = createFileRoute('/metricas')({
   component: GuardedMetricsPage,
@@ -69,19 +70,7 @@ const PLATFORMS: Array<{ id: string; label: string; icon: typeof Instagram; colo
   { id: 'tiktok', label: 'TikTok', icon: PlaySquare, color: 'text-cyan-400' },
 ];
 
-type Row = {
-  postId: string;
-  title: string;
-  platform: string;
-  username: string;
-  permalink: string | null;
-  publishedAt: string | null;
-  views: number;
-  clicks: number;
-  shares: number;
-  likes: number;
-  fetchedAt: string | null;
-};
+type Row = MetricRow;
 
 function mergeRows(metrics: PostInsight[], posts: PublishedPostRef[]): Row[] {
   const byPost = new Map<string, PostInsight>();
@@ -101,6 +90,8 @@ function mergeRows(metrics: PostInsight[], posts: PublishedPostRef[]): Row[] {
       clicks: m?.clicks ?? 0,
       shares: m?.shares ?? 0,
       likes: m?.likes ?? 0,
+      comments: m?.comments ?? 0,
+      saves: m?.saves ?? 0,
       fetchedAt: m?.fetched_at ?? null,
     };
   });
@@ -117,6 +108,8 @@ function mergeRows(metrics: PostInsight[], posts: PublishedPostRef[]): Row[] {
       clicks: m.clicks ?? 0,
       shares: m.shares ?? 0,
       likes: m.likes ?? 0,
+      comments: m.comments ?? 0,
+      saves: m.saves ?? 0,
       fetchedAt: m.fetched_at,
     });
   }
@@ -246,6 +239,9 @@ function MetricsPage() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
+
+        <ChannelCards rows={rows} />
+        <VideoRanking rows={rows} />
 
         {PLATFORMS.filter((p) => rows.some((r) => r.platform === p.id)).map((platform) => {
           const list = rows.filter((r) => r.platform === platform.id);
