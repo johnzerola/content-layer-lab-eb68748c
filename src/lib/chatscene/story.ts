@@ -32,21 +32,21 @@ export interface StoryCharacter {
   name: string;
   /** papel na história: chefe, filho, mãe, amigo… */
   role: string;
-  isSelf?: boolean;
-  gender?: VoiceGender;
-  age?: VoiceAge;
+  isSelf?: boolean | undefined;
+  gender?: VoiceGender | undefined;
+  age?: VoiceAge | undefined;
 }
 
 export interface StoryLine {
   speaker: string;
   text: string;
   /** "card" vira cartão de cena ("Momentos antes"); "system" vira aviso */
-  kind?: "text" | "card" | "system";
+  kind?: "text" | "card" | "system" | undefined;
   /** nome da conversa onde a fala acontece (ex.: "Chefe", "Grupo da família") */
-  thread?: string;
-  emotion?: VoiceEmotion;
+  thread?: string | undefined;
+  emotion?: VoiceEmotion | undefined;
   /** mensagem já visível antes do vídeo começar */
-  initial?: boolean;
+  initial?: boolean | undefined;
 }
 
 export interface StoryScript {
