@@ -1201,30 +1201,46 @@ export type Database = {
       }
       template_versions: {
         Row: {
+          base_id: string | null
           created_at: string
-          data: Json
+          data: Json | null
+          format: string
           id: string
           label: string
+          patch: Json | null
           template_id: string
           user_id: string
         }
         Insert: {
+          base_id?: string | null
           created_at?: string
-          data: Json
+          data?: Json | null
+          format?: string
           id?: string
           label?: string
+          patch?: Json | null
           template_id: string
           user_id: string
         }
         Update: {
+          base_id?: string | null
           created_at?: string
-          data?: Json
+          data?: Json | null
+          format?: string
           id?: string
           label?: string
+          patch?: Json | null
           template_id?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "template_versions_base_id_fkey"
+            columns: ["base_id"]
+            isOneToOne: false
+            referencedRelation: "template_versions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "template_versions_template_id_fkey"
             columns: ["template_id"]
