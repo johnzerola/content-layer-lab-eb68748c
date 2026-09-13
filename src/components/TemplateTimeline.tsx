@@ -1,7 +1,18 @@
 import { useState } from 'react';
 import { Pause, Play, Plus, Scissors, Maximize, Trash2 } from 'lucide-react';
-import type { BoxLayer, SelId, Template, TextLayer } from '@/lib/template';
+import type { BoxLayer, LayerAnim, SelId, Template, TextLayer } from '@/lib/template';
 import { layerOf, LAYER_LABELS, selectableIds } from './TemplateCanvas';
+
+const PALETTE = ['#ffffff', '#000000', '#ffd166', '#ff5c8a', '#7c5cff', '#38bdf8', '#34d399', '#f97316'];
+const ANIMS: { id: LayerAnim; label: string }[] = [
+  { id: 'fade', label: 'Fade' },
+  { id: 'up', label: 'Subindo' },
+  { id: 'down', label: 'Descendo' },
+  { id: 'left', label: 'Pela esquerda' },
+  { id: 'right', label: 'Pela direita' },
+  { id: 'zoom', label: 'Zoom' },
+  { id: 'pop', label: 'Pop' },
+];
 
 const keys: Record<string, string> = { name: 'name_' };
 function patchLayer(t: Template, id: string, patch: Partial<BoxLayer>): Template {
@@ -9,6 +20,7 @@ function patchLayer(t: Template, id: string, patch: Partial<BoxLayer>): Template
   const key = keys[id] ?? id;
   return { ...t, [key]: { ...(t[key as keyof Template] as BoxLayer), ...patch } };
 }
+
 
 export function TemplateTimeline({ template: t, onChange, selected, onSelect, time, onSeek, playing, onPlay, duration, onDuration }: {
   template: Template; onChange: (t: Template) => void; selected: SelId | null; onSelect: (id: SelId) => void;
