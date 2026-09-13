@@ -221,6 +221,47 @@ export const ANIMATION_PRESETS: { id: MessageAnimation; label: string }[] = [
   { id: "fast-pop", label: "Rápido" },
 ];
 
+/** Como a cena inteira sai no fim do vídeo. */
+export type SceneExit = "none" | "fade" | "up" | "down" | "zoom";
+
+export const SCENE_EXIT_PRESETS: { id: SceneExit; label: string }[] = [
+  { id: "fade", label: "Suave" },
+  { id: "up", label: "Subindo" },
+  { id: "down", label: "Descendo" },
+  { id: "zoom", label: "Zoom" },
+  { id: "none", label: "Sem saída" },
+];
+
+/**
+ * Efeitos de entrada das bolhas e de saída da cena, com duração e intensidade
+ * ajustáveis pelas alças da linha do tempo. `enter` é a mesma coisa que
+ * `project.animation` (mantido para documentos antigos).
+ */
+export interface ChatSceneMotion {
+  enter: MessageAnimation;
+  /** duração da entrada de cada bolha (ms) */
+  enterMs: number;
+  /** força do deslocamento/escala do efeito (0.2 = discreto, 2 = exagerado) */
+  intensity: number;
+  exit: SceneExit;
+  /** duração da saída da cena, no fim do vídeo (ms) */
+  exitMs: number;
+}
+
+export const DEFAULT_MOTION: ChatSceneMotion = {
+  enter: "soft-spring",
+  enterMs: 340,
+  intensity: 1,
+  exit: "fade",
+  exitMs: 700,
+};
+
+export const MOTION_LIMITS = {
+  enterMs: { min: 80, max: 1200 },
+  exitMs: { min: 0, max: 2500 },
+  intensity: { min: 0.2, max: 2 },
+};
+
 /** Enquadramento da conversa dentro do vídeo. */
 export type ChatLayoutPreset =
   | "full-chat"
