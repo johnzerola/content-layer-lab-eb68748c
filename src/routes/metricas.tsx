@@ -69,19 +69,7 @@ const PLATFORMS: Array<{ id: string; label: string; icon: typeof Instagram; colo
   { id: 'tiktok', label: 'TikTok', icon: PlaySquare, color: 'text-cyan-400' },
 ];
 
-type Row = {
-  postId: string;
-  title: string;
-  platform: string;
-  username: string;
-  permalink: string | null;
-  publishedAt: string | null;
-  views: number;
-  clicks: number;
-  shares: number;
-  likes: number;
-  fetchedAt: string | null;
-};
+type Row = MetricRow;
 
 function mergeRows(metrics: PostInsight[], posts: PublishedPostRef[]): Row[] {
   const byPost = new Map<string, PostInsight>();
