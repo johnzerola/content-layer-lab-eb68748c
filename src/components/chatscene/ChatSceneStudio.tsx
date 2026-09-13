@@ -21,6 +21,7 @@ import {
   Save,
   Undo2,
   Users,
+  Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Input } from "@/components/ui/base";
@@ -34,6 +35,9 @@ import { ParticipantsPanel } from "@/components/chatscene/ParticipantsPanel";
 import { BrandPanel } from "@/components/chatscene/BrandPanel";
 import { ThemePanel } from "@/components/chatscene/ThemePanel";
 import { MusicPanel } from "@/components/chatscene/MusicPanel";
+import { StoryPanel } from "@/components/chatscene/StoryPanel";
+import { generateStory } from "@/lib/chatscene/story.functions";
+import { storyToProject, timingForDuration, type StoryBrief } from "@/lib/chatscene/story";
 
 import { buildPlan } from "@/lib/chatscene/clock";
 import { encodeFrameSequence, frameEncoderSupported } from "@/lib/chatscene/encode-frames";
@@ -97,6 +101,7 @@ import {
 const PALETTE = ["#7c5cff", "#ff5c8a", "#22c08a", "#f2b705", "#4ec3ff", "#ff8a4c"];
 
 type StudioTab =
+  | "historia"
   | "participantes"
   | "mensagens"
   | "tempo"
@@ -107,6 +112,7 @@ type StudioTab =
 
 /** Abas do editor: cada assunto em uma tela, com a prévia sempre ao lado. */
 const STUDIO_TABS: { id: StudioTab; label: string; icon: typeof Palette }[] = [
+  { id: "historia", label: "História", icon: Wand2 },
   { id: "participantes", label: "Participantes", icon: Users },
   { id: "mensagens", label: "Mensagens", icon: MessageSquare },
   { id: "tempo", label: "Linha do tempo", icon: Clock },
@@ -149,6 +155,8 @@ export function ChatSceneStudio() {
   const [castFailures, setCastFailures] = useState<{ id: string; reason: string }[]>([]);
   /** fala tocando agora no painel de vozes */
   const [playingClip, setPlayingClip] = useState<string | null>(null);
+  /** história sendo escrita pela IA */
+  const [storyBusy, setStoryBusy] = useState(false);
 
   useEffect(() => {
     setLibrary(readLibrary());
@@ -485,6 +493,30 @@ export function ChatSceneStudio() {
   }, [project, recordId]);
 
   const speakFn = useServerFn(synthesizeVoice);
+  const storyFn = useServerFn(generateStory);
+
+  /** Modo simples: a IA escreve a história e o documento inteiro é remontado. */
+  const handleGenerateStory = useCallback(
+    async (brief: StoryBrief) => {
+      setStoryBusy(true);
+      try {
+        const script = await storyFn({ data: brief });
+        setProject((prev) =>
+          storyToProject({ ...prev, timing: timingForDuration(brief.durationSec) }, script),
+        );
+        setSelected(null);
+        setFrame(0);
+        setPlaying(false);
+        setTab("mensagens");
+        toast.success("História criada. Ajuste o que quiser nas abas.");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Não foi possível criar a história.");
+      } finally {
+        setStoryBusy(false);
+      }
+    },
+    [storyFn],
+  );
   const voiceProvider = useMemo(
     () => createGatewayVoiceProvider((input) => speakFn({ data: input })),
     [speakFn],
@@ -764,6 +796,10 @@ export function ChatSceneStudio() {
               );
             })}
           </nav>
+
+          {tab === "historia" && (
+            <StoryPanel busy={storyBusy} onGenerate={(brief) => void handleGenerateStory(brief)} />
+          )}
 
           {tab === "participantes" && (
             <ParticipantsPanel
