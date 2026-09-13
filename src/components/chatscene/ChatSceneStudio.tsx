@@ -6,6 +6,8 @@
  * Todo estado vive no documento `ChatSceneProject`; nenhuma cópia paralela.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { useProjectHistory } from "./useProjectHistory";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Clock,
@@ -177,6 +179,8 @@ export function ChatSceneStudio() {
   useEffect(() => {
     if (frame > plan.totalFrames - 1) setFrame(plan.totalFrames - 1);
   }, [plan.totalFrames, frame]);
+
+  const { undo, redo, canUndo, canRedo } = useProjectHistory(project, setProject);
 
   const patch = useCallback((changes: Partial<ChatSceneProject>) => {
     setProject((prev) => ({ ...prev, ...changes }));
@@ -707,6 +711,14 @@ export function ChatSceneStudio() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={undo} disabled={!canUndo} aria-label="Desfazer">
+            <Undo2 className="mr-1.5 size-4" />
+            Desfazer
+          </Button>
+          <Button variant="ghost" size="sm" onClick={redo} disabled={!canRedo} aria-label="Refazer">
+            <Redo2 className="mr-1.5 size-4" />
+            Refazer
+          </Button>
           <Button variant="ghost" size="sm" asChild>
             <a href="/chatscene/comparar">Comparar com referência</a>
           </Button>

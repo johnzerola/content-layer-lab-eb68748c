@@ -191,6 +191,17 @@ export function MessagesPanel({
                     ))}
                   </select>
                 )}
+                <button
+                  type="button"
+                  onClick={() => updateMessage(m.id, { initial: !m.initial })}
+                  aria-pressed={!!m.initial}
+                  title="Já está na tela quando o vídeo começa"
+                  className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${
+                    m.initial ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  histórico
+                </button>
                 <span className="ml-auto flex shrink-0 items-center gap-0.5">
                   <button
                     type="button"
