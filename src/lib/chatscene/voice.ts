@@ -138,20 +138,34 @@ export function voicePreset(id: string | undefined): VoicePreset { return VOICE_
 export function profileFromPreset(id: string, base: Partial<VoiceProfile> = {}): VoiceProfile {
   const p=voicePreset(id); return { ...DEFAULT_VOICE,...p.profile,...base,presetId:p.id,providerVoiceId:base.providerVoiceId??p.providerVoice,ageStyle:p.age,genderStyle:p.gender,name:base.name??p.label };
 }
-export function voiceDirection(style: VoiceStyle | undefined, emotion: VoiceEmotion = "neutral", energy?: number, age?: string, gender?: string): string {
+export interface VoiceTimbre { expressiveness?: number; roughness?: number; warmth?: number; brightness?: number; }
+
+/** Descreve o timbre em palavras, já que o provedor só aceita instrução em texto. */
+export function timbreDirection(timbre: VoiceTimbre | undefined): string {
+  if (!timbre) return "";
+  const parts: string[] = [];
+  const { expressiveness: ex, roughness: ro, warmth: wa, brightness: br } = timbre;
+  if (ex !== undefined) parts.push(ex <= .3 ? "pouca variação de entonação" : ex >= .7 ? "entonação muito expressiva" : "entonação moderada");
+  if (wa !== undefined) parts.push(wa <= .3 ? "timbre seco e distante" : wa >= .7 ? "timbre quente e acolhedor" : "timbre equilibrado");
+  if (br !== undefined) parts.push(br <= .3 ? "voz abafada e grave" : br >= .7 ? "voz clara e brilhante" : "voz de brilho médio");
+  if (ro !== undefined && ro >= .35) parts.push(ro >= .7 ? "voz bem rouca" : "leve aspereza na voz");
+  return parts.length ? ` Timbre: ${parts.join(", ")}.` : "";
+}
+
+export function voiceDirection(style: VoiceStyle | undefined, emotion: VoiceEmotion = "neutral", energy?: number, age?: string, gender?: string, timbre?: VoiceTimbre): string {
   const base=(VOICE_STYLES.find(s=>s.id===style)??VOICE_STYLES[0]!).direction;
   const emotionMap: Record<VoiceEmotion,string>={neutral:"",happy:" Soe feliz.",excited:" Soe empolgada.",serious:" Soe séria.",nervous:" Soe nervosa.",annoyed:" Soe incomodada.","angry-theatrical":" Soe brava de forma teatral, sem gritar.",sad:" Soe triste e contida.",sarcastic:" Use ironia leve.",surprised:" Soe surpresa.","whisper-like":" Fale como um segredo, sem perder clareza."};
   const energyText = energy === undefined ? "" : energy <= .3 ? " Volume baixo e intensidade contida." : energy >= .7 ? " Bastante energia e projeção." : " Intensidade média, sem exagero.";
   const castText = age || gender ? ` Personagem: ${[age, gender].filter(Boolean).join(", ")}.` : "";
   // sotaque brasileiro é obrigatório: nunca deixar a voz cair para português europeu
-  return `Fale em português do Brasil (pt-BR) como um falante nativo brasileiro: entonação e vogais abertas do Brasil, nunca sotaque de Portugal nem sotaque estrangeiro/inglês. Dicção clara, ritmo de conversa real de mensagem de voz. ${base}${emotionMap[emotion]}${energyText}${castText}`.trim();
+  return `Fale em português do Brasil (pt-BR) como um falante nativo brasileiro: entonação e vogais abertas do Brasil, nunca sotaque de Portugal nem sotaque estrangeiro/inglês. Dicção clara, ritmo de conversa real de mensagem de voz. ${base}${emotionMap[emotion]}${energyText}${castText}${timbreDirection(timbre)}`.trim();
 }
 
 export interface VoiceMixSettings { enabled:boolean; ducking:boolean; normalize:boolean; musicUrl?:string|null; musicGain:number; duckingAmount?:number; duckingAttackMs?:number; duckingReleaseMs?:number; }
 export const DEFAULT_VOICE_MIX: VoiceMixSettings = { enabled:false,ducking:true,normalize:true,musicUrl:null,musicGain:.25,duckingAmount:.78,duckingAttackMs:180,duckingReleaseMs:240 };
 
 export function voiceKey(text:string, profile:VoiceProfile, direction?:Partial<MessageVoiceDirection>):string {
-  const raw=JSON.stringify({text:text.trim(),provider:profile.provider??"mock",voice:profile.providerVoiceId??voicePreset(profile.presetId).providerVoice,preset:profile.presetId,locale:profile.locale??"pt-BR",style:profile.style,speed:Number(profile.speed.toFixed(3)),pitch:profile.pitch??0,energy:profile.energy??.5,expression:profile.expressiveness??.5,emotion:direction?.emotion??"neutral",speedMultiplier:direction?.speedMultiplier??1,energyMultiplier:direction?.energyMultiplier??1,settings:profile.providerSettings??{}});
+  const raw=JSON.stringify({text:text.trim(),provider:profile.provider??"mock",voice:profile.providerVoiceId??voicePreset(profile.presetId).providerVoice,preset:profile.presetId,locale:profile.locale??"pt-BR",style:profile.style,speed:Number(profile.speed.toFixed(3)),pitch:profile.pitch??0,energy:profile.energy??.5,expression:profile.expressiveness??.5,roughness:profile.roughness??0,warmth:profile.warmth??.5,brightness:profile.brightness??.5,emotion:direction?.emotion??"neutral",speedMultiplier:direction?.speedMultiplier??1,energyMultiplier:direction?.energyMultiplier??1,settings:profile.providerSettings??{}});
   let h1=2166136261,h2=5381; for(let i=0;i<raw.length;i++){h1=Math.imul(h1^raw.charCodeAt(i),16777619)>>>0;h2=((h2<<5)+h2+raw.charCodeAt(i))>>>0;} return `${h1.toString(36)}${h2.toString(36)}`;
 }
 export function speakableText(kind:string,text:string):string { if(kind==="system"||kind==="sticker"||kind==="card")return ""; return text.replace(/\s+/g," ").trim(); }

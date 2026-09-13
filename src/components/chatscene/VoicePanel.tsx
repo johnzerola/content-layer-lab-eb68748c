@@ -101,6 +101,10 @@ export function VoicePanel(props: VoicePanelProps) {
                         <VoiceRange label="Velocidade" value={voice.speed} min={.7} max={1.3} step={.05} suffix="×" onChange={(speed) => updateProfile(voice.id!, { speed })} />
                         {caps?.controls.energy ? <VoiceRange label="Energia" value={voice.energy ?? .5} min={0} max={1} step={.05} onChange={(energy) => voice.id && updateProfile(voice.id, { energy })} /> : null}
                         {caps?.controls.pitch ? <VoiceRange label="Tom" value={voice.pitch ?? 0} min={PITCH_MIN} max={PITCH_MAX} step={.5} onChange={(pitch) => voice.id && updateProfile(voice.id, { pitch })} /> : null}
+                        {caps?.controls.expressiveness ? <VoiceRange label="Expressividade" value={voice.expressiveness ?? .5} min={0} max={1} step={.05} onChange={(expressiveness) => voice.id && updateProfile(voice.id, { expressiveness })} /> : null}
+                        {caps?.controls.warmth ? <VoiceRange label="Calor do timbre" value={voice.warmth ?? .5} min={0} max={1} step={.05} onChange={(warmth) => voice.id && updateProfile(voice.id, { warmth })} /> : null}
+                        {caps?.controls.brightness ? <VoiceRange label="Brilho" value={voice.brightness ?? .5} min={0} max={1} step={.05} onChange={(brightness) => voice.id && updateProfile(voice.id, { brightness })} /> : null}
+                        {caps?.controls.roughness ? <VoiceRange label="Aspereza" value={voice.roughness ?? 0} min={0} max={1} step={.05} onChange={(roughness) => voice.id && updateProfile(voice.id, { roughness })} /> : null}
                         <Button size="sm" variant="ghost" className="h-7 w-full gap-1 text-[11px]" onClick={() => updateProfile(voice.id ?? `voice_${participant.id}`, profileFromPreset(voice.presetId, { id: voice.id ?? `voice_${participant.id}` }))}><RotateCcw className="size-3" /> Restaurar preset</Button>
                       </div>
                     </details>
