@@ -155,6 +155,8 @@ export function ChatSceneStudio() {
   const [castFailures, setCastFailures] = useState<{ id: string; reason: string }[]>([]);
   /** fala tocando agora no painel de vozes */
   const [playingClip, setPlayingClip] = useState<string | null>(null);
+  /** história sendo escrita pela IA */
+  const [storyBusy, setStoryBusy] = useState(false);
 
   useEffect(() => {
     setLibrary(readLibrary());
