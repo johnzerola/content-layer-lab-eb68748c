@@ -24,7 +24,8 @@ describe("documento da conversa", () => {
     const demo = createDemoChatSceneProject();
     expect(demo.chatKind).toBe("group");
     expect(demo.participants).toHaveLength(4);
-    expect(demo.messages.length).toBeGreaterThan(5);
+    expect(demo.messages.length).toBeGreaterThan(20);
+    expect(demo.messages.at(-1)?.text).toContain("almoço para a equipe");
     expect(demo.voiceProfiles?.every((voice) => voice.provider === "lovable-ai")).toBe(true);
     expect(new Set(demo.voiceProfiles?.map((voice) => voice.name)).size).toBe(4);
   });
