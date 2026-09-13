@@ -13,9 +13,9 @@ function baseProject() {
     ...createDemoChatSceneProject(),
     participants: [eu, outro],
     messages: [
-      createMessage({ participantId: eu.id, text: "Oi, tudo certo?", initial: true }),
-      createMessage({ participantId: outro.id, text: "Cheguei agora" }),
-      createMessage({ participantId: eu.id, text: "Beleza, te espero" }),
+      createMessage(eu.id, { text: "Oi, tudo certo?", initial: true }),
+      createMessage(outro.id, { text: "Cheguei agora" }),
+      createMessage(eu.id, { text: "Beleza, te espero" }),
     ],
   });
 }
