@@ -179,6 +179,12 @@ export function createGatewayVoiceProvider(
           Math.max(0, Math.min(1, (profile.energy ?? 0.5) * (direction?.energyMultiplier ?? 1))),
           preset.age,
           preset.gender,
+          {
+            ...(profile.expressiveness === undefined ? {} : { expressiveness: profile.expressiveness }),
+            ...(profile.roughness === undefined ? {} : { roughness: profile.roughness }),
+            ...(profile.warmth === undefined ? {} : { warmth: profile.warmth }),
+            ...(profile.brightness === undefined ? {} : { brightness: profile.brightness }),
+          },
         ),
         speed: Math.max(0.7, Math.min(1.3, profile.speed * (direction?.speedMultiplier ?? 1))),
       });

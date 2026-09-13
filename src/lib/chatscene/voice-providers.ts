@@ -3,7 +3,7 @@ import { voiceKey, voicePreset, type MessageVoiceDirection, type VoiceProfile, t
 
 export const PROVIDER_CAPABILITIES: Record<string, VoiceProviderCapabilities> = {
   mock: { languages:["pt-BR"],maxCharacters:600,controls:{speed:true,pitch:true,energy:true,expressiveness:false,roughness:false,warmth:false,brightness:false,emotion:true},costEstimate:false,local:true },
-  "lovable-ai": { languages:["pt-BR"],maxCharacters:600,controls:{speed:true,pitch:true,energy:false,expressiveness:true,roughness:false,warmth:false,brightness:false,emotion:true},costEstimate:false,local:false },
+  "lovable-ai": { languages:["pt-BR"],maxCharacters:600,controls:{speed:true,pitch:true,energy:true,expressiveness:true,roughness:true,warmth:true,brightness:true,emotion:true},costEstimate:false,local:false },
 };
 
 function wavTone(seconds:number, frequency:number): Blob {
