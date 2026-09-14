@@ -85,6 +85,14 @@ export function AuthGate({
 
   if (user) return <>{children}</>;
 
+  if (variant === "split") {
+    return (
+      <div className="mx-auto w-full max-w-5xl py-4">
+        <AuthScreen title={title} description={description} footer={fallbackExtra} />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-md">
       {/* card com Aurora: a borda se acende quando o usuário está preenchendo */}
