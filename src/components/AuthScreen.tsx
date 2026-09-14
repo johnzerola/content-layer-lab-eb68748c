@@ -129,8 +129,6 @@ export function AuthScreen({
           <span className="auth-floater auth-floater-play"><Play /></span>
           <span className="auth-floater auth-floater-heart"><Heart /></span>
           <span className="auth-floater auth-floater-send"><Send /></span>
-          <span className="auth-floater auth-floater-caption"><Captions /></span>
-          <span className="auth-floater auth-floater-trend"><TrendingUp /></span>
         </div>
 
         <div className="relative">
