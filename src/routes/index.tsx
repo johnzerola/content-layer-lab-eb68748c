@@ -3678,7 +3678,7 @@ function Home() {
       />
 
       {!user && (
-        <div className="fixed inset-0 z-[60] overflow-y-auto bg-background/70 p-3 backdrop-blur-md sm:p-6">
+        <div className="fixed inset-0 z-[60] overflow-y-auto bg-background/90 p-3 backdrop-blur-xl sm:p-6">
           <div className="mx-auto flex min-h-full w-full max-w-5xl items-center">
             <AuthGate
               variant="split"
