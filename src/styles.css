@@ -1047,10 +1047,12 @@
   box-shadow: var(--shadow-float);
 }
 .auth-stage {
+  isolation: isolate;
   background:
     radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--primary) 16%, transparent), transparent 60%),
     linear-gradient(160deg, var(--surface-2), var(--background));
 }
+.auth-stage > * { z-index: 1; }
 .auth-grid {
   position: absolute;
   inset: 0;
@@ -1062,33 +1064,65 @@
   opacity: 0.5;
   pointer-events: none;
 }
-.auth-orb {
+.auth-beam {
   position: absolute;
-  border-radius: 9999px;
-  filter: blur(60px);
+  pointer-events: none;
+  z-index: 0;
+  transform-origin: center;
+}
+.auth-beam-a {
+  width: 34rem;
+  height: 9rem;
+  top: 8%;
+  left: -48%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--primary) 28%, transparent), transparent);
+  filter: blur(26px);
+  transform: rotate(-24deg);
+  animation: vv-auth-beam 9s ease-in-out infinite alternate;
+}
+.auth-beam-b {
+  width: 28rem;
+  height: 7rem;
+  right: -42%;
+  bottom: 10%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 22%, transparent), transparent);
+  filter: blur(28px);
+  transform: rotate(32deg);
+  animation: vv-auth-beam 12s ease-in-out -3s infinite alternate-reverse;
+}
+@keyframes vv-auth-beam {
+  from { translate: -1.5rem -0.5rem; opacity: 0.45; }
+  to { translate: 3rem 1.5rem; opacity: 0.9; }
+}
+.auth-floaters {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   pointer-events: none;
 }
-.auth-orb-a {
-  width: 22rem;
-  height: 22rem;
-  top: -6rem;
-  left: -5rem;
-  background: color-mix(in srgb, var(--primary-glow) 55%, transparent);
-  opacity: 0.35;
-  animation: vv-auth-float 11s ease-in-out infinite;
+.auth-floater {
+  position: absolute;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--border));
+  border-radius: 0.65rem;
+  color: color-mix(in srgb, var(--primary) 62%, var(--muted-foreground));
+  background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+  box-shadow: 0 10px 32px color-mix(in srgb, var(--primary) 12%, transparent);
+  opacity: 0.52;
+  animation: vv-auth-icon 7s ease-in-out infinite;
 }
-.auth-orb-b {
-  width: 18rem;
-  height: 18rem;
-  bottom: -5rem;
-  right: -3rem;
-  background: color-mix(in srgb, #21d4d8 45%, transparent);
-  opacity: 0.22;
-  animation: vv-auth-float 14s ease-in-out -4s infinite reverse;
-}
-@keyframes vv-auth-float {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(2rem, -1.5rem, 0) scale(1.08); }
+.auth-floater svg { width: 0.9rem; height: 0.9rem; }
+.auth-floater-play { top: 14%; right: 12%; animation-delay: -1s; }
+.auth-floater-heart { top: 44%; right: 8%; animation-delay: -4s; }
+.auth-floater-send { bottom: 10%; left: 13%; animation-delay: -2s; }
+.auth-floater-caption { top: 38%; left: 7%; animation-delay: -5.5s; }
+.auth-floater-trend { bottom: 27%; right: 21%; animation-delay: -3s; }
+@keyframes vv-auth-icon {
+  0%, 100% { transform: translateY(0) rotate(-3deg); opacity: 0.32; }
+  50% { transform: translateY(-14px) rotate(4deg); opacity: 0.72; }
 }
 .auth-live {
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 60%, transparent);
@@ -1118,6 +1152,7 @@
 }
 .auth-card {
   animation: vv-rise var(--dur-panel, 240ms) var(--ease-out-expo, cubic-bezier(0.2, 0.8, 0.2, 1)) both;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 5%, transparent);
 }
 .auth-logo {
   background-image: var(--gradient-primary);
@@ -1173,6 +1208,13 @@
   to { opacity: 1; transform: translateY(0); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .auth-orb, .auth-live, .auth-shine, .auth-cta::after, .auth-enter, .auth-swap { animation: none !important; }
+  .auth-beam, .auth-floater, .auth-live, .auth-shine, .auth-cta::after, .auth-enter, .auth-swap { animation: none !important; }
   .auth-shine { color: var(--foreground); -webkit-text-fill-color: currentColor; }
+}
+
+@media (min-width: 768px) and (max-height: 680px) {
+  .auth-stage { padding-top: 1.25rem; padding-bottom: 1.25rem; }
+  .auth-stage h1 { margin-top: 1rem; font-size: 1.85rem; }
+  .auth-stage ul { margin-top: 1rem; }
+  .auth-stage > div:nth-of-type(3) { margin-top: 1rem; }
 }
