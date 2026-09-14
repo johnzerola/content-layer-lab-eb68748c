@@ -416,6 +416,45 @@ export function TemplateEditor({
     setT({ ...t, extras: list.map((e, i) => ({ ...e, z: 100 + i })) });
   };
 
+  /** converte um ponto da tela em coordenadas do canvas 1080x1920 */
+  const toCanvasPoint = (clientX: number, clientY: number) => {
+    const canvas = stageRef.current?.querySelector("canvas");
+    const W = t.canvasW ?? 1080;
+    const H = t.canvasH ?? 1920;
+    if (!canvas) return { x: W / 2, y: H / 2 };
+    const r = canvas.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(W, ((clientX - r.left) / Math.max(1, r.width)) * W)),
+      y: Math.max(0, Math.min(H, ((clientY - r.top) / Math.max(1, r.height)) * H)),
+    };
+  };
+
+  const handleStageDrop = async (dt: DataTransfer, clientX: number, clientY: number) => {
+    const at = toCanvasPoint(clientX, clientY);
+    const kind = dt.getData("application/x-vaiviral-layer");
+    if (kind === "text" || kind === "image") {
+      addExtra(kind, at);
+      return;
+    }
+    const files = Array.from(dt.files ?? []);
+    if (files.length === 0) return;
+    for (const f of files) {
+      const name = f.name.toLowerCase();
+      if (f.type.startsWith("image/")) {
+        addExtra("image", at, await fileToDataUrl(f));
+      } else if (/\.(ttf|otf|woff2?)$/.test(name)) {
+        await uploadFont(f);
+        toast.success(`Fonte "${f.name}" adicionada`);
+      } else if (f.type.startsWith("audio/")) {
+        toast.info("Som entra no Editor profissional", {
+          description: "Aqui você monta o visual; a trilha e o volume ficam na etapa de edição do vídeo.",
+        });
+      } else if (f.type.startsWith("video/")) {
+        toast.info("O vídeo de fundo vem da lista de vídeos importados.");
+      }
+    }
+  };
+
 
   const textLayer = (id: LayerId) => t[KEY_OF[id]] as unknown as TextLayer;
   const imgLayer = (id: LayerId) => t[KEY_OF[id]] as unknown as ImageLayer;
