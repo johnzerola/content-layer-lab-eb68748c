@@ -384,7 +384,7 @@ export function TemplateEditor({
   const [snap, setSnap] = useState(true);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [dropping, setDropping] = useState(false);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(0.75);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [timelineOpen, setTimelineOpen] = useState(true);
 
@@ -1159,7 +1159,7 @@ export function TemplateEditor({
         <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:min-h-[520px] lg:grid-cols-[276px_minmax(0,1fr)_348px] lg:overflow-hidden">
           {/* Coluna esquerda: camadas e ajustes do template */}
           <aside className="flex min-h-0 flex-col border-border lg:border-r">
-            <div className="flex gap-1 border-b border-border p-2">
+            <div className="grid grid-cols-4 gap-1 border-b border-border p-2">
               {[
                 { id: "layers" as const, label: "Camadas", icon: <Layers className="size-3.5" /> },
                 { id: "design" as const, label: "Design", icon: <Palette className="size-3.5" /> },
@@ -1170,7 +1170,7 @@ export function TemplateEditor({
                   key={item.id}
                   onClick={() => setTab(item.id)}
                   aria-pressed={tab === item.id}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium transition ${
+                  className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[10px] font-medium transition ${
                     tab === item.id
                       ? "bg-primary/15 text-primary"
                       : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
@@ -1670,37 +1670,31 @@ export function TemplateEditor({
           <section className="flex min-h-0 flex-col items-center justify-center gap-3 bg-background/40 p-4">
             <div className="flex w-full items-center justify-between gap-2">
               <p className="studio-label">Preview em tempo real</p>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))}
-                  className="rounded-lg border border-border p-1.5 hover:border-primary"
-                  aria-label="Diminuir zoom"
-                  title="Diminuir zoom"
-                >
-                  <ZoomOut className="size-3.5" />
-                </button>
-                <span className="w-12 text-center font-mono text-[11px] text-muted-foreground">
+              <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-surface-2 px-2 py-1">
+                <ZoomOut className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                <input
+                  type="range"
+                  min={50}
+                  max={200}
+                  step={5}
+                  value={Math.round(zoom * 100)}
+                  onChange={(event) => setZoom(Number(event.target.value) / 100)}
+                  aria-label="Zoom da prévia"
+                  aria-valuetext={`${Math.round(zoom * 100)}%`}
+                  className="w-28 sm:w-36"
+                />
+                <ZoomIn className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                <output className="w-10 shrink-0 text-right font-mono text-[11px] text-foreground">
                   {Math.round(zoom * 100)}%
-                </span>
+                </output>
                 <button
-                  onClick={() => setZoom((z) => Math.min(4, +(z + 0.25).toFixed(2)))}
-                  className="rounded-lg border border-border p-1.5 hover:border-primary"
-                  aria-label="Aumentar zoom"
-                  title="Aumentar zoom"
-                >
-                  <ZoomIn className="size-3.5" />
-                </button>
-                <button
-                  onClick={() => setZoom(1)}
-                  className="rounded-lg border border-border p-1.5 hover:border-primary"
+                  onClick={() => setZoom(0.75)}
+                  className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-surface-3 hover:text-foreground"
                   aria-label="Ajustar zoom"
                   title="Ajustar à tela"
                 >
                   <Maximize2 className="size-3.5" />
                 </button>
-                <span className="ml-1 rounded-full border border-border px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
-                  {t.canvasW ?? 1080}×{t.canvasH ?? 1920}
-                </span>
               </div>
             </div>
             <div
@@ -1720,7 +1714,7 @@ export function TemplateEditor({
               }}
               onWheel={(ev) => {
                 if (!ev.ctrlKey && !ev.metaKey) return;
-                setZoom((z) => Math.min(4, Math.max(0.5, +(z * Math.exp(-ev.deltaY * 0.0015)).toFixed(2))));
+                setZoom((z) => Math.min(2, Math.max(0.5, +(z * Math.exp(-ev.deltaY * 0.001)).toFixed(2))));
               }}
               className={`grid min-h-0 w-full flex-1 place-items-center overflow-auto rounded-2xl border bg-[repeating-conic-gradient(var(--color-surface-2)_0%_25%,transparent_0%_50%)] bg-[length:22px_22px] p-4 transition ${
                 dropping ? "border-primary bg-primary/5 ring-2 ring-primary/40" : "border-border"
