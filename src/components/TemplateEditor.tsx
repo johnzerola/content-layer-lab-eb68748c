@@ -1259,7 +1259,25 @@ export function TemplateEditor({
                 {t.canvasW ?? 1080}×{t.canvasH ?? 1920}
               </span>
             </div>
-            <div className="grid min-h-0 w-full flex-1 place-items-center rounded-2xl border border-border bg-[repeating-conic-gradient(var(--color-surface-2)_0%_25%,transparent_0%_50%)] bg-[length:22px_22px] p-4">
+            <div
+              ref={stageRef}
+              onDragOver={(ev) => {
+                ev.preventDefault();
+                ev.dataTransfer.dropEffect = "copy";
+                if (!dropping) setDropping(true);
+              }}
+              onDragLeave={(ev) => {
+                if (!ev.currentTarget.contains(ev.relatedTarget as Node | null)) setDropping(false);
+              }}
+              onDrop={(ev) => {
+                ev.preventDefault();
+                setDropping(false);
+                void handleStageDrop(ev.dataTransfer, ev.clientX, ev.clientY);
+              }}
+              className={`grid min-h-0 w-full flex-1 place-items-center rounded-2xl border bg-[repeating-conic-gradient(var(--color-surface-2)_0%_25%,transparent_0%_50%)] bg-[length:22px_22px] p-4 transition ${
+                dropping ? "border-primary bg-primary/5 ring-2 ring-primary/40" : "border-border"
+              }`}
+            >
               <TemplateCanvas
                 frameClassName="aspect-[9/16] h-full max-h-[62vh] w-auto max-w-full rounded-xl shadow-[0_24px_60px_-24px_rgba(0,0,0,0.8)]"
                 template={t}
@@ -1280,6 +1298,7 @@ export function TemplateEditor({
                 speed={adPreview ? adVariation.speed : 1}
               />
             </div>
+
             <p className="text-center text-[11px] text-muted-foreground">
               Arraste para mover · alças nos 8 pontos para redimensionar · Shift mantém proporção · Alt redimensiona
               pelo centro · setas movem 1px (Shift 10px)
