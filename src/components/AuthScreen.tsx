@@ -80,7 +80,7 @@ export function AuthScreen({
   };
 
   return (
-    <div className="auth-screen grid max-h-[94vh] w-full overflow-y-auto rounded-3xl border border-border bg-surface lg:max-h-[88vh] lg:grid-cols-[1.05fr_1fr] lg:overflow-hidden">
+    <div className="auth-screen auth-enter grid max-h-[94vh] w-full overflow-y-auto rounded-3xl border border-border bg-surface lg:max-h-[88vh] lg:grid-cols-[1.05fr_1fr] lg:overflow-hidden">
       {/* ---------- vitrine ---------- */}
       <aside className="auth-stage relative hidden flex-col justify-between overflow-hidden p-8 lg:flex">
         <span aria-hidden className="auth-orb auth-orb-a" />
