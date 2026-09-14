@@ -2,13 +2,15 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowRight,
   Check,
+  Clapperboard,
   Eye,
   EyeOff,
-  Heart,
+  Facebook,
+  Instagram,
   Loader2,
-  Play,
-  Send,
+  Music2,
   Sparkles,
+  Youtube,
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,7 +28,15 @@ const FEATURES = [
   "Publicação direta em TikTok, Reels e Shorts",
 ];
 
-function AnimatedNumber({ value, suffix }: { value: number; suffix: string }) {
+const SOCIAL_ICONS = [
+  { label: "Instagram", Icon: Instagram, className: "auth-social-instagram" },
+  { label: "TikTok", Icon: Music2, className: "auth-social-tiktok" },
+  { label: "Kwai", Icon: Clapperboard, className: "auth-social-kwai" },
+  { label: "YouTube", Icon: Youtube, className: "auth-social-youtube" },
+  { label: "Facebook", Icon: Facebook, className: "auth-social-facebook" },
+] as const;
+
+function AnimatedNumber({ value, suffix, delay = 0 }: { value: number; suffix: string; delay?: number }) {
   const [display, setDisplay] = useState(0);
 
   useEffect(() => {
@@ -35,18 +45,18 @@ function AnimatedNumber({ value, suffix }: { value: number; suffix: string }) {
       return;
     }
 
-    const duration = 1100;
-    const startedAt = performance.now();
+    const duration = 1450;
+    const startedAt = performance.now() + delay;
     let frame = 0;
     const tick = (now: number) => {
-      const progress = Math.min(1, (now - startedAt) / duration);
+      const progress = Math.max(0, Math.min(1, (now - startedAt) / duration));
       const eased = 1 - Math.pow(1 - progress, 3);
       setDisplay(value * eased);
       if (progress < 1) frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [value]);
+  }, [delay, value]);
 
   const formatted = value % 1 === 0 ? Math.round(display).toString() : display.toFixed(1).replace(".", ",");
   return <>{formatted}{suffix}</>;
@@ -123,10 +133,14 @@ export function AuthScreen({
         <span aria-hidden className="auth-beam auth-beam-a" />
         <span aria-hidden className="auth-beam auth-beam-b" />
         <span aria-hidden className="auth-grid" />
-        <div aria-hidden className="auth-floaters">
-          <span className="auth-floater auth-floater-play"><Play /></span>
-          <span className="auth-floater auth-floater-heart"><Heart /></span>
-          <span className="auth-floater auth-floater-send"><Send /></span>
+        <div aria-hidden className="auth-social-stream">
+          <div className="auth-social-track">
+            {[...SOCIAL_ICONS, ...SOCIAL_ICONS].map(({ label, Icon, className }, index) => (
+              <span className={`auth-social-icon ${className}`} key={`${label}-${index}`} title={label}>
+                <Icon />
+              </span>
+            ))}
+          </div>
         </div>
 
         <div className="relative">
@@ -156,7 +170,7 @@ export function AuthScreen({
                   h.tone === "primary" ? "text-gradient" : "text-foreground"
                 }`}
               >
-                <AnimatedNumber value={h.value} suffix={h.suffix} />
+                <AnimatedNumber value={h.value} suffix={h.suffix} delay={180 + i * 160} />
               </p>
               <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{h.label}</p>
             </div>
