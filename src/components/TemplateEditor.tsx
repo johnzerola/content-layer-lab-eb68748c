@@ -36,6 +36,7 @@ import {
   type LayerId,
   type SelId,
   type Template,
+  type ExtraLayer,
   type TextLayer,
   type EdgeFxKind,
   GRADIENT_PRESETS,
@@ -325,7 +326,7 @@ function mapTexts(t: Template, fn: (l: TextLayer) => TextLayer): Template {
     headline: fn(t.headline),
     cta: fn(t.cta),
     extras: (t.extras ?? []).map((e) =>
-      e.kind === "text" ? ({ ...(fn(e as unknown as TextLayer) as unknown as object), kind: "text" } as typeof e) : e,
+      "text" in e ? ({ ...e, ...fn(e as unknown as TextLayer) } as ExtraLayer) : e,
     ),
   };
 }
@@ -336,7 +337,7 @@ function applyStylePreset(t: Template, p: StylePreset): Template {
     ...next,
     bgGradient: { ...p.bgGradient },
     edgeFx: { ...p.edgeFx },
-    captions: next.captions ? { ...next.captions, font: p.font, weight: p.weight } : next.captions,
+    ...(next.captions ? { captions: { ...next.captions, font: p.font, weight: p.weight } } : {}),
   };
 }
 
