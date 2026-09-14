@@ -82,7 +82,7 @@ export function AuthScreen({
   return (
     <div className="auth-screen grid w-full overflow-hidden rounded-3xl border border-border bg-surface lg:grid-cols-[1.05fr_1fr]">
       {/* ---------- vitrine ---------- */}
-      <aside className="auth-stage relative hidden flex-col justify-between overflow-hidden p-10 lg:flex">
+      <aside className="auth-stage relative hidden flex-col justify-between overflow-hidden p-8 lg:flex">
         <span aria-hidden className="auth-orb auth-orb-a" />
         <span aria-hidden className="auth-orb auth-orb-b" />
         <span aria-hidden className="auth-grid" />
@@ -93,7 +93,7 @@ export function AuthScreen({
             estúdio em produção
           </span>
 
-          <h1 className="mt-7 font-display text-[clamp(2.4rem,4vw,3.4rem)] font-extrabold leading-[0.95] tracking-tight">
+          <h1 className="mt-6 font-display text-[clamp(2rem,3.2vw,2.9rem)] font-extrabold leading-[0.95] tracking-tight">
             <span className="auth-shine block">Seus cortes</span>
             <span className="text-gradient block">viram audiência.</span>
           </h1>
@@ -102,7 +102,7 @@ export function AuthScreen({
           </p>
         </div>
 
-        <div className="relative mt-8 grid grid-cols-2 gap-3">
+        <div className="relative mt-6 grid grid-cols-2 gap-3">
           {HIGHLIGHTS.map((h, i) => (
             <div
               key={h.label}
@@ -121,7 +121,7 @@ export function AuthScreen({
           ))}
         </div>
 
-        <ul className="relative mt-8 space-y-2.5">
+        <ul className="relative mt-6 space-y-2">
           {FEATURES.map((f, i) => (
             <li
               key={f}
@@ -138,7 +138,7 @@ export function AuthScreen({
       </aside>
 
       {/* ---------- formulário ---------- */}
-      <section className="relative flex flex-col justify-center bg-surface-2/40 p-7 sm:p-10">
+      <section className="relative flex flex-col justify-center bg-surface-2/40 p-6 sm:p-9">
         <div className={`mx-auto w-full max-w-sm ${mounted ? "rise-in" : "opacity-0"}`}>
           <div className="flex flex-col items-center text-center">
             <span className="auth-logo grid size-12 place-items-center rounded-2xl text-primary-foreground">
@@ -151,7 +151,7 @@ export function AuthScreen({
           <div
             role="tablist"
             aria-label="Entrar ou criar conta"
-            className="relative mt-7 grid grid-cols-2 rounded-xl border border-border bg-surface p-1"
+            className="relative mt-6 grid grid-cols-2 rounded-xl border border-border bg-surface p-1"
           >
             <span
               aria-hidden
