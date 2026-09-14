@@ -9,6 +9,8 @@ import {
   ArrowUp,
   ArrowDown,
   Magnet,
+  ChevronDown,
+  ChevronUp,
   Bug,
   Eye,
   EyeOff,
@@ -296,6 +298,7 @@ export function TemplateEditor({
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [dropping, setDropping] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [timelineOpen, setTimelineOpen] = useState(true);
 
   const [debug, setDebug] = useState(false);
   const [debugGrid, setDebugGrid] = useState(3);
@@ -1065,7 +1068,7 @@ export function TemplateEditor({
         </header>
 
         {/* Área de trabalho: ferramentas · palco · propriedades */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:min-h-[440px] lg:grid-cols-[276px_minmax(0,1fr)_348px] lg:overflow-hidden">
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:min-h-[520px] lg:grid-cols-[276px_minmax(0,1fr)_348px] lg:overflow-hidden">
           {/* Coluna esquerda: camadas e ajustes do template */}
           <aside className="flex min-h-0 flex-col border-border lg:border-r">
             <div className="flex gap-1 border-b border-border p-2">
@@ -1343,7 +1346,7 @@ export function TemplateEditor({
               }`}
             >
               <TemplateCanvas
-                frameClassName="aspect-[9/16] h-full max-h-[62vh] w-auto max-w-full rounded-xl shadow-[0_24px_60px_-24px_rgba(0,0,0,0.8)]"
+                frameClassName="aspect-[9/16] h-full max-h-[64vh] min-h-[300px] w-auto max-w-full rounded-xl shadow-[0_24px_60px_-24px_rgba(0,0,0,0.8)]"
                 template={t}
                 previewFile={previewFile ?? null}
                 timelineTime={time}
