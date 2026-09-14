@@ -1166,6 +1166,17 @@ export function EditorV2Foundation() {
       const safe = Math.max(definition.durationMin, Math.min(duration, definition.durationMax, context.maxDuration));
       run(new ApplyTransitionCommand({ ...transition, duration: safe }), `Transição ajustada para ${safe.toFixed(2)}s.`);
     },
+    onEditEffectRange: (clipId: string, effectId: string, start: number, end: number) => {
+      const state = busRef.current.getState();
+      const clip = findClip(state, clipId);
+      if (!clip) return;
+      const duration = Number(clip.projectEnd) - Number(clip.projectStart);
+      const safeStart = Math.max(0, Math.min(duration - .04, start));
+      const safeEnd = Math.min(duration, Math.max(safeStart + .04, end));
+      run(new UpdateClipCommand(clipId, { effects: clip.effects.map((effect) => effect.id === effectId ? { ...effect, parameters: { ...effect.parameters, start: safeStart, end: safeEnd } } : effect) }), "Intervalo do efeito atualizado.");
+      seek(Number(clip.projectStart) + safeStart);
+      setMobileSurface("inspector");
+    },
   };
 
   const libraryProps = {

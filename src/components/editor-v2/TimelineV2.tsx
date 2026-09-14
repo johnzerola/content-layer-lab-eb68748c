@@ -35,6 +35,7 @@ interface TimelineProps {
   onDropLibraryItem: (id: string, at: number) => void;
   onSelectTransition: (transitionId: string) => void;
   onResizeTransition: (transitionId: string, duration: number) => void;
+  onEditEffectRange: (clipId: string, effectId: string, start: number, end: number) => void;
 }
 
 type Draft = { id: string; mode: "move" | "trim-start" | "trim-end"; start: number; end: number; targetTrackId: string; compatible: boolean };
@@ -43,13 +44,14 @@ const TRACK_HEIGHT = 48;
 const RULER_HEIGHT = 28;
 
 export function TimelineV2(props: TimelineProps) {
-  const { project, currentTime, playing, zoom, assetThumbnails, assetWaveforms, onZoom, onSeek, onSelect, onMove, onTrim, onMoveKeyframe, onSplit, onAutoSplit, onRemoveSilence, removingSilence, onDuplicate, onDelete, onTogglePlayback, onSkip, onBatchSpeed, onBatchToggleReverse, onBatchToggleFlip, onCreateCompound, onDissolveCompound, onAddTrack, onToggleSnap, onToggleRipple, onTrackPatch, onDropLibraryItem, onSelectTransition, onResizeTransition } = props;
+  const { project, currentTime, playing, zoom, assetThumbnails, assetWaveforms, onZoom, onSeek, onSelect, onMove, onTrim, onMoveKeyframe, onSplit, onAutoSplit, onRemoveSilence, removingSilence, onDuplicate, onDelete, onTogglePlayback, onSkip, onBatchSpeed, onBatchToggleReverse, onBatchToggleFlip, onCreateCompound, onDissolveCompound, onAddTrack, onToggleSnap, onToggleRipple, onTrackPatch, onDropLibraryItem, onSelectTransition, onResizeTransition, onEditEffectRange } = props;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [autoCutOpen, setAutoCutOpen] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
   const [layerOpen, setLayerOpen] = useState(false);
   const [transitionDraft, setTransitionDraft] = useState<{ id: string; duration: number } | null>(null);
+  const [effectDraft, setEffectDraft] = useState<{ id: string; start: number; end: number } | null>(null);
   const [autoCutInterval, setAutoCutInterval] = useState(2);
   const [autoCutMode, setAutoCutMode] = useState<"interval" | "silence">("interval");
   const [silencePreset, setSilencePreset] = useState<"natural" | "tight">("natural");
@@ -183,6 +185,33 @@ export function TimelineV2(props: TimelineProps) {
     window.addEventListener("pointerup", up, { once: true });
   };
 
+  const beginEffectGesture = (event: React.PointerEvent, clip: Clip, effectId: string, mode: "move" | "start" | "end", initialStart: number, initialEnd: number) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect(clip.id, false);
+    const startX = event.clientX;
+    const clipDuration = Number(clip.projectEnd) - Number(clip.projectStart);
+    let latest = { id: effectId, start: initialStart, end: initialEnd };
+    const move = (next: PointerEvent) => {
+      const delta = (next.clientX - startX) / pxPerSecond;
+      if (mode === "move") {
+        const duration = initialEnd - initialStart;
+        const start = Math.max(0, Math.min(clipDuration - duration, initialStart + delta));
+        latest = { id: effectId, start, end: start + duration };
+      } else if (mode === "start") latest = { id: effectId, start: Math.max(0, Math.min(initialEnd - .04, initialStart + delta)), end: initialEnd };
+      else latest = { id: effectId, start: initialStart, end: Math.min(clipDuration, Math.max(initialStart + .04, initialEnd + delta)) };
+      setEffectDraft(latest);
+    };
+    const up = () => {
+      onEditEffectRange(clip.id, effectId, latest.start, latest.end);
+      setEffectDraft(null);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up, { once: true });
+  };
+
   return (
     <section className="editor-v2-timeline flex h-full min-h-0 flex-col" aria-label="Timeline multitrack">
       <header className="editor-v2-timeline-toolbar flex h-11 shrink-0 items-center gap-1 px-2 sm:px-3">
@@ -251,6 +280,12 @@ export function TimelineV2(props: TimelineProps) {
                     {(track.kind === "voice" || track.kind === "music" || track.kind === "sfx") && <Waveform {...(clip.assetId && assetWaveforms[clip.assetId] ? { peaks: assetWaveforms[clip.assetId] } : {})} />}
                     <span className="relative z-10 truncate drop-shadow-sm">{clip.name}</span>
                     {badges.length > 0 && <span className="relative z-10 ml-auto flex shrink-0 gap-0.5 pl-1" aria-label={badges.join(", ")}>{badges.map((badge) => <i key={badge} className="rounded bg-black/45 px-1 py-0.5 text-[7px] not-italic font-bold tracking-wide text-white/90">{badge}</i>)}</span>}
+                    {clip.effects.map((effect) => {
+                      const clipDuration = Number(clip.projectEnd) - Number(clip.projectStart);
+                      const start = effectDraft?.id === effect.id ? effectDraft.start : Math.max(0, Number(effect.parameters["start"] ?? 0));
+                      const end = effectDraft?.id === effect.id ? effectDraft.end : Math.min(clipDuration, Number(effect.parameters["end"] ?? clipDuration));
+                      return <div key={effect.id} data-effect-id={effect.id} title={`${effect.definitionId} · arraste para mover; use as bordas para ajustar`} onPointerDown={(event) => beginEffectGesture(event, clip, effect.id, "move", start, end)} className={`absolute bottom-0 z-30 h-2 min-w-3 cursor-grab rounded-t border-x border-t border-cyan-100/70 ${effect.enabled ? "bg-cyan-400/90 shadow-[0_0_9px_rgba(34,211,238,.55)]" : "bg-slate-500/70"}`} style={{ left: start * pxPerSecond, width: Math.max(12, (end - start) * pxPerSecond) }}><button type="button" aria-label={`Ajustar início de ${effect.definitionId}`} onPointerDown={(event) => beginEffectGesture(event, clip, effect.id, "start", start, end)} className="absolute inset-y-0 left-0 w-2 cursor-ew-resize bg-white/15 hover:bg-white/50" /><button type="button" aria-label={`Ajustar fim de ${effect.definitionId}`} onPointerDown={(event) => beginEffectGesture(event, clip, effect.id, "end", start, end)} className="absolute inset-y-0 right-0 w-2 cursor-ew-resize bg-white/15 hover:bg-white/50" /></div>;
+                    })}
                     {selected && clip.animations.flatMap((animation) => animation.keyframes.map((keyframe) => <button key={`${animation.property}-${keyframe.id}`} type="button" data-keyframe-id={keyframe.id} aria-label={`${animation.property} em ${formatProjectTime(Number(clip.projectStart) + Number(keyframe.time))}`} onPointerDown={(event) => beginKeyframeGesture(event, clip, animation.property, keyframe.id, Number(keyframe.time))} onClick={(event) => { event.stopPropagation(); onSeek(Number(clip.projectStart) + Number(keyframe.time)); }} className="absolute top-1/2 z-30 size-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[2px] border border-white bg-primary shadow-[0_0_0_2px_rgba(8,8,15,.75)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" style={{ left: Number(keyframe.time) * pxPerSecond }} />))}
                     {!track.locked && <><button type="button" aria-label={`Aparar início de ${clip.name}`} onPointerDown={(event) => beginClipGesture(event, clip, "trim-start")} className="absolute inset-y-0 left-0 z-20 w-2 cursor-ew-resize bg-white/0 hover:bg-white/30 focus-visible:bg-white/35" /><button type="button" aria-label={`Aparar fim de ${clip.name}`} onPointerDown={(event) => beginClipGesture(event, clip, "trim-end")} className="absolute inset-y-0 right-0 z-20 w-2 cursor-ew-resize bg-white/0 hover:bg-white/30 focus-visible:bg-white/35" /></>}
                   </div>;
