@@ -942,9 +942,10 @@ export function TemplateEditor({
               <Sparkles className="size-4" />
             </span>
             <div className="min-w-0 flex-1">
-              <label className="studio-label" htmlFor="studio-template-name">
+              <label className="studio-label block" htmlFor="studio-template-name">
                 Nome do template
               </label>
+
               <input
                 id="studio-template-name"
                 className="w-full max-w-md truncate border-0 bg-transparent p-0 studio-title text-[19px] text-foreground outline-none placeholder:text-muted-foreground focus:underline focus:decoration-primary/60 focus:underline-offset-4"
