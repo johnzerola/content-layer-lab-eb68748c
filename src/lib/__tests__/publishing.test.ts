@@ -72,10 +72,10 @@ describe("publishing policy", () => {
     expect(isRetryableCode("AUTH_INVALID")).toBe(false);
   });
 
-  it("does not advertise unimplemented platforms", () => {
+  it("advertises only implemented platform formats", () => {
     expect(canPublish("instagram", "reels")).toBe(true);
     expect(canPublish("instagram", "feed")).toBe(true);
-    expect(canPublish("tiktok", "reels")).toBe(false);
+    expect(canPublish("tiktok", "reels")).toBe(true);
     expect(canPublish("youtube", "reels")).toBe(false);
     expect(canPublish("youtube", "shorts")).toBe(true);
     expect(canPublish("youtube", "feed")).toBe(true);
@@ -93,7 +93,7 @@ describe("publishing policy", () => {
     expect(activeProvider("ayrshare")).toBeNull();
   });
 
-  it("rejects unsupported platforms without calling an external API", async () => {
+  it("requires an official TikTok account token", async () => {
     const result = await publish({
       kind: "reels",
       caption: "",
@@ -102,7 +102,7 @@ describe("publishing policy", () => {
       platform: "tiktok",
       provider: "tiktok",
     });
-    expect(result).toMatchObject({ ok: false, code: "CAPABILITY_UNAVAILABLE", retryable: false });
+    expect(result).toMatchObject({ ok: false, code: "ACCOUNT_NOT_CONNECTED", retryable: false });
   });
 
   it("prevents a Meta credential from targeting a different account", async () => {
@@ -172,6 +172,44 @@ describe("YouTube publisher", () => {
     expect(new Headers(fetchMock.mock.calls[2]?.[1]?.headers).get("authorization")).toBe(
       "Bearer youtube-access-token",
     );
+  });
+});
+
+describe("TikTok publisher", () => {
+  it("uploads a connected account video and returns its public link", async () => {
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(bytes, { status: 200, headers: { "content-type": "video/mp4" } }))
+      .mockResolvedValueOnce(jsonResponse(200, { data: { privacy_level_options: ["PUBLIC_TO_EVERYONE"] }, error: { code: "ok" } }))
+      .mockResolvedValueOnce(jsonResponse(200, { data: { publish_id: "pub-1", upload_url: "https://upload.tiktok.test/video" }, error: { code: "ok" } }))
+      .mockResolvedValueOnce(new Response(null, { status: 201 }))
+      .mockResolvedValueOnce(jsonResponse(200, { data: { status: "PUBLISH_COMPLETE", publicaly_available_post_id: ["tt-1"] }, error: { code: "ok" } }));
+
+    await expect(
+      publish({
+        kind: "reels",
+        caption: "Vídeo pronto",
+        videoUrl: "https://storage.example/video.mp4",
+        username: "criador",
+        platform: "tiktok",
+        provider: "tiktok",
+        providerAccountId: "open-id",
+        providerAccessToken: "tiktok-access-token",
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      providerPostId: "tt-1",
+      permalink: "https://www.tiktok.com/@criador/video/tt-1",
+    });
+
+    expect(String(fetchMock.mock.calls[2]?.[0])).toBe(
+      "https://open.tiktokapis.com/v2/post/publish/video/init/",
+    );
+    expect(new Headers(fetchMock.mock.calls[2]?.[1]?.headers).get("authorization")).toBe(
+      "Bearer tiktok-access-token",
+    );
+    expect(fetchMock.mock.calls[3]?.[1]).toMatchObject({ method: "PUT" });
   });
 });
 

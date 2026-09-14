@@ -103,7 +103,7 @@ export async function publishClaimedPost(post: ClaimedPost, deps: QueueDependenc
   }
 
   const selectedProvider = provider(connection?.provider ?? account.provider);
-  const needsToken = selectedProvider === "meta" || selectedProvider === "youtube";
+  const needsToken = selectedProvider === "meta" || selectedProvider === "youtube" || selectedProvider === "tiktok";
   const credential = needsToken && connection && deps.loadProviderAccessToken
     ? await deps.loadProviderAccessToken(connection)
     : undefined;
@@ -113,7 +113,9 @@ export async function publishClaimedPost(post: ClaimedPost, deps: QueueDependenc
       "AUTH_INVALID",
       selectedProvider === "youtube"
         ? "A credencial do canal do YouTube não está disponível. Reconecte o canal."
-        : "A credencial da conexão Meta não está disponível. Reconecte a Página/Instagram.",
+        : selectedProvider === "tiktok"
+          ? "A credencial da conta TikTok não está disponível. Reconecte a conta."
+          : "A credencial da conexão Meta não está disponível. Reconecte a Página/Instagram.",
     );
   }
 

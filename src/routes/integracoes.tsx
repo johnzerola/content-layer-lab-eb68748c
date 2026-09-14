@@ -3,7 +3,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useState } from "react";
 import {
   CheckCircle2,
-  Clock3,
   ExternalLink,
   Star,
   Facebook,
@@ -14,7 +13,7 @@ import {
   Pencil,
   RefreshCw,
   ShieldCheck,
-  Settings2,
+  Music2,
   Trash2,
   TriangleAlert,
   UserRound,
@@ -43,6 +42,7 @@ import {
   syncYoutubeChannels,
 } from "@/lib/youtube-oauth.functions";
 import { setPrimaryAccount } from "@/lib/social-primary.functions";
+import { beginTikTokOAuth } from "@/lib/tiktok-oauth.functions";
 import { RECONNECT_GUIDE_STEPS } from "@/lib/meta-reconnect-guide";
 import {
   YOUTUBE_RECONNECT_GUIDE_STEPS,
@@ -119,6 +119,13 @@ const YOUTUBE_PLATFORM = {
   icon: Youtube,
 };
 
+const TIKTOK_PLATFORM = {
+  platform: "tiktok" as const,
+  name: "TikTok",
+  description: "Vídeos verticais pela API oficial, com envio direto e link da publicação.",
+  icon: Music2,
+};
+
 function IntegrationsPage() {
   const mode: AppMode = "external";
   const jobs = listJobs();
@@ -129,6 +136,7 @@ function IntegrationsPage() {
   const startFacebook = useServerFn(beginFacebookOAuth);
   const startInstagram = useServerFn(beginInstagramOAuth);
   const startYoutube = useServerFn(beginYoutubeOAuth);
+  const startTikTok = useServerFn(beginTikTokOAuth);
   const syncYoutube = useServerFn(syncYoutubeChannels);
   const refreshChannel = useServerFn(refreshYoutubeChannel);
   const syncMeta = useServerFn(syncMetaAccounts);
@@ -196,6 +204,15 @@ function IntegrationsPage() {
           window.location.href = response.authorizationUrl;
           return;
         }
+        if (platform === "tiktok") {
+          const response = await startTikTok();
+          if (!response.ok) {
+            toast.error(response.error);
+            return;
+          }
+          window.location.href = response.authorizationUrl;
+          return;
+        }
         if (platform === "instagram") {
           const response = await startInstagram();
           if (!response.ok) {
@@ -243,7 +260,7 @@ function IntegrationsPage() {
         setBusy(null);
       }
     },
-    [startFacebook, startInstagram, startYoutube],
+    [startFacebook, startInstagram, startTikTok, startYoutube],
   );
 
   const disconnect = useCallback(
@@ -369,6 +386,7 @@ function IntegrationsPage() {
   const facebookAccounts = accounts.filter((account) => account.platform === "facebook");
   const instagramAccounts = accounts.filter((account) => account.platform === "instagram");
   const youtubeAccounts = accounts.filter((account) => account.platform === "youtube");
+  const tiktokAccounts = accounts.filter((account) => account.platform === "tiktok");
   const hasMetaAccounts = facebookAccounts.length + instagramAccounts.length > 0;
   const hasYoutubeAccounts = youtubeAccounts.length > 0;
   const connectingFacebook = busy === "facebook";
@@ -484,6 +502,16 @@ function IntegrationsPage() {
                 )}
                 {hasYoutubeAccounts ? "Adicionar canal/Conta de marca" : "Conectar YouTube"}
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy === "tiktok"}
+                onClick={() => void connect("tiktok")}
+                className="min-h-10 shrink-0"
+              >
+                {busy === "tiktok" ? <Loader2 className="size-4 animate-spin" /> : <Music2 className="size-4" />}
+                {tiktokAccounts.length > 0 ? "Adicionar TikTok" : "Conectar TikTok"}
+              </Button>
               {hasYoutubeAccounts && (
                 <Button
                   type="button"
@@ -547,6 +575,25 @@ function IntegrationsPage() {
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <ShieldCheck className="size-4 text-emerald-400" />
+                Conexão oficial TikTok
+              </div>
+              <p className="text-xs text-muted-foreground">{tiktokAccounts.length} conta(s) conectada(s)</p>
+            </div>
+            <AccountsColumn
+              platform={TIKTOK_PLATFORM}
+              accounts={tiktokAccounts}
+              divided={false}
+              onPrimary={choosePrimary}
+              onRemove={disconnect}
+            />
+          </section>
+        )}
+
+        {user && (
+          <section className="mt-4 border border-border/70 bg-surface/50">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <ShieldCheck className="size-4 text-emerald-400" />
                 Conexão oficial Google
               </div>
               <p className="text-xs text-muted-foreground">
@@ -586,12 +633,6 @@ function IntegrationsPage() {
           </div>
         </section>
 
-        <section className="mt-6 border-t border-border pt-5">
-          <p className="mono-label text-muted-foreground">Próximas integrações</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <ComingSoon icon={Settings2} name="TikTok" />
-          </div>
-        </section>
       </main>
     </AppShell>
   );
@@ -693,7 +734,7 @@ function AccountsColumn({
   onRemove,
   reconnectHelp = false,
 }: {
-  platform: (typeof META_PLATFORMS)[number] | typeof YOUTUBE_PLATFORM;
+  platform: (typeof META_PLATFORMS)[number] | typeof YOUTUBE_PLATFORM | typeof TIKTOK_PLATFORM;
   accounts: SocialAccount[];
   divided: boolean;
   onPrimary: (account: SocialAccount) => Promise<void>;
@@ -1044,18 +1085,6 @@ function YoutubeChannels({
           );
         })}
       </ul>
-    </div>
-  );
-}
-
-function ComingSoon({ icon: Icon, name }: { icon: typeof Settings2; name: string }) {
-  return (
-    <div className="flex items-center gap-3 border border-border px-4 py-3 text-sm text-muted-foreground">
-      <Icon className="size-4" />
-      <span className="font-medium text-foreground">{name}</span>
-      <span className="ml-auto flex items-center gap-1 text-xs">
-        <Clock3 className="size-3.5" /> Em preparação
-      </span>
     </div>
   );
 }

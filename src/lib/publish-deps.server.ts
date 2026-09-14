@@ -55,6 +55,48 @@ export async function createPublishDependencies(): Promise<QueueDependencies> {
       return data;
     },
     loadProviderAccessToken: async (connection) => {
+      if (connection.provider === "tiktok") {
+        const { data, error } = await supabaseAdmin
+          .from("social_connection_credentials")
+          .select("access_token_ciphertext,refresh_token_ciphertext,expires_at,refresh_expires_at")
+          .eq("connection_id", connection.id)
+          .maybeSingle();
+        if (error || !data?.access_token_ciphertext || !data.refresh_token_ciphertext) return null;
+        const { decryptSocialToken, encryptSocialToken } = await import("@/lib/social-credentials.server");
+        const accessExpiresAt = data.expires_at ? new Date(data.expires_at).getTime() : 0;
+        if (accessExpiresAt > Date.now() + 5 * 60 * 1000) {
+          try {
+            return { accessToken: decryptSocialToken(data.access_token_ciphertext) };
+          } catch {
+            return null;
+          }
+        }
+        const refreshExpiresAt = data.refresh_expires_at ? new Date(data.refresh_expires_at).getTime() : 0;
+        if (refreshExpiresAt <= Date.now()) return null;
+        try {
+          const { refreshTikTokTokens } = await import("@/lib/tiktok-oauth.server");
+          const refreshed = await refreshTikTokTokens({
+            refreshToken: decryptSocialToken(data.refresh_token_ciphertext),
+          });
+          const { error: credentialError } = await supabaseAdmin
+            .from("social_connection_credentials")
+            .update({
+              access_token_ciphertext: encryptSocialToken(refreshed.accessToken),
+              refresh_token_ciphertext: encryptSocialToken(refreshed.refreshToken),
+              expires_at: refreshed.expiresAt.toISOString(),
+              refresh_expires_at: refreshed.refreshExpiresAt.toISOString(),
+            })
+            .eq("connection_id", connection.id);
+          const { error: connectionError } = await supabaseAdmin
+            .from("social_connections")
+            .update({ expires_at: refreshed.refreshExpiresAt.toISOString() })
+            .eq("id", connection.id);
+          if (credentialError || connectionError) return null;
+          return { accessToken: refreshed.accessToken };
+        } catch {
+          return null;
+        }
+      }
       if (connection.provider === "youtube") {
         const { data, error } = await supabaseAdmin
           .from("social_connection_credentials")
