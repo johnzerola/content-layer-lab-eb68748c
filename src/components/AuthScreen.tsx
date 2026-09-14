@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowRight,
-  Captions,
   Check,
   Eye,
   EyeOff,
@@ -10,7 +9,6 @@ import {
   Play,
   Send,
   Sparkles,
-  TrendingUp,
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -129,8 +127,6 @@ export function AuthScreen({
           <span className="auth-floater auth-floater-play"><Play /></span>
           <span className="auth-floater auth-floater-heart"><Heart /></span>
           <span className="auth-floater auth-floater-send"><Send /></span>
-          <span className="auth-floater auth-floater-caption"><Captions /></span>
-          <span className="auth-floater auth-floater-trend"><TrendingUp /></span>
         </div>
 
         <div className="relative">
