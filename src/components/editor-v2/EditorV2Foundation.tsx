@@ -907,7 +907,7 @@ function AudioClipPreview({ url, sourceTime, playbackRate, gain, playing }: { ur
     const audio = ref.current;
     if (!audio) return;
     audio.playbackRate = playbackRate;
-    audio.preservesPitch = true;
+    audio.preservesPitch = false;
   }, [playbackRate]);
   useEffect(() => {
     const audio = ref.current;

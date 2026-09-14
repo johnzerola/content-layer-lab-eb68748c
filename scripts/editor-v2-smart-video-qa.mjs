@@ -51,7 +51,7 @@ await page.getByRole("tab", { name: "Velocidade" }).click();
 await page.getByRole("button", { name: /Câmera lenta suave/ }).click();
 await page.waitForTimeout(120);
 assert(await clip.getByText("0.5×", { exact: true }).count() === 1, "A timeline não sinalizou a câmera lenta de 0,5×");
-assert(await page.getByText("A prévia, a duração e a exportação usam a mesma velocidade do projeto.").count() === 1, "O inspector não explica o contrato de velocidade");
+assert(await page.getByText("A prévia, o áudio, a duração e a exportação usam a mesma velocidade do projeto.").count() === 1, "O inspector não explica o contrato de velocidade");
 
 assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "A nova barra criou overflow horizontal global");
 await page.screenshot({ path: `${output}/editor-v2-smart-video-1440x1000.png`, fullPage: false });

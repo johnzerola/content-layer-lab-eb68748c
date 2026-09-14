@@ -55,7 +55,7 @@ export function CreativeInspectorV2({ clip, onPatch }: { clip: Clip; onPatch: (p
       </button>
       <Range label="Velocidade" value={clip.playbackRate} min={.1} max={4} step={.05} display={`${clip.playbackRate.toFixed(2)}×`} onChange={setSpeed} />
       <div className="mt-3 grid grid-cols-6 gap-1">{[.25, .5, .75, 1, 1.5, 2].map((speed) => <button key={speed} type="button" onClick={() => setSpeed(speed)} className={`h-8 rounded-lg text-[10px] ${Math.abs(clip.playbackRate - speed) < .001 ? "bg-primary text-white" : "bg-white/5 text-muted-foreground hover:bg-white/8 hover:text-white"}`}>{speed}×</button>)}</div>
-      <p className="mt-3 text-[9px] leading-relaxed text-muted-foreground">A prévia, a duração e a exportação usam a mesma velocidade do projeto.</p>
+      <p className="mt-3 text-[9px] leading-relaxed text-muted-foreground">A prévia, o áudio, a duração e a exportação usam a mesma velocidade do projeto.</p>
     </div>}
     {tab === "motion" && <MotionEditor motion={clip.motion ?? {}} onChange={(motion) => onPatch({ motion })} />}
     {tab === "adjust" && <AdjustmentEditor adjustments={adjustments} onChange={(next) => onPatch({ adjustments: next })} />}

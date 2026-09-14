@@ -15,6 +15,7 @@ Estado: **IMPLEMENTADO E VALIDADO LOCALMENTE; PUBLICAÇÃO PENDENTE**
 - preservação do vínculo do áudio incorporado depois de dividir o vídeo;
 - o áudio incorporado é silenciado em clipes revertidos, enquanto voz e música extraídas permanecem independentes;
 - preview, persistência e manifest de exportação compartilham `playbackRate`, `reversed`, `flipHorizontal` e `flipVertical`.
+- prévia e exportação aplicam a mesma alteração de velocidade e tom ao áudio; preservação de tom fica reservada para uma futura etapa de time-stretch com qualidade validada.
 
 ## Comportamento do corte automático
 
