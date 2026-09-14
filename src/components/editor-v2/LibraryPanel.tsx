@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Check, Heart, Plus, Search } from "lucide-react";
+import { Check, Heart, Plus, Search, SlidersHorizontal } from "lucide-react";
 import { LibraryRegistry, loadLibraryUserState, markRecent, saveLibraryUserState, toggleFavorite, type LibraryItem, type LibraryItemType } from "@/lib/editor-v2/library";
 import { LibraryPreview } from "./LibraryPreview";
 
@@ -75,7 +75,7 @@ export function LibraryPanel({ registry, selectedId, onSelect, onAdd }: LibraryP
             </button>
             <div className="flex items-center border-t border-white/5 px-1.5 py-1">
               <button type="button" onClick={() => { const next = toggleFavorite(userState, item.id); setUserState(next); saveLibraryUserState(next); }} aria-label={favorite ? `Remover ${item.name} dos favoritos` : `Favoritar ${item.name}`} className={`grid size-7 place-items-center rounded-md hover:bg-white/10 ${favorite ? "text-rose-400" : "text-muted-foreground"}`}><Heart className="size-3.5" fill={favorite ? "currentColor" : "none"} /></button>
-              <button type="button" onClick={() => add(item)} className="editor-primary-button ml-auto flex h-7 items-center gap-1 rounded-md px-2 text-[10px] font-semibold text-primary-foreground"><Plus className="size-3" /> Inserir</button>
+              <button type="button" onClick={() => item.type === "transition" ? select(item) : add(item)} className="editor-primary-button ml-auto flex h-7 items-center gap-1 rounded-md px-2 text-[10px] font-semibold text-primary-foreground">{item.type === "transition" ? <SlidersHorizontal className="size-3" /> : <Plus className="size-3" />} {item.type === "transition" ? "Configurar" : "Inserir"}</button>
             </div>
           </article>;
         })}</div> : <div className="grid min-h-44 place-items-center rounded-xl border border-dashed border-white/10 px-5 text-center"><div><p className="text-xs font-medium">Nada por aqui</p><p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">Tente outra busca ou volte aos recursos incluídos.</p></div></div>}

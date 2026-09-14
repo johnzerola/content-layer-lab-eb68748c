@@ -1,16 +1,26 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, AlignCenter, AlignLeft, AlignRight, Diamond, KeyRound, SlidersHorizontal, Sparkles, Trash2 } from "lucide-react";
-import { ANIMATABLE_PROPERTIES, clipLocalTime, resolveAnimatedTransform, type AnimatableProperty, type AudioRepresentation, type AudioSourceGroup, type Clip, type ClipStyle, type ClipTransform, type MediaAsset, type ProjectSettings, type Track, type Transition } from "@/lib/editor-v2";
+import { AlertTriangle, AlignCenter, AlignLeft, AlignRight, Clock3, Diamond, KeyRound, Play, Scissors, SlidersHorizontal, Sparkles, Trash2 } from "lucide-react";
+import { ANIMATABLE_PROPERTIES, clampTransitionDuration, clipLocalTime, resolveAnimatedTransform, type AnimatableProperty, type AudioRepresentation, type AudioSourceGroup, type Clip, type ClipStyle, type ClipTransform, type MediaAsset, type ProjectSettings, type Track, type Transition } from "@/lib/editor-v2";
 import type { Easing } from "@/lib/video-template/types";
-import type { LibraryItem } from "@/lib/editor-v2/library";
+import { TRANSITION_DEFINITIONS, type LibraryItem, type TransitionDefinition } from "@/lib/editor-v2/library";
 import { CreativeInspectorV2 } from "./CreativeInspectorV2";
+import { LibraryPreview } from "./LibraryPreview";
+
+interface TransitionContext {
+  from: Clip;
+  to: Clip;
+  boundary: number;
+  maxDuration: number;
+  distance: number;
+  existing: Transition | undefined;
+}
 
 interface InspectorProps {
   clip: Clip | null;
   track: Track | null;
   libraryItem: LibraryItem | null;
   currentTime: number;
-  transitionContext: { from: Clip; to: Clip; existing: Transition | undefined } | null;
+  transitionContext: TransitionContext | null;
   audioGroup: AudioSourceGroup | null;
   missingAsset: MediaAsset | null;
   onPatchClip: (clipId: string, patch: Partial<Clip>) => void;
@@ -20,6 +30,7 @@ interface InspectorProps {
   onSeek: (time: number) => void;
   onApplyTransition: (definitionId: string, duration: number, easing: Easing) => void;
   onDeleteTransition: (transitionId: string) => void;
+  onPreviewTransition: (boundary: number, duration: number) => void;
   onUpsertAudioEnvelope: (gain: number, pointId?: string) => void;
   onDeleteAudioEnvelope: (pointId: string) => void;
   audioSettings: ProjectSettings["audio"];
@@ -38,11 +49,23 @@ interface InspectorProps {
 }
 
 export function InspectorV2(props: InspectorProps) {
-  const { clip, track, libraryItem, currentTime, transitionContext, audioGroup, missingAsset, onPatchClip, onTransform, onUpsertKeyframe, onDeleteKeyframe, onSeek, onApplyTransition, onDeleteTransition, onUpsertAudioEnvelope, onDeleteAudioEnvelope, audioSettings, onAudioSettings, onTrackAudio, onAudioRepresentation, onExtractAudio, onCancelAudioExtraction, onSeparateAudio, onCancelAudioSeparation, onRestoreOriginalAudio, onRelink, extractingAudio, separatingAudio, onAddLibraryItem } = props;
+  const { clip, track, libraryItem, currentTime, transitionContext, audioGroup, missingAsset, onPatchClip, onTransform, onUpsertKeyframe, onDeleteKeyframe, onSeek, onApplyTransition, onDeleteTransition, onPreviewTransition, onUpsertAudioEnvelope, onDeleteAudioEnvelope, audioSettings, onAudioSettings, onTrackAudio, onAudioRepresentation, onExtractAudio, onCancelAudioExtraction, onSeparateAudio, onCancelAudioSeparation, onRestoreOriginalAudio, onRelink, extractingAudio, separatingAudio, onAddLibraryItem } = props;
   const [easing, setEasing] = useState<Easing>("easeInOut");
   const [transitionKind, setTransitionKind] = useState("fade");
   const [transitionDuration, setTransitionDuration] = useState(0.45);
-  useEffect(() => { if (transitionContext?.existing) { setTransitionKind(transitionContext.existing.definitionId); setTransitionDuration(transitionContext.existing.duration); } }, [transitionContext?.existing]);
+  useEffect(() => {
+    const selectedDefinition = libraryItem?.type === "transition" ? libraryItem.definition as TransitionDefinition : null;
+    if (selectedDefinition) {
+      setTransitionKind(selectedDefinition.id);
+      setTransitionDuration(clampTransitionDuration(transitionContext?.existing?.duration ?? selectedDefinition.durationDefault, selectedDefinition.durationMin, Math.min(selectedDefinition.durationMax, transitionContext?.maxDuration ?? selectedDefinition.durationMax)));
+      setEasing(transitionContext?.existing?.easing ?? "easeInOut");
+    } else if (transitionContext?.existing) {
+      setTransitionKind(transitionContext.existing.definitionId);
+      setTransitionDuration(transitionContext.existing.duration);
+      setEasing(transitionContext.existing.easing);
+    }
+  }, [libraryItem, transitionContext?.from.id, transitionContext?.to.id, transitionContext?.maxDuration, transitionContext?.existing]);
+  if (!clip && libraryItem?.type === "transition") return <TransitionLibraryInspector item={libraryItem as LibraryItem<TransitionDefinition>} context={transitionContext} definitionId={transitionKind} duration={transitionDuration} easing={easing} onDefinition={setTransitionKind} onDuration={setTransitionDuration} onEasing={setEasing} onApply={onApplyTransition} onDelete={onDeleteTransition} onPreview={onPreviewTransition} />;
   if (!clip && libraryItem) return <LibraryInspector item={libraryItem} onAdd={() => onAddLibraryItem(libraryItem)} />;
   if (!clip) return <EmptyInspector />;
   const transform = resolveAnimatedTransform(clip, currentTime);
@@ -111,7 +134,7 @@ export function InspectorV2(props: InspectorProps) {
           <div className="mt-3 flex flex-wrap gap-2"><label className="flex items-center gap-1.5 text-[10px]"><input type="checkbox" checked={style.uppercase ?? false} onChange={(event) => patchStyle({ uppercase: event.target.checked })} className="accent-violet-500" />Caixa alta</label><label className="flex items-center gap-1.5 text-[10px]"><input type="checkbox" checked={style.shadow ?? false} onChange={(event) => patchStyle({ shadow: event.target.checked })} className="accent-violet-500" />Sombra</label></div>
         </InspectorSection>}
 
-        {transitionContext && <InspectorSection title="Transição"><p className="mb-3 text-[10px] text-muted-foreground">{transitionContext.from.name} → {transitionContext.to.name}</p><div className="grid grid-cols-2 gap-2"><label className="text-[10px] text-muted-foreground">Tipo<select aria-label="Tipo de transição" value={transitionKind} onChange={(event) => setTransitionKind(event.target.value)} className="mt-1.5 h-9 w-full rounded-lg border border-white/10 bg-black/20 px-2 text-xs"><option value="fade">Dissolver</option><option value="slide-left">Deslizar</option><option value="zoom">Zoom</option></select></label><NumberField label="Duração" value={transitionDuration} suffix="s" min={0} onCommit={setTransitionDuration} /></div><button type="button" onClick={() => onApplyTransition(transitionKind, transitionDuration, easing)} className="mt-3 h-9 w-full rounded-lg bg-primary text-xs font-semibold text-white">{transitionContext.existing ? "Atualizar transição" : "Aplicar transição"}</button>{transitionContext.existing && <button type="button" onClick={() => onDeleteTransition(transitionContext.existing!.id)} className="mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-destructive/10 text-[10px] text-destructive"><Trash2 className="size-3" />Remover transição</button>}</InspectorSection>}
+        {transitionContext && <InspectorSection title="Transição"><TransitionControls context={transitionContext} definitionId={transitionKind} duration={transitionDuration} easing={easing} onDefinition={setTransitionKind} onDuration={setTransitionDuration} onEasing={setEasing} onApply={onApplyTransition} onDelete={onDeleteTransition} onPreview={onPreviewTransition} /></InspectorSection>}
 
         <InspectorSection title="Tempo"><div className="grid grid-cols-2 gap-2"><NumberField label="Início" value={Number(clip.projectStart)} suffix="s" min={0} onCommit={() => undefined} disabled /><NumberField label="Duração" value={Number(clip.projectEnd) - Number(clip.projectStart)} suffix="s" min={0.04} onCommit={() => undefined} disabled /></div><p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">Ajuste início e duração diretamente na timeline.</p></InspectorSection>
       </div>
@@ -123,9 +146,53 @@ function AnimatedNumberField(props: { label: string; property: AnimatablePropert
 function KeyframeButton({ label, activeKeyframe, value, property, easing, onUpsert, onDelete }: { label: string; activeKeyframe: { id: string } | undefined; value: number; property: AnimatableProperty; easing: Easing; onUpsert: InspectorProps["onUpsertKeyframe"]; onDelete: InspectorProps["onDeleteKeyframe"] }) { return <button type="button" aria-label={activeKeyframe ? `Remover keyframe de ${label}` : `Adicionar keyframe de ${label}`} aria-pressed={Boolean(activeKeyframe)} onClick={() => activeKeyframe ? onDelete(property, activeKeyframe.id) : onUpsert(property, value, easing)} className={`mb-px grid size-9 shrink-0 place-items-center rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${activeKeyframe ? "border-primary bg-primary/20 text-primary" : "border-white/10 bg-white/5 text-muted-foreground hover:text-white"}`}><Diamond className={`size-3 ${activeKeyframe ? "fill-current" : ""}`} /></button>; }
 function keyframeAt(clip: Clip, property: AnimatableProperty, localTime: number) { return clip.animations.find((item) => item.property === property)?.keyframes.find((item) => Math.abs(Number(item.time) - localTime) < 1 / 60); }
 function InspectorSection({ title, children }: { title: string; children: React.ReactNode }) { return <section className="border-b border-white/8 py-4 last:border-0"><h3 className="mb-3 text-[11px] font-semibold text-foreground">{title}</h3>{children}</section>; }
-function NumberField({ label, value, suffix, min, onCommit, disabled = false }: { label: string; value: number; suffix: string; min?: number | undefined; onCommit: (value: number) => void; disabled?: boolean }) { const [draft, setDraft] = useState(String(round(value))); useEffect(() => setDraft(String(round(value))), [value]); const commit = () => { const next = Number(draft); if (Number.isFinite(next) && (min === undefined || next >= min)) onCommit(next); else setDraft(String(round(value))); }; return <label className="text-[10px] text-muted-foreground">{label}<span className={`mt-1.5 flex h-9 items-center rounded-lg border border-white/10 bg-black/20 px-2 ${disabled ? "opacity-55" : "focus-within:border-primary"}`}><input disabled={disabled} value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} inputMode="decimal" className="min-w-0 flex-1 bg-transparent text-xs tabular-nums text-foreground outline-none" /><span className="text-[9px]">{suffix}</span></span></label>; }
+function NumberField({ label, value, suffix, min, max, onCommit, disabled = false }: { label: string; value: number; suffix: string; min?: number | undefined; max?: number | undefined; onCommit: (value: number) => void; disabled?: boolean }) { const [draft, setDraft] = useState(String(round(value))); useEffect(() => setDraft(String(round(value))), [value]); const commit = () => { const next = Number(draft); if (Number.isFinite(next) && (min === undefined || next >= min) && (max === undefined || next <= max)) onCommit(next); else setDraft(String(round(value))); }; return <label className="text-[10px] text-muted-foreground">{label}<span className={`mt-1.5 flex h-9 items-center rounded-lg border border-white/10 bg-black/20 px-2 ${disabled ? "opacity-55" : "focus-within:border-primary"}`}><input disabled={disabled} value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} inputMode="decimal" className="min-w-0 flex-1 bg-transparent text-xs tabular-nums text-foreground outline-none" /><span className="text-[9px]">{suffix}</span></span></label>; }
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label className="flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-2 text-[10px] text-muted-foreground"><input type="color" value={value} onChange={(event) => onChange(event.target.value)} className="size-5 cursor-pointer rounded border-0 bg-transparent" />{label}<span className="ml-auto font-mono text-[9px] text-foreground">{value}</span></label>; }
 function AudioRange({ label, value, max, suffix, onChange }: { label: string; value: number; max: number; suffix: string; onChange: (value: number) => void }) { return <label className="mt-4 block text-[10px] text-muted-foreground">{label}<span className="float-right tabular-nums text-foreground">{suffix}</span><input type="range" min="0" max={max} step="0.01" value={value} onChange={(event) => onChange(Number(event.target.value))} className="mt-2 w-full accent-violet-500" /></label>; }
+function TransitionLibraryInspector(props: { item: LibraryItem<TransitionDefinition>; context: TransitionContext | null; definitionId: string; duration: number; easing: Easing; onDefinition: (value: string) => void; onDuration: (value: number) => void; onEasing: (value: Easing) => void; onApply: InspectorProps["onApplyTransition"]; onDelete: InspectorProps["onDeleteTransition"]; onPreview: InspectorProps["onPreviewTransition"] }) {
+  return <aside className="editor-v2-panel flex h-full min-h-0 flex-col" aria-label={`Configurar transição ${props.item.name}`}>
+    <header className="editor-v2-panel-header px-4 py-3"><div className="flex items-center gap-2"><Sparkles className="size-4 text-primary" /><div><h2 className="text-sm font-semibold">{props.item.name}</h2><p className="mt-0.5 text-[10px] text-muted-foreground">Configurar transição</p></div></div></header>
+    <div className="min-h-0 flex-1 overflow-y-auto p-4 vaiviral-scrollbar">
+      <div className="overflow-hidden rounded-xl border border-primary/25 shadow-[0_0_28px_hsl(var(--primary)/.1)]"><LibraryPreview item={props.item} active /></div>
+      <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">{props.item.description}</p>
+      <div className="mt-4"><TransitionControls {...props} /></div>
+    </div>
+  </aside>;
+}
+
+function TransitionControls({ context, definitionId, duration, easing, onDefinition, onDuration, onEasing, onApply, onDelete, onPreview }: { context: TransitionContext | null; definitionId: string; duration: number; easing: Easing; onDefinition: (value: string) => void; onDuration: (value: number) => void; onEasing: (value: Easing) => void; onApply: InspectorProps["onApplyTransition"]; onDelete: InspectorProps["onDeleteTransition"]; onPreview: InspectorProps["onPreviewTransition"] }) {
+  const definition = TRANSITION_DEFINITIONS.find((item) => item.id === definitionId) ?? TRANSITION_DEFINITIONS[1]!;
+  const isCut = definition.id === "cut";
+  const maximum = Math.max(definition.durationMin, Math.min(definition.durationMax, context?.maxDuration ?? definition.durationMax));
+  const safeDuration = isCut ? 0 : clampTransitionDuration(duration, definition.durationMin, maximum);
+  const presets = [0.2, 0.35, 0.5, 0.75, 1].filter((value) => value >= definition.durationMin && value <= maximum + 0.001);
+  const applyDisabled = !context || isCut && !context.existing;
+
+  return <div>
+    {context ? <button type="button" onClick={() => onPreview(context.boundary, safeDuration)} className="group w-full rounded-xl border border-white/10 bg-white/[0.035] p-3 text-left transition hover:border-primary/35 hover:bg-primary/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+      <span className="flex items-center gap-2"><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary"><Scissors className="size-3.5" /></span><span className="min-w-0 flex-1"><span className="block truncate text-[11px] font-semibold">{context.from.name} → {context.to.name}</span><span className="mt-0.5 flex items-center gap-1 text-[9px] text-muted-foreground"><Clock3 className="size-2.5" /> Corte em {formatTime(context.boundary)} · clique para visualizar</span></span><Play className="size-3.5 text-primary transition group-hover:scale-110" /></span>
+    </button> : <div role="status" className="rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-3"><div className="flex gap-2"><AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-300" /><div><p className="text-[10px] font-semibold text-amber-100">Nenhum corte encontrado</p><p className="mt-1 text-[9px] leading-relaxed text-muted-foreground">Posicione a agulha perto da junção entre dois clipes consecutivos.</p></div></div></div>}
+
+    <label className="mt-4 block text-[10px] text-muted-foreground">Tipo<select aria-label="Tipo de transição" value={definition.id} onChange={(event) => { const next = TRANSITION_DEFINITIONS.find((item) => item.id === event.target.value)!; onDefinition(next.id); onDuration(clampTransitionDuration(next.durationDefault, next.durationMin, Math.min(next.durationMax, context?.maxDuration ?? next.durationMax))); }} className="mt-1.5 h-9 w-full rounded-lg border border-white/10 bg-black/20 px-2 text-xs text-foreground outline-none focus:border-primary">{TRANSITION_DEFINITIONS.map((item) => <option key={item.id} value={item.id}>{transitionLabel(item.id, item.name)}</option>)}</select></label>
+
+    {!isCut && <div className="mt-4 rounded-xl border border-white/8 bg-white/[0.025] p-3">
+      <div className="flex items-center justify-between"><label htmlFor="transition-duration" className="text-[10px] font-semibold text-foreground">Duração</label><span className="rounded-md bg-primary/15 px-2 py-1 text-[10px] font-semibold tabular-nums text-primary">{safeDuration.toFixed(2)} s</span></div>
+      <input id="transition-duration" type="range" min={definition.durationMin} max={maximum} step="0.05" value={safeDuration} onChange={(event) => onDuration(Number(event.target.value))} className="mt-3 w-full accent-violet-500" />
+      <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Durações rápidas">{presets.map((value) => <button key={value} type="button" aria-pressed={Math.abs(safeDuration - value) < 0.01} onClick={() => onDuration(value)} className={`min-h-7 rounded-md px-2 text-[9px] font-semibold ${Math.abs(safeDuration - value) < 0.01 ? "bg-primary/20 text-primary" : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"}`}>{value.toFixed(2)}s</button>)}</div>
+      <div className="mt-3 grid grid-cols-2 gap-2"><NumberField label="Tempo exato" value={safeDuration} suffix="s" min={definition.durationMin} max={maximum} onCommit={(value) => onDuration(clampTransitionDuration(value, definition.durationMin, maximum))} /><label className="text-[10px] text-muted-foreground">Movimento<select aria-label="Curva da transição" value={easing} onChange={(event) => onEasing(event.target.value as Easing)} className="mt-1.5 h-9 w-full rounded-lg border border-white/10 bg-black/20 px-2 text-xs text-foreground outline-none focus:border-primary"><option value="easeInOut">Suave</option><option value="linear">Linear</option><option value="easeIn">Acelera</option><option value="easeOut">Desacelera</option></select></label></div>
+      <p className="mt-2 text-[9px] leading-relaxed text-muted-foreground">Máximo neste corte: {maximum.toFixed(2)}s. O limite protege os dois clipes.</p>
+    </div>}
+
+    <button type="button" disabled={applyDisabled} onClick={() => onApply(definition.id, safeDuration, easing)} className="editor-primary-button mt-4 min-h-10 w-full rounded-lg px-3 text-xs font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40">{isCut ? context?.existing ? "Remover efeito e manter corte seco" : "Este ponto já é um corte seco" : context?.existing ? "Atualizar transição" : "Aplicar neste corte"}</button>
+    {context?.existing && !isCut && <button type="button" onClick={() => onDelete(context.existing!.id)} className="mt-2 flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-destructive/10 px-3 text-[10px] font-semibold text-destructive transition hover:bg-destructive/15"><Trash2 className="size-3" />Remover transição</button>}
+  </div>;
+}
+
+function transitionLabel(id: string, fallback: string) {
+  const labels: Record<string, string> = { cut: "Corte seco", "cross-dissolve": "Dissolver", fade: "Suavizar", "fade-black": "Fade para preto", "fade-white": "Fade para branco", "slide-left": "Deslizar à esquerda", "slide-right": "Deslizar à direita", "slide-up": "Deslizar para cima", "slide-down": "Deslizar para baixo", push: "Empurrar", wipe: "Varredura", blur: "Desfoque", "zoom-in": "Zoom de entrada", "zoom-out": "Zoom de saída" };
+  return labels[id] ?? fallback;
+}
+function formatTime(seconds: number) { const minutes = Math.floor(seconds / 60); const rest = seconds - minutes * 60; return `${String(minutes).padStart(2, "0")}:${rest.toFixed(2).padStart(5, "0")}`; }
 function LibraryInspector({ item, onAdd }: { item: LibraryItem; onAdd: () => void }) { return <aside className="editor-v2-panel flex h-full flex-col"><header className="editor-v2-panel-header px-4 py-3"><div className="flex items-center gap-2"><Sparkles className="size-4 text-primary" /><h2 className="text-sm font-semibold">{item.name}</h2></div><p className="mt-1 text-[11px] text-muted-foreground">{item.type} · {item.category}</p></header><div className="p-4"><p className="text-xs leading-relaxed text-muted-foreground">{item.description}</p><button type="button" onClick={onAdd} className="editor-primary-button mt-5 h-9 w-full rounded-lg text-xs font-semibold text-primary-foreground">Inserir na agulha</button></div></aside>; }
 function EmptyInspector() { return <aside className="editor-v2-panel grid h-full place-items-center p-6 text-center"><div><span className="mx-auto grid size-10 place-items-center rounded-xl bg-white/5 text-muted-foreground"><SlidersHorizontal className="size-4" /></span><p className="mt-3 text-xs font-medium">Nada selecionado</p><p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">Selecione um item no canvas, na timeline ou na biblioteca.</p></div></aside>; }
 function round(value: number) { return Math.round(value * 100) / 100; }

@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it } from "vitest";
-import { AddCaptionBatchCommand, AddCaptionCueCommand, AddClipCommand, AddMediaClipCommand, ApplyCaptionPresetCommand, ApplySeparatedAudioCommand, ApplyTemplateCommand, ApplyTransitionCommand, CompositionClock, DeleteAudioEnvelopePointCommand, DeleteClipCommand, DeleteClipsCommand, DeleteKeyframeCommand, DuplicateClipsCommand, EditorCommandBus, MoveClipCommand, MoveKeyframeCommand, RegisterExtractedAudioCommand, RestoreOriginalAudioCommand, SelectItemCommand, SetAudioRepresentationCommand, SplitClipCommand, TrimClipCommand, UpdateClipCommand, UpdateProjectSettingsCommand, UpdateTrackCommand, UpdateTransformAtTimeCommand, UpsertAudioEnvelopePointCommand, UpsertKeyframeCommand, adaptEditorProjectV1, asProjectTime, buildExtractedAudioMedia, buildSeparatedAudioMedia, clipAudioGainAt, createCaptionBatch, createCaptionBatchFromTimedWords, createEditorProjectV2, createEditorRenderManifest, createPlaybackSurfaceKeys, createStemAsset, editorProjectFromManifest, interpolateKeyframes, isEditorV2Enabled, isTrackCompatible, parseTimedText, projectToSourceTime, resolveAnimatedTransform, resolveAudioMixFrame, resolveAudioRenderFrameFromManifest, resolveCaptionInsertion, resolveClipPresentation, resolveCompositionFrame, resolveCompositionFrameFromManifest, resolveLibraryInsertion, resolveTemplateApplication, snapProjectTime, sourceToProjectTime, summarizeWaveform, visibleTimelineRange, type AudioSourceGroup, type Clip, type MediaAsset } from "@/lib/editor-v2";
+import { AddCaptionBatchCommand, AddCaptionCueCommand, AddClipCommand, AddMediaClipCommand, ApplyCaptionPresetCommand, ApplySeparatedAudioCommand, ApplyTemplateCommand, ApplyTransitionCommand, CompositionClock, DeleteAudioEnvelopePointCommand, DeleteClipCommand, DeleteClipsCommand, DeleteKeyframeCommand, DuplicateClipsCommand, EditorCommandBus, MoveClipCommand, MoveKeyframeCommand, RegisterExtractedAudioCommand, RestoreOriginalAudioCommand, SelectItemCommand, SetAudioRepresentationCommand, SplitClipCommand, TrimClipCommand, UpdateClipCommand, UpdateProjectSettingsCommand, UpdateTrackCommand, UpdateTransformAtTimeCommand, UpsertAudioEnvelopePointCommand, UpsertKeyframeCommand, adaptEditorProjectV1, asProjectTime, buildExtractedAudioMedia, buildSeparatedAudioMedia, clampTransitionDuration, clipAudioGainAt, createCaptionBatch, createCaptionBatchFromTimedWords, createEditorProjectV2, createEditorRenderManifest, createPlaybackSurfaceKeys, createStemAsset, editorProjectFromManifest, findTransitionTarget, interpolateKeyframes, isEditorV2Enabled, isTrackCompatible, parseTimedText, projectToSourceTime, resolveAnimatedTransform, resolveAudioMixFrame, resolveAudioRenderFrameFromManifest, resolveCaptionInsertion, resolveClipPresentation, resolveCompositionFrame, resolveCompositionFrameFromManifest, resolveLibraryInsertion, resolveTemplateApplication, snapProjectTime, sourceToProjectTime, summarizeWaveform, visibleTimelineRange, type AudioSourceGroup, type Clip, type MediaAsset } from "@/lib/editor-v2";
 import { BUILT_IN_LIBRARY_ITEMS, type CaptionPresetDefinition, type LibraryItem, type TemplateDefinition } from "@/lib/editor-v2/library";
 import { AutoSplitClipsCommand } from "@/lib/editor-v2";
 import { createEditorProject } from "@/lib/editor/project";
@@ -260,6 +260,27 @@ describe("Command bus", () => {
     expect(frame.map((layer) => layer.transition.opacity)).toEqual([0.5, 0.5]);
     expect(createEditorRenderManifest(bus.getState()).transitions[0]).toMatchObject({ id: "transition-1", fallback: "cut" });
     expect(() => bus.execute(new ApplyTransitionCommand({ id: "bad", definitionId: "fade", fromClipId: "clip-1", toClipId: "clip-2", duration: 3, easing: "linear", fallback: "cut", parameters: {} }))).toThrow(/máxima/);
+  });
+
+  it("encontra a junção visual mais próxima da agulha e calcula a duração segura", () => {
+    const project = createEditorProjectV2({ duration: 8 });
+    project.tracks[0]!.clips = [
+      { ...clip(), projectStart: asProjectTime(0), projectEnd: asProjectTime(2), sourceIn: 0, sourceOut: 2 },
+      { ...clip(), id: "clip-2", projectStart: asProjectTime(2), projectEnd: asProjectTime(6), sourceIn: 2, sourceOut: 6 },
+      { ...clip(), id: "clip-3", projectStart: asProjectTime(6), projectEnd: asProjectTime(8), sourceIn: 6, sourceOut: 8 },
+    ];
+    const target = findTransitionTarget(project, 5.7);
+    expect(target).toMatchObject({ from: { id: "clip-2" }, to: { id: "clip-3" }, boundary: 6, maxDuration: 1 });
+    expect(clampTransitionDuration(1.8, 0.1, target!.maxDuration)).toBe(1);
+  });
+
+  it("não oferece transição entre clipes separados por um vazio", () => {
+    const project = createEditorProjectV2({ duration: 8 });
+    project.tracks[0]!.clips = [
+      { ...clip(), projectStart: asProjectTime(0), projectEnd: asProjectTime(2), sourceIn: 0, sourceOut: 2 },
+      { ...clip(), id: "clip-2", projectStart: asProjectTime(3), projectEnd: asProjectTime(6), sourceIn: 2, sourceOut: 5 },
+    ];
+    expect(findTransitionTarget(project, 2.5)).toBeNull();
   });
 });
 

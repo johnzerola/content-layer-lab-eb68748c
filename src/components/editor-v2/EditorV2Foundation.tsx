@@ -57,6 +57,7 @@ import {
   createCaptionBatch,
   createCaptionBatchFromTimedWords,
   createAudioSeparationJob,
+  findTransitionTarget,
   resolveTemplateApplication,
   transitionAudioSeparationJob,
   type AudioSeparationJobRecord,
@@ -77,7 +78,7 @@ import { runStemJob } from "@/lib/editor/stem-service";
 import { downloadBlob } from "@/lib/render";
 import { generateCaptions } from "@/lib/captions";
 import type { Easing } from "@/lib/video-template/types";
-import { BUILT_IN_LIBRARY_ITEMS, LibraryRegistry, type CaptionPresetDefinition, type CreativeEffectDefinition, type FilterPresetDefinition, type LibraryItem, type MotionDefinition, type TemplateDefinition } from "@/lib/editor-v2/library";
+import { BUILT_IN_LIBRARY_ITEMS, LibraryRegistry, TRANSITION_DEFINITIONS, type CaptionPresetDefinition, type CreativeEffectDefinition, type FilterPresetDefinition, type LibraryItem, type MotionDefinition, type TemplateDefinition } from "@/lib/editor-v2/library";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { EditorCanvasV2 } from "./EditorCanvasV2";
 import { InspectorV2 } from "./InspectorV2";
@@ -211,6 +212,12 @@ export function EditorV2Foundation() {
   const addLibraryItem = useCallback((item: LibraryItem, at = Number(clockRef.current.getSnapshot().projectTime)) => {
     const state = busRef.current.getState();
     const selected = findClip(state, state.selection.primaryId) ?? findClip(state, lastSelectedClipIdRef.current);
+    if (item.type === "transition") {
+      run(new SelectItemCommand([item.id], "library"));
+      setMobileSurface("inspector");
+      setMessage("Defina a duração e aplique a transição no corte mais próximo da agulha.");
+      return;
+    }
     if (item.type === "animation") {
       if (!selected || selected.kind === "audio") { setMessage("Selecione um clipe visual antes de aplicar a animação."); return; }
       const definition = item.definition as MotionDefinition;
@@ -774,12 +781,7 @@ export function EditorV2Foundation() {
   const activeAudioAssetIds = selectedAudioGroup ? audioAssetIdsForRepresentation(project, selectedAudioGroup) : [];
   const selectedAssetId = selectedClip?.assetId;
   const missingAsset = project.assets.find((asset) => missingAssetIds.includes(asset.id) && (activeAudioAssetIds.includes(asset.id) || asset.id === selectedAssetId)) ?? null;
-  const orderedTrackClips = selectedTrack ? [...selectedTrack.clips].sort((a, b) => Number(a.projectStart) - Number(b.projectStart)) : [];
-  const selectedIndex = selectedClip ? orderedTrackClips.findIndex((clip) => clip.id === selectedClip.id) : -1;
-  const transitionPair = selectedIndex >= 0 && orderedTrackClips.length > 1
-    ? selectedIndex < orderedTrackClips.length - 1 ? { from: orderedTrackClips[selectedIndex]!, to: orderedTrackClips[selectedIndex + 1]! } : { from: orderedTrackClips[selectedIndex - 1]!, to: orderedTrackClips[selectedIndex]! }
-    : null;
-  const transitionContext = transitionPair ? { ...transitionPair, existing: project.transitions.find((item) => item.fromClipId === transitionPair.from.id && item.toClipId === transitionPair.to.id) } : null;
+  const transitionContext = findTransitionTarget(project, Number(clock.projectTime), selectedClip?.id ?? lastSelectedClipIdRef.current);
   const selectedLibraryItem = project.selection.surface === "library" ? registry.get(project.selection.primaryId ?? "") : null;
   const itemCount = project.tracks.reduce((total, track) => total + track.clips.length, 0);
   const canvasProps = {
@@ -806,8 +808,26 @@ export function EditorV2Foundation() {
     onUpsertKeyframe: (property: AnimatableProperty, value: number, easing: Easing, keyframeId?: string) => { if (selectedClip) run(new UpsertKeyframeCommand(selectedClip.id, property, clipLocalTime(selectedClip, Number(clock.projectTime)), value, easing, keyframeId ?? `${selectedClip.id}-${property}-${project.revisions.document + 1}`), "Keyframe adicionado."); },
     onDeleteKeyframe: (property: AnimatableProperty, keyframeId: string) => { if (selectedClip) run(new DeleteKeyframeCommand(selectedClip.id, property, keyframeId), "Keyframe removido."); },
     onSeek: seek,
-    onApplyTransition: (definitionId: string, duration: number, easing: Easing) => { if (transitionPair) run(new ApplyTransitionCommand({ id: transitionContext?.existing?.id ?? `transition-${transitionPair.from.id}-${transitionPair.to.id}`, definitionId, fromClipId: transitionPair.from.id, toClipId: transitionPair.to.id, duration, easing, fallback: "cut", parameters: {} }), "Transição aplicada."); },
+    onApplyTransition: (definitionId: string, duration: number, easing: Easing) => {
+      if (!transitionContext) { setMessage("Posicione a agulha perto de um corte entre dois clipes."); return; }
+      if (definitionId === "cut") {
+        if (transitionContext.existing) run(new DeleteTransitionCommand(transitionContext.existing.id), "Corte seco restaurado.");
+        else setMessage("Este ponto já usa corte seco.");
+        return;
+      }
+      const definition = TRANSITION_DEFINITIONS.find((item) => item.id === definitionId);
+      const maximum = Math.min(definition?.durationMax ?? 2, transitionContext.maxDuration);
+      const minimum = definition?.durationMin ?? 0.1;
+      const safeDuration = Math.min(maximum, Math.max(minimum, duration));
+      run(new ApplyTransitionCommand({ id: transitionContext.existing?.id ?? `transition-${transitionContext.from.id}-${transitionContext.to.id}`, definitionId, fromClipId: transitionContext.from.id, toClipId: transitionContext.to.id, duration: safeDuration, easing, fallback: "cut", parameters: {} }), `Transição aplicada por ${safeDuration.toFixed(2)}s.`);
+    },
     onDeleteTransition: (id: string) => run(new DeleteTransitionCommand(id), "Transição removida."),
+    onPreviewTransition: (boundary: number, duration: number) => {
+      const start = Math.max(0, boundary - Math.max(0.35, duration / 2 + 0.2));
+      clockRef.current.seek(start);
+      setClock(clockRef.current.play());
+      setMessage("Reproduzindo a partir do corte selecionado.");
+    },
     onUpsertAudioEnvelope: (gain: number, pointId?: string) => { if (selectedClip?.audio) run(new UpsertAudioEnvelopePointCommand(selectedClip.id, pointId ?? `${selectedClip.id}-gain-${project.revisions.document + 1}`, clipLocalTime(selectedClip, Number(clock.projectTime)), gain), "Ponto de volume adicionado."); },
     onDeleteAudioEnvelope: (pointId: string) => { if (selectedClip?.audio) run(new DeleteAudioEnvelopePointCommand(selectedClip.id, pointId), "Ponto de volume removido."); },
     audioSettings: project.settings.audio,
