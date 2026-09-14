@@ -1,5 +1,6 @@
 ﻿import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Upload,
   Link as LinkIcon,
@@ -3677,27 +3678,24 @@ function Home() {
           }))}
       />
 
-      {!user && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/40 backdrop-blur-md p-4">
-          <div className="w-full max-w-md scale-105 transform shadow-2xl">
-            <div className="mb-6 flex flex-col items-center text-center">
-              <div className="mb-4 grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary">
-                <Sparkles className="size-8" />
-              </div>
-              <h2 className="text-2xl font-bold tracking-tight">VaiViral Pro</h2>
-              <p className="mt-2 text-muted-foreground">Entre para começar a criar conteúdos virais em massa.</p>
-            </div>
-            <AuthGate>
+      {!user && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[60] overflow-y-auto bg-background/90 p-3 backdrop-blur-xl sm:p-6">
+          <div className="mx-auto flex min-h-full w-full max-w-5xl items-center">
+            <AuthGate
+              variant="split"
+              title="Acesse sua conta"
+              description="Entre ou crie sua conta para começar"
+              fallbackExtra={
+                <Link to="/vendas" className="text-[12px] text-muted-foreground hover:text-foreground">
+                  Ainda não conhece o VaiViral? Ver planos
+                </Link>
+              }
+            >
               <div className="hidden">Logado!</div>
             </AuthGate>
-            <p className="mt-4 text-center text-xs text-muted-foreground">
-              Ainda não conhece o VaiViral?{" "}
-              <Link to="/vendas" className="text-primary underline-offset-4 hover:underline">
-                Ver planos e o que a plataforma faz
-              </Link>
-            </p>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </AppShell>
   );
