@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   X,
-  ChevronDown,
   Trash2,
   Upload,
   Undo2,
@@ -11,7 +10,11 @@ import {
   ArrowDown,
   Magnet,
   Bug,
-
+  Eye,
+  EyeOff,
+  Layers,
+  Palette,
+  Sparkles,
   Type as TypeIcon,
   Image as ImageIcon,
 } from "lucide-react";
@@ -22,7 +25,6 @@ import {
   makeExtra,
   type BoxLayer,
   type CaptionStyle,
-
   type ImageLayer,
   type LayerId,
   type SelId,
@@ -31,10 +33,9 @@ import {
 } from "@/lib/template";
 import { BUILTIN_FONTS, fileToFont, registerFonts } from "@/lib/fonts";
 import { defaultAntiDup, makeVariation, describeVariation } from "@/lib/variation";
-import { TemplateTimeline } from './TemplateTimeline';
+import { TemplateTimeline } from "./TemplateTimeline";
 import { uploadFileOrInline } from "@/lib/media-store";
 import { useMediaUrl } from "@/hooks/useMediaUrl";
-
 
 const KEY_OF: Record<LayerId, keyof Template> = {
   video: "video",
@@ -50,14 +51,13 @@ const KEY_OF: Record<LayerId, keyof Template> = {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block space-y-1.5">
-      <span className="mono-label">{label}</span>
+      <span className="studio-label">{label}</span>
       {children}
     </label>
   );
 }
 
-const inputCls =
-  "field text-sm";
+const inputCls = "field text-sm";
 
 function Slider({
   label,
@@ -160,7 +160,7 @@ function DebugPanel({
   return (
     <div className="space-y-3 rounded-xl border border-border bg-surface-2 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="mono-label">Depuração</span>
+        <span className="studio-label">Depuração</span>
         <button
           onClick={() => setBoxes(!boxes)}
           className={`rounded-md border px-2 py-1 font-mono text-[11px] ${boxes ? "border-primary text-primary" : "border-border text-muted-foreground"}`}
@@ -206,6 +206,50 @@ function DebugPanel({
   );
 }
 
+/** Botão de ferramenta da barra superior, com rótulo curto e dica. */
+function ToolButton({
+  icon,
+  label,
+  title,
+  active,
+  disabled,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  title: string;
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      aria-label={title}
+      aria-pressed={active ?? undefined}
+      className={`interactive flex h-11 w-[58px] flex-col items-center justify-center gap-0.5 rounded-xl border text-muted-foreground disabled:opacity-40 ${
+        active ? "border-primary/60 bg-primary/15 text-primary" : "border-border bg-surface-2"
+      }`}
+    >
+      {icon}
+      <span className="text-[10px] font-medium">{label}</span>
+    </button>
+  );
+}
+
+const LAYER_ICON: Record<string, React.ReactNode> = {
+  video: <ImageIcon className="size-4" />,
+  watermark: <ImageIcon className="size-4" />,
+  avatar: <ImageIcon className="size-4" />,
+  name: <TypeIcon className="size-4" />,
+  handle: <TypeIcon className="size-4" />,
+  headline: <TypeIcon className="size-4" />,
+  cta: <TypeIcon className="size-4" />,
+  captions: <TypeIcon className="size-4" />,
+};
 
 export function TemplateEditor({
   value,
@@ -246,7 +290,7 @@ export function TemplateEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, duration]);
   const [selected, setSelected] = useState<SelId | null>("headline");
-  const [open, setOpen] = useState<SelId | null>("headline");
+  const [tab, setTab] = useState<"layers" | "design" | "effects">("layers");
   const [snap, setSnap] = useState(true);
   const [debug, setDebug] = useState(false);
   const [debugGrid, setDebugGrid] = useState(3);
@@ -275,9 +319,6 @@ export function TemplateEditor({
         : undefined,
     [adPreview, adVariation],
   );
-
-
-
 
   const past = useRef<Template[]>([]);
   const future = useRef<Template[]>([]);
@@ -333,10 +374,7 @@ export function TemplateEditor({
     return () => window.removeEventListener("keydown", onKey);
   }, [undo, redo]);
 
-  const fonts = useMemo(
-    () => [...BUILTIN_FONTS, ...(t.fonts ?? []).map((f) => f.name)],
-    [t.fonts],
-  );
+  const fonts = useMemo(() => [...BUILTIN_FONTS, ...(t.fonts ?? []).map((f) => f.name)], [t.fonts]);
 
   const patch = (id: LayerId, data: Record<string, unknown>) => {
     const key = KEY_OF[id];
@@ -354,11 +392,13 @@ export function TemplateEditor({
     const extra = makeExtra(kind, (t.extras ?? []).length);
     setT({ ...t, extras: [...(t.extras ?? []), extra] });
     setSelected(`extra:${extra.id}`);
-    setOpen(`extra:${extra.id}`);
+    setTab("layers");
   };
 
-  const removeExtra = (extraId: string) =>
+  const removeExtra = (extraId: string) => {
     setT({ ...t, extras: (t.extras ?? []).filter((e) => e.id !== extraId) });
+    if (selected === `extra:${extraId}`) setSelected(null);
+  };
 
   const textLayer = (id: LayerId) => t[KEY_OF[id]] as unknown as TextLayer;
   const imgLayer = (id: LayerId) => t[KEY_OF[id]] as unknown as ImageLayer;
@@ -376,8 +416,8 @@ export function TemplateEditor({
     const start = layer.tStart ?? 0;
     const end = layer.tEnd ?? null;
     return (
-      <div className="space-y-2 border-t border-border pt-2">
-        <p className="mono-label">Tempo em tela</p>
+      <div className="space-y-2 border-t border-border pt-3">
+        <p className="studio-label">Tempo em tela</p>
         <div className="grid grid-cols-2 gap-2">
           <Field label="Aparece em (s)">
             <input
@@ -431,14 +471,14 @@ export function TemplateEditor({
             <button
               key={label as string}
               onClick={() => apply({ tStart: 0, tEnd: secs, fadeIn: 0.4, fadeOut: 0.6 })}
-              className="rounded-md border border-border px-2 py-1 font-mono text-[11px] hover:border-primary"
+              className="rounded-full border border-border px-3 py-1 text-[11px] hover:border-primary"
             >
               {label as string}
             </button>
           ))}
           <button
             onClick={() => apply({ tStart: 0, tEnd: null, fadeIn: 0, fadeOut: 0 })}
-            className="rounded-md border border-border px-2 py-1 font-mono text-[11px] hover:border-primary"
+            className="rounded-full border border-border px-3 py-1 text-[11px] hover:border-primary"
           >
             Vídeo todo
           </button>
@@ -458,15 +498,9 @@ export function TemplateEditor({
     },
     apply: (data: Record<string, unknown>) => void,
   ) => (
-    <div className="space-y-2 border-t border-border pt-2">
-
-      <Slider
-        label="Ordem (z-index)"
-        value={layer.z ?? 0}
-        min={0}
-        max={200}
-        onChange={(v) => apply({ z: v })}
-      />
+    <div className="space-y-2 border-t border-border pt-3">
+      <p className="studio-label">Posição e transparência</p>
+      <Slider label="Ordem (z-index)" value={layer.z ?? 0} min={0} max={200} onChange={(v) => apply({ z: v })} />
       <Slider
         label="Opacidade"
         value={Math.round((layer.opacity ?? 1) * 100)}
@@ -477,20 +511,19 @@ export function TemplateEditor({
       <div className="flex gap-2">
         <button
           onClick={() => apply({ z: (layer.z ?? 0) + 10 })}
-          className="flex items-center gap-1 rounded-md border border-border px-2 py-1 font-mono text-[11px] hover:border-primary"
+          className="flex items-center gap-1 rounded-full border border-border px-3 py-1 text-[11px] hover:border-primary"
         >
-          <ArrowUp className="size-3" /> frente
+          <ArrowUp className="size-3" /> trazer para frente
         </button>
         <button
           onClick={() => apply({ z: Math.max(0, (layer.z ?? 0) - 10) })}
-          className="flex items-center gap-1 rounded-md border border-border px-2 py-1 font-mono text-[11px] hover:border-primary"
+          className="flex items-center gap-1 rounded-full border border-border px-3 py-1 text-[11px] hover:border-primary"
         >
-          <ArrowDown className="size-3" /> trás
+          <ArrowDown className="size-3" /> enviar para trás
         </button>
       </div>
       {timing(layer, apply)}
     </div>
-
   );
 
   const fontSelect = (val: string, onPick: (v: string) => void) => (
@@ -505,84 +538,712 @@ export function TemplateEditor({
     </Field>
   );
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/85 p-2 backdrop-blur-md sm:p-6">
-      <div className="panel glass pop-in flex h-full w-full max-w-7xl flex-col overflow-hidden">
-        <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b border-border px-5 py-4">
-          <div className="min-w-0">
-            <p className="eyebrow">
-              <span className="size-1.5 rounded-full bg-primary" aria-hidden />
-              Editor visual
+  /** Propriedades de uma camada fixa do template. */
+  const layerProperties = (id: LayerId) => {
+    const layer = t[KEY_OF[id]] as unknown as (BoxLayer & { visible: boolean }) | undefined;
+    if (!layer) return null;
+    return (
+      <div className="space-y-3">
+        {id === "video" && (
+          <>
+            <Slider label="X" value={t.video.x} min={-200} max={1080} onChange={(v) => patch(id, { x: v })} />
+            <Slider label="Y" value={t.video.y} min={-200} max={1920} onChange={(v) => patch(id, { y: v })} />
+            <Slider label="Largura" value={t.video.w} min={200} max={1080} onChange={(v) => patch(id, { w: v })} />
+            <Slider label="Altura" value={t.video.h} min={200} max={1920} onChange={(v) => patch(id, { h: v })} />
+            <Slider
+              label="Cantos arredondados"
+              value={t.video.radius}
+              min={0}
+              max={240}
+              onChange={(v) => patch(id, { radius: v })}
+            />
+            <div className="flex gap-2">
+              {[
+                ["9:16", 9 / 16],
+                ["4:5", 4 / 5],
+                ["1:1", 1],
+              ].map(([label, ratio]) => (
+                <button
+                  key={label as string}
+                  onClick={() => patch(id, { h: Math.round(t.video.w / (ratio as number)) })}
+                  className="rounded-full border border-border px-3 py-1 text-xs hover:border-primary"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {id === "captions" && (
+          <>
+            <p className="text-[11px] text-muted-foreground">
+              As legendas são geradas por vídeo na tela principal. Aqui você define o estilo.
             </p>
-            <h2 className="title-editorial mt-1 truncate !text-[26px]">
-              {t.name || (
-                <>
-                  Personalizar <span className="title-em">template</span>
-                </>
+            <Field label="Estilo">
+              <select
+                className={inputCls}
+                value={caps.mode}
+                onChange={(e) => patch(id, { mode: e.target.value as CaptionStyle["mode"] })}
+              >
+                <option value="karaoke">Karaokê (destaca a palavra falada)</option>
+                <option value="word">Uma palavra por vez</option>
+                <option value="line">Linha inteira</option>
+              </select>
+            </Field>
+            {fontSelect(caps.font, (v) => patch(id, { font: v }))}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Cor">
+                <input
+                  type="color"
+                  className="h-9 w-full rounded-lg border border-border bg-transparent"
+                  value={caps.color}
+                  onChange={(e) => patch(id, { color: e.target.value })}
+                />
+              </Field>
+              <Field label="Cor do destaque">
+                <input
+                  type="color"
+                  className="h-9 w-full rounded-lg border border-border bg-transparent"
+                  value={caps.activeColor}
+                  onChange={(e) => patch(id, { activeColor: e.target.value })}
+                />
+              </Field>
+            </div>
+            <Slider label="Tamanho" value={caps.size} min={28} max={140} onChange={(v) => patch(id, { size: v })} />
+            <Slider label="Contorno" value={caps.stroke} min={0} max={24} onChange={(v) => patch(id, { stroke: v })} />
+            <Slider
+              label="Palavras por bloco"
+              value={caps.maxWords}
+              min={1}
+              max={8}
+              onChange={(v) => patch(id, { maxWords: v })}
+            />
+            <Slider
+              label="Sincronia (s)"
+              value={caps.offset ?? 0}
+              min={-1}
+              max={1}
+              step={0.05}
+              onChange={(v) => patch(id, { offset: v })}
+            />
+            <Slider label="X" value={caps.x} min={0} max={1080} onChange={(v) => patch(id, { x: v })} />
+            <Slider label="Y" value={caps.y} min={0} max={1920} onChange={(v) => patch(id, { y: v })} />
+            <Slider label="Largura" value={caps.w} min={200} max={1080} onChange={(v) => patch(id, { w: v })} />
+            <Field label="Fundo">
+              <select
+                className={inputCls}
+                value={caps.bg}
+                onChange={(e) => patch(id, { bg: e.target.value as CaptionStyle["bg"] })}
+              >
+                <option value="shadow">Sombra</option>
+                <option value="box">Caixa</option>
+                <option value="none">Nenhum</option>
+              </select>
+            </Field>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={caps.uppercase}
+                onChange={(e) => patch(id, { uppercase: e.target.checked })}
+                className="size-4 accent-[var(--primary)]"
+              />
+              MAIÚSCULAS
+            </label>
+          </>
+        )}
+
+        {(id === "avatar" || id === "watermark") && (
+          <>
+            <div className="flex items-center gap-2">
+              {imgLayer(id).src && <MediaThumb src={imgLayer(id).src!} className="size-10 rounded-md object-cover" />}
+              <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:border-primary">
+                <Upload className="size-3.5" /> Trocar imagem
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (f) patch(id, { src: await fileToDataUrl(f), visible: true });
+                  }}
+                />
+              </label>
+              {imgLayer(id).src && (
+                <button
+                  onClick={() => patch(id, { src: null })}
+                  className="rounded-lg border border-border p-2 text-destructive hover:border-destructive"
+                  aria-label="Remover imagem"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
               )}
-            </h2>
-            <p className="truncate text-[12px] text-muted-foreground">
-              Ajuste textos, cores e elementos — o preview atualiza em tempo real.
-            </p>
+            </div>
+            <Slider label="X" value={imgLayer(id).x} min={-100} max={1080} onChange={(v) => patch(id, { x: v })} />
+            <Slider label="Y" value={imgLayer(id).y} min={-100} max={1920} onChange={(v) => patch(id, { y: v })} />
+            <Slider
+              label="Tamanho"
+              value={imgLayer(id).w}
+              min={40}
+              max={900}
+              onChange={(v) => patch(id, { w: v, h: v })}
+            />
+            <Slider
+              label="Opacidade"
+              value={Math.round(imgLayer(id).opacity * 100)}
+              min={0}
+              max={100}
+              onChange={(v) => patch(id, { opacity: v / 100 })}
+            />
+            <Slider
+              label="Rotação"
+              value={imgLayer(id).rotation}
+              min={-45}
+              max={45}
+              onChange={(v) => patch(id, { rotation: v })}
+            />
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={imgLayer(id).round}
+                onChange={(e) => patch(id, { round: e.target.checked })}
+                className="size-4 accent-[var(--primary)]"
+              />
+              Recorte circular
+            </label>
+          </>
+        )}
+
+        {["name", "handle", "headline", "cta"].includes(id) && (
+          <>
+            <Field label="Texto">
+              <textarea
+                className={inputCls}
+                rows={id === "headline" ? 2 : 1}
+                value={textLayer(id).text}
+                onChange={(e) => patch(id, { text: e.target.value })}
+              />
+            </Field>
+            {fontSelect(textLayer(id).font, (v) => patch(id, { font: v }))}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Cor">
+                <input
+                  type="color"
+                  className="h-9 w-full rounded-lg border border-border bg-transparent"
+                  value={textLayer(id).color}
+                  onChange={(e) => patch(id, { color: e.target.value })}
+                />
+              </Field>
+              <Field label="Tamanho">
+                <input
+                  type="number"
+                  className={inputCls}
+                  value={textLayer(id).size}
+                  onChange={(e) => patch(id, { size: Number(e.target.value) })}
+                />
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Peso">
+                <select
+                  className={inputCls}
+                  value={textLayer(id).weight}
+                  onChange={(e) => patch(id, { weight: e.target.value })}
+                >
+                  <option value="400">Regular</option>
+                  <option value="600">Semibold</option>
+                  <option value="700">Bold</option>
+                  <option value="800">Black</option>
+                </select>
+              </Field>
+              <Field label="Alinhamento">
+                <select
+                  className={inputCls}
+                  value={textLayer(id).align}
+                  onChange={(e) => patch(id, { align: e.target.value })}
+                >
+                  <option value="left">Esquerda</option>
+                  <option value="center">Centro</option>
+                  <option value="right">Direita</option>
+                </select>
+              </Field>
+            </div>
+            <Slider label="X" value={textLayer(id).x} min={-100} max={1080} onChange={(v) => patch(id, { x: v })} />
+            <Slider label="Y" value={textLayer(id).y} min={-100} max={1920} onChange={(v) => patch(id, { y: v })} />
+            <Slider
+              label="Largura da caixa"
+              value={textLayer(id).w}
+              min={100}
+              max={1080}
+              onChange={(v) => patch(id, { w: v })}
+            />
+            <Slider
+              label="Rotação"
+              value={textLayer(id).rotation}
+              min={-45}
+              max={45}
+              onChange={(v) => patch(id, { rotation: v })}
+            />
+
+            {id === "name" && (
+              <>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={!!textLayer(id).badge}
+                    onChange={(e) => patch(id, { badge: e.target.checked })}
+                    className="size-4 accent-[var(--primary)]"
+                  />
+                  Mostrar selo azul verificado
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={!!textLayer(id).accentColor}
+                    onChange={(e) =>
+                      patch(id, {
+                        accentColor: e.target.checked ? "#d75904" : undefined,
+                        accentFrom: 0,
+                        accentTo: textLayer(id).text.length,
+                      })
+                    }
+                    className="size-4 accent-[var(--primary)]"
+                  />
+                  Colorir parte do nome
+                </label>
+                {textLayer(id).accentColor && (
+                  <div className="space-y-2">
+                    <Slider
+                      label="Início"
+                      value={textLayer(id).accentFrom ?? 0}
+                      min={0}
+                      max={textLayer(id).text.length}
+                      onChange={(v) => patch(id, { accentFrom: v })}
+                    />
+                    <Slider
+                      label="Fim"
+                      value={textLayer(id).accentTo ?? 0}
+                      min={0}
+                      max={textLayer(id).text.length}
+                      onChange={(v) => patch(id, { accentTo: v })}
+                    />
+                    <input
+                      type="color"
+                      value={textLayer(id).accentColor}
+                      onChange={(e) => patch(id, { accentColor: e.target.value })}
+                      className="h-9 w-full rounded-lg border border-border bg-transparent"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        {zOpacity(layer, (data) => patch(id, data))}
+      </div>
+    );
+  };
+
+  /** Propriedades de uma camada livre (texto ou imagem adicionada pelo usuário). */
+  const extraProperties = (extraId: string) => {
+    const e = (t.extras ?? []).find((x) => x.id === extraId);
+    if (!e) return null;
+    const isImg = "src" in e;
+    return (
+      <div className="space-y-3">
+        <Field label="Nome da camada">
+          <input className={inputCls} value={e.label} onChange={(ev) => patchExtra(e.id, { label: ev.target.value })} />
+        </Field>
+        {isImg ? (
+          <>
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:border-primary">
+              <Upload className="size-3.5" /> Enviar imagem
+              <input
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={async (ev) => {
+                  const f = ev.target.files?.[0];
+                  if (f) patchExtra(e.id, { src: await fileToDataUrl(f) });
+                }}
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={(e as ImageLayer).round}
+                onChange={(ev) => patchExtra(e.id, { round: ev.target.checked })}
+                className="size-4 accent-[var(--primary)]"
+              />
+              Recorte circular
+            </label>
+          </>
+        ) : (
+          <>
+            <Field label="Texto">
+              <textarea
+                className={inputCls}
+                rows={2}
+                value={(e as TextLayer).text}
+                onChange={(ev) => patchExtra(e.id, { text: ev.target.value })}
+              />
+            </Field>
+            {fontSelect((e as TextLayer).font, (v) => patchExtra(e.id, { font: v }))}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Cor">
+                <input
+                  type="color"
+                  className="h-9 w-full rounded-lg border border-border bg-transparent"
+                  value={(e as TextLayer).color}
+                  onChange={(ev) => patchExtra(e.id, { color: ev.target.value })}
+                />
+              </Field>
+              <Field label="Tamanho">
+                <input
+                  type="number"
+                  className={inputCls}
+                  value={(e as TextLayer).size}
+                  onChange={(ev) => patchExtra(e.id, { size: Number(ev.target.value) })}
+                />
+              </Field>
+            </div>
+          </>
+        )}
+        <Slider label="X" value={e.x} min={-200} max={1080} onChange={(v) => patchExtra(e.id, { x: v })} />
+        <Slider label="Y" value={e.y} min={-200} max={1920} onChange={(v) => patchExtra(e.id, { y: v })} />
+        <Slider label="Largura" value={e.w} min={40} max={1080} onChange={(v) => patchExtra(e.id, { w: v })} />
+        <Slider label="Altura" value={e.h} min={40} max={1920} onChange={(v) => patchExtra(e.id, { h: v })} />
+        <Slider label="Rotação" value={e.rotation} min={-45} max={45} onChange={(v) => patchExtra(e.id, { rotation: v })} />
+        {zOpacity(e, (data) => patchExtra(e.id, data))}
+        <button
+          onClick={() => removeExtra(e.id)}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-destructive hover:border-destructive"
+        >
+          <Trash2 className="size-3.5" /> Excluir camada
+        </button>
+      </div>
+    );
+  };
+
+  const selectedLabel = selected
+    ? selected.startsWith("extra:")
+      ? ((t.extras ?? []).find((e) => `extra:${e.id}` === selected)?.label ?? "Camada")
+      : LAYER_LABELS[selected as LayerId]
+    : null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/85 p-0 backdrop-blur-md sm:p-4">
+      <div className="studio panel glass pop-in flex h-full w-full max-w-[1600px] flex-col overflow-hidden">
+        {/* Barra superior: identidade, ferramentas e ações principais */}
+        <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border px-4 py-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary">
+              <Sparkles className="size-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <label className="studio-label" htmlFor="studio-template-name">
+                Nome do template
+              </label>
+              <input
+                id="studio-template-name"
+                className="w-full max-w-md truncate border-0 bg-transparent p-0 studio-title text-[19px] text-foreground outline-none placeholder:text-muted-foreground focus:underline focus:decoration-primary/60 focus:underline-offset-4"
+                value={t.name}
+                placeholder="Sem título"
+                onChange={(e) => setT({ ...t, name: e.target.value })}
+              />
+            </div>
           </div>
+
           <div className="flex shrink-0 items-center gap-1.5">
-            <button
-              onClick={undo}
-              disabled={!past.current.length}
-              className="btn-ghost interactive h-12 w-14 flex-col gap-0.5 disabled:opacity-40"
+            <ToolButton
+              icon={<Undo2 className="size-4" />}
+              label="Desfazer"
               title="Desfazer (Ctrl+Z)"
-            >
-              <Undo2 className="size-4" />
-              <span className="font-mono text-[9px] uppercase tracking-[0.1em]">desfazer</span>
-            </button>
-            <button
-              onClick={redo}
-              disabled={!future.current.length}
-              className="btn-ghost interactive h-12 w-14 flex-col gap-0.5 disabled:opacity-40"
+              disabled={!past.current.length}
+              onClick={undo}
+            />
+            <ToolButton
+              icon={<Redo2 className="size-4" />}
+              label="Refazer"
               title="Refazer (Ctrl+Shift+Z)"
-            >
-              <Redo2 className="size-4" />
-              <span className="font-mono text-[9px] uppercase tracking-[0.1em]">refazer</span>
-            </button>
-            <button
-              onClick={() => setSnap((s) => !s)}
-              className={`btn-ghost interactive h-12 w-14 flex-col gap-0.5 ${snap ? "bg-primary/15 text-primary" : ""}`}
+              disabled={!future.current.length}
+              onClick={redo}
+            />
+            <ToolButton
+              icon={<Magnet className="size-4" />}
+              label="Ímã"
               title="Snap e guias de alinhamento (segure Alt para ignorar)"
-            >
-              <Magnet className="size-4" />
-              <span className="font-mono text-[9px] uppercase tracking-[0.1em]">snap</span>
-            </button>
-            <button
-              onClick={() => setDebug((d) => !d)}
-              className={`btn-ghost interactive h-12 w-14 flex-col gap-0.5 ${debug ? "bg-primary/15 text-primary" : ""}`}
+              active={snap}
+              onClick={() => setSnap((s) => !s)}
+            />
+            <ToolButton
+              icon={<Bug className="size-4" />}
+              label="Grade"
               title="Modo de depuração: grade, safe areas e bounding boxes"
-            >
-              <Bug className="size-4" />
-              <span className="font-mono text-[9px] uppercase tracking-[0.1em]">grade</span>
-            </button>
+              active={debug}
+              onClick={() => setDebug((d) => !d)}
+            />
+            <div className="mx-1 h-8 w-px bg-border" aria-hidden />
+            <Button variant="outline" size="sm" onClick={() => onUse(t)}>
+              Usar sem salvar
+            </Button>
+            <Button size="sm" onClick={() => onSave(t)}>
+              Salvar template
+            </Button>
             <button
               onClick={onCancel}
-              className="btn-ghost interactive h-12 w-14 flex-col gap-0.5"
-              aria-label="Fechar"
+              className="interactive ml-1 grid size-9 place-items-center rounded-xl border border-border bg-surface-2 text-muted-foreground"
+              aria-label="Fechar editor"
+              title="Fechar editor"
             >
               <X className="size-4" />
-              <span className="font-mono text-[9px] uppercase tracking-[0.1em]">fechar</span>
             </button>
           </div>
         </header>
 
-        <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto p-5 lg:grid-cols-[minmax(0,1fr)_400px]">
+        {/* Área de trabalho: ferramentas · palco · propriedades */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[276px_minmax(0,1fr)_348px] lg:overflow-hidden">
+          {/* Coluna esquerda: camadas e ajustes do template */}
+          <aside className="flex min-h-0 flex-col border-border lg:border-r">
+            <div className="flex gap-1 border-b border-border p-2">
+              {[
+                { id: "layers" as const, label: "Camadas", icon: <Layers className="size-3.5" /> },
+                { id: "design" as const, label: "Design", icon: <Palette className="size-3.5" /> },
+                { id: "effects" as const, label: "Efeitos", icon: <Sparkles className="size-3.5" /> },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setTab(item.id)}
+                  aria-pressed={tab === item.id}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium transition ${
+                    tab === item.id
+                      ? "bg-primary/15 text-primary"
+                      : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                  }`}
+                >
+                  {item.icon}
+                  {item.label}
+                </button>
+              ))}
+            </div>
 
-          <div className="space-y-3 lg:sticky lg:top-0 lg:self-start">
-            <div className="flex items-center justify-between gap-2">
-              <p className="mono-label">Preview em tempo real</p>
-              <span className="mono-label rounded-full border border-border px-2 py-0.5 text-muted-foreground">
-                {(t.canvasW ?? 1080)}×{(t.canvasH ?? 1920)}
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
+              {tab === "layers" && (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => addExtra("text")}
+                      className="interactive flex items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2 py-2 text-xs font-medium"
+                    >
+                      <Plus className="size-3.5" /> Texto
+                    </button>
+                    <button
+                      onClick={() => addExtra("image")}
+                      className="interactive flex items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2 py-2 text-xs font-medium"
+                    >
+                      <Plus className="size-3.5" /> Imagem
+                    </button>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="studio-label px-1">Elementos do template</p>
+                    {LAYER_ORDER.map((id) => {
+                      const layer = t[KEY_OF[id]] as unknown as (BoxLayer & { visible: boolean }) | undefined;
+                      if (!layer) return null;
+                      const active = selected === id;
+                      return (
+                        <div
+                          key={id}
+                          className={`studio-item ${active ? "studio-item-active" : ""}`}
+                        >
+                          <button
+                            onClick={() => patch(id, { visible: !layer.visible })}
+                            className="text-muted-foreground hover:text-foreground"
+                            aria-label={layer.visible ? `Ocultar ${LAYER_LABELS[id]}` : `Mostrar ${LAYER_LABELS[id]}`}
+                            title={layer.visible ? "Ocultar" : "Mostrar"}
+                          >
+                            {layer.visible ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                          </button>
+                          <button
+                            onClick={() => setSelected(id)}
+                            className={`flex min-w-0 flex-1 items-center gap-2 text-left text-sm ${
+                              layer.visible ? "" : "text-muted-foreground line-through"
+                            }`}
+                          >
+                            <span className="text-muted-foreground">{LAYER_ICON[id]}</span>
+                            <span className="truncate">{LAYER_LABELS[id]}</span>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="studio-label px-1">Camadas livres</p>
+                    {(t.extras ?? []).length === 0 && (
+                      <p className="px-1 text-[11px] text-muted-foreground">
+                        Nenhuma ainda — use os botões acima para adicionar texto ou imagem.
+                      </p>
+                    )}
+                    {(t.extras ?? []).map((e) => {
+                      const active = selected === `extra:${e.id}`;
+                      return (
+                        <div key={e.id} className={`studio-item ${active ? "studio-item-active" : ""}`}>
+                          <button
+                            onClick={() => patchExtra(e.id, { visible: !e.visible })}
+                            className="text-muted-foreground hover:text-foreground"
+                            aria-label={e.visible ? `Ocultar ${e.label}` : `Mostrar ${e.label}`}
+                            title={e.visible ? "Ocultar" : "Mostrar"}
+                          >
+                            {e.visible ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                          </button>
+                          <button
+                            onClick={() => setSelected(`extra:${e.id}`)}
+                            className={`flex min-w-0 flex-1 items-center gap-2 text-left text-sm ${
+                              e.visible ? "" : "text-muted-foreground line-through"
+                            }`}
+                          >
+                            <span className="text-muted-foreground">
+                              {"src" in e ? <ImageIcon className="size-4" /> : <TypeIcon className="size-4" />}
+                            </span>
+                            <span className="truncate">{e.label}</span>
+                          </button>
+                          <button
+                            onClick={() => removeExtra(e.id)}
+                            className="text-muted-foreground hover:text-destructive"
+                            aria-label={`Excluir ${e.label}`}
+                            title="Excluir camada"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {tab === "design" && (
+                <>
+                  <Field label="Cor de fundo">
+                    <div className="flex gap-2">
+                      {["#ffffff", "#0a0a0a", "#101418"].map((c) => (
+                        <button
+                          key={c}
+                          onClick={() => setT({ ...t, background: c })}
+                          className={`size-9 rounded-lg border-2 ${t.background === c ? "border-primary" : "border-border"}`}
+                          style={{ background: c }}
+                          aria-label={`Fundo ${c}`}
+                        />
+                      ))}
+                      <input
+                        type="color"
+                        value={t.background}
+                        onChange={(e) => setT({ ...t, background: e.target.value })}
+                        className="size-9 rounded-lg border border-border bg-transparent"
+                        aria-label="Cor de fundo personalizada"
+                      />
+                    </div>
+                  </Field>
+
+                  <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
+                    <p className="studio-label">Fontes próprias</p>
+                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:border-primary">
+                      <Upload className="size-3.5" /> Enviar .ttf / .otf / .woff
+                      <input
+                        type="file"
+                        accept=".ttf,.otf,.woff,.woff2,font/*"
+                        hidden
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0];
+                          if (f) await uploadFont(f);
+                        }}
+                      />
+                    </label>
+                    {(t.fonts ?? []).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {(t.fonts ?? []).map((f) => (
+                          <span
+                            key={f.name}
+                            className="flex items-center gap-1 rounded-full border border-border px-2 py-1 text-[11px]"
+                          >
+                            {f.name}
+                            <button
+                              onClick={() => setT({ ...t, fonts: (t.fonts ?? []).filter((x) => x.name !== f.name) })}
+                              className="text-destructive"
+                              aria-label={`Remover fonte ${f.name}`}
+                            >
+                              <X className="size-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {tab === "effects" && (
+                <div className="space-y-3 rounded-xl border border-border bg-surface-2 p-3">
+                  <p className="studio-label">Anti-duplicidade</p>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={adPreview}
+                      onChange={(e) => setAdPreview(e.target.checked)}
+                      className="size-4 accent-[var(--primary)]"
+                    />
+                    Pré-visualizar efeito no preview
+                  </label>
+                  {adPreview ? (
+                    <div className="space-y-2 rounded-lg border border-primary/40 bg-background/40 p-2">
+                      <p className="text-xs text-muted-foreground">{describeVariation(adVariation)}</p>
+                      <button
+                        className="rounded-full border border-border px-3 py-1 text-xs hover:border-primary"
+                        onClick={() => setAdSeed(Math.random().toString(36).slice(2, 8))}
+                      >
+                        Sortear outra variação
+                      </button>
+                    </div>
+                  ) : null}
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={t.mirror}
+                      onChange={(e) => setT({ ...t, mirror: e.target.checked })}
+                      className="size-4 accent-[var(--primary)]"
+                    />
+                    Espelhar vídeo horizontalmente
+                  </label>
+                  <Slider
+                    label="Velocidade"
+                    value={t.speed}
+                    min={0.95}
+                    max={1.05}
+                    step={0.01}
+                    onChange={(v) => setT({ ...t, speed: v })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Muda a duração e o fingerprint do arquivo. Não há garantia de que plataformas tratem o vídeo como
+                    novo.
+                  </p>
+                </div>
+              )}
+            </div>
+          </aside>
+
+          {/* Palco central: preview 9:16 */}
+          <section className="flex min-h-0 flex-col items-center justify-center gap-3 bg-background/40 p-4">
+            <div className="flex w-full items-center justify-between gap-2">
+              <p className="studio-label">Preview em tempo real</p>
+              <span className="rounded-full border border-border px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+                {t.canvasW ?? 1080}×{t.canvasH ?? 1920}
               </span>
             </div>
-            <div className="grid place-items-center rounded-2xl border border-border bg-[repeating-conic-gradient(var(--color-surface-2)_0%_25%,transparent_0%_50%)] bg-[length:22px_22px] p-4">
+            <div className="grid min-h-0 w-full flex-1 place-items-center rounded-2xl border border-border bg-[repeating-conic-gradient(var(--color-surface-2)_0%_25%,transparent_0%_50%)] bg-[length:22px_22px] p-4">
               <TemplateCanvas
-                frameClassName="aspect-[9/16] h-[min(68vh,720px)] w-auto max-w-full shadow-[0_24px_60px_-24px_rgba(0,0,0,0.8)]"
+                frameClassName="aspect-[9/16] h-full max-h-[62vh] w-auto max-w-full rounded-xl shadow-[0_24px_60px_-24px_rgba(0,0,0,0.8)]"
                 template={t}
                 previewFile={previewFile ?? null}
                 timelineTime={time}
@@ -601,582 +1262,84 @@ export function TemplateEditor({
                 speed={adPreview ? adVariation.speed : 1}
               />
             </div>
+            <p className="text-center text-[11px] text-muted-foreground">
+              Arraste para mover · alças nos 8 pontos para redimensionar · Shift mantém proporção · Alt redimensiona
+              pelo centro · setas movem 1px (Shift 10px)
+            </p>
+          </section>
 
-            <TemplateTimeline template={t} onChange={setT} selected={selected} onSelect={setSelected}
-              time={time} onSeek={n => { setPlaying(false); setTime(n); }} playing={playing}
-              onPlay={() => { if (time >= duration) setTime(0); setPlaying(p => !p); }}
-              duration={duration} onDuration={n => { setPlaying(false); setMediaDuration(null); setTime(v => Math.min(v, n)); setT({ ...t, timelineDuration: n }); }} />
-            {debug ? <DebugPanel
-              t={t}
-              selected={selected}
-              grid={debugGrid}
-              setGrid={setDebugGrid}
-              safe={debugSafe}
-              setSafe={setDebugSafe}
-              boxes={debugBoxes}
-              setBoxes={setDebugBoxes}
-            /> : (
-              <p className="text-center text-xs text-muted-foreground">
-                Arraste para mover · alças nos 8 pontos para redimensionar · Shift mantém proporção · Alt redimensiona pelo centro · setas movem 1px (Shift 10px)
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-4 lg:max-h-[70vh] lg:overflow-y-auto lg:pr-1">
-            <Field label="Nome do template">
-
-              <input className={inputCls} value={t.name} onChange={(e) => setT({ ...t, name: e.target.value })} />
-            </Field>
-
-            <Field label="Fundo">
-              <div className="flex gap-2">
-                {["#ffffff", "#0a0a0a", "#101418"].map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => setT({ ...t, background: c })}
-                    className={`size-9 rounded-lg border-2 ${t.background === c ? "border-primary" : "border-border"}`}
-                    style={{ background: c }}
-                    aria-label={c}
-                  />
-                ))}
-                <input
-                  type="color"
-                  value={t.background}
-                  onChange={(e) => setT({ ...t, background: e.target.value })}
-                  className="size-9 rounded-lg border border-border bg-transparent"
-                />
-              </div>
-            </Field>
-
-            <div className="rounded-xl border border-border bg-surface-2 p-3">
-              <p className="mono-label mb-2">Fontes próprias</p>
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:border-primary">
-                <Upload className="size-3.5" /> Enviar .ttf / .otf / .woff
-                <input
-                  type="file"
-                  accept=".ttf,.otf,.woff,.woff2,font/*"
-                  hidden
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (f) await uploadFont(f);
-                  }}
-                />
-              </label>
-              {(t.fonts ?? []).length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {(t.fonts ?? []).map((f) => (
-                    <span
-                      key={f.name}
-                      className="flex items-center gap-1 rounded-md border border-border px-2 py-1 font-mono text-[11px]"
-                    >
-                      {f.name}
-                      <button
-                        onClick={() => setT({ ...t, fonts: (t.fonts ?? []).filter((x) => x.name !== f.name) })}
-                        className="text-destructive"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
+          {/* Coluna direita: propriedades do elemento selecionado */}
+          <aside className="flex min-h-0 flex-col border-border lg:border-l">
+            <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+              <h3 className="studio-title truncate text-sm">
+                {selectedLabel ? selectedLabel : "Propriedades"}
+              </h3>
+              {selectedLabel ? <span className="studio-label">selecionado</span> : null}
+            </div>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+              {selected ? (
+                selected.startsWith("extra:") ? (
+                  extraProperties(selected.slice("extra:".length))
+                ) : (
+                  layerProperties(selected as LayerId)
+                )
+              ) : (
+                <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+                  Clique em um elemento do vídeo ou na lista de camadas para editar seus ajustes aqui.
+                </p>
               )}
-            </div>
 
-            {LAYER_ORDER.map((id) => {
-              const layer = t[KEY_OF[id]] as unknown as (BoxLayer & { visible: boolean }) | undefined;
-              if (!layer) return null;
-              const isOpen = open === id;
-              return (
-                <div key={id} className="rounded-xl border border-border bg-surface-2">
-                  <div className="flex items-center gap-3 px-3 py-2.5">
-                    <input
-                      type="checkbox"
-                      checked={layer.visible}
-                      onChange={(e) => patch(id, { visible: e.target.checked })}
-                      className="size-4 accent-[var(--primary)]"
-                    />
-                    <button
-                      className="flex flex-1 items-center justify-between text-left text-sm"
-                      onClick={() => {
-                        setOpen(isOpen ? null : id);
-                        setSelected(id);
-                      }}
-                    >
-                      {LAYER_LABELS[id]}
-                      <ChevronDown className={`size-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-                    </button>
-                  </div>
-
-                  {isOpen && (
-                    <div className="space-y-3 border-t border-border p-3">
-                      {id === "video" && (
-                        <>
-                          <Slider label="X" value={t.video.x} min={-200} max={1080} onChange={(v) => patch(id, { x: v })} />
-                          <Slider label="Y" value={t.video.y} min={-200} max={1920} onChange={(v) => patch(id, { y: v })} />
-                          <Slider label="Largura" value={t.video.w} min={200} max={1080} onChange={(v) => patch(id, { w: v })} />
-                          <Slider label="Altura" value={t.video.h} min={200} max={1920} onChange={(v) => patch(id, { h: v })} />
-                          <Slider label="Cantos arredondados" value={t.video.radius} min={0} max={240} onChange={(v) => patch(id, { radius: v })} />
-                          <div className="flex gap-2">
-                            {[
-                              ["9:16", 9 / 16],
-                              ["4:5", 4 / 5],
-                              ["1:1", 1],
-                            ].map(([label, ratio]) => (
-                              <button
-                                key={label as string}
-                                onClick={() => patch(id, { h: Math.round(t.video.w / (ratio as number)) })}
-                                className="rounded-md border border-border px-2.5 py-1 font-mono text-xs hover:border-primary"
-                              >
-                                {label}
-                              </button>
-                            ))}
-                          </div>
-                        </>
-                      )}
-
-                      {id === "captions" && (
-                        <>
-                          <p className="font-mono text-[11px] text-muted-foreground">
-                            As legendas são geradas por vídeo na tela principal. Aqui você define o estilo.
-                          </p>
-                          <Field label="Estilo">
-                            <select
-                              className={inputCls}
-                              value={caps.mode}
-                              onChange={(e) => patch(id, { mode: e.target.value as CaptionStyle["mode"] })}
-                            >
-                              <option value="karaoke">Karaokê (destaca a palavra falada)</option>
-                              <option value="word">Uma palavra por vez</option>
-                              <option value="line">Linha inteira</option>
-                            </select>
-                          </Field>
-                          {fontSelect(caps.font, (v) => patch(id, { font: v }))}
-                          <div className="grid grid-cols-2 gap-3">
-                            <Field label="Cor">
-                              <input
-                                type="color"
-                                className="h-9 w-full rounded-lg border border-border bg-transparent"
-                                value={caps.color}
-                                onChange={(e) => patch(id, { color: e.target.value })}
-                              />
-                            </Field>
-                            <Field label="Cor do destaque">
-                              <input
-                                type="color"
-                                className="h-9 w-full rounded-lg border border-border bg-transparent"
-                                value={caps.activeColor}
-                                onChange={(e) => patch(id, { activeColor: e.target.value })}
-                              />
-                            </Field>
-                          </div>
-                          <Slider label="Tamanho" value={caps.size} min={28} max={140} onChange={(v) => patch(id, { size: v })} />
-                          <Slider label="Contorno" value={caps.stroke} min={0} max={24} onChange={(v) => patch(id, { stroke: v })} />
-                          <Slider label="Palavras por bloco" value={caps.maxWords} min={1} max={8} onChange={(v) => patch(id, { maxWords: v })} />
-                          <Slider label="Sincronia (s)" value={caps.offset ?? 0} min={-1} max={1} step={0.05} onChange={(v) => patch(id, { offset: v })} />
-                          <Slider label="X" value={caps.x} min={0} max={1080} onChange={(v) => patch(id, { x: v })} />
-                          <Slider label="Y" value={caps.y} min={0} max={1920} onChange={(v) => patch(id, { y: v })} />
-                          <Slider label="Largura" value={caps.w} min={200} max={1080} onChange={(v) => patch(id, { w: v })} />
-                          <Field label="Fundo">
-                            <select
-                              className={inputCls}
-                              value={caps.bg}
-                              onChange={(e) => patch(id, { bg: e.target.value as CaptionStyle["bg"] })}
-                            >
-                              <option value="shadow">Sombra</option>
-                              <option value="box">Caixa</option>
-                              <option value="none">Nenhum</option>
-                            </select>
-                          </Field>
-                          <label className="flex items-center gap-2 text-sm">
-                            <input
-                              type="checkbox"
-                              checked={caps.uppercase}
-                              onChange={(e) => patch(id, { uppercase: e.target.checked })}
-                              className="size-4 accent-[var(--primary)]"
-                            />
-                            MAIÚSCULAS
-                          </label>
-                        </>
-                      )}
-
-                      {(id === "avatar" || id === "watermark") && (
-                        <>
-                          <div className="flex items-center gap-2">
-                            {imgLayer(id).src && (
-                              <MediaThumb src={imgLayer(id).src!} className="size-10 rounded-md object-cover" />
-                            )}
-                            <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:border-primary">
-                              <Upload className="size-3.5" /> Trocar imagem
-                              <input
-                                type="file"
-                                accept="image/*"
-                                hidden
-                                onChange={async (e) => {
-                                  const f = e.target.files?.[0];
-                                  if (f) patch(id, { src: await fileToDataUrl(f), visible: true });
-                                }}
-                              />
-                            </label>
-                            {imgLayer(id).src && (
-                              <button
-                                onClick={() => patch(id, { src: null })}
-                                className="rounded-lg border border-border p-2 text-destructive hover:border-destructive"
-                              >
-                                <Trash2 className="size-3.5" />
-                              </button>
-                            )}
-                          </div>
-                          <Slider label="X" value={imgLayer(id).x} min={-100} max={1080} onChange={(v) => patch(id, { x: v })} />
-                          <Slider label="Y" value={imgLayer(id).y} min={-100} max={1920} onChange={(v) => patch(id, { y: v })} />
-                          <Slider
-                            label="Tamanho"
-                            value={imgLayer(id).w}
-                            min={40}
-                            max={900}
-                            onChange={(v) => patch(id, { w: v, h: v })}
-                          />
-                          <Slider
-                            label="Opacidade"
-                            value={Math.round(imgLayer(id).opacity * 100)}
-                            min={0}
-                            max={100}
-                            onChange={(v) => patch(id, { opacity: v / 100 })}
-                          />
-                          <Slider
-                            label="Rotação"
-                            value={imgLayer(id).rotation}
-                            min={-45}
-                            max={45}
-                            onChange={(v) => patch(id, { rotation: v })}
-                          />
-                          <label className="flex items-center gap-2 text-sm">
-                            <input
-                              type="checkbox"
-                              checked={imgLayer(id).round}
-                              onChange={(e) => patch(id, { round: e.target.checked })}
-                              className="size-4 accent-[var(--primary)]"
-                            />
-                            Recorte circular
-                          </label>
-                        </>
-                      )}
-
-                      {["name", "handle", "headline", "cta"].includes(id) && (
-                        <>
-                          <Field label="Texto">
-                            <textarea
-                              className={inputCls}
-                              rows={id === "headline" ? 2 : 1}
-                              value={textLayer(id).text}
-                              onChange={(e) => patch(id, { text: e.target.value })}
-                            />
-                          </Field>
-                          {fontSelect(textLayer(id).font, (v) => patch(id, { font: v }))}
-                          <div className="grid grid-cols-2 gap-3">
-                            <Field label="Cor">
-                              <input
-                                type="color"
-                                className="h-9 w-full rounded-lg border border-border bg-transparent"
-                                value={textLayer(id).color}
-                                onChange={(e) => patch(id, { color: e.target.value })}
-                              />
-                            </Field>
-                            <Field label="Tamanho">
-                              <input
-                                type="number"
-                                className={inputCls}
-                                value={textLayer(id).size}
-                                onChange={(e) => patch(id, { size: Number(e.target.value) })}
-                              />
-                            </Field>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <Field label="Peso">
-                              <select
-                                className={inputCls}
-                                value={textLayer(id).weight}
-                                onChange={(e) => patch(id, { weight: e.target.value })}
-                              >
-                                <option value="400">Regular</option>
-                                <option value="600">Semibold</option>
-                                <option value="700">Bold</option>
-                                <option value="800">Black</option>
-                              </select>
-                            </Field>
-                            <Field label="Alinhamento">
-                              <select
-                                className={inputCls}
-                                value={textLayer(id).align}
-                                onChange={(e) => patch(id, { align: e.target.value })}
-                              >
-                                <option value="left">Esquerda</option>
-                                <option value="center">Centro</option>
-                                <option value="right">Direita</option>
-                              </select>
-                            </Field>
-                          </div>
-                          <Slider label="X" value={textLayer(id).x} min={-100} max={1080} onChange={(v) => patch(id, { x: v })} />
-                          <Slider label="Y" value={textLayer(id).y} min={-100} max={1920} onChange={(v) => patch(id, { y: v })} />
-                          <Slider label="Largura da caixa" value={textLayer(id).w} min={100} max={1080} onChange={(v) => patch(id, { w: v })} />
-                          <Slider label="Rotação" value={textLayer(id).rotation} min={-45} max={45} onChange={(v) => patch(id, { rotation: v })} />
-
-                          {id === "name" && (
-                            <>
-                              <label className="flex items-center gap-2 text-sm">
-                                <input
-                                  type="checkbox"
-                                  checked={!!textLayer(id).badge}
-                                  onChange={(e) => patch(id, { badge: e.target.checked })}
-                                  className="size-4 accent-[var(--primary)]"
-                                />
-                                Mostrar selo azul verificado
-                              </label>
-                              <label className="flex items-center gap-2 text-sm">
-                                <input
-                                  type="checkbox"
-                                  checked={!!textLayer(id).accentColor}
-                                  onChange={(e) =>
-                                    patch(id, {
-                                      accentColor: e.target.checked ? "#d75904" : undefined,
-                                      accentFrom: 0,
-                                      accentTo: textLayer(id).text.length,
-                                    })
-                                  }
-                                  className="size-4 accent-[var(--primary)]"
-                                />
-                                Colorir parte do nome
-                              </label>
-                              {textLayer(id).accentColor && (
-                                <div className="space-y-2">
-                                  <Slider
-                                    label="Início"
-                                    value={textLayer(id).accentFrom ?? 0}
-                                    min={0}
-                                    max={textLayer(id).text.length}
-                                    onChange={(v) => patch(id, { accentFrom: v })}
-                                  />
-                                  <Slider
-                                    label="Fim"
-                                    value={textLayer(id).accentTo ?? 0}
-                                    min={0}
-                                    max={textLayer(id).text.length}
-                                    onChange={(v) => patch(id, { accentTo: v })}
-                                  />
-                                  <input
-                                    type="color"
-                                    value={textLayer(id).accentColor}
-                                    onChange={(e) => patch(id, { accentColor: e.target.value })}
-                                    className="h-9 w-full rounded-lg border border-border bg-transparent"
-                                  />
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </>
-                      )}
-
-                      {zOpacity(layer, (data) => patch(id, data))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* camadas livres */}
-            <div className="rounded-xl border border-border bg-surface-2 p-3">
-              <div className="flex items-center justify-between">
-                <p className="mono-label">Camadas livres</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => addExtra("text")}
-                    className="flex items-center gap-1 rounded-md border border-border px-2 py-1 font-mono text-[11px] hover:border-primary"
-                  >
-                    <Plus className="size-3" />
-                    <TypeIcon className="size-3" /> texto
-                  </button>
-                  <button
-                    onClick={() => addExtra("image")}
-                    className="flex items-center gap-1 rounded-md border border-border px-2 py-1 font-mono text-[11px] hover:border-primary"
-                  >
-                    <Plus className="size-3" />
-                    <ImageIcon className="size-3" /> imagem
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-3 space-y-2">
-                {(t.extras ?? []).length === 0 && (
-                  <p className="font-mono text-[11px] text-muted-foreground">
-                    nenhuma ainda — adicione textos ou imagens extras
-                  </p>
-                )}
-                {(t.extras ?? []).map((e) => {
-                  const sel = open === `extra:${e.id}`;
-                  const isImg = "src" in e;
-                  return (
-                    <div key={e.id} className="rounded-lg border border-border bg-background">
-                      <div className="flex items-center gap-2 px-2.5 py-2">
-                        <input
-                          type="checkbox"
-                          checked={e.visible}
-                          onChange={(ev) => patchExtra(e.id, { visible: ev.target.checked })}
-                          className="size-4 accent-[var(--primary)]"
-                        />
-                        <button
-                          className="flex-1 text-left text-sm"
-                          onClick={() => {
-                            setOpen(sel ? null : `extra:${e.id}`);
-                            setSelected(`extra:${e.id}`);
-                          }}
-                        >
-                          {e.label}
-                        </button>
-                        <button onClick={() => removeExtra(e.id)} className="text-destructive">
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      </div>
-                      {sel && (
-                        <div className="space-y-3 border-t border-border p-3">
-                          <Field label="Nome da camada">
-                            <input
-                              className={inputCls}
-                              value={e.label}
-                              onChange={(ev) => patchExtra(e.id, { label: ev.target.value })}
-                            />
-                          </Field>
-                          {isImg ? (
-                            <>
-                              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:border-primary">
-                                <Upload className="size-3.5" /> Enviar imagem
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  hidden
-                                  onChange={async (ev) => {
-                                    const f = ev.target.files?.[0];
-                                    if (f) patchExtra(e.id, { src: await fileToDataUrl(f) });
-                                  }}
-                                />
-                              </label>
-                              <label className="flex items-center gap-2 text-sm">
-                                <input
-                                  type="checkbox"
-                                  checked={(e as ImageLayer).round}
-                                  onChange={(ev) => patchExtra(e.id, { round: ev.target.checked })}
-                                  className="size-4 accent-[var(--primary)]"
-                                />
-                                Recorte circular
-                              </label>
-                            </>
-                          ) : (
-                            <>
-                              <Field label="Texto">
-                                <textarea
-                                  className={inputCls}
-                                  rows={2}
-                                  value={(e as TextLayer).text}
-                                  onChange={(ev) => patchExtra(e.id, { text: ev.target.value })}
-                                />
-                              </Field>
-                              {fontSelect((e as TextLayer).font, (v) => patchExtra(e.id, { font: v }))}
-                              <div className="grid grid-cols-2 gap-3">
-                                <Field label="Cor">
-                                  <input
-                                    type="color"
-                                    className="h-9 w-full rounded-lg border border-border bg-transparent"
-                                    value={(e as TextLayer).color}
-                                    onChange={(ev) => patchExtra(e.id, { color: ev.target.value })}
-                                  />
-                                </Field>
-                                <Field label="Tamanho">
-                                  <input
-                                    type="number"
-                                    className={inputCls}
-                                    value={(e as TextLayer).size}
-                                    onChange={(ev) => patchExtra(e.id, { size: Number(ev.target.value) })}
-                                  />
-                                </Field>
-                              </div>
-                            </>
-                          )}
-                          <Slider label="X" value={e.x} min={-200} max={1080} onChange={(v) => patchExtra(e.id, { x: v })} />
-                          <Slider label="Y" value={e.y} min={-200} max={1920} onChange={(v) => patchExtra(e.id, { y: v })} />
-                          <Slider label="Largura" value={e.w} min={40} max={1080} onChange={(v) => patchExtra(e.id, { w: v })} />
-                          <Slider label="Altura" value={e.h} min={40} max={1920} onChange={(v) => patchExtra(e.id, { h: v })} />
-                          <Slider label="Rotação" value={e.rotation} min={-45} max={45} onChange={(v) => patchExtra(e.id, { rotation: v })} />
-                          {zOpacity(e, (data) => patchExtra(e.id, data))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-border bg-surface-2 p-3">
-              <p className="mono-label mb-2">Anti-duplicidade</p>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={adPreview}
-                  onChange={(e) => setAdPreview(e.target.checked)}
-                  className="size-4 accent-[var(--primary)]"
+              {debug ? (
+                <DebugPanel
+                  t={t}
+                  selected={selected}
+                  grid={debugGrid}
+                  setGrid={setDebugGrid}
+                  safe={debugSafe}
+                  setSafe={setDebugSafe}
+                  boxes={debugBoxes}
+                  setBoxes={setDebugBoxes}
                 />
-                Pré-visualizar efeito no preview
-              </label>
-              {adPreview ? (
-                <div className="mt-2 space-y-2 rounded-lg border border-primary/40 bg-background/40 p-2">
-                  <p className="text-xs text-muted-foreground">{describeVariation(adVariation)}</p>
-                  <button
-                    className="rounded-md border border-border px-2 py-1 text-xs hover:border-primary"
-                    onClick={() => setAdSeed(Math.random().toString(36).slice(2, 8))}
-                  >
-                    Sortear outra variação
-                  </button>
-                </div>
               ) : null}
-              <label className="mt-3 flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={t.mirror}
-                  onChange={(e) => setT({ ...t, mirror: e.target.checked })}
-                  className="size-4 accent-[var(--primary)]"
-                />
-                Espelhar vídeo horizontalmente
-              </label>
-              <div className="mt-3">
-                <Slider
-                  label="Velocidade"
-                  value={t.speed}
-                  min={0.95}
-                  max={1.05}
-                  step={0.01}
-                  onChange={(v) => setT({ ...t, speed: v })}
-                />
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Muda a duração e o fingerprint do arquivo. Não há garantia de que plataformas tratem o vídeo como novo.
-              </p>
             </div>
-
-          </div>
+          </aside>
         </div>
 
-        <footer className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t border-border bg-surface-2/40 px-5 py-3">
-          <p className="mono-label truncate text-muted-foreground">
-            alterações aplicadas no preview · nada é salvo até confirmar
-          </p>
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-            <Button variant="ghost" onClick={onCancel}>
-              Cancelar
-            </Button>
-            <Button variant="outline" onClick={() => onUse(t)}>
-              Usar sem salvar
-            </Button>
-            <Button onClick={() => onSave(t)}>Salvar e usar</Button>
-          </div>
-        </footer>
+        {/* Linha do tempo em toda a largura */}
+        <div className="shrink-0 border-t border-border bg-surface-2/40 p-3">
+          <TemplateTimeline
+            template={t}
+            onChange={setT}
+            selected={selected}
+            onSelect={setSelected}
+            time={time}
+            onSeek={(n) => {
+              setPlaying(false);
+              setTime(n);
+            }}
+            playing={playing}
+            onPlay={() => {
+              if (time >= duration) setTime(0);
+              setPlaying((p) => !p);
+            }}
+            duration={duration}
+            onDuration={(n) => {
+              setPlaying(false);
+              setMediaDuration(null);
+              setTime((v) => Math.min(v, n));
+              setT({ ...t, timelineDuration: n });
+            }}
+          />
+        </div>
 
+        <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-4 py-2.5">
+          <p className="truncate text-[11px] text-muted-foreground">
+            As alterações aparecem no preview — nada é salvo até confirmar.
+          </p>
+          <Button variant="ghost" size="sm" onClick={onCancel}>
+            Cancelar
+          </Button>
+        </footer>
       </div>
     </div>
   );
