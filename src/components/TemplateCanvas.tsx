@@ -300,6 +300,12 @@ export function TemplateCanvas({
 
   // props de desenho em ref: evita reiniciar o loop a cada render (digitação/arraste)
   const paintProps = useRef({ template, drawOpts, motionVar, speed, loopStart, loopEnd });
+  const templateRevision = useRef(0);
+  const prev = paintProps.current;
+  if (prev.template !== template || prev.drawOpts !== drawOpts || prev.motionVar !== motionVar ||
+    prev.speed !== speed || prev.loopStart !== loopStart || prev.loopEnd !== loopEnd) {
+    templateRevision.current++;
+  }
   paintProps.current = { template, drawOpts, motionVar, speed, loopStart, loopEnd };
 
   useEffect(() => {
