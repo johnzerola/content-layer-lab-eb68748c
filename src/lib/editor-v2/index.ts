@@ -16,5 +16,6 @@ export * from "./playback-surfaces";
 export * from "./feature-flags";
 export * from "./project";
 export * from "./render-manifest";
+export * from "./sound-effects";
 export * from "./types";
 export * from "./transitions";

@@ -6,7 +6,7 @@ import { EFFECTS as LEGACY_EFFECTS } from "@/lib/editor/effects";
 import { STICKERS } from "@/lib/editor/stickers";
 import { READY_TEMPLATES } from "@/lib/editor/template-presets";
 import { NEUTRAL_VIDEO_ADJUSTMENTS } from "../creative";
-import type { CaptionPresetDefinition, CreativeEffectDefinition, FilterPresetDefinition, LibraryItem, LibraryItemType, LibraryPreview, MotionDefinition, StickerDefinition, TemplateDefinition, TextPresetDefinition } from "./types";
+import type { CaptionPresetDefinition, CreativeEffectDefinition, FilterPresetDefinition, LibraryItem, LibraryItemType, LibraryPreview, MotionDefinition, SoundEffectDefinition, StickerDefinition, TemplateDefinition, TextPresetDefinition } from "./types";
 
 const license: AssetLicenseMetadata = {
   provider: "VaiViral",
@@ -96,6 +96,25 @@ const stickers = STICKERS.map((sticker) => { const definition: StickerDefinition
 
 const shapes = ["Rectangle", "Circle", "Line", "Gradient"].map((name) => item(name.toLowerCase(), "shape", name, "Formas", { kind: "shape", rendererId: name.toLowerCase(), colors: ["#8d73ff", "#43d6b2"] }, { shape: name.toLowerCase() }, ["elemento"]));
 
+const soundEffectRows: Array<[string, string, string, SoundEffectDefinition["generator"], number, number, string, string[]]> = [
+  ["whoosh-short", "Whoosh curto", "Transições", "whoosh", .48, .82, "#8d73ff", ["shorts", "reels", "passagem"]],
+  ["whoosh-air", "Whoosh aéreo", "Transições", "whoosh", .82, .68, "#57c8ff", ["movimento", "suave"]],
+  ["impact-bass", "Impacto grave", "Impactos", "impact", .72, .9, "#ff4d79", ["ênfase", "beat", "shorts"]],
+  ["impact-punch", "Punch rápido", "Impactos", "impact", .32, .75, "#ff8a4c", ["corte", "ênfase"]],
+  ["pop-clean", "Pop limpo", "Interface", "pop", .25, .62, "#45e1b6", ["texto", "legenda", "cta"]],
+  ["click-camera", "Clique de câmera", "Interface", "click", .18, .72, "#f7d154", ["foto", "flash"]],
+  ["sparkle", "Brilho mágico", "Reações", "sparkle", .86, .48, "#f3a7ff", ["reveal", "produto", "beleza"]],
+  ["notification", "Notificação positiva", "Interface", "notification", .68, .5, "#6fe6a8", ["sucesso", "mensagem"]],
+  ["riser-short", "Subida de tensão", "Transições", "riser", 1.2, .62, "#ff56c7", ["reveal", "antes e depois"]],
+  ["drop-comedy", "Queda cômica", "Reações", "drop", .78, .72, "#7ca0ff", ["humor", "erro", "meme"]],
+];
+const soundEffects = soundEffectRows.map(([id, name, category, generator, duration, gain, color, tags]) => {
+  const definition: SoundEffectDefinition = { id, duration, gain, generator, color };
+  const result = item(id, "sound-effect", name, category, { kind: "audio", rendererId: generator, colors: [color, "#10131d"] }, definition, ["efeito sonoro", ...tags]);
+  result.duration = duration;
+  return result;
+});
+
 const layerBase = (id: string, name: string, type: TemplateLayer["type"], x: number, y: number, width: number, height: number, startTime = 0, endTime: number | null = null) => ({ id, name, type, bindingType: "STATIC" as const, x, y, width, height, rotation: 0, opacity: 1, zIndex: 1, visible: true, locked: false, startTime, endTime });
 const textLayer = (id: string, text: string, x: number, y: number, width: number, height: number, color: string, size: number, background: string | null = null): TemplateLayer => ({ ...layerBase(id, id, "text", x, y, width, height), type: "text", text, fontFamily: "Outfit", fontWeight: 800, fontSize: size, color, align: "left", letterSpacing: 0, lineHeight: .95, uppercase: true, italic: false, underline: false, strokeColor: "transparent", strokeWidth: 0, shadow: false, background, padding: 12, radius: 12 });
 const shapeLayer = (id: string, x: number, y: number, width: number, height: number, fill: string, shape: "rect" | "rounded" | "circle" | "line" = "rounded"): TemplateLayer => ({ ...layerBase(id, id, "shape", x, y, width, height), type: "shape", shape, fill, stroke: "transparent", strokeWidth: 0, radius: 18 });
@@ -126,4 +145,4 @@ const readyTemplates = READY_TEMPLATES.map((preset) => {
   return makeTemplate(`ready-${preset.id}`, preset.label, 8, "9:16", preset.swatch[1], layers, textPlaceholders, ["editor clássico", "pronto", preset.hint]);
 });
 
-export const BUILT_IN_LIBRARY_ITEMS: LibraryItem[] = [...templates, ...readyTemplates, ...transitions, ...effects, ...filters, ...text, ...captions, ...captionAliases, ...animations, ...stickers, ...shapes];
+export const BUILT_IN_LIBRARY_ITEMS: LibraryItem[] = [...templates, ...readyTemplates, ...transitions, ...effects, ...filters, ...text, ...captions, ...captionAliases, ...animations, ...stickers, ...shapes, ...soundEffects];

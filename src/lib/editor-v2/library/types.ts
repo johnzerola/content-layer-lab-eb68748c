@@ -94,6 +94,13 @@ export interface StickerDefinition { id: string; text: string; color: string; ac
 export interface MotionDefinition { id: string; slot: MotionSlot; duration: number; intensity: number; easing: "linear" | "easeIn" | "easeOut" | "easeInOut" }
 export interface FilterPresetDefinition { id: string; adjustments: VideoAdjustments }
 export interface CreativeEffectDefinition { id: string; duration: number; intensity: number }
+export interface SoundEffectDefinition {
+  id: string;
+  duration: number;
+  gain: number;
+  generator: "whoosh" | "impact" | "pop" | "click" | "sparkle" | "notification" | "riser" | "drop";
+  color: string;
+}
 
 export interface LibrarySearchQuery {
   text?: string;

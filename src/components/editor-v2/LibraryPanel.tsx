@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Captions, Check, Film, Heart, Image as ImageIcon, LoaderCircle, Music2, Plus, Search, SlidersHorizontal, Upload } from "lucide-react";
+import { Captions, Check, Film, Heart, Image as ImageIcon, LoaderCircle, Music2, Plus, Search, SlidersHorizontal, Upload, Volume2 } from "lucide-react";
 import { LibraryRegistry, loadLibraryUserState, markRecent, saveLibraryUserState, toggleFavorite, type LibraryItem, type LibraryItemType } from "@/lib/editor-v2/library";
 import type { MediaAsset } from "@/lib/editor-v2/types";
 import { LibraryPreview } from "./LibraryPreview";
@@ -30,12 +30,13 @@ interface LibraryPanelProps {
   importingMedia: boolean;
   onImportFiles: (files: FileList) => void;
   onInsertMedia: (asset: MediaAsset) => void;
+  onPreviewSoundEffect: (item: LibraryItem) => void;
   revision?: number;
 }
 
 type MediaFilter = "all" | "video" | "image" | "audio";
 
-export function LibraryPanel({ registry, selectedId, onSelect, onAdd, onGenerateCaptions, generatingCaptions, captionProgress, mediaAssets, assetThumbnails, importingMedia, onImportFiles, onInsertMedia, revision = 0 }: LibraryPanelProps) {
+export function LibraryPanel({ registry, selectedId, onSelect, onAdd, onGenerateCaptions, generatingCaptions, captionProgress, mediaAssets, assetThumbnails, importingMedia, onImportFiles, onInsertMedia, onPreviewSoundEffect, revision = 0 }: LibraryPanelProps) {
   const [section, setSection] = useState("Mídia");
   const [scope, setScope] = useState<Scope>("built-in");
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
@@ -126,6 +127,7 @@ export function LibraryPanel({ registry, selectedId, onSelect, onAdd, onGenerate
             </button>
             <div className="flex items-center border-t border-white/5 px-1.5 py-1">
               <button type="button" onClick={() => { const next = toggleFavorite(userState, item.id); setUserState(next); saveLibraryUserState(next); }} aria-label={favorite ? `Remover ${item.name} dos favoritos` : `Favoritar ${item.name}`} className={`grid size-7 place-items-center rounded-md hover:bg-white/10 ${favorite ? "text-rose-400" : "text-muted-foreground"}`}><Heart className="size-3.5" fill={favorite ? "currentColor" : "none"} /></button>
+              {item.type === "sound-effect" && <button type="button" onClick={() => onPreviewSoundEffect(item)} aria-label={`Ouvir ${item.name}`} className="ml-0.5 flex h-7 items-center gap-1 rounded-md px-2 text-[9px] font-semibold text-cyan-300 hover:bg-cyan-300/10"><Volume2 className="size-3" />Ouvir</button>}
               <button type="button" onClick={() => item.type === "transition" ? select(item) : add(item)} className="editor-primary-button ml-auto flex h-7 items-center gap-1 rounded-md px-2 text-[10px] font-semibold text-primary-foreground">{item.type === "transition" ? <SlidersHorizontal className="size-3" /> : item.type === "caption" ? <Captions className="size-3" /> : <Plus className="size-3" />} {actionLabel(item)}</button>
             </div>
           </article>;

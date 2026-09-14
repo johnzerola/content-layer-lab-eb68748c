@@ -30,7 +30,17 @@ export function LibraryPreview({ item, active = false }: { item: LibraryItem; ac
   if (item.preview.kind === "animation") return <AnimationPreview item={item} progress={progress} />;
   if (item.preview.kind === "shape") return <ShapePreview item={item} />;
   if (item.preview.kind === "sticker") return <StickerPreview item={item} progress={progress} />;
+  if (item.preview.kind === "audio") return <AudioPreview item={item} />;
   return <TextPreview item={item} />;
+}
+
+function AudioPreview({ item }: { item: LibraryItem }) {
+  const color = item.preview.colors?.[0] ?? "#8d73ff";
+  const bars = [18, 42, 70, 34, 84, 54, 27, 65, 91, 48, 74, 30, 58, 22];
+  return <span className="relative flex aspect-video items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_50%_20%,#222c45,#0a0d15_72%)] px-4">
+    <span className="flex h-12 w-full items-center justify-center gap-1 rounded-xl border border-white/8 bg-black/20 px-3" aria-hidden>{bars.map((height, index) => <i key={index} className="w-1 rounded-full opacity-90" style={{ height: `${height}%`, background: color, boxShadow: `0 0 9px ${color}66` }} />)}</span>
+    <span className="absolute bottom-2 right-2 rounded-md border border-white/10 bg-black/55 px-1.5 py-0.5 text-[7px] font-semibold text-white">SFX {item.duration?.toFixed(2)}s</span>
+  </span>;
 }
 
 function TransitionPreview({ item, progress }: { item: LibraryItem; progress: number }) {

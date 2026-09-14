@@ -14,6 +14,9 @@ describe("Library registry", () => {
     expect(registry.search({ types: ["filter"] }).total).toBeGreaterThanOrEqual(12);
     expect(registry.search({ types: ["animation"] }).total).toBeGreaterThanOrEqual(18);
     expect(registry.search({ types: ["video-effect"] }).total).toBe(12);
+    const soundEffects = registry.search({ types: ["sound-effect"] });
+    expect(soundEffects.total).toBeGreaterThanOrEqual(10);
+    expect(soundEffects.items.every((item) => item.license.licenseType === "VaiViral Original" && item.duration && item.duration > 0)).toBe(true);
     expect(registry.list().every(canPublishBuiltIn)).toBe(true);
   });
 

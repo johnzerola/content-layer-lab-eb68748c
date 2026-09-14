@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Captions, Check, ChevronDown, Film, FolderOpen, Import, Library, PanelRight, Pause, Play, Redo2, Undo2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { toast } from "sonner";
 import {
   AddClipCommand,
   AddCaptionBatchCommand,
@@ -73,6 +74,7 @@ import {
   validateRelinkFile,
   resolveAudioMixFrame,
   sourceToProjectTime,
+  synthesizeSoundEffect,
 } from "@/lib/editor-v2";
 import { prepareAudioSeparation, updateAudioSeparationJob } from "@/lib/audio.functions";
 import { downloadSourceFile, uploadAudioStem } from "@/lib/editor/media-cloud";
@@ -82,7 +84,7 @@ import { downloadBlob } from "@/lib/render";
 import { generateCaptions } from "@/lib/captions";
 import { analyzeAudio, findSilences, keepRanges } from "@/lib/editor/silence";
 import type { Easing } from "@/lib/video-template/types";
-import { BUILT_IN_LIBRARY_ITEMS, LibraryRegistry, TRANSITION_DEFINITIONS, userTemplateLibraryItem, type CaptionPresetDefinition, type CreativeEffectDefinition, type FilterPresetDefinition, type LibraryItem, type MotionDefinition, type TemplateDefinition } from "@/lib/editor-v2/library";
+import { BUILT_IN_LIBRARY_ITEMS, LibraryRegistry, TRANSITION_DEFINITIONS, userTemplateLibraryItem, type CaptionPresetDefinition, type CreativeEffectDefinition, type FilterPresetDefinition, type LibraryItem, type MotionDefinition, type SoundEffectDefinition, type TemplateDefinition } from "@/lib/editor-v2/library";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { EditorCanvasV2 } from "./EditorCanvasV2";
 import { InspectorV2 } from "./InspectorV2";
@@ -133,6 +135,7 @@ export function EditorV2Foundation() {
   const lastSelectedClipIdRef = useRef<string | null>(null);
   const lastSelectedClipIdsRef = useRef<string[]>([]);
   const lastMediaClockAtRef = useRef(0);
+  const soundPreviewRef = useRef<{ audio: HTMLAudioElement; url: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -237,12 +240,58 @@ export function EditorV2Foundation() {
   }, [run]);
 
   const selectLibrary = useCallback((item: LibraryItem) => run(new SelectItemCommand([item.id], "library")), [run]);
+  const previewSoundEffect = useCallback((item: LibraryItem) => {
+    const previous = soundPreviewRef.current;
+    if (previous) { previous.audio.pause(); URL.revokeObjectURL(previous.url); soundPreviewRef.current = null; }
+    const file = synthesizeSoundEffect(item.definition as SoundEffectDefinition, 1);
+    const url = URL.createObjectURL(file);
+    const audio = new Audio(url);
+    soundPreviewRef.current = { audio, url };
+    audio.onended = () => { if (soundPreviewRef.current?.audio === audio) soundPreviewRef.current = null; URL.revokeObjectURL(url); };
+    void audio.play().catch(() => { if (soundPreviewRef.current?.audio === audio) soundPreviewRef.current = null; URL.revokeObjectURL(url); setMessage("O navegador bloqueou a prévia. Clique novamente em Ouvir."); });
+  }, []);
+  const insertSoundEffect = useCallback(async (item: LibraryItem, at: number) => {
+    const definition = item.definition as SoundEffectDefinition;
+    const state = busRef.current.getState();
+    const serial = state.revisions.document + state.tracks.reduce((total, track) => total + track.clips.length, 0) + 1;
+    setMessage(`Criando ${item.name}…`);
+    try {
+      const file = synthesizeSoundEffect(definition, serial);
+      const runtime = await prepareLocalMedia(file, at, serial);
+      runtime.asset.name = item.name;
+      runtime.asset.license = structuredClone(item.license);
+      runtime.clip.name = item.name;
+      runtime.clip.trackId = "track-sfx";
+      runtime.clip.projectEnd = (at + definition.duration) as Clip["projectEnd"];
+      runtime.clip.sourceOut = definition.duration;
+      runtime.clip.audio = { ...(runtime.clip.audio ?? { gain: 1, muted: false, fadeIn: 0, fadeOut: 0, loop: false, envelope: [] }), stemRole: "sfx" };
+      runtime.clip.metadata = { ...runtime.clip.metadata, soundEffectId: definition.id, generated: true };
+      const persisted = await persistEditorMedia(state.id, runtime.asset.id, file);
+      if (persisted) runtime.asset.storagePath = editorMediaStoragePath(state.id, runtime.asset.id);
+      runtimeUrlsRef.current.add(runtime.objectUrl);
+      sourceFilesRef.current.set(runtime.asset.id, file);
+      setAssetSources((current) => ({ ...current, [runtime.asset.id]: runtime.objectUrl }));
+      run(new AddMediaClipCommand(runtime.asset, runtime.clip), `${item.name} inserido na faixa Efeitos em ${formatProjectTime(at)}.`);
+      void analyzeAudioFile(file).then((analysis) => {
+        setAssetWaveforms((current) => ({ ...current, [runtime.asset.id]: analysis.peaks }));
+        run(new UpdateAssetAnalysisCommand(runtime.asset.id, { cacheKey: analysis.cacheKey, status: "ready", sampleRate: analysis.sampleRate, channels: analysis.channels, durationMs: analysis.durationMs, peaks: analysis.peaks }));
+      }).catch(() => undefined);
+      setMobileSurface("timeline");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : `Não foi possível criar ${item.name}.`);
+    }
+  }, [run]);
+
   const addLibraryItem = useCallback((item: LibraryItem, at = Number(clockRef.current.getSnapshot().projectTime)) => {
     const state = busRef.current.getState();
     const selected = findClip(state, state.selection.primaryId) ?? findClip(state, lastSelectedClipIdRef.current);
     const activeClipIds = state.selection.itemIds.filter((id) => Boolean(findClip(state, id)));
     const rememberedIds = lastSelectedClipIdsRef.current.filter((id) => Boolean(findClip(state, id)));
     const selectedClips = (activeClipIds.length ? activeClipIds : rememberedIds).map((id) => findClip(state, id)).filter((clip): clip is Clip => Boolean(clip));
+    if (item.type === "sound-effect") {
+      void insertSoundEffect(item, at);
+      return;
+    }
     if (item.type === "transition") {
       run(new SelectItemCommand([item.id], "library"));
       setMobileSurface("inspector");
@@ -299,7 +348,7 @@ export function EditorV2Foundation() {
     }
     run(new AddClipCommand(clip), `${item.name} inserido em ${formatProjectTime(at)}.`);
     setMobileSurface("canvas");
-  }, [run]);
+  }, [insertSoundEffect, run]);
 
   const undo = useCallback(() => { setProject(busRef.current.undo()); setMessage("Ação desfeita."); }, []);
   const redo = useCallback(() => { setProject(busRef.current.redo()); setMessage("Ação refeita."); }, []);
@@ -868,7 +917,9 @@ export function EditorV2Foundation() {
       : state.tracks.flatMap((track) => track.clips).find((clip) => clip.kind === "video" && clip.assetId && sourceFilesRef.current.has(clip.assetId));
     const file = video?.assetId ? sourceFilesRef.current.get(video.assetId) : undefined;
     if (!video || !file) {
-      setMessage("Importe e selecione um vídeo local para gerar legendas automáticas.");
+      const warning = "Importe e selecione um vídeo local para gerar legendas automáticas.";
+      setMessage(warning);
+      toast.info(warning);
       return;
     }
     const chosenStyle = state.selection.surface === "library" ? registry.get(state.selection.primaryId ?? "") : null;
@@ -900,16 +951,19 @@ export function EditorV2Foundation() {
       })).sort((left, right) => left.start - right.start);
       if (!mapped.length) throw new Error("Nenhuma fala foi encontrada no trecho selecionado.");
       run(new AddCaptionBatchCommand(createCaptionBatchFromTimedWords(mapped, presetItem.definition, state.revisions.document + 1)), `${mapped.length} blocos de legenda gerados com o estilo ${presetItem.name}.`);
+      toast.success(`${mapped.length} blocos de legenda criados e sincronizados.`);
       setMobileSurface("timeline");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Não foi possível gerar as legendas.");
+      const failure = error instanceof Error ? error.message : "Não foi possível gerar as legendas.";
+      setMessage(failure);
+      toast.error(failure, { duration: 7000 });
     } finally {
       setTranscribing(false);
       setCaptionProgress(0);
     }
   }, [registry, run]);
 
-  useEffect(() => () => { audioExtractionRef.current?.abort(); audioSeparationRef.current?.abort(); runtimeUrlsRef.current.forEach((url) => URL.revokeObjectURL(url)); runtimeUrlsRef.current.clear(); }, []);
+  useEffect(() => () => { audioExtractionRef.current?.abort(); audioSeparationRef.current?.abort(); soundPreviewRef.current?.audio.pause(); if (soundPreviewRef.current) URL.revokeObjectURL(soundPreviewRef.current.url); runtimeUrlsRef.current.forEach((url) => URL.revokeObjectURL(url)); runtimeUrlsRef.current.clear(); }, []);
 
   useEffect(() => {
     if (!clock.playing) return;
@@ -1086,6 +1140,7 @@ export function EditorV2Foundation() {
     importingMedia: importing,
     onImportFiles: (files: FileList) => void importFiles(files),
     onInsertMedia: insertMediaAsset,
+    onPreviewSoundEffect: previewSoundEffect,
   };
 
   return (
