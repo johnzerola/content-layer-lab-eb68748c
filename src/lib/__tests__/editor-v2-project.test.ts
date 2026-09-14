@@ -1,7 +1,7 @@
 ﻿import { describe, expect, it } from "vitest";
 import { AddCaptionBatchCommand, AddCaptionCueCommand, AddClipCommand, AddMediaClipCommand, ApplyCaptionPresetCommand, ApplySeparatedAudioCommand, ApplyTemplateCommand, ApplyTransitionCommand, CompositionClock, DeleteAudioEnvelopePointCommand, DeleteClipCommand, DeleteClipsCommand, DeleteKeyframeCommand, DuplicateClipsCommand, EditorCommandBus, MoveClipCommand, MoveKeyframeCommand, RegisterExtractedAudioCommand, RestoreOriginalAudioCommand, SelectItemCommand, SetAudioRepresentationCommand, SplitClipCommand, TrimClipCommand, UpdateClipCommand, UpdateProjectSettingsCommand, UpdateTrackCommand, UpdateTransformAtTimeCommand, UpsertAudioEnvelopePointCommand, UpsertKeyframeCommand, adaptEditorProjectV1, asProjectTime, buildExtractedAudioMedia, buildSeparatedAudioMedia, clampTransitionDuration, clipAudioGainAt, createCaptionBatch, createCaptionBatchFromTimedWords, createEditorProjectV2, createEditorRenderManifest, createPlaybackSurfaceKeys, createStemAsset, editorProjectFromManifest, findTransitionTarget, interpolateKeyframes, isEditorV2Enabled, isTrackCompatible, parseTimedText, projectToSourceTime, resolveAnimatedTransform, resolveAudioMixFrame, resolveAudioRenderFrameFromManifest, resolveCaptionInsertion, resolveClipPresentation, resolveCompositionFrame, resolveCompositionFrameFromManifest, resolveLibraryInsertion, resolveTemplateApplication, snapProjectTime, sourceToProjectTime, summarizeWaveform, visibleTimelineRange, type AudioSourceGroup, type Clip, type MediaAsset } from "@/lib/editor-v2";
 import { BUILT_IN_LIBRARY_ITEMS, type CaptionPresetDefinition, type LibraryItem, type TemplateDefinition } from "@/lib/editor-v2/library";
-import { AutoSplitClipsCommand, UpdateClipsCommand } from "@/lib/editor-v2";
+import { AutoSplitClipsCommand, InsertMediaClipCommand, UpdateClipsCommand, createMediaClipFromAsset } from "@/lib/editor-v2";
 import { createEditorProject } from "@/lib/editor/project";
 
 function clip(): Clip {
@@ -236,6 +236,25 @@ describe("Command bus", () => {
     expect(JSON.stringify(bus.getState())).not.toContain("data:");
     bus.undo();
     expect(bus.getState().assets).toHaveLength(0);
+  });
+
+  it("reutiliza uma mídia existente na agulha sem duplicar o arquivo", () => {
+    const license: MediaAsset["license"] = { provider: "teste", sourceUrl: "fixture", licenseType: "fixture", licenseUrl: "fixture", author: "teste", attributionRequired: false, commercialUseAllowed: true, redistributionAllowed: false };
+    const asset: MediaAsset = { id: "reusable-video", kind: "video", name: "reutilizavel.mp4", mimeType: "video/mp4", duration: 8, license };
+    const first = createMediaClipFromAsset(asset, 0, 1);
+    const second = createMediaClipFromAsset(asset, 12, 2);
+    const bus = new EditorCommandBus(createEditorProjectV2({ duration: 20 }));
+    bus.execute(new AddMediaClipCommand(asset, first.clip, first.audioGroup));
+    bus.execute(new InsertMediaClipCommand(second.clip, second.audioGroup));
+    expect(bus.getState().assets).toHaveLength(1);
+    expect(bus.getState().tracks[0]!.clips.map((item) => [item.id, item.projectStart, item.projectEnd])).toEqual([
+      [first.clip.id, 0, 8],
+      [second.clip.id, 12, 20],
+    ]);
+    expect(bus.getState().audioGroups.map((group) => group.sourceVideoClipId)).toEqual([first.clip.id, second.clip.id]);
+    bus.undo();
+    expect(bus.getState().assets).toHaveLength(1);
+    expect(bus.getState().tracks[0]!.clips).toHaveLength(1);
   });
 
   it("cria, move e remove keyframes por propriedade com undo", () => {

@@ -5,6 +5,7 @@ import {
   AddClipCommand,
   AddCaptionBatchCommand,
   AddMediaClipCommand,
+  InsertMediaClipCommand,
   AutoSplitClipsCommand,
   AudioSeparationJobRepository,
   ApplyCaptionPresetCommand,
@@ -41,6 +42,7 @@ import {
   captureVideoPoster,
   clipLocalTime,
   createEditorProjectV2,
+  createMediaClipFromAsset,
   editorMediaStoragePath,
   extractAudioFromMediaFile,
   findClip,
@@ -472,6 +474,19 @@ export function EditorV2Foundation() {
     else if (imported) setMessage(volatileImports ? `${imported} ${imported === 1 ? "mídia importada" : "mídias importadas"}; ${volatileImports} ficará apenas nesta sessão porque o armazenamento local não respondeu.` : `${imported} ${imported === 1 ? "mídia importada e salva" : "mídias importadas e salvas"} neste navegador.`);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, [registry, run]);
+
+  const insertMediaAsset = useCallback((asset: MediaAsset) => {
+    try {
+      const state = busRef.current.getState();
+      const at = Number(clockRef.current.getSnapshot().projectTime);
+      const serial = state.revisions.document + state.tracks.reduce((total, track) => total + track.clips.length, 0) + 1;
+      const insertion = createMediaClipFromAsset(asset, at, serial);
+      run(new InsertMediaClipCommand(insertion.clip, insertion.audioGroup), `${asset.name} inserido em ${formatProjectTime(at)}.`);
+      setMobileSurface("canvas");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível inserir a mídia novamente.");
+    }
+  }, [run]);
 
   const extractSelectedAudio = useCallback(async () => {
     const state = busRef.current.getState();
@@ -951,6 +966,22 @@ export function EditorV2Foundation() {
     onDropLibraryItem: (id: string, at: number) => { const item = registry.get(id); if (item) addLibraryItem(item, at); },
   };
 
+  const libraryProps = {
+    registry,
+    revision: libraryRevision,
+    selectedId: project.selection.surface === "library" ? project.selection.primaryId : null,
+    onSelect: selectLibrary,
+    onAdd: addLibraryItem,
+    onGenerateCaptions: () => void generateAutomaticCaptions(),
+    generatingCaptions: transcribing,
+    captionProgress,
+    mediaAssets: project.assets,
+    assetThumbnails,
+    importingMedia: importing,
+    onImportFiles: (files: FileList) => void importFiles(files),
+    onInsertMedia: insertMediaAsset,
+  };
+
   return (
     <main className="editor-v2-shell flex h-dvh min-h-[620px] flex-col overflow-hidden text-foreground">
       <header className="editor-v2-topbar flex h-14 shrink-0 items-center gap-2 px-2 sm:px-3" aria-label="Barra principal do editor">
@@ -975,7 +1006,7 @@ export function EditorV2Foundation() {
         <ResizablePanelGroup orientation="vertical" id="editor-v2-vertical">
           <ResizablePanel defaultSize="68%" minSize={360}>
             <ResizablePanelGroup orientation="horizontal" id="editor-v2-workspace">
-              <ResizablePanel defaultSize={300} minSize={250} maxSize={430}><LibraryPanel registry={registry} revision={libraryRevision} selectedId={project.selection.surface === "library" ? project.selection.primaryId : null} onSelect={selectLibrary} onAdd={addLibraryItem} onGenerateCaptions={() => void generateAutomaticCaptions()} generatingCaptions={transcribing} captionProgress={captionProgress} /></ResizablePanel>
+              <ResizablePanel defaultSize={300} minSize={250} maxSize={430}><LibraryPanel {...libraryProps} /></ResizablePanel>
               <ResizableHandle withHandle className="bg-white/8 hover:bg-primary/50" />
               <ResizablePanel defaultSize="55%" minSize={420}><EditorCanvasV2 {...canvasProps} /></ResizablePanel>
               <ResizableHandle withHandle className="bg-white/8 hover:bg-primary/50" />
@@ -991,7 +1022,7 @@ export function EditorV2Foundation() {
         <nav className="editor-v2-mobile-nav grid h-11 shrink-0 grid-cols-4" aria-label="Áreas do editor">
           {([['library', Library, 'Biblioteca'], ['canvas', Film, 'Prévia'], ['inspector', PanelRight, 'Inspector'], ['timeline', FolderOpen, 'Timeline']] as const).map(([id, Icon, label]) => <button key={id} type="button" onClick={() => setMobileSurface(id)} aria-pressed={mobileSurface === id} className={`flex items-center justify-center gap-1.5 text-[10px] ${mobileSurface === id ? "bg-primary/12 text-primary" : "text-muted-foreground"}`}><Icon className="size-3.5" />{label}</button>)}
         </nav>
-        <div className="min-h-0 flex-1">{mobileSurface === "library" ? <LibraryPanel registry={registry} revision={libraryRevision} selectedId={project.selection.surface === "library" ? project.selection.primaryId : null} onSelect={selectLibrary} onAdd={addLibraryItem} onGenerateCaptions={() => void generateAutomaticCaptions()} generatingCaptions={transcribing} captionProgress={captionProgress} /> : mobileSurface === "canvas" ? <EditorCanvasV2 {...canvasProps} /> : mobileSurface === "inspector" ? <InspectorV2 {...inspectorProps} /> : <TimelineV2 {...timelineProps} />}</div>
+        <div className="min-h-0 flex-1">{mobileSurface === "library" ? <LibraryPanel {...libraryProps} /> : mobileSurface === "canvas" ? <EditorCanvasV2 {...canvasProps} /> : mobileSurface === "inspector" ? <InspectorV2 {...inspectorProps} /> : <TimelineV2 {...timelineProps} />}</div>
       </div>
 
       <footer className="editor-v2-statusbar flex h-9 shrink-0 items-center gap-2 px-2.5" aria-live="polite">

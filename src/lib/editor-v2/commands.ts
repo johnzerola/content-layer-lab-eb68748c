@@ -544,6 +544,28 @@ export class SplitClipCommand extends SnapshotCommand {
   serialize() { return { type: this.type, payload: { clipId: this.clipId, at: this.at, rightClipId: this.rightClipId } }; }
 }
 
+/** Adds another clip instance for an asset that is already registered in the project. */
+export class InsertMediaClipCommand extends SnapshotCommand {
+  readonly type = "insertMediaClip";
+  readonly renderImpact = "full" as const;
+  constructor(private readonly clip: Clip, private readonly audioGroup?: AudioSourceGroup) { super(); }
+  protected apply(project: EditorProjectV2) {
+    if (!this.clip.assetId || !project.assets.some((item) => item.id === this.clip.assetId)) throw new Error("A mídia precisa estar na biblioteca antes de ser inserida.");
+    if (project.tracks.some((item) => item.clips.some((clip) => clip.id === this.clip.id))) throw new Error(`Clipe já existe: ${this.clip.id}`);
+    const owner = track(project, this.clip.trackId);
+    if (!isTrackCompatible(this.clip, owner)) throw new Error(`${this.clip.name} não é compatível com ${owner.name}.`);
+    owner.clips.push(cloneProjectValue(this.clip));
+    if (this.audioGroup) {
+      if (this.audioGroup.sourceAssetId !== this.clip.assetId || this.audioGroup.sourceVideoClipId !== this.clip.id) throw new Error("O grupo de áudio não corresponde ao vídeo inserido.");
+      if (project.audioGroups.some((item) => item.id === this.audioGroup!.id)) throw new Error(`Grupo de áudio já existe: ${this.audioGroup.id}`);
+      project.audioGroups.push(cloneProjectValue(this.audioGroup));
+    }
+    project.selection = { itemIds: [this.clip.id], primaryId: this.clip.id, surface: "timeline" };
+    return project;
+  }
+  serialize() { return { type: this.type, payload: { clip: this.clip, ...(this.audioGroup ? { audioGroup: this.audioGroup } : {}) } }; }
+}
+
 export class AutoSplitClipsCommand extends SnapshotCommand {
   readonly type = "autoSplitClips";
   readonly renderImpact = "timeline" as const;

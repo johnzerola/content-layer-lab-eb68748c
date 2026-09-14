@@ -8,6 +8,47 @@ export interface LocalMediaRuntime {
   audioGroup?: AudioSourceGroup;
 }
 
+export interface ExistingMediaInsertion {
+  clip: Clip;
+  audioGroup?: AudioSourceGroup;
+}
+
+/** Creates another timeline instance while keeping the imported asset reusable. */
+export function createMediaClipFromAsset(asset: MediaAsset, at: number, serial: number): ExistingMediaInsertion {
+  if (asset.kind !== "video" && asset.kind !== "audio" && asset.kind !== "image") throw new Error("Esta mídia não pode ser inserida na timeline.");
+  const duration = asset.kind === "image" ? Math.max(0.5, asset.duration ?? 5) : Math.max(0.5, asset.duration ?? 5);
+  const trackId = asset.kind === "video" ? "track-video" : asset.kind === "audio" ? "track-music" : "track-overlay";
+  const clipId = `clip-${asset.id}-${serial}`;
+  const clip: Clip = {
+    id: clipId,
+    kind: asset.kind,
+    trackId,
+    assetId: asset.id,
+    name: asset.name,
+    projectStart: asProjectTime(at),
+    projectEnd: asProjectTime(at + duration),
+    sourceIn: 0,
+    sourceOut: duration,
+    playbackRate: 1,
+    enabled: true,
+    effects: [],
+    animations: [],
+    ...(asset.kind !== "audio" ? { transform: { x: 50, y: 50, width: 100, height: 100, scale: 1, rotation: 0, opacity: 1 } } : {}),
+    ...(asset.kind === "video" || asset.kind === "audio" ? { audio: { gain: 1, muted: false, fadeIn: 0, fadeOut: 0, loop: false, stemRole: asset.kind === "video" ? "original" as const : "music" as const, envelope: [] } } : {}),
+    metadata: { localSession: asset.storagePath?.startsWith("local-session://") ?? false },
+  };
+  const audioGroup: AudioSourceGroup | undefined = asset.kind === "video" ? {
+    id: `audio-group-${asset.id}-${serial}`,
+    sourceAssetId: asset.id,
+    sourceStreamIndex: 0,
+    sourceVideoClipId: clip.id,
+    activeRepresentation: "embedded",
+    linkedEditing: true,
+    sourceRevision: 0,
+  } : undefined;
+  return { clip, ...(audioGroup ? { audioGroup } : {}) };
+}
+
 export async function prepareLocalMedia(file: File, at: number, serial: number): Promise<LocalMediaRuntime> {
   const kind = mediaKind(file.type);
   if (!kind) throw new Error("Use um arquivo de vídeo, imagem ou áudio compatível.");
@@ -16,7 +57,6 @@ export async function prepareLocalMedia(file: File, at: number, serial: number):
   try {
     const metadata = await readMetadata(objectUrl, kind);
     const duration = kind === "image" ? 5 : Math.max(0.5, metadata.duration ?? 5);
-    const trackId = kind === "video" ? "track-video" : kind === "audio" ? "track-music" : "track-overlay";
     const asset: MediaAsset = {
       id,
       kind,
@@ -30,34 +70,10 @@ export async function prepareLocalMedia(file: File, at: number, serial: number):
       ...(metadata.height ? { height: metadata.height } : {}),
       license: { provider: "Arquivo local", sourceUrl: `local-session://${id}`, licenseType: "Fornecida pelo usuário", licenseUrl: "internal://editor-v2/local-media", author: "Usuário", attributionRequired: false, commercialUseAllowed: true, redistributionAllowed: false },
     };
-    const clip: Clip = {
-      id: `clip-${id}`,
-      kind,
-      trackId,
-      assetId: id,
-      name: file.name,
-      projectStart: asProjectTime(at),
-      projectEnd: asProjectTime(at + duration),
-      sourceIn: 0,
-      sourceOut: duration,
-      playbackRate: 1,
-      enabled: true,
-      effects: [],
-      animations: [],
-      ...(kind !== "audio" ? { transform: { x: 50, y: 50, width: 100, height: 100, scale: 1, rotation: 0, opacity: 1 } } : {}),
-      ...(kind === "video" || kind === "audio" ? { audio: { gain: 1, muted: false, fadeIn: 0, fadeOut: 0, loop: false, stemRole: kind === "video" ? "original" as const : "music" as const, envelope: [] } } : {}),
-      metadata: { localSession: true },
-    };
+    const insertion = createMediaClipFromAsset(asset, at, serial);
+    const clip = insertion.clip;
     const thumbnailUrl = kind === "image" ? objectUrl : kind === "video" ? await captureVideoPoster(objectUrl, duration).catch(() => undefined) : undefined;
-    const audioGroup: AudioSourceGroup | undefined = kind === "video" ? {
-      id: `audio-group-${id}`,
-      sourceAssetId: asset.id,
-      sourceStreamIndex: 0,
-      sourceVideoClipId: clip.id,
-      activeRepresentation: "embedded",
-      linkedEditing: true,
-      sourceRevision: 0,
-    } : undefined;
+    const audioGroup = insertion.audioGroup;
     return { asset, clip, objectUrl, ...(thumbnailUrl ? { thumbnailUrl } : {}), ...(audioGroup ? { audioGroup } : {}) };
   } catch (error) {
     URL.revokeObjectURL(objectUrl);
