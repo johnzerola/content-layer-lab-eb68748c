@@ -82,9 +82,16 @@ export function TemplateTimeline({ template: t, onChange, selected, onSelect, ti
       <span className="font-mono text-xs">{time.toFixed(1)} / {duration.toFixed(1)} s</span>
       <button className="btn-ghost text-xs" onClick={() => addText(false)}><Plus size={14} /> Frase</button>
       <button className="btn-ghost text-xs" disabled={!layer || !('text' in layer) || time <= (layer.tStart ?? 0) || time >= (layer.tEnd ?? duration)} onClick={() => addText(true)}><Scissors size={14} /> Dividir frase</button>
-      <button className="btn-ghost text-xs" title="A partir deste segundo tudo some em fade e o vídeo cresce sozinho até 9:16 inteiro" onClick={() => { const id = crypto.randomUUID(); onChange({ ...t, fullscreenClips: [...(t.fullscreenClips ?? []), { id, start: Math.min(time, Math.max(0, duration - 1)), end: duration, fade: 1.5 }] }); setFullId(id); }}><Maximize size={14} /> Sumir tudo e expandir</button>
-      <button className="btn-ghost text-xs" title="Grava tamanho e posição atuais do vídeo neste segundo" onClick={addVideoKey}><Diamond size={14} /> Keyframe</button>
+      <button className="btn-ghost text-xs" title="A partir deste segundo tudo some em fade e o vídeo cresce sozinho até 9:16 inteiro" onClick={presetSumir}><Maximize size={14} /> Sumir tudo e expandir</button>
+      <button className="btn-ghost text-xs" title="Grava tamanho e posição atuais do vídeo neste segundo" onClick={() => addVideoKey()}><Diamond size={14} /> Keyframe</button>
       <label className="ml-auto text-xs">Zoom <select aria-label="Zoom da timeline" value={zoom} onChange={e => setZoom(Number(e.target.value))} className="field w-16"><option value={1}>1×</option><option value={2}>2×</option><option value={4}>4×</option></select></label>
+    </div>
+    <div className="flex flex-wrap items-center gap-1.5" aria-label="Efeitos rápidos no segundo atual">
+      <span className="text-[11px] text-muted-foreground">Efeitos rápidos em {time.toFixed(1)}s:</span>
+      <button className="btn-ghost px-2 py-1 text-[11px]" title="O vídeo cresce até ocupar o 9:16 inteiro a partir deste segundo" onClick={presetExpand}><ZoomIn size={12} /> Expandir</button>
+      <button className="btn-ghost px-2 py-1 text-[11px]" disabled={!layer} title="A camada selecionada some em fade a partir deste ponto" onClick={() => presetFade('out')}><LogOut size={12} /> Sair em fade</button>
+      <button className="btn-ghost px-2 py-1 text-[11px]" disabled={!layer} title="A camada selecionada entra em fade neste ponto" onClick={() => presetFade('in')}><LogIn size={12} /> Entrar em fade</button>
+      <button className="btn-ghost px-2 py-1 text-[11px]" title="Daqui em diante tudo some em fade e o vídeo ocupa a tela toda" onClick={presetSumir}><EyeOff size={12} /> Sumir tudo</button>
     </div>
     <div className="max-h-64 overflow-auto rounded-lg border border-border">
       <div style={{ minWidth: `${zoom * 100}%` }}>
