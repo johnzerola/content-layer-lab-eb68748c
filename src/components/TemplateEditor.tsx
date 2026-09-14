@@ -391,6 +391,24 @@ export function TemplateEditor({
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [timelineOpen, setTimelineOpen] = useState(true);
 
+  /** Marca a posição/tamanho atual do vídeo como keyframe no tempo da linha do tempo. */
+  const addVideoKey = () =>
+    setT({
+      ...t,
+      videoKeyframes: [
+        ...(t.videoKeyframes ?? []).filter((k) => Math.abs(k.t - time) > 0.05),
+        {
+          id: crypto.randomUUID(),
+          t: Number(time.toFixed(2)),
+          x: t.video.x,
+          y: t.video.y,
+          w: t.video.w,
+          h: t.video.h,
+          radius: t.video.radius,
+        },
+      ].sort((a, b) => a.t - b.t),
+    });
+
   /** Trecho final em que tudo some e o vídeo ocupa o 9:16 inteiro. */
   const autoFull = (t.fullscreenClips ?? []).find((c) => c.id === AUTO_FULL_ID) ?? null;
   const patchAutoFull = (patch: Partial<NonNullable<Template["fullscreenClips"]>[number]>) =>
@@ -734,6 +752,47 @@ export function TemplateEditor({
                   {label}
                 </button>
               ))}
+            </div>
+
+            <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
+              <p className="studio-label">Movimento por keyframes</p>
+              <p className="text-[11px] text-muted-foreground">
+                Posicione a linha do tempo, ajuste o vídeo e marque um keyframe. Entre dois keyframes o vídeo cresce ou
+                se move sozinho, de forma suave.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button className="rounded-full border border-primary px-3 py-1 text-xs text-primary" onClick={addVideoKey}>
+                  + Keyframe em {time.toFixed(1)}s
+                </button>
+                <button
+                  className="rounded-full border border-border px-3 py-1 text-xs hover:border-primary"
+                  onClick={() => setT({ ...t, videoKeyframes: [] })}
+                >
+                  Limpar
+                </button>
+              </div>
+              {(t.videoKeyframes ?? []).length ? (
+                <ul className="space-y-1">
+                  {[...(t.videoKeyframes ?? [])]
+                    .sort((a, b) => a.t - b.t)
+                    .map((k) => (
+                      <li key={k.id} className="flex items-center gap-2 text-xs">
+                        <button className="flex-1 text-left hover:text-primary" onClick={() => setTime(k.t)}>
+                          {k.t.toFixed(1)}s — {Math.round(k.w)}×{Math.round(k.h)}
+                        </button>
+                        <button
+                          aria-label={`Remover keyframe em ${k.t.toFixed(1)} segundos`}
+                          className="text-muted-foreground hover:text-red-400"
+                          onClick={() =>
+                            setT({ ...t, videoKeyframes: (t.videoKeyframes ?? []).filter((o) => o.id !== k.id) })
+                          }
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+              ) : null}
             </div>
           </>
         )}
