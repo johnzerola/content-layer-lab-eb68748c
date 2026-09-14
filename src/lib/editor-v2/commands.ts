@@ -2,7 +2,7 @@ import type { Easing } from "@/lib/video-template/types";
 import { asProjectTime, type AnimatableProperty, type AudioRepresentation, type AudioSourceGroup, type CaptionCue, type Clip, type ClipStyle, type ClipTransform, type EditorProjectV2, type MediaAsset, type ProjectSettings, type RenderImpact, type SelectionState, type TemplateInstance, type Track, type Transition } from "./types";
 import { cloneProject, normalizeProject } from "./project";
 import { isTrackCompatible } from "./interactions";
-import { projectToSourceTime } from "./clock";
+import { projectToSourceTime, sourceToProjectTime } from "./clock";
 
 export interface SerializedEditorCommand {
   type: string;
@@ -611,6 +611,62 @@ export class AutoSplitClipsCommand extends SnapshotCommand {
     return project;
   }
   serialize() { return { type: this.type, payload: { clipIds: this.clipIds, interval: this.interval, suffix: this.suffix } }; }
+}
+
+export interface SilenceClipPlan {
+  clipId: string;
+  keepSourceRanges: { start: number; end: number }[];
+}
+
+/** Removes detected pauses and closes the gaps in one reversible edit. */
+export class RemoveSilenceCommand extends SnapshotCommand {
+  readonly type = "removeSilence";
+  readonly renderImpact = "full" as const;
+  constructor(private readonly plans: SilenceClipPlan[], private readonly suffix: string) { super(); }
+  protected apply(project: EditorProjectV2) {
+    const selected: string[] = [];
+    let removed = 0;
+    for (const plan of this.plans) {
+      const { clip, owner, index } = locate(project, plan.clipId);
+      if (owner.locked) throw new Error(`Trilha bloqueada: ${owner.name}`);
+      if (clip.kind !== "video") continue;
+      const orderedRanges = [...plan.keepSourceRanges]
+        .filter((range) => range.end - range.start >= .04)
+        .sort((left, right) => left.start - right.start);
+      if (clip.reversed) orderedRanges.reverse();
+      if (!orderedRanges.length) continue;
+      const originalDuration = Number(clip.projectEnd) - Number(clip.projectStart);
+      let cursor = Number(clip.projectStart);
+      const sourceAudioGroup = project.audioGroups.find((group) => group.sourceVideoClipId === clip.id || group.id === clip.audioGroupId);
+      const segments = orderedRanges.map((range, rangeIndex) => {
+        const segment = cloneProjectValue(clip);
+        const projectDuration = (range.end - range.start) / Math.max(.05, clip.playbackRate);
+        const originalFirst = sourceToProjectTime(clip, range.start);
+        const originalLast = sourceToProjectTime(clip, range.end);
+        const localStart = Math.max(0, Math.min(Number(originalFirst ?? clip.projectStart), Number(originalLast ?? clip.projectStart)) - Number(clip.projectStart));
+        const localEnd = Math.min(originalDuration, Math.max(Number(originalFirst ?? clip.projectEnd), Number(originalLast ?? clip.projectEnd)) - Number(clip.projectStart));
+        segment.id = rangeIndex === 0 ? clip.id : `${clip.id}-speech-${this.suffix}-${rangeIndex + 1}`;
+        segment.name = `${clip.name} · fala ${rangeIndex + 1}`;
+        segment.projectStart = asProjectTime(cursor);
+        segment.projectEnd = asProjectTime(cursor + projectDuration);
+        segment.sourceIn = range.start;
+        segment.sourceOut = range.end;
+        segment.animations = animationsForRange(clip, localStart, localEnd);
+        if (sourceAudioGroup) segment.audioGroupId = sourceAudioGroup.id;
+        cursor += projectDuration;
+        return segment;
+      });
+      const kept = segments.reduce((total, segment) => total + Number(segment.projectEnd) - Number(segment.projectStart), 0);
+      removed += Math.max(0, originalDuration - kept);
+      owner.clips.splice(index, 1, ...segments);
+      reconnectSplitReferences(project, clip.id, segments.map((segment) => segment.id));
+      selected.push(...segments.map((segment) => segment.id));
+    }
+    if (removed < .04) throw new Error("Nenhuma pausa longa o suficiente foi encontrada na seleção.");
+    project.selection = { itemIds: selected, primaryId: selected.at(-1) ?? null, surface: "timeline" };
+    return project;
+  }
+  serialize() { return { type: this.type, payload: { plans: this.plans, suffix: this.suffix } }; }
 }
 
 export class DeleteClipCommand extends SnapshotCommand {

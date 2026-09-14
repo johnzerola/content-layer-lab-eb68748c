@@ -7,6 +7,7 @@ import {
   AddMediaClipCommand,
   InsertMediaClipCommand,
   AutoSplitClipsCommand,
+  RemoveSilenceCommand,
   AudioSeparationJobRepository,
   ApplyCaptionPresetCommand,
   ApplySeparatedAudioCommand,
@@ -79,6 +80,7 @@ import { runStemJob } from "@/lib/editor/stem-service";
 import { listMyTemplates } from "@/lib/video-template/service";
 import { downloadBlob } from "@/lib/render";
 import { generateCaptions } from "@/lib/captions";
+import { analyzeAudio, findSilences, keepRanges } from "@/lib/editor/silence";
 import type { Easing } from "@/lib/video-template/types";
 import { BUILT_IN_LIBRARY_ITEMS, LibraryRegistry, TRANSITION_DEFINITIONS, userTemplateLibraryItem, type CaptionPresetDefinition, type CreativeEffectDefinition, type FilterPresetDefinition, type LibraryItem, type MotionDefinition, type TemplateDefinition } from "@/lib/editor-v2/library";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -112,6 +114,7 @@ export function EditorV2Foundation() {
   const [assetWaveforms, setAssetWaveforms] = useState<Record<string, number[]>>({});
   const [importing, setImporting] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
+  const [removingSilence, setRemovingSilence] = useState(false);
   const [captionProgress, setCaptionProgress] = useState(0);
   const [extractingAudio, setExtractingAudio] = useState(false);
   const [separatingAudio, setSeparatingAudio] = useState(false);
@@ -323,11 +326,92 @@ export function EditorV2Foundation() {
     run(new SplitClipCommand(clip.id, Number(clockRef.current.getSnapshot().projectTime), `${clip.id}-split-${state.revisions.document + 1}`), "Clipe dividido na agulha.");
   }, [run]);
 
+  const dropLibraryItem = useCallback((id: string, at: number) => {
+    const item = registry.get(id);
+    if (!item) return;
+    const state = busRef.current.getState();
+    if (item.type === "transition") {
+      const context = findTransitionTarget(state, at);
+      if (!context) { setMessage("Solte a transição exatamente entre dois clipes consecutivos."); return; }
+      const definition = item.definition as typeof TRANSITION_DEFINITIONS[number];
+      if (definition.id === "cut") {
+        if (context.existing) run(new DeleteTransitionCommand(context.existing.id), "Corte seco restaurado.");
+      } else {
+        const duration = Math.min(definition.durationDefault, definition.durationMax, context.maxDuration);
+        run(new ApplyTransitionCommand({ id: context.existing?.id ?? `transition-${context.from.id}-${context.to.id}`, definitionId: definition.id, fromClipId: context.from.id, toClipId: context.to.id, duration, easing: "easeInOut", fallback: "cut", parameters: {} }), `${item.name} aplicada no corte em ${formatProjectTime(context.boundary)}.`);
+      }
+      run(new SelectItemCommand([item.id], "library"));
+      seek(context.boundary);
+      setMobileSurface("inspector");
+      return;
+    }
+    if (["video-effect", "filter", "animation"].includes(item.type)) {
+      const target = state.tracks
+        .filter((track) => track.kind === "video" || track.kind === "overlay")
+        .flatMap((track) => track.clips)
+        .reverse()
+        .find((clip) => Number(clip.projectStart) <= at && Number(clip.projectEnd) >= at && clip.kind !== "audio");
+      if (!target) { setMessage("Solte o efeito sobre um vídeo ou imagem da timeline."); return; }
+      lastSelectedClipIdRef.current = target.id;
+      lastSelectedClipIdsRef.current = [target.id];
+      run(new SelectItemCommand([target.id], "timeline"));
+      addLibraryItem(item, at);
+      return;
+    }
+    addLibraryItem(item, at);
+  }, [addLibraryItem, registry, run, seek]);
+
   const autoSplit = useCallback((interval: number) => {
     const state = busRef.current.getState();
     const ids = state.selection.itemIds.filter((id) => findClip(state, id)?.kind === "video");
     if (!ids.length) return setMessage("Selecione um ou mais vídeos antes de aplicar os cortes automáticos.");
     run(new AutoSplitClipsCommand(ids, interval, String(state.revisions.document + 1)), `Vídeos divididos a cada ${interval.toLocaleString("pt-BR")}s. Ctrl+Z desfaz todos os cortes.`);
+  }, [run]);
+
+  const removeSilence = useCallback(async (options: { threshold: number; minSilence: number; padding: number }) => {
+    const state = busRef.current.getState();
+    const videos = state.selection.itemIds
+      .map((id) => findClip(state, id))
+      .filter((clip): clip is Clip => Boolean(clip?.kind === "video" && clip.assetId));
+    if (!videos.length) {
+      setMessage("Selecione um ou mais vídeos com áudio antes de remover silêncios.");
+      return;
+    }
+    const separated = videos.find((clip) => {
+      const group = state.audioGroups.find((candidate) => candidate.id === clip.audioGroupId || candidate.sourceVideoClipId === clip.id);
+      return group && group.activeRepresentation !== "embedded";
+    });
+    if (separated) {
+      setMessage("Restaure o áudio original deste vídeo antes de cortar por silêncio; assim imagem e áudio permanecem sincronizados.");
+      return;
+    }
+    setRemovingSilence(true);
+    setMessage(`Analisando pausas em ${videos.length} ${videos.length === 1 ? "vídeo" : "vídeos"}…`);
+    try {
+      const analyses = new Map<string, Awaited<ReturnType<typeof analyzeAudio>>>();
+      const silenceOptions = { ...options, minSpeech: .2 };
+      const plans = [];
+      for (const video of videos) {
+        const file = sourceFilesRef.current.get(video.assetId!);
+        if (!file) throw new Error(`${video.name} precisa ser religado antes da análise de silêncio.`);
+        let analysis = analyses.get(video.assetId!);
+        if (!analysis) {
+          analysis = await analyzeAudio(file);
+          analyses.set(video.assetId!, analysis);
+        }
+        const silences = findSilences(analysis, silenceOptions);
+        const ranges = keepRanges(analysis.duration, silences, silenceOptions)
+          .map((range) => ({ start: Math.max(range.start, video.sourceIn), end: Math.min(range.end, video.sourceOut) }))
+          .filter((range) => range.end - range.start >= silenceOptions.minSpeech);
+        plans.push({ clipId: video.id, keepSourceRanges: ranges });
+      }
+      run(new RemoveSilenceCommand(plans, String(state.revisions.document + 1)), `Pausas removidas de ${videos.length} ${videos.length === 1 ? "vídeo" : "vídeos"}. Ctrl+Z desfaz toda a operação.`);
+      setMobileSurface("timeline");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível analisar e remover os silêncios.");
+    } finally {
+      setRemovingSilence(false);
+    }
   }, [run]);
 
   const removeSelected = useCallback(() => {
@@ -953,6 +1037,8 @@ export function EditorV2Foundation() {
     onMoveKeyframe: (id: string, property: AnimatableProperty, keyframeId: string, localTime: number) => run(new MoveKeyframeCommand(id, property, keyframeId, localTime), "Keyframe movido."),
     onSplit: split,
     onAutoSplit: autoSplit,
+    onRemoveSilence: removeSilence,
+    removingSilence,
     onDuplicate: duplicateSelected,
     onDelete: removeSelected,
     onTogglePlayback: togglePlayback,
@@ -963,7 +1049,27 @@ export function EditorV2Foundation() {
     onToggleSnap: () => run(new UpdateProjectSettingsCommand({ snapEnabled: !project.settings.snapEnabled })),
     onToggleRipple: () => run(new UpdateProjectSettingsCommand({ rippleEnabled: !project.settings.rippleEnabled })),
     onTrackPatch: (trackId: string, patch: Partial<Pick<Track, "muted" | "solo" | "gain" | "hidden" | "locked">>) => run(new UpdateTrackCommand(trackId, patch)),
-    onDropLibraryItem: (id: string, at: number) => { const item = registry.get(id); if (item) addLibraryItem(item, at); },
+    onDropLibraryItem: dropLibraryItem,
+    onSelectTransition: (transitionId: string) => {
+      const state = busRef.current.getState();
+      const transition = state.transitions.find((item) => item.id === transitionId);
+      const from = transition ? findClip(state, transition.fromClipId) : null;
+      if (!transition || !from) return;
+      const item = registry.get(`builtin.transition.${transition.definitionId}`);
+      if (item) run(new SelectItemCommand([item.id], "library"));
+      seek(Number(from.projectEnd));
+      setMobileSurface("inspector");
+    },
+    onResizeTransition: (transitionId: string, duration: number) => {
+      const state = busRef.current.getState();
+      const transition = state.transitions.find((item) => item.id === transitionId);
+      if (!transition) return;
+      const context = findTransitionTarget(state, Number(findClip(state, transition.fromClipId)?.projectEnd ?? 0), transition.fromClipId);
+      const definition = TRANSITION_DEFINITIONS.find((item) => item.id === transition.definitionId);
+      if (!context || !definition) return;
+      const safe = Math.max(definition.durationMin, Math.min(duration, definition.durationMax, context.maxDuration));
+      run(new ApplyTransitionCommand({ ...transition, duration: safe }), `Transição ajustada para ${safe.toFixed(2)}s.`);
+    },
   };
 
   const libraryProps = {

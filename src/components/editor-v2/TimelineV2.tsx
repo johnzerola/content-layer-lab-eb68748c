@@ -17,6 +17,8 @@ interface TimelineProps {
   onMoveKeyframe: (clipId: string, property: AnimatableProperty, keyframeId: string, localTime: number) => void;
   onSplit: () => void;
   onAutoSplit: (interval: number) => void;
+  onRemoveSilence: (options: { threshold: number; minSilence: number; padding: number }) => void;
+  removingSilence: boolean;
   onDuplicate: () => void;
   onDelete: () => void;
   onTogglePlayback: () => void;
@@ -28,6 +30,8 @@ interface TimelineProps {
   onToggleRipple: () => void;
   onTrackPatch: (trackId: string, patch: Partial<Pick<Track, "muted" | "solo" | "gain" | "hidden" | "locked">>) => void;
   onDropLibraryItem: (id: string, at: number) => void;
+  onSelectTransition: (transitionId: string) => void;
+  onResizeTransition: (transitionId: string, duration: number) => void;
 }
 
 type Draft = { id: string; mode: "move" | "trim-start" | "trim-end"; start: number; end: number; targetTrackId: string; compatible: boolean };
@@ -36,12 +40,15 @@ const TRACK_HEIGHT = 48;
 const RULER_HEIGHT = 28;
 
 export function TimelineV2(props: TimelineProps) {
-  const { project, currentTime, playing, zoom, assetThumbnails, assetWaveforms, onZoom, onSeek, onSelect, onMove, onTrim, onMoveKeyframe, onSplit, onAutoSplit, onDuplicate, onDelete, onTogglePlayback, onSkip, onBatchSpeed, onBatchToggleReverse, onBatchToggleFlip, onToggleSnap, onToggleRipple, onTrackPatch, onDropLibraryItem } = props;
+  const { project, currentTime, playing, zoom, assetThumbnails, assetWaveforms, onZoom, onSeek, onSelect, onMove, onTrim, onMoveKeyframe, onSplit, onAutoSplit, onRemoveSilence, removingSilence, onDuplicate, onDelete, onTogglePlayback, onSkip, onBatchSpeed, onBatchToggleReverse, onBatchToggleFlip, onToggleSnap, onToggleRipple, onTrackPatch, onDropLibraryItem, onSelectTransition, onResizeTransition } = props;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [autoCutOpen, setAutoCutOpen] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
+  const [transitionDraft, setTransitionDraft] = useState<{ id: string; duration: number } | null>(null);
   const [autoCutInterval, setAutoCutInterval] = useState(2);
+  const [autoCutMode, setAutoCutMode] = useState<"interval" | "silence">("interval");
+  const [silencePreset, setSilencePreset] = useState<"natural" | "tight">("natural");
   const [viewport, setViewport] = useState({ scrollLeft: 0, width: 1200 });
   const pxPerSecond = 52 * zoom;
   const width = Math.max(900, project.settings.duration * pxPerSecond + 120);
@@ -150,6 +157,26 @@ export function TimelineV2(props: TimelineProps) {
     window.addEventListener("pointerup", up, { once: true });
   };
 
+  const beginTransitionResize = (event: React.PointerEvent, transitionId: string, duration: number, side: "left" | "right") => {
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    let latest = duration;
+    const move = (next: PointerEvent) => {
+      const delta = (next.clientX - startX) / pxPerSecond * 2 * (side === "right" ? 1 : -1);
+      latest = Math.max(.1, duration + delta);
+      setTransitionDraft({ id: transitionId, duration: latest });
+    };
+    const up = () => {
+      onResizeTransition(transitionId, latest);
+      setTransitionDraft(null);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up, { once: true });
+  };
+
   return (
     <section className="editor-v2-timeline flex h-full min-h-0 flex-col" aria-label="Timeline multitrack">
       <header className="editor-v2-timeline-toolbar flex h-11 shrink-0 items-center gap-1 px-2 sm:px-3">
@@ -161,12 +188,11 @@ export function TimelineV2(props: TimelineProps) {
         <button type="button" onClick={onSplit} className="editor-tool-button"><Scissors className="size-3.5" /><span className="hidden sm:inline">Dividir</span></button>
         <div className="relative">
           <button type="button" aria-label="Cortes automáticos" title="Cortar seleção por intervalo" onClick={() => setAutoCutOpen((open) => !open)} aria-expanded={autoCutOpen} className={`editor-tool-button ${autoCutOpen ? "text-primary" : ""}`}><Timer className="size-3.5" /><span className="hidden xl:inline">Cortes automáticos</span></button>
-          {autoCutOpen && <form onSubmit={(event) => { event.preventDefault(); onAutoSplit(autoCutInterval); setAutoCutOpen(false); }} className="editor-auto-cut-popover absolute left-0 top-9 z-50 w-64 rounded-xl border border-white/10 p-3 shadow-2xl">
-            <p className="text-[11px] font-semibold text-foreground">Cortar por intervalo</p>
-            <p className="mt-1 text-[9px] leading-relaxed text-muted-foreground">Divide todos os vídeos selecionados em partes iguais. Uma ação, um Ctrl+Z.</p>
-            <label className="mt-3 block text-[9px] text-muted-foreground">Intervalo em segundos<input autoFocus aria-label="Intervalo dos cortes automáticos em segundos" type="number" min="0.25" max="60" step="0.25" value={autoCutInterval} onChange={(event) => setAutoCutInterval(Number(event.target.value))} className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-black/30 px-2 text-xs tabular-nums text-foreground" /></label>
-            <div className="mt-2 grid grid-cols-4 gap-1">{[1, 2, 3, 5].map((value) => <button key={value} type="button" onClick={() => setAutoCutInterval(value)} className={`h-7 rounded-md text-[9px] ${autoCutInterval === value ? "bg-primary text-white" : "bg-white/5 text-muted-foreground hover:text-white"}`}>{value}s</button>)}</div>
-            <button type="submit" className="editor-primary-button mt-3 h-8 w-full rounded-lg text-[10px] font-semibold text-white">Aplicar cortes</button>
+          {autoCutOpen && <form onSubmit={(event) => { event.preventDefault(); if (autoCutMode === "interval") onAutoSplit(autoCutInterval); else onRemoveSilence(silencePreset === "natural" ? { threshold: .06, minSilence: .35, padding: .1 } : { threshold: .11, minSilence: .22, padding: .06 }); if (!removingSilence) setAutoCutOpen(false); }} className="editor-auto-cut-popover absolute left-0 top-9 z-50 w-72 rounded-xl border border-white/10 p-3 shadow-2xl">
+            <p className="text-[11px] font-semibold text-foreground">Cortes automáticos</p>
+            <div className="mt-2 grid grid-cols-2 gap-1 rounded-lg bg-black/20 p-1" role="tablist" aria-label="Tipo de corte automático"><button type="button" role="tab" aria-selected={autoCutMode === "interval"} onClick={() => setAutoCutMode("interval")} className={`h-8 rounded-md text-[9px] font-semibold ${autoCutMode === "interval" ? "bg-primary/20 text-primary" : "text-muted-foreground"}`}>Por intervalo</button><button type="button" role="tab" aria-selected={autoCutMode === "silence"} onClick={() => setAutoCutMode("silence")} className={`h-8 rounded-md text-[9px] font-semibold ${autoCutMode === "silence" ? "bg-primary/20 text-primary" : "text-muted-foreground"}`}>Remover silêncios</button></div>
+            {autoCutMode === "interval" ? <><p className="mt-2 text-[9px] leading-relaxed text-muted-foreground">Divide todos os vídeos selecionados em partes iguais. Uma ação, um Ctrl+Z.</p><label className="mt-3 block text-[9px] text-muted-foreground">Intervalo em segundos<input autoFocus aria-label="Intervalo dos cortes automáticos em segundos" type="number" min="0.25" max="60" step="0.25" value={autoCutInterval} onChange={(event) => setAutoCutInterval(Number(event.target.value))} className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-black/30 px-2 text-xs tabular-nums text-foreground" /></label><div className="mt-2 grid grid-cols-4 gap-1">{[1, 2, 3, 5].map((value) => <button key={value} type="button" onClick={() => setAutoCutInterval(value)} className={`h-7 rounded-md text-[9px] ${autoCutInterval === value ? "bg-primary text-white" : "bg-white/5 text-muted-foreground hover:text-white"}`}>{value}s</button>)}</div></> : <><p className="mt-2 text-[9px] leading-relaxed text-muted-foreground">Analisa o áudio real, remove pausas e fecha os espaços automaticamente.</p><div className="mt-3 grid grid-cols-2 gap-1"><button type="button" onClick={() => setSilencePreset("natural")} className={`rounded-lg border p-2 text-left ${silencePreset === "natural" ? "border-primary/60 bg-primary/12" : "border-white/8 bg-white/[.025]"}`}><span className="block text-[9px] font-semibold text-foreground">Natural</span><span className="mt-0.5 block text-[8px] text-muted-foreground">Mantém respirações curtas</span></button><button type="button" onClick={() => setSilencePreset("tight")} className={`rounded-lg border p-2 text-left ${silencePreset === "tight" ? "border-primary/60 bg-primary/12" : "border-white/8 bg-white/[.025]"}`}><span className="block text-[9px] font-semibold text-foreground">Dinâmico</span><span className="mt-0.5 block text-[8px] text-muted-foreground">Shorts com ritmo rápido</span></button></div></>}
+            <button type="submit" disabled={removingSilence} className="editor-primary-button mt-3 flex h-9 w-full items-center justify-center rounded-lg text-[10px] font-semibold text-white disabled:cursor-wait disabled:opacity-60">{removingSilence ? "Analisando áudio…" : autoCutMode === "interval" ? "Aplicar cortes" : "Remover pausas"}</button>
           </form>}
         </div>
         <button type="button" onClick={onDuplicate} className="editor-tool-button"><Copy className="size-3.5" /><span className="hidden sm:inline">Duplicar</span></button>
@@ -215,7 +241,17 @@ export function TimelineV2(props: TimelineProps) {
                     {!track.locked && <><button type="button" aria-label={`Aparar início de ${clip.name}`} onPointerDown={(event) => beginClipGesture(event, clip, "trim-start")} className="absolute inset-y-0 left-0 z-20 w-2 cursor-ew-resize bg-white/0 hover:bg-white/30 focus-visible:bg-white/35" /><button type="button" aria-label={`Aparar fim de ${clip.name}`} onPointerDown={(event) => beginClipGesture(event, clip, "trim-end")} className="absolute inset-y-0 right-0 z-20 w-2 cursor-ew-resize bg-white/0 hover:bg-white/30 focus-visible:bg-white/35" /></>}
                   </div>;
                 })}
-                {project.transitions.filter((transition) => track.clips.some((clip) => clip.id === transition.fromClipId)).map((transition) => { const from = track.clips.find((clip) => clip.id === transition.fromClipId); return from ? <span key={transition.id} data-transition-id={transition.id} role="img" aria-label={`Transição ${transition.definitionId}`} title={`${transition.definitionId} · ${transition.duration}s`} className="absolute top-1/2 z-20 grid size-4 -translate-x-1/2 -translate-y-1/2 rotate-45 place-items-center rounded-[3px] border border-fuchsia-200 bg-fuchsia-500 shadow" style={{ left: Number(from.projectEnd) * pxPerSecond }}><span className="size-1.5 rounded-sm bg-white/80" /></span> : null; })}
+                {project.transitions.filter((transition) => track.clips.some((clip) => clip.id === transition.fromClipId)).map((transition) => {
+                  const from = track.clips.find((clip) => clip.id === transition.fromClipId);
+                  if (!from) return null;
+                  const duration = transitionDraft?.id === transition.id ? transitionDraft.duration : transition.duration;
+                  const transitionWidth = Math.max(20, duration * pxPerSecond);
+                  return <div key={transition.id} data-transition-id={transition.id} role="button" tabIndex={0} aria-label={`Transição ${transition.definitionId}, ${duration.toFixed(2)} segundos`} title={`${transition.definitionId} · arraste as bordas para ajustar`} onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); onSelectTransition(transition.id); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectTransition(transition.id); } }} className="absolute top-1/2 z-30 flex h-6 -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center rounded-md border border-fuchsia-200/70 bg-fuchsia-500/85 px-2 text-[8px] font-bold text-white shadow-[0_0_16px_rgba(217,70,239,.35)] backdrop-blur focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" style={{ left: Number(from.projectEnd) * pxPerSecond, width: transitionWidth }}>
+                    <button type="button" aria-label="Ajustar início da transição" onPointerDown={(event) => beginTransitionResize(event, transition.id, duration, "left")} className="absolute inset-y-0 left-0 w-2 cursor-ew-resize rounded-l-md bg-white/10 hover:bg-white/35" />
+                    <span className="max-w-full truncate">{duration.toFixed(2)}s</span>
+                    <button type="button" aria-label="Ajustar fim da transição" onPointerDown={(event) => beginTransitionResize(event, transition.id, duration, "right")} className="absolute inset-y-0 right-0 w-2 cursor-ew-resize rounded-r-md bg-white/10 hover:bg-white/35" />
+                  </div>;
+                })}
               </div>
             </div>;
           })}

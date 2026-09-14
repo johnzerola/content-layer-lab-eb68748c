@@ -1,7 +1,7 @@
 ﻿import { describe, expect, it } from "vitest";
 import { AddCaptionBatchCommand, AddCaptionCueCommand, AddClipCommand, AddMediaClipCommand, ApplyCaptionPresetCommand, ApplySeparatedAudioCommand, ApplyTemplateCommand, ApplyTransitionCommand, CompositionClock, DeleteAudioEnvelopePointCommand, DeleteClipCommand, DeleteClipsCommand, DeleteKeyframeCommand, DuplicateClipsCommand, EditorCommandBus, MoveClipCommand, MoveKeyframeCommand, RegisterExtractedAudioCommand, RestoreOriginalAudioCommand, SelectItemCommand, SetAudioRepresentationCommand, SplitClipCommand, TrimClipCommand, UpdateClipCommand, UpdateProjectSettingsCommand, UpdateTrackCommand, UpdateTransformAtTimeCommand, UpsertAudioEnvelopePointCommand, UpsertKeyframeCommand, adaptEditorProjectV1, asProjectTime, buildExtractedAudioMedia, buildSeparatedAudioMedia, clampTransitionDuration, clipAudioGainAt, createCaptionBatch, createCaptionBatchFromTimedWords, createEditorProjectV2, createEditorRenderManifest, createPlaybackSurfaceKeys, createStemAsset, editorProjectFromManifest, findTransitionTarget, interpolateKeyframes, isEditorV2Enabled, isTrackCompatible, parseTimedText, projectToSourceTime, resolveAnimatedTransform, resolveAudioMixFrame, resolveAudioRenderFrameFromManifest, resolveCaptionInsertion, resolveClipPresentation, resolveCompositionFrame, resolveCompositionFrameFromManifest, resolveLibraryInsertion, resolveTemplateApplication, snapProjectTime, sourceToProjectTime, summarizeWaveform, visibleTimelineRange, type AudioSourceGroup, type Clip, type MediaAsset } from "@/lib/editor-v2";
 import { BUILT_IN_LIBRARY_ITEMS, type CaptionPresetDefinition, type LibraryItem, type TemplateDefinition } from "@/lib/editor-v2/library";
-import { AutoSplitClipsCommand, InsertMediaClipCommand, UpdateClipsCommand, createMediaClipFromAsset } from "@/lib/editor-v2";
+import { AutoSplitClipsCommand, InsertMediaClipCommand, RemoveSilenceCommand, UpdateClipsCommand, createMediaClipFromAsset } from "@/lib/editor-v2";
 import { createEditorProject } from "@/lib/editor/project";
 
 function clip(): Clip {
@@ -68,6 +68,25 @@ describe("Command bus", () => {
     expect(bus.getState().tracks[0]!.clips).toHaveLength(1);
     bus.redo();
     expect(bus.getState().tracks[0]!.clips).toHaveLength(4);
+  });
+
+  it("remove pausas, fecha os espaços e desfaz tudo em uma ação", () => {
+    const source: Clip = { ...clip(), id: "speech-video", assetId: "speech-asset", projectStart: asProjectTime(0), projectEnd: asProjectTime(8), sourceIn: 0, sourceOut: 8 };
+    const project = createEditorProjectV2({ duration: 8 });
+    project.tracks[0]!.clips.push(source);
+    project.audioGroups.push({ id: "speech-group", sourceAssetId: source.assetId!, sourceStreamIndex: 0, sourceVideoClipId: source.id, activeRepresentation: "embedded", linkedEditing: true, sourceRevision: 0 });
+    const bus = new EditorCommandBus(project);
+    const command = new RemoveSilenceCommand([{ clipId: source.id, keepSourceRanges: [{ start: 0, end: 2 }, { start: 3.25, end: 5.5 }, { start: 6, end: 8 }] }], "fixture");
+    bus.execute(command);
+    expect(bus.getState().tracks[0]!.clips.map((item) => [item.projectStart, item.projectEnd, item.sourceIn, item.sourceOut])).toEqual([
+      [0, 2, 0, 2], [2, 4.25, 3.25, 5.5], [4.25, 6.25, 6, 8],
+    ]);
+    expect(resolveAudioMixFrame(bus.getState(), 3)).toMatchObject([{ sourceTime: 4.25, muted: false }]);
+    expect(command.serialize()).toMatchObject({ type: "removeSilence", payload: { suffix: "fixture" } });
+    bus.undo();
+    expect(bus.getState().tracks[0]!.clips).toEqual([source]);
+    bus.redo();
+    expect(bus.getState().tracks[0]!.clips).toHaveLength(3);
   });
 
   it("mantém uma superfície contínua nos cortes secos e troca exatamente para o clipe da direita", () => {
