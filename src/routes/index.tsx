@@ -1,5 +1,6 @@
 ﻿import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Upload,
   Link as LinkIcon,
@@ -3677,7 +3678,7 @@ function Home() {
           }))}
       />
 
-      {!user && (
+      {!user && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[60] overflow-y-auto bg-background/90 p-3 backdrop-blur-xl sm:p-6">
           <div className="mx-auto flex min-h-full w-full max-w-5xl items-center">
             <AuthGate
@@ -3693,7 +3694,8 @@ function Home() {
               <div className="hidden">Logado!</div>
             </AuthGate>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </AppShell>
   );

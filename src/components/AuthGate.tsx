@@ -88,9 +88,7 @@ export function AuthGate({
 
   if (variant === "split") {
     return (
-      <div className="mx-auto w-full max-w-5xl py-4">
-        <AuthScreen title={title} description={description} footer={fallbackExtra} />
-      </div>
+      <AuthScreen title={title} description={description} footer={fallbackExtra} />
     );
   }
 
