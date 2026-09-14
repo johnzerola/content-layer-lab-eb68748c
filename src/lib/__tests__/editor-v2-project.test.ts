@@ -16,7 +16,6 @@ describe("EditorProjectV2", () => {
     expect(restored.tracks.map((track: { kind: string }) => track.kind)).toEqual(["video", "overlay", "captions", "voice", "music", "sfx"]);
   });
 });
-
 describe("ProjectTime e CompositionClock", () => {
   it("mapeia projectTime e sourceTime nos dois sentidos", () => {
     expect(projectToSourceTime(clip(), asProjectTime(7))).toBe(10);
