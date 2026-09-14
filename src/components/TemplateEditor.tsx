@@ -44,6 +44,9 @@ import {
 } from "@/lib/template";
 import { BUILTIN_FONTS, fileToFont, registerFonts } from "@/lib/fonts";
 import { defaultAntiDup, makeVariation, describeVariation } from "@/lib/variation";
+
+/** Identificador do trecho automático "tudo some e o vídeo vai para tela cheia". */
+const AUTO_FULL_ID = "auto-fullscreen";
 import { TemplateTimeline } from "./TemplateTimeline";
 import { uploadFileOrInline } from "@/lib/media-store";
 import { useMediaUrl } from "@/hooks/useMediaUrl";
@@ -387,6 +390,14 @@ export function TemplateEditor({
   const [zoom, setZoom] = useState(0.75);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [timelineOpen, setTimelineOpen] = useState(true);
+
+  /** Trecho final em que tudo some e o vídeo ocupa o 9:16 inteiro. */
+  const autoFull = (t.fullscreenClips ?? []).find((c) => c.id === AUTO_FULL_ID) ?? null;
+  const patchAutoFull = (patch: Partial<NonNullable<Template["fullscreenClips"]>[number]>) =>
+    setT({
+      ...t,
+      fullscreenClips: (t.fullscreenClips ?? []).map((c) => (c.id === AUTO_FULL_ID ? { ...c, ...patch } : c)),
+    });
 
   const [debug, setDebug] = useState(false);
   const [debugGrid, setDebugGrid] = useState(3);
@@ -1156,7 +1167,7 @@ export function TemplateEditor({
         </header>
 
         {/* Área de trabalho: ferramentas · palco · propriedades */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:min-h-[520px] lg:grid-cols-[276px_minmax(0,1fr)_348px] lg:overflow-hidden">
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[276px_minmax(0,1fr)_348px] lg:overflow-hidden">
           {/* Coluna esquerda: camadas e ajustes do template */}
           <aside className="flex min-h-0 flex-col border-border lg:border-r">
             <div className="grid grid-cols-4 gap-1 border-b border-border p-2">
@@ -1663,6 +1674,64 @@ export function TemplateEditor({
                   </p>
                 </div>
               )}
+
+              {tab === "effects" && (
+                <div className="space-y-3 rounded-xl border border-border bg-surface-2 p-3">
+                  <p className="studio-label">Vídeo em tela cheia</p>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(autoFull)}
+                      onChange={(e) => {
+                        if (e.target.checked)
+                          setT({
+                            ...t,
+                            fullscreenClips: [
+                              ...(t.fullscreenClips ?? []),
+                              {
+                                id: AUTO_FULL_ID,
+                                start: Math.min(5, Math.max(0, duration - 1)),
+                                end: duration,
+                                fade: 0.8,
+                              },
+                            ],
+                          });
+                        else
+                          setT({
+                            ...t,
+                            fullscreenClips: (t.fullscreenClips ?? []).filter((c) => c.id !== AUTO_FULL_ID),
+                          });
+                      }}
+                      className="size-4 accent-[var(--primary)]"
+                    />
+                    A partir de X segundos, tudo some e o vídeo ocupa a tela toda
+                  </label>
+                  {autoFull ? (
+                    <div className="space-y-2 rounded-lg border border-primary/40 bg-background/40 p-2">
+                      <Slider
+                        label="Começa em (s)"
+                        value={autoFull.start}
+                        min={0}
+                        max={Math.max(1, Math.round(duration))}
+                        step={0.5}
+                        onChange={(v) => patchAutoFull({ start: Math.min(v, autoFull.end - 0.2) })}
+                      />
+                      <Slider
+                        label="Suavidade da transição (s)"
+                        value={autoFull.fade}
+                        min={0}
+                        max={3}
+                        step={0.1}
+                        onChange={(v) => patchAutoFull({ fade: v })}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Textos, foto e marca d&apos;água desaparecem com fade enquanto o vídeo cresce até 9:16 inteiro.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+
+              )}
             </div>
           </aside>
 
@@ -1725,7 +1794,7 @@ export function TemplateEditor({
                 style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
               >
               <TemplateCanvas
-                frameClassName="aspect-[9/16] h-full max-h-[64vh] min-h-[300px] w-auto max-w-full rounded-xl shadow-[0_24px_60px_-24px_rgba(0,0,0,0.8)]"
+                frameClassName="aspect-[9/16] h-full max-h-[58vh] min-h-[200px] w-auto max-w-full rounded-xl shadow-[0_24px_60px_-24px_rgba(0,0,0,0.8)]"
                 template={t}
                 previewFile={previewFile ?? null}
                 timelineTime={time}
@@ -1803,7 +1872,7 @@ export function TemplateEditor({
             </span>
           </button>
           {timelineOpen && (
-            <div className="max-h-[34vh] min-h-[180px] overflow-y-auto px-3 pb-3">
+            <div className="max-h-[30vh] min-h-[120px] overflow-y-auto px-3 pb-3">
               <TemplateTimeline
                 template={t}
                 onChange={setT}
