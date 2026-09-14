@@ -49,6 +49,8 @@ export function socialAccountOptionLabel(account: SocialAccount): string {
         ? "Instagram"
         : account.platform === "youtube"
           ? "YouTube"
+           : account.platform === "tiktok"
+             ? "TikTok"
           : account.platform;
   const id = account.provider_account_id ? ` · ID ${account.provider_account_id}` : "";
   return `${platform}: ${title}${id}`;
@@ -62,6 +64,7 @@ export function socialAccountDetail(account: SocialAccount): string {
   }
   if (account.platform === "facebook") return `Página do Facebook · ${id}`;
   if (account.platform === "youtube") return `Canal do YouTube · ${id}`;
+  if (account.platform === "tiktok") return `Conta do TikTok · ${id}`;
   return `${account.provider || "provedor"} · ${id}`;
 }
 

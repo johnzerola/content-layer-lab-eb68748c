@@ -47,6 +47,7 @@ export function ResultLibrary() {
   const [preparing, setPreparing] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [publishItem, setPublishItem] = useState<BulkScheduleItem | null>(null);
+  const [publishedLink, setPublishedLink] = useState<string | null>(null);
 
   useEffect(() => {
     listExports(100)
@@ -262,8 +263,23 @@ export function ResultLibrary() {
         items={publishItem ? [publishItem] : []}
         hideFilePicker
         subtitle="Publique este clipe da biblioteca na conta escolhida."
+        publishImmediately
+        onPublished={(result) => setPublishedLink(result.permalink)}
         onDone={() => setPublishItem(null)}
       />
+      {publishedLink && (
+        <div className="fixed bottom-4 right-4 z-50 flex max-w-sm items-center gap-3 border border-emerald-500/40 bg-surface p-4 shadow-lg">
+          <p className="text-sm text-foreground">Vídeo publicado com sucesso.</p>
+          <Button asChild size="sm">
+            <a href={publishedLink} target="_blank" rel="noreferrer">
+              <ExternalLink className="size-4" /> Abrir post
+            </a>
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setPublishedLink(null)}>
+            Fechar
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

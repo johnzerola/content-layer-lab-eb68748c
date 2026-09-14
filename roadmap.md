@@ -42,7 +42,7 @@
 
 ## Lançamento
 - [x] Biblioteca: botão Baixar para os vídeos guardados na conta (link temporário)
-- [x] TikTok bloqueado no agendamento com aviso "em breve"
+- [x] TikTok real na Biblioteca e Agenda via API oficial, com OAuth, renovação e link da publicação
 - [x] Tela inicial: estúdios carregam sob demanda
 - [ ] Pagamento real (Paddle ou Stripe) — adiado por decisão do usuário
 - [ ] Retenção de arquivos por plano com aviso antes de apagar

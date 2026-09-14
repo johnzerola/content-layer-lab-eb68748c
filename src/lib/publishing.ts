@@ -40,11 +40,11 @@ export const PLATFORM_CAPABILITIES: Record<SocialPlatform, PlatformCapabilities>
     canRefreshToken: false,
   },
   tiktok: {
-    canPublishReels: false,
+    canPublishReels: true,
     canPublishStories: false,
     canPublishFeed: false,
     canPublishShorts: false,
-    canRefreshToken: false,
+    canRefreshToken: true,
   },
   youtube: {
     canPublishReels: false,
