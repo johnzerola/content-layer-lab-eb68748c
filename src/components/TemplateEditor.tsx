@@ -1406,32 +1406,48 @@ export function TemplateEditor({
           </aside>
         </div>
 
-        {/* Linha do tempo em toda a largura */}
-        <div className="max-h-[38vh] shrink-0 overflow-y-auto border-t border-border bg-surface-2/40 p-3">
-          <TemplateTimeline
-            template={t}
-            onChange={setT}
-            selected={selected}
-            onSelect={setSelected}
-            time={time}
-            onSeek={(n) => {
-              setPlaying(false);
-              setTime(n);
-            }}
-            playing={playing}
-            onPlay={() => {
-              if (time >= duration) setTime(0);
-              setPlaying((p) => !p);
-            }}
-            duration={duration}
-            onDuration={(n) => {
-              setPlaying(false);
-              setMediaDuration(null);
-              setTime((v) => Math.min(v, n));
-              setT({ ...t, timelineDuration: n });
-            }}
-          />
+        {/* Linha do tempo em toda a largura (recolhível para dar espaço ao vídeo) */}
+        <div className="shrink-0 border-t border-border bg-surface-2/40">
+          <button
+            onClick={() => setTimelineOpen((v) => !v)}
+            aria-expanded={timelineOpen}
+            className="interactive flex w-full items-center justify-between gap-2 px-4 py-2 text-left"
+          >
+            <span className="studio-label">Linha do tempo</span>
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              {timelineOpen ? "Recolher" : "Expandir"}
+              {timelineOpen ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
+            </span>
+          </button>
+          {timelineOpen && (
+            <div className="max-h-[34vh] min-h-[180px] overflow-y-auto px-3 pb-3">
+              <TemplateTimeline
+                template={t}
+                onChange={setT}
+                selected={selected}
+                onSelect={setSelected}
+                time={time}
+                onSeek={(n) => {
+                  setPlaying(false);
+                  setTime(n);
+                }}
+                playing={playing}
+                onPlay={() => {
+                  if (time >= duration) setTime(0);
+                  setPlaying((p) => !p);
+                }}
+                duration={duration}
+                onDuration={(n) => {
+                  setPlaying(false);
+                  setMediaDuration(null);
+                  setTime((v) => Math.min(v, n));
+                  setT({ ...t, timelineDuration: n });
+                }}
+              />
+            </div>
+          )}
         </div>
+
 
         <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-4 py-2.5">
           <p className="truncate text-[11px] text-muted-foreground">
