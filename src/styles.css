@@ -1041,7 +1041,7 @@
 @keyframes tp-swing { 0% { opacity: 0; transform: rotate(-12deg) scale(0.9) } 65%,100% { opacity: 1; transform: rotate(0) scale(1) } }
 
 /* =========================================================
-   TELA DE ACESSO — split screen com glow e motion
+   TELA DE ACESSO — split screen com glow e motion leve
    ========================================================= */
 .auth-screen {
   box-shadow: var(--shadow-float);
@@ -1049,7 +1049,7 @@
 .auth-stage {
   isolation: isolate;
   background:
-    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--primary) 16%, transparent), transparent 60%),
+    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 55%),
     linear-gradient(160deg, var(--surface-2), var(--background));
 }
 .auth-stage > * { z-index: 1; }
@@ -1057,11 +1057,11 @@
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(to right, color-mix(in srgb, var(--border) 60%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--border) 60%, transparent) 1px, transparent 1px);
-  background-size: 52px 52px;
-  mask-image: radial-gradient(90% 70% at 20% 10%, #000, transparent 75%);
-  opacity: 0.5;
+    linear-gradient(to right, color-mix(in srgb, var(--border) 45%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--border) 45%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(90% 70% at 20% 10%, #000, transparent 80%);
+  opacity: 0.35;
   pointer-events: none;
 }
 .auth-beam {
@@ -1071,28 +1071,28 @@
   transform-origin: center;
 }
 .auth-beam-a {
-  width: 34rem;
-  height: 9rem;
-  top: 8%;
-  left: -48%;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--primary) 28%, transparent), transparent);
-  filter: blur(26px);
-  transform: rotate(-24deg);
-  animation: vv-auth-beam 9s ease-in-out infinite alternate;
+  width: 30rem;
+  height: 7rem;
+  top: 10%;
+  left: -40%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--primary) 18%, transparent), transparent);
+  filter: blur(34px);
+  transform: rotate(-22deg);
+  animation: vv-auth-beam 12s ease-in-out infinite alternate;
 }
 .auth-beam-b {
-  width: 28rem;
-  height: 7rem;
-  right: -42%;
-  bottom: 10%;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 22%, transparent), transparent);
-  filter: blur(28px);
-  transform: rotate(32deg);
-  animation: vv-auth-beam 12s ease-in-out -3s infinite alternate-reverse;
+  width: 24rem;
+  height: 6rem;
+  right: -36%;
+  bottom: 12%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 14%, transparent), transparent);
+  filter: blur(36px);
+  transform: rotate(28deg);
+  animation: vv-auth-beam 16s ease-in-out -4s infinite alternate-reverse;
 }
 @keyframes vv-auth-beam {
-  from { translate: -1.5rem -0.5rem; opacity: 0.45; }
-  to { translate: 3rem 1.5rem; opacity: 0.9; }
+  from { translate: -1rem -0.3rem; opacity: 0.35; }
+  to { translate: 2rem 1rem; opacity: 0.65; }
 }
 .auth-floaters {
   position: absolute;
@@ -1103,60 +1103,58 @@
 .auth-floater {
   position: absolute;
   display: grid;
-  width: 2rem;
-  height: 2rem;
+  width: 1.75rem;
+  height: 1.75rem;
   place-items: center;
-  border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--border));
-  border-radius: 0.65rem;
-  color: color-mix(in srgb, var(--primary) 62%, var(--muted-foreground));
-  background: color-mix(in srgb, var(--surface-2) 72%, transparent);
-  box-shadow: 0 10px 32px color-mix(in srgb, var(--primary) 12%, transparent);
-  opacity: 0.52;
-  animation: vv-auth-icon 7s ease-in-out infinite;
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+  border-radius: 0.55rem;
+  color: color-mix(in srgb, var(--primary) 50%, var(--muted-foreground));
+  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--primary) 8%, transparent);
+  opacity: 0.38;
+  animation: vv-auth-icon 10s ease-in-out infinite;
 }
-.auth-floater svg { width: 0.9rem; height: 0.9rem; }
-.auth-floater-play { top: 14%; right: 12%; animation-delay: -1s; }
-.auth-floater-heart { top: 44%; right: 8%; animation-delay: -4s; }
-.auth-floater-send { bottom: 10%; left: 13%; animation-delay: -2s; }
-.auth-floater-caption { top: 38%; left: 7%; animation-delay: -5.5s; }
-.auth-floater-trend { bottom: 27%; right: 21%; animation-delay: -3s; }
+.auth-floater svg { width: 0.8rem; height: 0.8rem; }
+.auth-floater-play { top: 16%; right: 14%; animation-delay: -1s; }
+.auth-floater-heart { top: 46%; right: 10%; animation-delay: -5s; }
+.auth-floater-send { bottom: 14%; left: 12%; animation-delay: -3s; }
 @keyframes vv-auth-icon {
-  0%, 100% { transform: translateY(0) rotate(-3deg); opacity: 0.32; }
-  50% { transform: translateY(-14px) rotate(4deg); opacity: 0.72; }
+  0%, 100% { transform: translateY(0) rotate(-2deg); opacity: 0.28; }
+  50% { transform: translateY(-10px) rotate(2deg); opacity: 0.55; }
 }
 .auth-live {
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 60%, transparent);
-  animation: vv-auth-live 2.2s ease-out infinite;
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 40%, transparent);
+  animation: vv-auth-live 3.2s ease-out infinite;
 }
 @keyframes vv-auth-live {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 55%, transparent); }
-  70% { box-shadow: 0 0 0 7px transparent; }
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 40%, transparent); }
+  70% { box-shadow: 0 0 0 5px transparent; }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 .auth-shine {
   background-image: linear-gradient(
     100deg,
-    var(--foreground) 35%,
-    color-mix(in srgb, var(--primary-glow) 85%, white) 50%,
-    var(--foreground) 65%
+    var(--foreground) 40%,
+    color-mix(in srgb, var(--primary-glow) 70%, white) 52%,
+    var(--foreground) 64%
   );
-  background-size: 220% 100%;
+  background-size: 260% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: vv-auth-shine 6s linear infinite;
+  animation: vv-auth-shine 10s linear infinite;
 }
 @keyframes vv-auth-shine {
-  from { background-position: 180% 0; }
-  to { background-position: -80% 0; }
+  from { background-position: 200% 0; }
+  to { background-position: -60% 0; }
 }
 .auth-card {
   animation: vv-rise var(--dur-panel, 240ms) var(--ease-out-expo, cubic-bezier(0.2, 0.8, 0.2, 1)) both;
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 5%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent);
 }
 .auth-logo {
   background-image: var(--gradient-primary);
-  box-shadow: 0 10px 30px -12px var(--primary-glow), 0 0 0 1px color-mix(in srgb, var(--primary) 35%, transparent);
+  box-shadow: 0 8px 24px -10px var(--primary-glow), 0 0 0 1px color-mix(in srgb, var(--primary) 25%, transparent);
 }
 .auth-field {
   transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
@@ -1166,45 +1164,45 @@
 }
 .auth-field:focus {
   border-color: color-mix(in srgb, var(--primary) 70%, transparent);
-  box-shadow: 0 0 0 4px var(--primary-subtle);
+  box-shadow: 0 0 0 3px var(--primary-subtle);
 }
 .auth-cta {
   position: relative;
   overflow: hidden;
-  box-shadow: 0 14px 34px -16px var(--primary-glow);
+  box-shadow: 0 10px 26px -14px var(--primary-glow);
   transition: transform 160ms var(--ease-out-expo, cubic-bezier(0.2, 0.8, 0.2, 1)), box-shadow 200ms ease;
 }
 .auth-cta:not(:disabled):hover {
   transform: translateY(-1px);
-  box-shadow: 0 18px 44px -14px var(--primary-glow);
+  box-shadow: 0 14px 34px -12px var(--primary-glow);
 }
 .auth-cta:not(:disabled)::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, transparent 35%, rgba(255, 255, 255, 0.28) 50%, transparent 65%);
+  background: linear-gradient(100deg, transparent 40%, rgba(255, 255, 255, 0.18) 50%, transparent 60%);
   transform: translateX(-120%);
-  animation: vv-auth-sweep 3.6s ease-in-out infinite;
+  animation: vv-auth-sweep 5.5s ease-in-out infinite;
   pointer-events: none;
 }
 @keyframes vv-auth-sweep {
-  0%, 60% { transform: translateX(-120%); }
+  0%, 70% { transform: translateX(-120%); }
   100% { transform: translateX(120%); }
 }
 /* Entrada suave da tela inteira (evita "abrir de uma vez") */
 .auth-enter {
-  animation: vv-auth-enter 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: vv-auth-enter 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 @keyframes vv-auth-enter {
-  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  from { opacity: 0; transform: translateY(10px) scale(0.99); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 /* Transição suave ao trocar Entrar <-> Criar conta */
 .auth-swap {
-  animation: vv-auth-swap 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: vv-auth-swap 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 @keyframes vv-auth-swap {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 @media (prefers-reduced-motion: reduce) {
