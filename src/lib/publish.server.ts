@@ -62,6 +62,24 @@ function nestedString(value: unknown, path: string[]): string | undefined {
   return typeof current === "string" ? current : undefined;
 }
 
+/**
+ * Erros HTTP 400 do Meta que são temporários (instabilidade, limite ou bloqueio
+ * temporário da conta) e por isso merecem nova tentativa em vez de falha final.
+ */
+const META_TRANSIENT_CODES = new Set([1, 2, 4, 17, 32, 341, 613]);
+/** Bloqueio temporário de segurança da conta — dura horas ou dias. */
+const META_TEMPORARY_BLOCK = 368;
+
+function metaError(payload: unknown): { code: number | null; message: string | null } {
+  const error = asObject(asObject(payload)?.["error"]);
+  const raw = error?.["code"];
+  const message = error?.["message"];
+  return {
+    code: typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) || null : null,
+    message: typeof message === "string" ? message : null,
+  };
+}
+
 function providerFailure(provider: string, status: number, payload: unknown): PublishResult {
   const detail = JSON.stringify(payload)?.slice(0, 300) ?? "resposta invalida";
   if (status === 401 || status === 403) {
@@ -73,8 +91,28 @@ function providerFailure(provider: string, status: number, payload: unknown): Pu
   if (status >= 500) {
     return { ok: false, code: "PROVIDER_TEMPORARY_ERROR", retryable: true, error: `${provider} [${status}]: ${detail}` };
   }
-  return { ok: false, code: "PROVIDER_PERMANENT_ERROR", retryable: false, error: `${provider} [${status}]: ${detail}` };
+  const meta = metaError(payload);
+  if (meta.code === META_TEMPORARY_BLOCK) {
+    return {
+      ok: false,
+      code: "ACCOUNT_NOT_CONNECTED",
+      retryable: false,
+      error:
+        `${provider}: a conta no Facebook/Instagram está temporariamente bloqueada pelo Meta por motivos de segurança. ` +
+        `Acesse a conta no Facebook, resolva o aviso de segurança e reagende a publicação.`,
+    };
+  }
+  if (meta.code !== null && META_TRANSIENT_CODES.has(meta.code)) {
+    return {
+      ok: false,
+      code: "PROVIDER_TEMPORARY_ERROR",
+      retryable: true,
+      error: `${provider} [${meta.code}]: ${meta.message ?? detail}`,
+    };
+  }
+  return { ok: false, code: "PROVIDER_PERMANENT_ERROR", retryable: false, error: `${provider} [${status}]: ${meta.message ?? detail}` };
 }
+
 
 function youtubePrivacyStatus(): "private" | "public" | "unlisted" {
   const configured = process.env["YOUTUBE_PRIVACY_STATUS"]?.trim();
