@@ -261,6 +261,85 @@ const LAYER_ICON: Record<string, React.ReactNode> = {
   captions: <TypeIcon className="size-4" />,
 };
 
+const TEXT_COLORS = ["#ffffff", "#0a0a0a", "#ffd60a", "#7c5cff", "#21d4d8", "#ff4d6d", "#4ade80"];
+
+type StylePreset = {
+  id: string;
+  label: string;
+  hint: string;
+  font: string;
+  color: string;
+  weight: TextLayer["weight"];
+  bgGradient: NonNullable<Template["bgGradient"]>;
+  edgeFx: NonNullable<Template["edgeFx"]>;
+};
+
+const STYLE_PRESETS: StylePreset[] = [
+  {
+    id: "noite",
+    label: "Cinema",
+    hint: "escuro e dramático",
+    font: "Sora",
+    color: "#ffffff",
+    weight: "800",
+    bgGradient: { kind: "linear", from: "#0b0f1a", to: "#1b2435", angle: 160 },
+    edgeFx: { kind: "vignette", color: "#000000", strength: 0.55, size: 32 },
+  },
+  {
+    id: "viral",
+    label: "Viral",
+    hint: "violeta vibrante",
+    font: "Manrope",
+    color: "#ffffff",
+    weight: "800",
+    bgGradient: { kind: "linear", from: "#2b0a4d", to: "#7c5cff", angle: 140 },
+    edgeFx: { kind: "both", color: "#12061f", strength: 0.5, size: 26 },
+  },
+  {
+    id: "clean",
+    label: "Clean",
+    hint: "claro e minimalista",
+    font: "Manrope",
+    color: "#0a0a0a",
+    weight: "700",
+    bgGradient: { kind: "linear", from: "#ffffff", to: "#e8ecf1", angle: 180 },
+    edgeFx: { kind: "frame", color: "#c8ced8", strength: 0.4, size: 18 },
+  },
+  {
+    id: "neon",
+    label: "Neon",
+    hint: "alto contraste",
+    font: "Sora",
+    color: "#21d4d8",
+    weight: "800",
+    bgGradient: { kind: "radial", from: "#0d1b2a", to: "#03060b", angle: 90 },
+    edgeFx: { kind: "vignette", color: "#000000", strength: 0.7, size: 38 },
+  },
+];
+
+function mapTexts(t: Template, fn: (l: TextLayer) => TextLayer): Template {
+  return {
+    ...t,
+    name_: fn(t.name_),
+    handle: fn(t.handle),
+    headline: fn(t.headline),
+    cta: fn(t.cta),
+    extras: (t.extras ?? []).map((e) =>
+      e.kind === "text" ? ({ ...(fn(e as unknown as TextLayer) as unknown as object), kind: "text" } as typeof e) : e,
+    ),
+  };
+}
+
+function applyStylePreset(t: Template, p: StylePreset): Template {
+  const next = mapTexts(t, (l) => ({ ...l, font: p.font, color: p.color, weight: p.weight }));
+  return {
+    ...next,
+    bgGradient: { ...p.bgGradient },
+    edgeFx: { ...p.edgeFx },
+    captions: next.captions ? { ...next.captions, font: p.font, weight: p.weight } : next.captions,
+  };
+}
+
 export function TemplateEditor({
   value,
   onCancel,
