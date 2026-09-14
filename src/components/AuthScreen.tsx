@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowRight,
-  Captions,
   Check,
   Eye,
   EyeOff,
@@ -10,7 +9,6 @@ import {
   Play,
   Send,
   Sparkles,
-  TrendingUp,
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
