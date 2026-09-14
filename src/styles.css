@@ -1132,11 +1132,11 @@
   display: inline-block;
   min-width: 4.5ch;
   font-variant-numeric: tabular-nums;
-  animation: vv-auth-counter-rise 3.15s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: vv-auth-counter-rise 5.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 @keyframes vv-auth-counter-rise {
-  0%, 16% { transform: translateY(0.32em); opacity: 0.45; filter: brightness(0.82); }
-  72% { transform: translateY(-0.04em); opacity: 1; filter: brightness(1.18); }
+  0%, 20% { transform: translateY(0.32em); opacity: 0.45; filter: brightness(0.82); }
+  74% { transform: translateY(-0.04em); opacity: 1; filter: brightness(1.24); text-shadow: 0 0 18px var(--primary-glow); }
   100% { transform: translateY(0); opacity: 1; filter: brightness(1); }
 }
 .auth-social-instagram { color: color-mix(in srgb, var(--accent) 75%, var(--foreground)); }

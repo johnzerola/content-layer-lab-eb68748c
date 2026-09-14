@@ -45,12 +45,12 @@ function AnimatedNumber({ value, suffix, delay = 0 }: { value: number; suffix: s
       return;
     }
 
-    const duration = value >= 100 ? 2600 : 2200;
+    const duration = value >= 100 ? 4200 : 3600;
     const startedAt = performance.now() + delay;
     let frame = 0;
     const tick = (now: number) => {
       const progress = Math.max(0, Math.min(1, (now - startedAt) / duration));
-      const eased = 1 - Math.pow(1 - progress, 4);
+      const eased = progress < 0.08 ? 0 : 1 - Math.pow(1 - (progress - 0.08) / 0.92, 3);
       setDisplay(value * eased);
       if (progress < 1) frame = requestAnimationFrame(tick);
     };
@@ -171,7 +171,7 @@ export function AuthScreen({
                   h.tone === "primary" ? "text-gradient" : "text-foreground"
                 }`}
               >
-                <AnimatedNumber value={h.value} suffix={h.suffix} delay={520 + i * 220} />
+                <AnimatedNumber value={h.value} suffix={h.suffix} delay={1100 + i * 280} />
               </p>
               <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{h.label}</p>
             </div>
