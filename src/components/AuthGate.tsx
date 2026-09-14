@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { currentUser, onAuth, resetPassword, signIn, signUp, type CloudUser } from "@/lib/cloud";
 import { toast } from "sonner";
+import { AuthScreen } from "@/components/AuthScreen";
 
 
 /**
