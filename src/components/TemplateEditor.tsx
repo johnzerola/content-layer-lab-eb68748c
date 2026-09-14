@@ -44,6 +44,9 @@ import {
 } from "@/lib/template";
 import { BUILTIN_FONTS, fileToFont, registerFonts } from "@/lib/fonts";
 import { defaultAntiDup, makeVariation, describeVariation } from "@/lib/variation";
+
+/** Identificador do trecho automático "tudo some e o vídeo vai para tela cheia". */
+const AUTO_FULL_ID = "auto-fullscreen";
 import { TemplateTimeline } from "./TemplateTimeline";
 import { uploadFileOrInline } from "@/lib/media-store";
 import { useMediaUrl } from "@/hooks/useMediaUrl";
