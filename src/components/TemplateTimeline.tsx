@@ -31,6 +31,14 @@ export function TemplateTimeline({ template: t, onChange, selected, onSelect, ti
   const layer = selected ? layerOf(t, selected) as BoxLayer | null : null;
   const full = t.fullscreenClips?.find(c => c.id === fullId);
   const changeLayer = (patch: Partial<BoxLayer>) => selected && onChange(patchLayer(t, selected, patch));
+  const videoKeys = [...(t.videoKeyframes ?? [])].sort((a, b) => a.t - b.t);
+  const addVideoKey = () => onChange({
+    ...t,
+    videoKeyframes: [
+      ...videoKeys.filter(k => Math.abs(k.t - time) > 0.05),
+      { id: crypto.randomUUID(), t: Number(time.toFixed(2)), x: t.video.x, y: t.video.y, w: t.video.w, h: t.video.h, radius: t.video.radius },
+    ].sort((a, b) => a.t - b.t),
+  });
   const changeFull = (patch: Partial<NonNullable<Template['fullscreenClips']>[number]>) => onChange({ ...t, fullscreenClips: (t.fullscreenClips ?? []).map(c => c.id === fullId ? { ...c, ...patch } : c) });
   const addText = (split: boolean) => {
     const base = layer && 'text' in layer ? layer as TextLayer : t.headline;
