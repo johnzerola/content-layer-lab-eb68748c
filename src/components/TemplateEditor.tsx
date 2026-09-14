@@ -18,6 +18,7 @@ import {
   Type as TypeIcon,
   Image as ImageIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { TemplateCanvas, LAYER_ORDER, LAYER_LABELS, layerOf, selectableIds } from "./TemplateCanvas";
 import {
@@ -292,6 +293,10 @@ export function TemplateEditor({
   const [selected, setSelected] = useState<SelId | null>("headline");
   const [tab, setTab] = useState<"layers" | "design" | "effects">("layers");
   const [snap, setSnap] = useState(true);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const [dropping, setDropping] = useState(false);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+
   const [debug, setDebug] = useState(false);
   const [debugGrid, setDebugGrid] = useState(3);
   const [debugSafe, setDebugSafe] = useState(true);
