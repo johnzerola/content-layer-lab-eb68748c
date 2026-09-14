@@ -64,7 +64,8 @@ export function TemplateTimeline({ template: t, onChange, selected, onSelect, ti
       <span className="font-mono text-xs">{time.toFixed(1)} / {duration.toFixed(1)} s</span>
       <button className="btn-ghost text-xs" onClick={() => addText(false)}><Plus size={14} /> Frase</button>
       <button className="btn-ghost text-xs" disabled={!layer || !('text' in layer) || time <= (layer.tStart ?? 0) || time >= (layer.tEnd ?? duration)} onClick={() => addText(true)}><Scissors size={14} /> Dividir frase</button>
-      <button className="btn-ghost text-xs" onClick={() => { const id = crypto.randomUUID(); onChange({ ...t, fullscreenClips: [...(t.fullscreenClips ?? []), { id, start: Math.min(time, duration - 0.1), end: duration, fade: 0.5 }] }); setFullId(id); }}><Maximize size={14} /> Tela cheia</button>
+      <button className="btn-ghost text-xs" title="A partir deste segundo tudo some em fade e o vídeo cresce sozinho até 9:16 inteiro" onClick={() => { const id = crypto.randomUUID(); onChange({ ...t, fullscreenClips: [...(t.fullscreenClips ?? []), { id, start: Math.min(time, Math.max(0, duration - 1)), end: duration, fade: 1.5 }] }); setFullId(id); }}><Maximize size={14} /> Sumir tudo e expandir</button>
+      <button className="btn-ghost text-xs" title="Grava tamanho e posição atuais do vídeo neste segundo" onClick={addVideoKey}><Diamond size={14} /> Keyframe</button>
       <label className="ml-auto text-xs">Zoom <select aria-label="Zoom da timeline" value={zoom} onChange={e => setZoom(Number(e.target.value))} className="field w-16"><option value={1}>1×</option><option value={2}>2×</option><option value={4}>4×</option></select></label>
     </div>
     <div className="max-h-64 overflow-auto rounded-lg border border-border">
