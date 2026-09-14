@@ -45,12 +45,12 @@ function AnimatedNumber({ value, suffix, delay = 0 }: { value: number; suffix: s
       return;
     }
 
-    const duration = 1450;
+    const duration = value >= 100 ? 2600 : 2200;
     const startedAt = performance.now() + delay;
     let frame = 0;
     const tick = (now: number) => {
       const progress = Math.max(0, Math.min(1, (now - startedAt) / duration));
-      const eased = 1 - Math.pow(1 - progress, 3);
+      const eased = 1 - Math.pow(1 - progress, 4);
       setDisplay(value * eased);
       if (progress < 1) frame = requestAnimationFrame(tick);
     };
@@ -59,7 +59,7 @@ function AnimatedNumber({ value, suffix, delay = 0 }: { value: number; suffix: s
   }, [delay, value]);
 
   const formatted = value % 1 === 0 ? Math.round(display).toString() : display.toFixed(1).replace(".", ",");
-  return <>{formatted}{suffix}</>;
+  return <span className="auth-counter" aria-label={`${value.toString().replace(".", ",")}${suffix}`}>{formatted}{suffix}</span>;
 }
 
 /**
@@ -171,7 +171,7 @@ export function AuthScreen({
                   h.tone === "primary" ? "text-gradient" : "text-foreground"
                 }`}
               >
-                <AnimatedNumber value={h.value} suffix={h.suffix} delay={180 + i * 160} />
+                <AnimatedNumber value={h.value} suffix={h.suffix} delay={520 + i * 220} />
               </p>
               <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{h.label}</p>
             </div>
