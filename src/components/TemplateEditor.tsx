@@ -1152,10 +1152,26 @@ export function TemplateEditor({
                         Nenhuma ainda — use os botões acima para adicionar texto ou imagem.
                       </p>
                     )}
-                    {(t.extras ?? []).map((e) => {
+                    {(t.extras ?? []).map((e, idx) => {
                       const active = selected === `extra:${e.id}`;
                       return (
-                        <div key={e.id} className={`studio-item ${active ? "studio-item-active" : ""}`}>
+                        <div
+                          key={e.id}
+                          draggable
+                          onDragStart={() => setDragIdx(idx)}
+                          onDragEnd={() => setDragIdx(null)}
+                          onDragOver={(ev) => ev.preventDefault()}
+                          onDrop={(ev) => {
+                            ev.preventDefault();
+                            if (dragIdx !== null) moveExtra(dragIdx, idx);
+                            setDragIdx(null);
+                          }}
+                          title="Arraste para mudar a ordem das camadas"
+                          className={`studio-item cursor-grab active:cursor-grabbing ${active ? "studio-item-active" : ""} ${
+                            dragIdx === idx ? "opacity-50" : ""
+                          }`}
+                        >
+
                           <button
                             onClick={() => patchExtra(e.id, { visible: !e.visible })}
                             className="text-muted-foreground hover:text-foreground"
