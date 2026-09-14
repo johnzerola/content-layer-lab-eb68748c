@@ -19,6 +19,7 @@ import {
   Sparkles,
   Type as TypeIcon,
   Image as ImageIcon,
+  Brush,
   ZoomIn,
   ZoomOut,
   Maximize2,
@@ -35,6 +36,7 @@ import {
   type LayerId,
   type SelId,
   type Template,
+  type ExtraLayer,
   type TextLayer,
   type EdgeFxKind,
   GRADIENT_PRESETS,
@@ -260,6 +262,85 @@ const LAYER_ICON: Record<string, React.ReactNode> = {
   captions: <TypeIcon className="size-4" />,
 };
 
+const TEXT_COLORS = ["#ffffff", "#0a0a0a", "#ffd60a", "#7c5cff", "#21d4d8", "#ff4d6d", "#4ade80"];
+
+type StylePreset = {
+  id: string;
+  label: string;
+  hint: string;
+  font: string;
+  color: string;
+  weight: TextLayer["weight"];
+  bgGradient: NonNullable<Template["bgGradient"]>;
+  edgeFx: NonNullable<Template["edgeFx"]>;
+};
+
+const STYLE_PRESETS: StylePreset[] = [
+  {
+    id: "noite",
+    label: "Cinema",
+    hint: "escuro e dramático",
+    font: "Sora",
+    color: "#ffffff",
+    weight: "800",
+    bgGradient: { kind: "linear", from: "#0b0f1a", to: "#1b2435", angle: 160 },
+    edgeFx: { kind: "vignette", color: "#000000", strength: 0.55, size: 32 },
+  },
+  {
+    id: "viral",
+    label: "Viral",
+    hint: "violeta vibrante",
+    font: "Manrope",
+    color: "#ffffff",
+    weight: "800",
+    bgGradient: { kind: "linear", from: "#2b0a4d", to: "#7c5cff", angle: 140 },
+    edgeFx: { kind: "both", color: "#12061f", strength: 0.5, size: 26 },
+  },
+  {
+    id: "clean",
+    label: "Clean",
+    hint: "claro e minimalista",
+    font: "Manrope",
+    color: "#0a0a0a",
+    weight: "700",
+    bgGradient: { kind: "linear", from: "#ffffff", to: "#e8ecf1", angle: 180 },
+    edgeFx: { kind: "frame", color: "#c8ced8", strength: 0.4, size: 18 },
+  },
+  {
+    id: "neon",
+    label: "Neon",
+    hint: "alto contraste",
+    font: "Sora",
+    color: "#21d4d8",
+    weight: "800",
+    bgGradient: { kind: "radial", from: "#0d1b2a", to: "#03060b", angle: 90 },
+    edgeFx: { kind: "vignette", color: "#000000", strength: 0.7, size: 38 },
+  },
+];
+
+function mapTexts(t: Template, fn: (l: TextLayer) => TextLayer): Template {
+  return {
+    ...t,
+    name_: fn(t.name_),
+    handle: fn(t.handle),
+    headline: fn(t.headline),
+    cta: fn(t.cta),
+    extras: (t.extras ?? []).map((e) =>
+      "text" in e ? ({ ...e, ...fn(e as unknown as TextLayer) } as ExtraLayer) : e,
+    ),
+  };
+}
+
+function applyStylePreset(t: Template, p: StylePreset): Template {
+  const next = mapTexts(t, (l) => ({ ...l, font: p.font, color: p.color, weight: p.weight }));
+  return {
+    ...next,
+    bgGradient: { ...p.bgGradient },
+    edgeFx: { ...p.edgeFx },
+    ...(next.captions ? { captions: { ...next.captions, font: p.font, weight: p.weight } } : {}),
+  };
+}
+
 export function TemplateEditor({
   value,
   onCancel,
@@ -299,7 +380,7 @@ export function TemplateEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, duration]);
   const [selected, setSelected] = useState<SelId | null>("headline");
-  const [tab, setTab] = useState<"layers" | "design" | "effects">("layers");
+  const [tab, setTab] = useState<"layers" | "design" | "style" | "effects">("layers");
   const [snap, setSnap] = useState(true);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [dropping, setDropping] = useState(false);
@@ -1082,6 +1163,7 @@ export function TemplateEditor({
               {[
                 { id: "layers" as const, label: "Camadas", icon: <Layers className="size-3.5" /> },
                 { id: "design" as const, label: "Design", icon: <Palette className="size-3.5" /> },
+                { id: "style" as const, label: "Estilo", icon: <Brush className="size-3.5" /> },
                 { id: "effects" as const, label: "Efeitos", icon: <Sparkles className="size-3.5" /> },
               ].map((item) => (
                 <button
@@ -1240,6 +1322,160 @@ export function TemplateEditor({
                   </Field>
 
                   <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
+                    <p className="studio-label">Fontes próprias</p>
+                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:border-primary">
+                      <Upload className="size-3.5" /> Enviar .ttf / .otf / .woff
+                      <input
+                        type="file"
+                        accept=".ttf,.otf,.woff,.woff2,font/*"
+                        hidden
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0];
+                          if (f) await uploadFont(f);
+                        }}
+                      />
+                    </label>
+                    {(t.fonts ?? []).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {(t.fonts ?? []).map((f) => (
+                          <span
+                            key={f.name}
+                            className="flex items-center gap-1 rounded-full border border-border px-2 py-1 text-[11px]"
+                          >
+                            {f.name}
+                            <button
+                              onClick={() => setT({ ...t, fonts: (t.fonts ?? []).filter((x) => x.name !== f.name) })}
+                              className="text-destructive"
+                              aria-label={`Remover fonte ${f.name}`}
+                            >
+                              <X className="size-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {tab === "style" && (
+                <>
+                  <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
+                    <p className="studio-label">Predefinições de estilo</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {STYLE_PRESETS.map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => setT(applyStylePreset(t, p))}
+                          className="rounded-lg border border-border p-2 text-left transition hover:border-primary"
+                        >
+                          <span
+                            className="mb-1 block h-8 rounded"
+                            style={{
+                              background: `linear-gradient(${p.bgGradient.angle}deg, ${p.bgGradient.from}, ${p.bgGradient.to})`,
+                            }}
+                          />
+                          <span className="block text-xs font-semibold" style={{ fontFamily: p.font, color: p.color }}>
+                            {p.label}
+                          </span>
+                          <span className="block text-[10px] text-muted-foreground">{p.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
+                    <p className="studio-label">Tipografia de todos os textos</p>
+                    <select
+                      value={t.headline.font}
+                      onChange={(e) => setT(mapTexts(t, (l) => ({ ...l, font: e.target.value })))}
+                      className="w-full rounded-lg border border-border bg-background px-2 py-2 text-sm"
+                      aria-label="Fonte de todos os textos"
+                    >
+                      {fonts.map((f) => (
+                        <option key={f} value={f}>
+                          {f}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex gap-2">
+                      <select
+                        value={t.headline.weight}
+                        onChange={(e) =>
+                          setT(mapTexts(t, (l) => ({ ...l, weight: e.target.value as TextLayer["weight"] })))
+                        }
+                        className="flex-1 rounded-lg border border-border bg-background px-2 py-2 text-sm"
+                        aria-label="Peso de todos os textos"
+                      >
+                        <option value="400">Regular</option>
+                        <option value="600">Semibold</option>
+                        <option value="700">Bold</option>
+                        <option value="800">Black</option>
+                      </select>
+                      <select
+                        value={t.headline.align}
+                        onChange={(e) =>
+                          setT(mapTexts(t, (l) => ({ ...l, align: e.target.value as TextLayer["align"] })))
+                        }
+                        className="flex-1 rounded-lg border border-border bg-background px-2 py-2 text-sm"
+                        aria-label="Alinhamento de todos os textos"
+                      >
+                        <option value="left">Esquerda</option>
+                        <option value="center">Centro</option>
+                        <option value="right">Direita</option>
+                      </select>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        ["Menor", 0.9],
+                        ["Padrão", 1],
+                        ["Maior", 1.15],
+                        ["Bem maior", 1.3],
+                      ].map(([label, f]) => (
+                        <button
+                          key={label as string}
+                          onClick={() =>
+                            setT(
+                              mapTexts(t, (l) => ({
+                                ...l,
+                                size: Math.max(14, Math.round(l.size * (f as number))),
+                              })),
+                            )
+                          }
+                          className="rounded-full border border-border px-3 py-1 text-xs hover:border-primary"
+                        >
+                          {label as string}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
+                    <p className="studio-label">Cor dos textos</p>
+                    <div className="flex flex-wrap gap-2">
+                      {TEXT_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          onClick={() => setT(mapTexts(t, (l) => ({ ...l, color: c })))}
+                          className="size-8 rounded-lg border-2 border-border hover:border-primary"
+                          style={{ background: c }}
+                          aria-label={`Cor dos textos ${c}`}
+                        />
+                      ))}
+                      <input
+                        type="color"
+                        value={t.headline.color}
+                        onChange={(e) => setT(mapTexts(t, (l) => ({ ...l, color: e.target.value })))}
+                        className="size-8 rounded-lg border border-border bg-transparent"
+                        aria-label="Cor personalizada dos textos"
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Aplica em todos os textos de uma vez. Para mudar só um, selecione a camada no vídeo.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
                     <p className="studio-label">Fundo em gradiente</p>
                     <div className="grid grid-cols-3 gap-2">
                       {GRADIENT_PRESETS.map((g) => (
@@ -1377,41 +1613,6 @@ export function TemplateEditor({
                         />
                       </div>
                     ) : null}
-                  </div>
-
-                  <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
-                    <p className="studio-label">Fontes próprias</p>
-                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:border-primary">
-                      <Upload className="size-3.5" /> Enviar .ttf / .otf / .woff
-                      <input
-                        type="file"
-                        accept=".ttf,.otf,.woff,.woff2,font/*"
-                        hidden
-                        onChange={async (e) => {
-                          const f = e.target.files?.[0];
-                          if (f) await uploadFont(f);
-                        }}
-                      />
-                    </label>
-                    {(t.fonts ?? []).length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {(t.fonts ?? []).map((f) => (
-                          <span
-                            key={f.name}
-                            className="flex items-center gap-1 rounded-full border border-border px-2 py-1 text-[11px]"
-                          >
-                            {f.name}
-                            <button
-                              onClick={() => setT({ ...t, fonts: (t.fonts ?? []).filter((x) => x.name !== f.name) })}
-                              className="text-destructive"
-                              aria-label={`Remover fonte ${f.name}`}
-                            >
-                              <X className="size-3" />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 </>
               )}
