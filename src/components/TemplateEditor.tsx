@@ -388,17 +388,34 @@ export function TemplateEditor({
       extras: (t.extras ?? []).map((e) => (e.id === extraId ? ({ ...e, ...data } as typeof e) : e)),
     });
 
-  const addExtra = (kind: "text" | "image") => {
+  const addExtra = (kind: "text" | "image", at?: { x: number; y: number }, src?: string) => {
     const extra = makeExtra(kind, (t.extras ?? []).length);
+    if (at) {
+      extra.x = Math.round(at.x - extra.w / 2);
+      extra.y = Math.round(at.y - extra.h / 2);
+    }
+    if (src && "src" in extra) (extra as ImageLayer).src = src;
     setT({ ...t, extras: [...(t.extras ?? []), extra] });
     setSelected(`extra:${extra.id}`);
     setTab("layers");
+    return extra;
   };
 
   const removeExtra = (extraId: string) => {
     setT({ ...t, extras: (t.extras ?? []).filter((e) => e.id !== extraId) });
     if (selected === `extra:${extraId}`) setSelected(null);
   };
+
+  /** reordena as camadas livres (arraste na lista) e reescreve o z de cada uma */
+  const moveExtra = (from: number, to: number) => {
+    const list = [...(t.extras ?? [])];
+    if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return;
+    const [item] = list.splice(from, 1);
+    if (!item) return;
+    list.splice(to, 0, item);
+    setT({ ...t, extras: list.map((e, i) => ({ ...e, z: 100 + i })) });
+  };
+
 
   const textLayer = (id: LayerId) => t[KEY_OF[id]] as unknown as TextLayer;
   const imgLayer = (id: LayerId) => t[KEY_OF[id]] as unknown as ImageLayer;
