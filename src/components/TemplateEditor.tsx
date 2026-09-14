@@ -1004,7 +1004,7 @@ export function TemplateEditor({
         </header>
 
         {/* Área de trabalho: ferramentas · palco · propriedades */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[276px_minmax(0,1fr)_348px] lg:overflow-hidden">
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:min-h-[440px] lg:grid-cols-[276px_minmax(0,1fr)_348px] lg:overflow-hidden">
           {/* Coluna esquerda: camadas e ajustes do template */}
           <aside className="flex min-h-0 flex-col border-border lg:border-r">
             <div className="flex gap-1 border-b border-border p-2">
