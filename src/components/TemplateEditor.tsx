@@ -388,6 +388,14 @@ export function TemplateEditor({
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [timelineOpen, setTimelineOpen] = useState(true);
 
+  /** Trecho final em que tudo some e o vídeo ocupa o 9:16 inteiro. */
+  const autoFull = (t.fullscreenClips ?? []).find((c) => c.id === AUTO_FULL_ID) ?? null;
+  const patchAutoFull = (patch: Partial<NonNullable<Template["fullscreenClips"]>[number]>) =>
+    setT({
+      ...t,
+      fullscreenClips: (t.fullscreenClips ?? []).map((c) => (c.id === AUTO_FULL_ID ? { ...c, ...patch } : c)),
+    });
+
   const [debug, setDebug] = useState(false);
   const [debugGrid, setDebugGrid] = useState(3);
   const [debugSafe, setDebugSafe] = useState(true);
