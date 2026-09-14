@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ImagePlus, Move, RotateCw } from "lucide-react";
-import { DEFAULT_CLIP_TRANSFORM, asProjectTime, findClip, projectToSourceTime, resolveCompositionFrame, type CaptionCue, type Clip, type ClipTransform, type EditorProjectV2, type ResolvedClipPresentation } from "@/lib/editor-v2";
+import { DEFAULT_CLIP_TRANSFORM, asProjectTime, findClip, projectToSourceTime, resolveCompositionFrame, sourceToProjectTime, type CaptionCue, type Clip, type ClipTransform, type EditorProjectV2, type ResolvedClipPresentation } from "@/lib/editor-v2";
 import { StickerVisualV2 } from "./StickerVisualV2";
 
 interface CanvasProps {
@@ -8,6 +8,7 @@ interface CanvasProps {
   currentTime: number;
   playing: boolean;
   assetSources: Record<string, string>;
+  onPlaybackTime: (time: number) => void;
   onSelect: (id: string | null, additive?: boolean) => void;
   onTransform: (clipId: string, transform: ClipTransform) => void;
   onDropLibraryItem: (id: string) => void;
@@ -15,11 +16,12 @@ interface CanvasProps {
 
 type Gesture = { clipId: string; mode: "move" | "resize" | "rotate"; startX: number; startY: number; initial: ClipTransform; startAngle?: number };
 
-export function EditorCanvasV2({ project, currentTime, playing, assetSources, onSelect, onTransform, onDropLibraryItem }: CanvasProps) {
+export function EditorCanvasV2({ project, currentTime, playing, assetSources, onPlaybackTime, onSelect, onTransform, onDropLibraryItem }: CanvasProps) {
   const frameRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<{ id: string; transform: ClipTransform } | null>(null);
   const resolvedLayers = useMemo(() => resolveCompositionFrame(project, currentTime), [project, currentTime]);
   const activeClips = useMemo(() => resolvedLayers.map((layer) => findClip(project, layer.clipId)).filter((clip): clip is Clip => Boolean(clip)), [project, resolvedLayers]);
+  const playbackClockClipId = activeClips.find((clip) => clip.kind === "video" && !clip.reversed && project.tracks.find((track) => track.id === clip.trackId)?.kind === "video")?.id ?? null;
   const primary = findClip(project, project.selection.primaryId);
 
   const beginGesture = (event: React.PointerEvent, clip: Clip, mode: Gesture["mode"]) => {
@@ -73,7 +75,7 @@ export function EditorCanvasV2({ project, currentTime, playing, assetSources, on
             const transition = layer.transition;
             const selected = project.selection.itemIds.includes(clip.id);
             const assetUrl = clip.assetId ? assetSources[clip.assetId] : undefined;
-            return <CanvasClip key={clip.id} clip={clip} transform={transform} transition={transition} presentation={layer.presentation} selected={selected} primary={primary?.id === clip.id} currentTime={currentTime} playing={playing} {...(layer.caption ? { caption: layer.caption } : {})} {...(assetUrl ? { assetUrl } : {})} onSelect={(additive) => onSelect(clip.id, additive)} onMove={(event) => beginGesture(event, clip, "move")} onResize={(event) => beginGesture(event, clip, "resize")} onRotate={(event) => beginGesture(event, clip, "rotate")} onKeyboardTransform={(next) => onTransform(clip.id, next)} />;
+            return <CanvasClip key={clip.id} clip={clip} transform={transform} transition={transition} presentation={layer.presentation} selected={selected} primary={primary?.id === clip.id} currentTime={currentTime} playing={playing} drivesPlaybackClock={playbackClockClipId === clip.id} onPlaybackTime={onPlaybackTime} {...(layer.caption ? { caption: layer.caption } : {})} {...(assetUrl ? { assetUrl } : {})} onSelect={(additive) => onSelect(clip.id, additive)} onMove={(event) => beginGesture(event, clip, "move")} onResize={(event) => beginGesture(event, clip, "resize")} onRotate={(event) => beginGesture(event, clip, "rotate")} onKeyboardTransform={(next) => onTransform(clip.id, next)} />;
           })}
           <div className="pointer-events-none absolute inset-[5%] border border-dashed border-white/10" aria-hidden />
           {draft && (Math.abs(draft.transform.x - 50) < 0.01 || Math.abs(draft.transform.y - 50) < 0.01) && <><span className="pointer-events-none absolute inset-y-0 left-1/2 w-px bg-primary/65" /><span className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-primary/65" /></>}
@@ -83,12 +85,12 @@ export function EditorCanvasV2({ project, currentTime, playing, assetSources, on
   );
 }
 
-function CanvasClip({ clip, transform, transition, presentation, selected, primary, currentTime, playing, assetUrl, caption, onSelect, onMove, onResize, onRotate, onKeyboardTransform }: { clip: Clip; transform: ClipTransform; transition: { opacity: number; translateX: number; scale: number }; presentation: ResolvedClipPresentation; selected: boolean; primary: boolean; currentTime: number; playing: boolean; assetUrl?: string; caption?: { cue: CaptionCue; preset: Record<string, unknown> }; onSelect: (additive: boolean) => void; onMove: (event: React.PointerEvent) => void; onResize: (event: React.PointerEvent) => void; onRotate: (event: React.PointerEvent) => void; onKeyboardTransform: (transform: ClipTransform) => void }) {
+function CanvasClip({ clip, transform, transition, presentation, selected, primary, currentTime, playing, drivesPlaybackClock, onPlaybackTime, assetUrl, caption, onSelect, onMove, onResize, onRotate, onKeyboardTransform }: { clip: Clip; transform: ClipTransform; transition: { opacity: number; translateX: number; scale: number }; presentation: ResolvedClipPresentation; selected: boolean; primary: boolean; currentTime: number; playing: boolean; drivesPlaybackClock: boolean; onPlaybackTime: (time: number) => void; assetUrl?: string; caption?: { cue: CaptionCue; preset: Record<string, unknown> }; onSelect: (additive: boolean) => void; onMove: (event: React.PointerEvent) => void; onResize: (event: React.PointerEvent) => void; onRotate: (event: React.PointerEvent) => void; onKeyboardTransform: (transform: ClipTransform) => void }) {
   const colors = Array.isArray(clip.metadata?.["colors"]) ? clip.metadata["colors"] as string[] : ["#7657ff", "#111522", "#f8f7ff"];
   const text = clip.style?.text ?? clip.name;
   return (
     <div role="button" tabIndex={0} aria-label={`${clip.name}${selected ? ", selecionado" : ""}`} onPointerDown={onMove} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(event.shiftKey); return; } const step = event.shiftKey ? 5 : 1; if (event.key === "ArrowLeft") onKeyboardTransform({ ...transform, x: transform.x - step }); else if (event.key === "ArrowRight") onKeyboardTransform({ ...transform, x: transform.x + step }); else if (event.key === "ArrowUp") onKeyboardTransform({ ...transform, y: transform.y - step }); else if (event.key === "ArrowDown") onKeyboardTransform({ ...transform, y: transform.y + step }); else return; event.preventDefault(); event.stopPropagation(); }} className="absolute touch-none select-none outline-none" style={{ left: `${transform.x}%`, top: `${transform.y}%`, width: `${transform.width}%`, height: `${transform.height}%`, opacity: transform.opacity * transition.opacity * presentation.opacity, transform: `translate(calc(-50% + ${transition.translateX + presentation.translateX}%), calc(-50% + ${presentation.translateY}%)) rotate(${transform.rotation + presentation.rotation}deg) scale(${transform.scale * transition.scale * presentation.scale})`, filter: presentation.filter, zIndex: selected ? 30 : 10 }}>
-      {assetUrl && (clip.kind === "video" || clip.kind === "image") ? <MediaVisual clip={clip} url={assetUrl} currentTime={currentTime} playing={playing} /> : caption ? <CaptionVisual clip={clip} cue={caption.cue} preset={caption.preset} currentTime={currentTime} /> : clip.kind === "sticker" && clip.sticker ? <StickerVisualV2 sticker={clip.sticker} time={Math.max(0, currentTime - Number(clip.projectStart))} /> : clip.kind === "shape" ? <div className={`${clip.metadata?.["rendererId"] === "circle" ? "h-full aspect-square rounded-full" : clip.metadata?.["rendererId"] === "line" ? "absolute left-0 right-0 top-1/2 h-1 rounded-full" : "h-full w-full rounded-xl"}`} style={{ background: `linear-gradient(135deg,${colors[0]},${colors[1] ?? "#2dd4aa"})` }} /> : <div className="flex h-full w-full items-center justify-center px-3 text-center" style={{ color: clip.style?.color, background: clip.style?.backgroundColor, borderRadius: clip.style?.borderRadius, fontFamily: clip.style?.fontFamily, fontWeight: clip.style?.fontWeight, fontSize: `clamp(10px, ${Math.max(1, (clip.style?.fontSize ?? 48) / 34)}vw, ${clip.style?.fontSize ?? 48}px)`, textAlign: clip.style?.align, textTransform: clip.style?.uppercase ? "uppercase" : undefined, letterSpacing: clip.style?.letterSpacing, lineHeight: clip.style?.lineHeight ?? 1.02, WebkitTextStroke: clip.style?.strokeWidth ? `${Math.max(.5, clip.style.strokeWidth / 5)}px ${clip.style.strokeColor ?? "#000"}` : undefined, textShadow: clip.style?.shadow ? `0 3px 12px ${clip.style?.strokeColor ?? "#000"}` : undefined }}>{text}</div>}
+      {assetUrl && (clip.kind === "video" || clip.kind === "image") ? <MediaVisual clip={clip} url={assetUrl} currentTime={currentTime} playing={playing} drivesPlaybackClock={drivesPlaybackClock} onPlaybackTime={onPlaybackTime} /> : caption ? <CaptionVisual clip={clip} cue={caption.cue} preset={caption.preset} currentTime={currentTime} /> : clip.kind === "sticker" && clip.sticker ? <StickerVisualV2 sticker={clip.sticker} time={Math.max(0, currentTime - Number(clip.projectStart))} /> : clip.kind === "shape" ? <div className={`${clip.metadata?.["rendererId"] === "circle" ? "h-full aspect-square rounded-full" : clip.metadata?.["rendererId"] === "line" ? "absolute left-0 right-0 top-1/2 h-1 rounded-full" : "h-full w-full rounded-xl"}`} style={{ background: `linear-gradient(135deg,${colors[0]},${colors[1] ?? "#2dd4aa"})` }} /> : <div className="flex h-full w-full items-center justify-center px-3 text-center" style={{ color: clip.style?.color, background: clip.style?.backgroundColor, borderRadius: clip.style?.borderRadius, fontFamily: clip.style?.fontFamily, fontWeight: clip.style?.fontWeight, fontSize: `clamp(10px, ${Math.max(1, (clip.style?.fontSize ?? 48) / 34)}vw, ${clip.style?.fontSize ?? 48}px)`, textAlign: clip.style?.align, textTransform: clip.style?.uppercase ? "uppercase" : undefined, letterSpacing: clip.style?.letterSpacing, lineHeight: clip.style?.lineHeight ?? 1.02, WebkitTextStroke: clip.style?.strokeWidth ? `${Math.max(.5, clip.style.strokeWidth / 5)}px ${clip.style.strokeColor ?? "#000"}` : undefined, textShadow: clip.style?.shadow ? `0 3px 12px ${clip.style?.strokeColor ?? "#000"}` : undefined }}>{text}</div>}
       {presentation.overlay && <div className="pointer-events-none absolute inset-0" style={{ background: presentation.overlay, opacity: presentation.overlayOpacity, mixBlendMode: presentation.overlay.startsWith("#") ? "screen" : "normal" }} />}
       {selected && <div className={`pointer-events-none absolute -inset-1 border ${primary ? "border-primary" : "border-primary/55"}`}><span className="absolute -left-1.5 -top-1.5 size-3 rounded-[3px] border border-primary bg-white" /><span className="absolute -right-1.5 -top-1.5 size-3 rounded-[3px] border border-primary bg-white" /><span className="absolute -bottom-1.5 -left-1.5 size-3 rounded-[3px] border border-primary bg-white" /></div>}
       {primary && <><button type="button" onPointerDown={onResize} onKeyDown={(event) => { const step = event.shiftKey ? 5 : 1; if (event.key === "ArrowRight") onKeyboardTransform({ ...transform, width: transform.width + step }); else if (event.key === "ArrowDown") onKeyboardTransform({ ...transform, height: transform.height + step }); else if (event.key === "ArrowLeft") onKeyboardTransform({ ...transform, width: Math.max(8, transform.width - step) }); else if (event.key === "ArrowUp") onKeyboardTransform({ ...transform, height: Math.max(6, transform.height - step) }); else return; event.preventDefault(); event.stopPropagation(); }} aria-label={`Redimensionar ${clip.name}`} className="absolute -bottom-2 -right-2 z-10 size-4 cursor-nwse-resize rounded-[4px] border border-primary bg-white shadow" /><button type="button" onPointerDown={onRotate} onKeyDown={(event) => { const step = event.shiftKey ? 15 : 1; if (event.key === "ArrowLeft") onKeyboardTransform({ ...transform, rotation: transform.rotation - step }); else if (event.key === "ArrowRight") onKeyboardTransform({ ...transform, rotation: transform.rotation + step }); else return; event.preventDefault(); event.stopPropagation(); }} aria-label={`Girar ${clip.name}`} className="absolute -top-7 left-1/2 z-10 grid size-5 -translate-x-1/2 place-items-center rounded-full bg-primary text-white focus-visible:ring-2 focus-visible:ring-white"><RotateCw className="size-3" /></button></>}
@@ -108,7 +110,7 @@ function CaptionVisual({ clip, cue, preset, currentTime }: { clip: Clip; cue: Ca
   </div>;
 }
 
-function MediaVisual({ clip, url, currentTime, playing }: { clip: Clip; url: string; currentTime: number; playing: boolean }) {
+function MediaVisual({ clip, url, currentTime, playing, drivesPlaybackClock, onPlaybackTime }: { clip: Clip; url: string; currentTime: number; playing: boolean; drivesPlaybackClock: boolean; onPlaybackTime: (time: number) => void }) {
   const ref = useRef<HTMLVideoElement>(null);
   const sourceTime = projectToSourceTime(clip, asProjectTime(currentTime)) ?? clip.sourceIn;
   const mediaTransform = `scaleX(${clip.flipHorizontal ? -1 : 1}) scaleY(${clip.flipVertical ? -1 : 1})`;
@@ -116,9 +118,33 @@ function MediaVisual({ clip, url, currentTime, playing }: { clip: Clip; url: str
     const video = ref.current;
     if (!video) return;
     video.playbackRate = Math.max(0.05, Math.min(4, clip.playbackRate));
+  }, [clip.playbackRate]);
+  useEffect(() => {
+    const video = ref.current;
+    if (!video) return;
     if (Math.abs(video.currentTime - sourceTime) > (clip.reversed ? 1 / 60 : 0.12)) video.currentTime = sourceTime;
+  }, [clip.reversed, sourceTime]);
+  useEffect(() => {
+    const video = ref.current;
+    if (!video) return;
     if (playing && !clip.reversed) void video.play().catch(() => undefined); else video.pause();
-  }, [clip.playbackRate, clip.reversed, playing, sourceTime]);
+  }, [clip.reversed, playing]);
+  useEffect(() => {
+    const video = ref.current;
+    if (!video || !playing || clip.reversed || !drivesPlaybackClock) return;
+    const report = () => {
+      const projectTime = sourceToProjectTime(clip, video.currentTime);
+      if (projectTime !== null) onPlaybackTime(Number(projectTime));
+    };
+    if (video.requestVideoFrameCallback) {
+      let handle = 0;
+      const frame = () => { report(); handle = video.requestVideoFrameCallback(frame); };
+      handle = video.requestVideoFrameCallback(frame);
+      return () => video.cancelVideoFrameCallback?.(handle);
+    }
+    video.addEventListener("timeupdate", report);
+    return () => video.removeEventListener("timeupdate", report);
+  }, [clip, drivesPlaybackClock, onPlaybackTime, playing]);
   if (clip.kind === "image") return <img src={url} alt="" draggable={false} className="pointer-events-none h-full w-full object-cover" style={{ transform: mediaTransform }} />;
   return <video ref={ref} src={url} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" style={{ transform: mediaTransform }} />;
 }

@@ -124,6 +124,7 @@ export function EditorV2Foundation() {
   const audioSeparationRef = useRef<AbortController | null>(null);
   const exportRef = useRef<AbortController | null>(null);
   const lastSelectedClipIdRef = useRef<string | null>(null);
+  const lastMediaClockAtRef = useRef(0);
 
   const installRuntimeMedia = useCallback(async (asset: MediaAsset, file: File) => {
     const objectUrl = URL.createObjectURL(file);
@@ -265,8 +266,21 @@ export function EditorV2Foundation() {
 
   const undo = useCallback(() => { setProject(busRef.current.undo()); setMessage("Ação desfeita."); }, []);
   const redo = useCallback(() => { setProject(busRef.current.redo()); setMessage("Ação refeita."); }, []);
-  const seek = useCallback((time: number) => setClock(clockRef.current.seek(Math.min(busRef.current.getState().settings.duration, time))), []);
-  const togglePlayback = useCallback(() => setClock((value) => value.playing ? clockRef.current.pause() : clockRef.current.play()), []);
+  const seek = useCallback((time: number) => {
+    lastMediaClockAtRef.current = 0;
+    setClock(clockRef.current.seek(Math.max(0, Math.min(busRef.current.getState().settings.duration, time))));
+  }, []);
+  const togglePlayback = useCallback(() => {
+    lastMediaClockAtRef.current = 0;
+    setClock(clockRef.current.getSnapshot().playing ? clockRef.current.pause() : clockRef.current.play());
+  }, []);
+  const syncPlaybackToMedia = useCallback((time: number) => {
+    const snapshot = clockRef.current.getSnapshot();
+    if (!snapshot.playing || !Number.isFinite(time)) return;
+    lastMediaClockAtRef.current = performance.now();
+    const duration = busRef.current.getState().settings.duration;
+    setClock(clockRef.current.seek(Math.max(0, Math.min(duration, time))));
+  }, []);
 
   const split = useCallback(() => {
     const state = busRef.current.getState();
@@ -718,7 +732,10 @@ export function EditorV2Foundation() {
     let previous = performance.now();
     const tick = (now: number) => {
       const duration = busRef.current.getState().settings.duration;
-      const next = clockRef.current.tick((now - previous) / 1000);
+      const mediaClockIsFresh = now - lastMediaClockAtRef.current < 180;
+      const next = mediaClockIsFresh
+        ? clockRef.current.getSnapshot()
+        : clockRef.current.tick((now - previous) / 1000);
       previous = now;
       if (Number(next.projectTime) >= duration) {
         clockRef.current.seek(0);
@@ -770,6 +787,7 @@ export function EditorV2Foundation() {
     currentTime: Number(clock.projectTime),
     playing: clock.playing,
     assetSources,
+    onPlaybackTime: syncPlaybackToMedia,
     onSelect: (id: string | null, additive?: boolean) => selectClip(id, additive, "canvas"),
     onTransform: (id: string, transform: ClipTransform) => run(new UpdateTransformAtTimeCommand(id, Number(clock.projectTime), transform, "easeInOut", String(project.revisions.document + 1)), "Posição atualizada."),
     onDropLibraryItem: (id: string) => { const item = registry.get(id); if (item) addLibraryItem(item); },
@@ -808,6 +826,7 @@ export function EditorV2Foundation() {
   const timelineProps = {
     project,
     currentTime: Number(clock.projectTime),
+    playing: clock.playing,
     zoom: timelineZoom,
     assetThumbnails,
     assetWaveforms,

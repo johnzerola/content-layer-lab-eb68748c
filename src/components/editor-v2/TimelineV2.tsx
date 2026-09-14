@@ -5,6 +5,7 @@ import { formatProjectTime, isTrackCompatible, snapProjectTime, visibleTimelineR
 interface TimelineProps {
   project: EditorProjectV2;
   currentTime: number;
+  playing: boolean;
   zoom: number;
   assetThumbnails: Record<string, string>;
   assetWaveforms: Record<string, number[]>;
@@ -29,7 +30,7 @@ const TRACK_HEIGHT = 48;
 const RULER_HEIGHT = 28;
 
 export function TimelineV2(props: TimelineProps) {
-  const { project, currentTime, zoom, assetThumbnails, assetWaveforms, onZoom, onSeek, onSelect, onMove, onTrim, onMoveKeyframe, onSplit, onAutoSplit, onDuplicate, onToggleSnap, onToggleRipple, onTrackPatch, onDropLibraryItem } = props;
+  const { project, currentTime, playing, zoom, assetThumbnails, assetWaveforms, onZoom, onSeek, onSelect, onMove, onTrim, onMoveKeyframe, onSplit, onAutoSplit, onDuplicate, onToggleSnap, onToggleRipple, onTrackPatch, onDropLibraryItem } = props;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [autoCutOpen, setAutoCutOpen] = useState(false);
@@ -49,6 +50,17 @@ export function TimelineV2(props: TimelineProps) {
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element || !playing) return;
+    const playheadX = TRACK_LABEL_WIDTH + currentTime * pxPerSecond;
+    const safeLeft = element.scrollLeft + TRACK_LABEL_WIDTH + 16;
+    const safeRight = element.scrollLeft + element.clientWidth - 72;
+    if (playheadX < safeLeft || playheadX > safeRight) {
+      element.scrollTo({ left: Math.max(0, playheadX - element.clientWidth * 0.32), behavior: "auto" });
+    }
+  }, [currentTime, playing, pxPerSecond]);
 
   const timeFromPointer = (clientX: number) => {
     const rect = scrollRef.current?.getBoundingClientRect();
