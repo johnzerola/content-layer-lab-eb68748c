@@ -64,11 +64,18 @@ export async function listEditorProjects(limit = 30): Promise<EditorProjectSumma
   });
 }
 
-/** Renomeia sem reescrever o documento inteiro. */
+/** Renomeia a linha e o título dentro do documento, para o editor não voltar ao nome antigo. */
 export async function renameEditorProject(id: string, name: string): Promise<void> {
-  const { error } = await supabase.from("projects").update({ name } as never).eq("id", id);
+  const { data, error: readError } = await supabase.from("projects").select("data").eq("id", id).maybeSingle();
+  if (readError) throw readError;
+  const doc = ((data as { data?: unknown } | null)?.data ?? {}) as Record<string, unknown>;
+  const { error } = await supabase
+    .from("projects")
+    .update({ name, data: { ...doc, title: name } as unknown as Json } as never)
+    .eq("id", id);
   if (error) throw error;
 }
+
 
 export async function createEditorProjectRecord(
   doc: EditorProjectDoc,

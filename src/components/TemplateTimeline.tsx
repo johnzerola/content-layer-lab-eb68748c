@@ -32,7 +32,7 @@ export function TemplateTimeline({ template: t, onChange, selected, onSelect, ti
   const full = t.fullscreenClips?.find(c => c.id === fullId);
   const changeLayer = (patch: Partial<BoxLayer>) => selected && onChange(patchLayer(t, selected, patch));
   const videoKeys = [...(t.videoKeyframes ?? [])].sort((a, b) => a.t - b.t);
-  const addVideoKey = (box?: Partial<Pick<BoxLayer, 'x' | 'y' | 'w' | 'h' | 'radius'>>) => onChange({
+  const addVideoKey = (box?: Partial<{ x: number; y: number; w: number; h: number; radius: number }>) => onChange({
     ...t,
     videoKeyframes: [
       ...videoKeys.filter(k => Math.abs(k.t - time) > 0.05),
