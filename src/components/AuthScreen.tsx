@@ -133,14 +133,15 @@ export function AuthScreen({
         <span aria-hidden className="auth-beam auth-beam-a" />
         <span aria-hidden className="auth-beam auth-beam-b" />
         <span aria-hidden className="auth-grid" />
-        <div aria-hidden className="auth-social-stream">
-          <div className="auth-social-track">
-            {[...SOCIAL_ICONS, ...SOCIAL_ICONS].map(({ label, Icon, className }, index) => (
-              <span className={`auth-social-icon ${className}`} key={`${label}-${index}`} title={label}>
-                <Icon />
+        <div aria-hidden className="auth-social-field">
+          {[...SOCIAL_ICONS, ...SOCIAL_ICONS].map(({ label, Icon, className }, index) => (
+            <span className={`auth-social-float ${className}`} key={`${label}-${index}`}>
+              <span className="auth-social-icon">
+                <Icon aria-label={label} />
               </span>
-            ))}
-          </div>
+            </span>
+          ))}
+          <span className="auth-glass-sheen" />
         </div>
 
         <div className="relative">

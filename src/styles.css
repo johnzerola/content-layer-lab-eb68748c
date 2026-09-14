@@ -1094,23 +1094,20 @@
   from { translate: -1rem -0.3rem; opacity: 0.35; }
   to { translate: 2rem 1rem; opacity: 0.65; }
 }
-.auth-social-stream {
+.auth-social-field {
   position: absolute;
-  top: 7%;
-  right: 4%;
-  width: 4rem;
-  height: 86%;
+  inset: 0;
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 11%, #000 86%, transparent);
 }
-.auth-social-track {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.15rem;
+.auth-social-float {
+  position: absolute;
+  bottom: -4rem;
+  left: 8%;
   animation: vv-auth-social-rise 18s linear infinite;
+  will-change: transform, opacity;
 }
 .auth-social-icon {
   position: relative;
@@ -1122,24 +1119,57 @@
   border: 1px solid color-mix(in srgb, currentColor 22%, var(--border));
   border-radius: 0.7rem;
   color: color-mix(in srgb, var(--primary) 65%, var(--foreground));
-  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
-  box-shadow: 0 0 18px color-mix(in srgb, currentColor 15%, transparent);
-  opacity: 0.68;
-  animation: vv-auth-social-glow 3.8s ease-in-out infinite alternate;
+  background: color-mix(in srgb, var(--surface-2) 58%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 16%, transparent),
+    0 0 22px color-mix(in srgb, currentColor 18%, transparent);
+  backdrop-filter: blur(8px) saturate(125%);
+  opacity: 0.66;
+  animation: vv-auth-social-glow 4.2s ease-in-out infinite alternate;
 }
 .auth-social-icon svg { width: 1rem; height: 1rem; }
-.auth-social-instagram { color: color-mix(in srgb, var(--accent) 75%, var(--foreground)); animation-delay: -0.8s; }
-.auth-social-tiktok { color: color-mix(in srgb, var(--cyan) 78%, var(--foreground)); animation-delay: -1.6s; }
-.auth-social-kwai { color: color-mix(in srgb, var(--warning) 75%, var(--foreground)); animation-delay: -2.4s; }
-.auth-social-youtube { color: color-mix(in srgb, var(--destructive) 78%, var(--foreground)); animation-delay: -3.2s; }
-.auth-social-facebook { color: color-mix(in srgb, var(--primary) 70%, var(--foreground)); animation-delay: -4s; }
+.auth-social-instagram { color: color-mix(in srgb, var(--accent) 75%, var(--foreground)); }
+.auth-social-tiktok { color: color-mix(in srgb, var(--cyan) 78%, var(--foreground)); }
+.auth-social-kwai { color: color-mix(in srgb, var(--warning) 75%, var(--foreground)); }
+.auth-social-youtube { color: color-mix(in srgb, var(--destructive) 78%, var(--foreground)); }
+.auth-social-facebook { color: color-mix(in srgb, var(--primary) 70%, var(--foreground)); }
+.auth-social-float:nth-child(1) { left: 7%; animation-delay: -2s; animation-duration: 19s; }
+.auth-social-float:nth-child(2) { left: 31%; animation-delay: -11s; animation-duration: 23s; }
+.auth-social-float:nth-child(3) { left: 57%; animation-delay: -6s; animation-duration: 20s; }
+.auth-social-float:nth-child(4) { left: 82%; animation-delay: -15s; animation-duration: 25s; }
+.auth-social-float:nth-child(5) { left: 70%; animation-delay: -1s; animation-duration: 22s; }
+.auth-social-float:nth-child(6) { left: 18%; animation-delay: -16s; animation-duration: 24s; }
+.auth-social-float:nth-child(7) { left: 44%; animation-delay: -4s; animation-duration: 26s; }
+.auth-social-float:nth-child(8) { left: 89%; animation-delay: -9s; animation-duration: 21s; }
+.auth-social-float:nth-child(9) { left: 52%; animation-delay: -19s; animation-duration: 27s; }
+.auth-social-float:nth-child(10) { left: 25%; animation-delay: -7s; animation-duration: 22s; }
+.auth-social-float:nth-child(3n) .auth-social-icon { width: 1.9rem; height: 1.9rem; opacity: 0.46; filter: blur(0.35px); }
+.auth-social-float:nth-child(4n) .auth-social-icon { width: 2.7rem; height: 2.7rem; opacity: 0.76; }
 @keyframes vv-auth-social-rise {
-  from { transform: translateY(0); }
-  to { transform: translateY(calc(-50% - 0.575rem)); }
+  0% { transform: translate3d(0, 0, 0) rotate(-3deg); opacity: 0; }
+  8% { opacity: 0.68; }
+  35% { transform: translate3d(0.8rem, -34vh, 0) rotate(2deg); }
+  68% { transform: translate3d(-0.65rem, -68vh, 0) rotate(-2deg); }
+  92% { opacity: 0.58; }
+  100% { transform: translate3d(0.45rem, -108vh, 0) rotate(3deg); opacity: 0; }
 }
 @keyframes vv-auth-social-glow {
-  from { transform: scale(0.94) rotate(-2deg); opacity: 0.48; filter: saturate(0.85); }
-  to { transform: scale(1.05) rotate(2deg); opacity: 0.86; filter: saturate(1.15); }
+  from { transform: scale(0.94) translateX(-2px); filter: saturate(0.8); }
+  to { transform: scale(1.05) translateX(2px); filter: saturate(1.18); }
+}
+.auth-glass-sheen {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(105deg, transparent 8%, color-mix(in srgb, var(--foreground) 4%, transparent) 34%, transparent 54%),
+    radial-gradient(80% 52% at 48% 8%, color-mix(in srgb, var(--foreground) 5%, transparent), transparent 72%);
+  border-right: 1px solid color-mix(in srgb, var(--foreground) 5%, transparent);
+  box-shadow: inset -18px 0 34px color-mix(in srgb, var(--background) 18%, transparent);
+  animation: vv-auth-glass 9s ease-in-out infinite alternate;
+}
+@keyframes vv-auth-glass {
+  from { transform: translateX(-1.5%); opacity: 0.48; }
+  to { transform: translateX(1.5%); opacity: 0.72; }
 }
 .auth-live {
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 40%, transparent);
@@ -1225,7 +1255,7 @@
   to { opacity: 1; transform: translateY(0); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .auth-beam, .auth-social-track, .auth-social-icon, .auth-live, .auth-shine, .auth-cta::after, .auth-enter, .auth-swap { animation: none !important; }
+  .auth-beam, .auth-social-float, .auth-social-icon, .auth-glass-sheen, .auth-live, .auth-shine, .auth-cta::after, .auth-enter, .auth-swap { animation: none !important; }
   .auth-shine { color: var(--foreground); -webkit-text-fill-color: currentColor; }
 }
 
