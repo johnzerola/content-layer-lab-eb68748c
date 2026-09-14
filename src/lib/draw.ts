@@ -1,4 +1,4 @@
-import { fullscreenAt } from './template-timeline';
+import { fullscreenAt, videoBoxAt } from './template-timeline';
 /** O cliente de armazenamento só é carregado no navegador, nunca no worker. */
 const STORAGE_PREFIX = "storage:";
 const isStorageRef = (v: string) => v.startsWith(STORAGE_PREFIX);
@@ -1127,7 +1127,9 @@ export function drawFrame(
   source?: FrameSource | null,
   opts?: DrawOpts,
 ) {
-  const fullscreen = fullscreenAt(t, Math.max(0, (opts?.time ?? 0) - (opts?.clip?.start ?? 0)));
+  const localTime = Math.max(0, (opts?.time ?? 0) - (opts?.clip?.start ?? 0));
+  if (t.videoKeyframes?.length) t = { ...t, video: videoBoxAt(t, localTime) };
+  const fullscreen = fullscreenAt(t, localTime);
   if (fullscreen.amount > 0) t = { ...t, video: fullscreen.video };
   const W = t.canvasW ?? CANVAS_W;
   const H = t.canvasH ?? CANVAS_H;
