@@ -1548,6 +1548,7 @@ export function TemplateEditor({
                 motionVar={adPreview ? adVariation : null}
                 speed={adPreview ? adVariation.speed : 1}
               />
+              </div>
             </div>
 
             <p className="text-center text-[11px] text-muted-foreground">
