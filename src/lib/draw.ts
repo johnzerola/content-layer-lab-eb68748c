@@ -1132,7 +1132,7 @@ export function drawFrame(
   const W = t.canvasW ?? CANVAS_W;
   const H = t.canvasH ?? CANVAS_H;
   ctx.save();
-  ctx.fillStyle = t.background;
+  ctx.fillStyle = backgroundPaint(ctx, t, W, H);
   ctx.fillRect(0, 0, W, H);
 
   // transição de abertura/saída: afeta o quadro montado inteiro
@@ -1241,5 +1241,74 @@ export function drawFrame(
 
 
   if (animating) ctx.restore();
+  drawEdgeFx(ctx, t, W, H);
+  ctx.restore();
+}
+
+/** fundo sólido ou em gradiente */
+function backgroundPaint(ctx: CanvasRenderingContext2D, t: Template, W: number, H: number): string | CanvasGradient {
+  const g = t.bgGradient;
+  if (!g) return t.background || "#000";
+  if (g.kind === "radial") {
+    const rad = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.05, W / 2, H / 2, Math.max(W, H) * 0.72);
+    rad.addColorStop(0, g.from);
+    rad.addColorStop(1, g.to);
+    return rad;
+  }
+  const a = ((g.angle ?? 135) * Math.PI) / 180;
+  const cx = W / 2;
+  const cy = H / 2;
+  const len = (Math.abs(Math.cos(a)) * W + Math.abs(Math.sin(a)) * H) / 2;
+  const lin = ctx.createLinearGradient(cx - Math.cos(a) * len, cy - Math.sin(a) * len, cx + Math.cos(a) * len, cy + Math.sin(a) * len);
+  lin.addColorStop(0, g.from);
+  lin.addColorStop(1, g.to);
+  return lin;
+}
+
+/** gradiente/vinheta nas bordas, desenhado por cima de todas as camadas */
+function drawEdgeFx(ctx: CanvasRenderingContext2D, t: Template, W: number, H: number) {
+  const fx = t.edgeFx;
+  if (!fx || fx.strength <= 0) return;
+  const a = Math.max(0, Math.min(1, fx.strength));
+  const size = Math.max(0.05, Math.min(0.6, (fx.size ?? 28) / 100));
+  ctx.save();
+  if (fx.kind === "vignette") {
+    const r = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * (0.5 - size * 0.4), W / 2, H / 2, Math.max(W, H) * 0.75);
+    r.addColorStop(0, withAlpha(fx.color, 0));
+    r.addColorStop(1, withAlpha(fx.color, a));
+    ctx.fillStyle = r;
+    ctx.fillRect(0, 0, W, H);
+  } else if (fx.kind === "frame") {
+    const band = Math.round(Math.min(W, H) * size);
+    const strips: [number, number, number, number, [number, number, number, number]][] = [
+      [0, 0, W, band, [0, 0, 0, band]],
+      [0, H - band, W, band, [0, H, 0, H - band]],
+      [0, 0, band, H, [0, 0, band, 0]],
+      [W - band, 0, band, H, [W, 0, W - band, 0]],
+    ];
+    for (const [x, y, w, h, line] of strips) {
+      const g = ctx.createLinearGradient(line[0], line[1], line[2], line[3]);
+      g.addColorStop(0, withAlpha(fx.color, a));
+      g.addColorStop(1, withAlpha(fx.color, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(x, y, w, h);
+    }
+  } else {
+    const band = Math.round(H * size);
+    if (fx.kind === "top" || fx.kind === "both") {
+      const g = ctx.createLinearGradient(0, 0, 0, band);
+      g.addColorStop(0, withAlpha(fx.color, a));
+      g.addColorStop(1, withAlpha(fx.color, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, band);
+    }
+    if (fx.kind === "bottom" || fx.kind === "both") {
+      const g = ctx.createLinearGradient(0, H, 0, H - band);
+      g.addColorStop(0, withAlpha(fx.color, a));
+      g.addColorStop(1, withAlpha(fx.color, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, H - band, W, band);
+    }
+  }
   ctx.restore();
 }

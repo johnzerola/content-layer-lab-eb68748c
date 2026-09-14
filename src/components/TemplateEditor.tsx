@@ -19,6 +19,9 @@ import {
   Sparkles,
   Type as TypeIcon,
   Image as ImageIcon,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -33,6 +36,9 @@ import {
   type SelId,
   type Template,
   type TextLayer,
+  type EdgeFxKind,
+  GRADIENT_PRESETS,
+  defaultEdgeFx,
 } from "@/lib/template";
 import { BUILTIN_FONTS, fileToFont, registerFonts } from "@/lib/fonts";
 import { defaultAntiDup, makeVariation, describeVariation } from "@/lib/variation";
@@ -297,6 +303,7 @@ export function TemplateEditor({
   const [snap, setSnap] = useState(true);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [dropping, setDropping] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [timelineOpen, setTimelineOpen] = useState(true);
 
@@ -1212,12 +1219,12 @@ export function TemplateEditor({
               {tab === "design" && (
                 <>
                   <Field label="Cor de fundo">
-                    <div className="flex gap-2">
-                      {["#ffffff", "#0a0a0a", "#101418"].map((c) => (
+                    <div className="flex flex-wrap gap-2">
+                      {["#ffffff", "#0a0a0a", "#101418", "#1b1140", "#f5f3ee"].map((c) => (
                         <button
                           key={c}
-                          onClick={() => setT({ ...t, background: c })}
-                          className={`size-9 rounded-lg border-2 ${t.background === c ? "border-primary" : "border-border"}`}
+                          onClick={() => setT({ ...t, background: c, bgGradient: null })}
+                          className={`size-9 rounded-lg border-2 ${!t.bgGradient && t.background === c ? "border-primary" : "border-border"}`}
                           style={{ background: c }}
                           aria-label={`Fundo ${c}`}
                         />
@@ -1225,12 +1232,152 @@ export function TemplateEditor({
                       <input
                         type="color"
                         value={t.background}
-                        onChange={(e) => setT({ ...t, background: e.target.value })}
+                        onChange={(e) => setT({ ...t, background: e.target.value, bgGradient: null })}
                         className="size-9 rounded-lg border border-border bg-transparent"
                         aria-label="Cor de fundo personalizada"
                       />
                     </div>
                   </Field>
+
+                  <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
+                    <p className="studio-label">Fundo em gradiente</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {GRADIENT_PRESETS.map((g) => (
+                        <button
+                          key={g.id}
+                          onClick={() => setT({ ...t, bgGradient: { ...g.value } })}
+                          className={`h-12 rounded-lg border-2 text-[10px] font-semibold text-white/90 ${
+                            t.bgGradient?.from === g.value.from && t.bgGradient?.to === g.value.to
+                              ? "border-primary"
+                              : "border-border"
+                          }`}
+                          style={{
+                            background:
+                              g.value.kind === "radial"
+                                ? `radial-gradient(circle, ${g.value.from}, ${g.value.to})`
+                                : `linear-gradient(${g.value.angle}deg, ${g.value.from}, ${g.value.to})`,
+                          }}
+                        >
+                          {g.label}
+                        </button>
+                      ))}
+                    </div>
+                    {t.bgGradient ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={t.bgGradient.from}
+                            onChange={(e) =>
+                              setT({ ...t, bgGradient: { ...t.bgGradient!, from: e.target.value } })
+                            }
+                            className="size-9 rounded-lg border border-border bg-transparent"
+                            aria-label="Cor inicial do gradiente"
+                          />
+                          <input
+                            type="color"
+                            value={t.bgGradient.to}
+                            onChange={(e) => setT({ ...t, bgGradient: { ...t.bgGradient!, to: e.target.value } })}
+                            className="size-9 rounded-lg border border-border bg-transparent"
+                            aria-label="Cor final do gradiente"
+                          />
+                          <select
+                            value={t.bgGradient.kind}
+                            onChange={(e) =>
+                              setT({
+                                ...t,
+                                bgGradient: { ...t.bgGradient!, kind: e.target.value as "linear" | "radial" },
+                              })
+                            }
+                            className="flex-1 rounded-lg border border-border bg-background px-2 py-2 text-sm"
+                            aria-label="Tipo de gradiente"
+                          >
+                            <option value="linear">Linear</option>
+                            <option value="radial">Radial</option>
+                          </select>
+                        </div>
+                        {t.bgGradient.kind === "linear" && (
+                          <Slider
+                            label="Ângulo"
+                            value={t.bgGradient.angle}
+                            min={0}
+                            max={360}
+                            step={5}
+                            onChange={(v) => setT({ ...t, bgGradient: { ...t.bgGradient!, angle: v } })}
+                          />
+                        )}
+                        <button
+                          onClick={() => setT({ ...t, bgGradient: null })}
+                          className="rounded-full border border-border px-3 py-1 text-xs hover:border-primary"
+                        >
+                          Usar cor sólida
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
+                    <p className="studio-label">Gradiente nas bordas</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {([
+                        ["none", "Nenhum"],
+                        ["vignette", "Vinheta"],
+                        ["top", "Topo"],
+                        ["bottom", "Base"],
+                        ["both", "Topo + base"],
+                        ["frame", "Moldura"],
+                      ] as [string, string][]).map(([k, label]) => {
+                        const active = (t.edgeFx?.kind ?? "none") === k;
+                        return (
+                          <button
+                            key={k}
+                            onClick={() =>
+                              setT({
+                                ...t,
+                                edgeFx:
+                                  k === "none"
+                                    ? null
+                                    : { ...(t.edgeFx ?? defaultEdgeFx()), kind: k as EdgeFxKind },
+                              })
+                            }
+                            className={`rounded-full border px-3 py-1 text-xs ${active ? "border-primary bg-primary/10" : "border-border hover:border-primary"}`}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {t.edgeFx ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          Cor
+                          <input
+                            type="color"
+                            value={t.edgeFx.color}
+                            onChange={(e) => setT({ ...t, edgeFx: { ...t.edgeFx!, color: e.target.value } })}
+                            className="size-8 rounded-lg border border-border bg-transparent"
+                            aria-label="Cor da borda"
+                          />
+                        </div>
+                        <Slider
+                          label="Intensidade"
+                          value={t.edgeFx.strength}
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          onChange={(v) => setT({ ...t, edgeFx: { ...t.edgeFx!, strength: v } })}
+                        />
+                        <Slider
+                          label="Tamanho (%)"
+                          value={t.edgeFx.size}
+                          min={5}
+                          max={60}
+                          step={1}
+                          onChange={(v) => setT({ ...t, edgeFx: { ...t.edgeFx!, size: v } })}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
 
                   <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
                     <p className="studio-label">Fontes próprias</p>
@@ -1322,9 +1469,38 @@ export function TemplateEditor({
           <section className="flex min-h-0 flex-col items-center justify-center gap-3 bg-background/40 p-4">
             <div className="flex w-full items-center justify-between gap-2">
               <p className="studio-label">Preview em tempo real</p>
-              <span className="rounded-full border border-border px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
-                {t.canvasW ?? 1080}×{t.canvasH ?? 1920}
-              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))}
+                  className="rounded-lg border border-border p-1.5 hover:border-primary"
+                  aria-label="Diminuir zoom"
+                  title="Diminuir zoom"
+                >
+                  <ZoomOut className="size-3.5" />
+                </button>
+                <span className="w-12 text-center font-mono text-[11px] text-muted-foreground">
+                  {Math.round(zoom * 100)}%
+                </span>
+                <button
+                  onClick={() => setZoom((z) => Math.min(4, +(z + 0.25).toFixed(2)))}
+                  className="rounded-lg border border-border p-1.5 hover:border-primary"
+                  aria-label="Aumentar zoom"
+                  title="Aumentar zoom"
+                >
+                  <ZoomIn className="size-3.5" />
+                </button>
+                <button
+                  onClick={() => setZoom(1)}
+                  className="rounded-lg border border-border p-1.5 hover:border-primary"
+                  aria-label="Ajustar zoom"
+                  title="Ajustar à tela"
+                >
+                  <Maximize2 className="size-3.5" />
+                </button>
+                <span className="ml-1 rounded-full border border-border px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+                  {t.canvasW ?? 1080}×{t.canvasH ?? 1920}
+                </span>
+              </div>
             </div>
             <div
               ref={stageRef}
@@ -1341,10 +1517,18 @@ export function TemplateEditor({
                 setDropping(false);
                 void handleStageDrop(ev.dataTransfer, ev.clientX, ev.clientY);
               }}
-              className={`grid min-h-0 w-full flex-1 place-items-center rounded-2xl border bg-[repeating-conic-gradient(var(--color-surface-2)_0%_25%,transparent_0%_50%)] bg-[length:22px_22px] p-4 transition ${
+              onWheel={(ev) => {
+                if (!ev.ctrlKey && !ev.metaKey) return;
+                setZoom((z) => Math.min(4, Math.max(0.5, +(z * Math.exp(-ev.deltaY * 0.0015)).toFixed(2))));
+              }}
+              className={`grid min-h-0 w-full flex-1 place-items-center overflow-auto rounded-2xl border bg-[repeating-conic-gradient(var(--color-surface-2)_0%_25%,transparent_0%_50%)] bg-[length:22px_22px] p-4 transition ${
                 dropping ? "border-primary bg-primary/5 ring-2 ring-primary/40" : "border-border"
               }`}
             >
+              <div
+                className="grid min-h-0 place-items-center transition-transform"
+                style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
+              >
               <TemplateCanvas
                 frameClassName="aspect-[9/16] h-full max-h-[64vh] min-h-[300px] w-auto max-w-full rounded-xl shadow-[0_24px_60px_-24px_rgba(0,0,0,0.8)]"
                 template={t}
@@ -1364,6 +1548,7 @@ export function TemplateEditor({
                 motionVar={adPreview ? adVariation : null}
                 speed={adPreview ? adVariation.speed : 1}
               />
+              </div>
             </div>
 
             <p className="text-center text-[11px] text-muted-foreground">
