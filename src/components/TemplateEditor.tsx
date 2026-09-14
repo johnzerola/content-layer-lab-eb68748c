@@ -18,6 +18,7 @@ import {
   Type as TypeIcon,
   Image as ImageIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { TemplateCanvas, LAYER_ORDER, LAYER_LABELS, layerOf, selectableIds } from "./TemplateCanvas";
 import {
@@ -292,6 +293,10 @@ export function TemplateEditor({
   const [selected, setSelected] = useState<SelId | null>("headline");
   const [tab, setTab] = useState<"layers" | "design" | "effects">("layers");
   const [snap, setSnap] = useState(true);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const [dropping, setDropping] = useState(false);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+
   const [debug, setDebug] = useState(false);
   const [debugGrid, setDebugGrid] = useState(3);
   const [debugSafe, setDebugSafe] = useState(true);
@@ -388,17 +393,73 @@ export function TemplateEditor({
       extras: (t.extras ?? []).map((e) => (e.id === extraId ? ({ ...e, ...data } as typeof e) : e)),
     });
 
-  const addExtra = (kind: "text" | "image") => {
+  const addExtra = (kind: "text" | "image", at?: { x: number; y: number }, src?: string) => {
     const extra = makeExtra(kind, (t.extras ?? []).length);
+    if (at) {
+      extra.x = Math.round(at.x - extra.w / 2);
+      extra.y = Math.round(at.y - extra.h / 2);
+    }
+    if (src && "src" in extra) (extra as ImageLayer).src = src;
     setT({ ...t, extras: [...(t.extras ?? []), extra] });
     setSelected(`extra:${extra.id}`);
     setTab("layers");
+    return extra;
   };
 
   const removeExtra = (extraId: string) => {
     setT({ ...t, extras: (t.extras ?? []).filter((e) => e.id !== extraId) });
     if (selected === `extra:${extraId}`) setSelected(null);
   };
+
+  /** reordena as camadas livres (arraste na lista) e reescreve o z de cada uma */
+  const moveExtra = (from: number, to: number) => {
+    const list = [...(t.extras ?? [])];
+    if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return;
+    const [item] = list.splice(from, 1);
+    if (!item) return;
+    list.splice(to, 0, item);
+    setT({ ...t, extras: list.map((e, i) => ({ ...e, z: 100 + i })) });
+  };
+
+  /** converte um ponto da tela em coordenadas do canvas 1080x1920 */
+  const toCanvasPoint = (clientX: number, clientY: number) => {
+    const canvas = stageRef.current?.querySelector("canvas");
+    const W = t.canvasW ?? 1080;
+    const H = t.canvasH ?? 1920;
+    if (!canvas) return { x: W / 2, y: H / 2 };
+    const r = canvas.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(W, ((clientX - r.left) / Math.max(1, r.width)) * W)),
+      y: Math.max(0, Math.min(H, ((clientY - r.top) / Math.max(1, r.height)) * H)),
+    };
+  };
+
+  const handleStageDrop = async (dt: DataTransfer, clientX: number, clientY: number) => {
+    const at = toCanvasPoint(clientX, clientY);
+    const kind = dt.getData("application/x-vaiviral-layer");
+    if (kind === "text" || kind === "image") {
+      addExtra(kind, at);
+      return;
+    }
+    const files = Array.from(dt.files ?? []);
+    if (files.length === 0) return;
+    for (const f of files) {
+      const name = f.name.toLowerCase();
+      if (f.type.startsWith("image/")) {
+        addExtra("image", at, await fileToDataUrl(f));
+      } else if (/\.(ttf|otf|woff2?)$/.test(name)) {
+        await uploadFont(f);
+        toast.success(`Fonte "${f.name}" adicionada`);
+      } else if (f.type.startsWith("audio/")) {
+        toast.info("Som entra no Editor profissional", {
+          description: "Aqui você monta o visual; a trilha e o volume ficam na etapa de edição do vídeo.",
+        });
+      } else if (f.type.startsWith("video/")) {
+        toast.info("O vídeo de fundo vem da lista de vídeos importados.");
+      }
+    }
+  };
+
 
   const textLayer = (id: LayerId) => t[KEY_OF[id]] as unknown as TextLayer;
   const imgLayer = (id: LayerId) => t[KEY_OF[id]] as unknown as ImageLayer;
@@ -1033,19 +1094,23 @@ export function TemplateEditor({
               {tab === "layers" && (
                 <>
                   <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => addExtra("text")}
-                      className="interactive flex items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2 py-2 text-xs font-medium"
-                    >
-                      <Plus className="size-3.5" /> Texto
-                    </button>
-                    <button
-                      onClick={() => addExtra("image")}
-                      className="interactive flex items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2 py-2 text-xs font-medium"
-                    >
-                      <Plus className="size-3.5" /> Imagem
-                    </button>
+                    {(["text", "image"] as const).map((kind) => (
+                      <button
+                        key={kind}
+                        draggable
+                        onDragStart={(ev) => ev.dataTransfer.setData("application/x-vaiviral-layer", kind)}
+                        onClick={() => addExtra(kind)}
+                        title="Clique para adicionar ou arraste até o vídeo"
+                        className="interactive flex cursor-grab items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2 py-2 text-xs font-medium active:cursor-grabbing"
+                      >
+                        <Plus className="size-3.5" /> {kind === "text" ? "Texto" : "Imagem"}
+                      </button>
+                    ))}
                   </div>
+                  <p className="px-1 text-[11px] text-muted-foreground">
+                    Arraste estes botões — ou arquivos de imagem e fontes do seu computador — direto para o vídeo.
+                  </p>
+
 
                   <div className="space-y-1">
                     <p className="studio-label px-1">Elementos do template</p>
@@ -1087,10 +1152,26 @@ export function TemplateEditor({
                         Nenhuma ainda — use os botões acima para adicionar texto ou imagem.
                       </p>
                     )}
-                    {(t.extras ?? []).map((e) => {
+                    {(t.extras ?? []).map((e, idx) => {
                       const active = selected === `extra:${e.id}`;
                       return (
-                        <div key={e.id} className={`studio-item ${active ? "studio-item-active" : ""}`}>
+                        <div
+                          key={e.id}
+                          draggable
+                          onDragStart={() => setDragIdx(idx)}
+                          onDragEnd={() => setDragIdx(null)}
+                          onDragOver={(ev) => ev.preventDefault()}
+                          onDrop={(ev) => {
+                            ev.preventDefault();
+                            if (dragIdx !== null) moveExtra(dragIdx, idx);
+                            setDragIdx(null);
+                          }}
+                          title="Arraste para mudar a ordem das camadas"
+                          className={`studio-item cursor-grab active:cursor-grabbing ${active ? "studio-item-active" : ""} ${
+                            dragIdx === idx ? "opacity-50" : ""
+                          }`}
+                        >
+
                           <button
                             onClick={() => patchExtra(e.id, { visible: !e.visible })}
                             className="text-muted-foreground hover:text-foreground"
@@ -1242,7 +1323,25 @@ export function TemplateEditor({
                 {t.canvasW ?? 1080}×{t.canvasH ?? 1920}
               </span>
             </div>
-            <div className="grid min-h-0 w-full flex-1 place-items-center rounded-2xl border border-border bg-[repeating-conic-gradient(var(--color-surface-2)_0%_25%,transparent_0%_50%)] bg-[length:22px_22px] p-4">
+            <div
+              ref={stageRef}
+              onDragOver={(ev) => {
+                ev.preventDefault();
+                ev.dataTransfer.dropEffect = "copy";
+                if (!dropping) setDropping(true);
+              }}
+              onDragLeave={(ev) => {
+                if (!ev.currentTarget.contains(ev.relatedTarget as Node | null)) setDropping(false);
+              }}
+              onDrop={(ev) => {
+                ev.preventDefault();
+                setDropping(false);
+                void handleStageDrop(ev.dataTransfer, ev.clientX, ev.clientY);
+              }}
+              className={`grid min-h-0 w-full flex-1 place-items-center rounded-2xl border bg-[repeating-conic-gradient(var(--color-surface-2)_0%_25%,transparent_0%_50%)] bg-[length:22px_22px] p-4 transition ${
+                dropping ? "border-primary bg-primary/5 ring-2 ring-primary/40" : "border-border"
+              }`}
+            >
               <TemplateCanvas
                 frameClassName="aspect-[9/16] h-full max-h-[62vh] w-auto max-w-full rounded-xl shadow-[0_24px_60px_-24px_rgba(0,0,0,0.8)]"
                 template={t}
@@ -1263,9 +1362,10 @@ export function TemplateEditor({
                 speed={adPreview ? adVariation.speed : 1}
               />
             </div>
+
             <p className="text-center text-[11px] text-muted-foreground">
-              Arraste para mover · alças nos 8 pontos para redimensionar · Shift mantém proporção · Alt redimensiona
-              pelo centro · setas movem 1px (Shift 10px)
+              Solte imagens e fontes aqui · arraste para mover · alças nos 8 pontos para redimensionar · Shift mantém
+              proporção · Alt redimensiona pelo centro · setas movem 1px (Shift 10px)
             </p>
           </section>
 
