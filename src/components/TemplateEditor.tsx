@@ -1663,6 +1663,64 @@ export function TemplateEditor({
                   </p>
                 </div>
               )}
+
+              {tab === "effects" && (
+                <div className="space-y-3 rounded-xl border border-border bg-surface-2 p-3">
+                  <p className="studio-label">Vídeo em tela cheia</p>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(autoFull)}
+                      onChange={(e) => {
+                        if (e.target.checked)
+                          setT({
+                            ...t,
+                            fullscreenClips: [
+                              ...(t.fullscreenClips ?? []),
+                              {
+                                id: AUTO_FULL_ID,
+                                start: Math.min(5, Math.max(0, duration - 1)),
+                                end: duration,
+                                fade: 0.8,
+                              },
+                            ],
+                          });
+                        else
+                          setT({
+                            ...t,
+                            fullscreenClips: (t.fullscreenClips ?? []).filter((c) => c.id !== AUTO_FULL_ID),
+                          });
+                      }}
+                      className="size-4 accent-[var(--primary)]"
+                    />
+                    A partir de X segundos, tudo some e o vídeo ocupa a tela toda
+                  </label>
+                  {autoFull ? (
+                    <div className="space-y-2 rounded-lg border border-primary/40 bg-background/40 p-2">
+                      <Slider
+                        label="Começa em (s)"
+                        value={autoFull.start}
+                        min={0}
+                        max={Math.max(1, Math.round(duration))}
+                        step={0.5}
+                        onChange={(v) => patchAutoFull({ start: Math.min(v, autoFull.end - 0.2) })}
+                      />
+                      <Slider
+                        label="Suavidade da transição (s)"
+                        value={autoFull.fade}
+                        min={0}
+                        max={3}
+                        step={0.1}
+                        onChange={(v) => patchAutoFull({ fade: v })}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Textos, foto e marca d&apos;água desaparecem com fade enquanto o vídeo cresce até 9:16 inteiro.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+
+              )}
             </div>
           </aside>
 
