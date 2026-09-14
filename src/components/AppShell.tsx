@@ -2,19 +2,16 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Layers,
-  Palette,
   KeyRound,
   FolderKanban,
   Scissors,
   Library,
-  Cloud,
   CalendarClock,
   History,
   PanelLeftClose,
   PanelLeftOpen,
   Sparkle,
   Wand2,
-  HardDrive,
   Radio,
   Settings2,
   BarChart3,
@@ -346,22 +343,9 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           }}
         />
         {routeLink("/templates", "Templates de vídeo", Layers, expanded, close)}
-        {routeLink("/estilos", "Estilos reutilizáveis", Palette, expanded, close)}
-        {routeLink("/comparar", "Comparar layouts", Layers, expanded, close)}
-
         {routeLink("/editor", "Editor profissional", Wand2, expanded, close)}
         {routeLink("/projetos", "Projetos", FolderKanban, expanded, close)}
         {routeLink("/biblioteca", "Resultados", History, expanded, close)}
-        {routeLink("/armazenamento", "Armazenamento", HardDrive, expanded, close)}
-        <NavItem
-          open={expanded}
-          label="Nuvem"
-          icon={Cloud}
-          onClick={() => {
-            onCloud();
-            close?.();
-          }}
-        />
       </div>
 
       <div className="mt-4 flex flex-col gap-0.5 px-3">
