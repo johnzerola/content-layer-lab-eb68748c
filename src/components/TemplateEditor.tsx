@@ -942,9 +942,10 @@ export function TemplateEditor({
               <Sparkles className="size-4" />
             </span>
             <div className="min-w-0 flex-1">
-              <label className="studio-label" htmlFor="studio-template-name">
+              <label className="studio-label block" htmlFor="studio-template-name">
                 Nome do template
               </label>
+
               <input
                 id="studio-template-name"
                 className="w-full max-w-md truncate border-0 bg-transparent p-0 studio-title text-[19px] text-foreground outline-none placeholder:text-muted-foreground focus:underline focus:decoration-primary/60 focus:underline-offset-4"
@@ -1003,7 +1004,7 @@ export function TemplateEditor({
         </header>
 
         {/* Área de trabalho: ferramentas · palco · propriedades */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[276px_minmax(0,1fr)_348px] lg:overflow-hidden">
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:min-h-[440px] lg:grid-cols-[276px_minmax(0,1fr)_348px] lg:overflow-hidden">
           {/* Coluna esquerda: camadas e ajustes do template */}
           <aside className="flex min-h-0 flex-col border-border lg:border-r">
             <div className="flex gap-1 border-b border-border p-2">
@@ -1306,7 +1307,7 @@ export function TemplateEditor({
         </div>
 
         {/* Linha do tempo em toda a largura */}
-        <div className="shrink-0 border-t border-border bg-surface-2/40 p-3">
+        <div className="max-h-[38vh] shrink-0 overflow-y-auto border-t border-border bg-surface-2/40 p-3">
           <TemplateTimeline
             template={t}
             onChange={setT}
