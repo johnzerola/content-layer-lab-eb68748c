@@ -104,5 +104,17 @@ export function normalizeProject(project: EditorProjectV2): EditorProjectV2 {
       track.cues.sort((a, b) => Number(a.start) - Number(b.start));
     }
   }
+  const compoundCounts = new Map<string, number>();
+  for (const clip of next.tracks.flatMap((track) => track.clips)) {
+    const groupId = clip.metadata?.["compoundGroupId"];
+    if (typeof groupId === "string") compoundCounts.set(groupId, (compoundCounts.get(groupId) ?? 0) + 1);
+  }
+  for (const clip of next.tracks.flatMap((track) => track.clips)) {
+    const groupId = clip.metadata?.["compoundGroupId"];
+    if (typeof groupId === "string" && (compoundCounts.get(groupId) ?? 0) < 2) {
+      const { compoundGroupId: _group, compoundName: _name, ...metadata } = clip.metadata ?? {};
+      clip.metadata = metadata;
+    }
+  }
   return next;
 }

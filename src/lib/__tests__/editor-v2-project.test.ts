@@ -1,7 +1,7 @@
 ﻿import { describe, expect, it } from "vitest";
 import { AddCaptionBatchCommand, AddCaptionCueCommand, AddClipCommand, AddMediaClipCommand, ApplyCaptionPresetCommand, ApplySeparatedAudioCommand, ApplyTemplateCommand, ApplyTransitionCommand, CompositionClock, DeleteAudioEnvelopePointCommand, DeleteClipCommand, DeleteClipsCommand, DeleteKeyframeCommand, DuplicateClipsCommand, EditorCommandBus, MoveClipCommand, MoveKeyframeCommand, RegisterExtractedAudioCommand, RestoreOriginalAudioCommand, SelectItemCommand, SetAudioRepresentationCommand, SplitClipCommand, TrimClipCommand, UpdateClipCommand, UpdateProjectSettingsCommand, UpdateTrackCommand, UpdateTransformAtTimeCommand, UpsertAudioEnvelopePointCommand, UpsertKeyframeCommand, adaptEditorProjectV1, asProjectTime, buildExtractedAudioMedia, buildSeparatedAudioMedia, clampTransitionDuration, clipAudioGainAt, createCaptionBatch, createCaptionBatchFromTimedWords, createEditorProjectV2, createEditorRenderManifest, createPlaybackSurfaceKeys, createStemAsset, editorProjectFromManifest, findTransitionTarget, interpolateKeyframes, isEditorV2Enabled, isTrackCompatible, parseTimedText, projectToSourceTime, resolveAnimatedTransform, resolveAudioMixFrame, resolveAudioRenderFrameFromManifest, resolveCaptionInsertion, resolveClipPresentation, resolveCompositionFrame, resolveCompositionFrameFromManifest, resolveLibraryInsertion, resolveTemplateApplication, snapProjectTime, sourceToProjectTime, summarizeWaveform, visibleTimelineRange, type AudioSourceGroup, type Clip, type MediaAsset } from "@/lib/editor-v2";
 import { BUILT_IN_LIBRARY_ITEMS, type CaptionPresetDefinition, type LibraryItem, type TemplateDefinition } from "@/lib/editor-v2/library";
-import { AutoSplitClipsCommand, InsertMediaClipCommand, RemoveSilenceCommand, UpdateClipsCommand, createMediaClipFromAsset } from "@/lib/editor-v2";
+import { AddTrackCommand, AutoSplitClipsCommand, CreateCompoundClipCommand, DissolveCompoundClipCommand, InsertMediaClipCommand, MoveCompoundClipCommand, RemoveSilenceCommand, UpdateClipsCommand, createMediaClipFromAsset } from "@/lib/editor-v2";
 import { createEditorProject } from "@/lib/editor/project";
 
 function clip(): Clip {
@@ -255,6 +255,38 @@ describe("Command bus", () => {
     expect(JSON.stringify(bus.getState())).not.toContain("data:");
     bus.undo();
     expect(bus.getState().assets).toHaveLength(0);
+  });
+
+  it("cria, move e desfaz um clipe composto sem achatar suas camadas", () => {
+    const project = createEditorProjectV2({ duration: 12 });
+    const video = { ...clip(), id: "compound-video", projectStart: asProjectTime(1), projectEnd: asProjectTime(5), sourceIn: 0, sourceOut: 4 };
+    const overlay: Clip = { ...clip(), id: "compound-overlay", kind: "image", trackId: "track-overlay", projectStart: asProjectTime(2), projectEnd: asProjectTime(4), sourceIn: 0, sourceOut: 2 };
+    project.tracks[0]!.clips.push(video);
+    project.tracks[1]!.clips.push(overlay);
+    const bus = new EditorCommandBus(project);
+    bus.execute(new CreateCompoundClipCommand([video.id, overlay.id], "compound-1", "Composto 1"));
+    expect(bus.getState().selection.itemIds).toEqual([video.id, overlay.id]);
+    expect(bus.getState().tracks[1]!.clips[0]!.metadata).toMatchObject({ compoundGroupId: "compound-1", compoundName: "Composto 1" });
+    bus.execute(new DuplicateClipsCommand([video.id, overlay.id], "compound-copy", 8));
+    const copiedGroups = bus.getState().tracks.flatMap((track) => track.clips).filter((item) => item.id.includes("-copy-")).map((item) => item.metadata?.["compoundGroupId"]);
+    expect(copiedGroups).toEqual(["compound-1-copy-compound-copy", "compound-1-copy-compound-copy"]);
+    bus.undo();
+    bus.execute(new MoveCompoundClipCommand("compound-1", video.id, 5));
+    expect(bus.getState().tracks[0]!.clips[0]).toMatchObject({ projectStart: 5, projectEnd: 9 });
+    expect(bus.getState().tracks[1]!.clips[0]).toMatchObject({ projectStart: 6, projectEnd: 8 });
+    bus.undo();
+    expect(bus.getState().tracks[0]!.clips[0]).toMatchObject({ projectStart: 1, projectEnd: 5 });
+    bus.execute(new DissolveCompoundClipCommand("compound-1"));
+    expect(bus.getState().tracks.flatMap((track) => track.clips).every((item) => !item.metadata?.["compoundGroupId"])).toBe(true);
+  });
+
+  it("adiciona uma camada extra com histórico reversível", () => {
+    const bus = new EditorCommandBus(createEditorProjectV2({ duration: 12 }));
+    const extra = { id: "track-overlay-2", kind: "overlay" as const, name: "Sobreposição 2", order: 6, locked: false, hidden: false, muted: false, solo: false, gain: 1, clips: [] };
+    bus.execute(new AddTrackCommand(extra));
+    expect(bus.getState().tracks.at(-1)).toMatchObject({ id: "track-overlay-2", kind: "overlay" });
+    bus.undo();
+    expect(bus.getState().tracks.some((track) => track.id === "track-overlay-2")).toBe(false);
   });
 
   it("reutiliza uma mídia existente na agulha sem duplicar o arquivo", () => {

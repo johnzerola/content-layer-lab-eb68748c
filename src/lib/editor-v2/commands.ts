@@ -217,6 +217,70 @@ export class MoveClipCommand extends SnapshotCommand {
   serialize() { return { type: this.type, payload: { clipId: this.clipId, targetTrackId: this.targetTrackId, projectStart: this.projectStart } }; }
 }
 
+/** Moves every layer of an editable compound while preserving its track and relative offset. */
+export class MoveCompoundClipCommand extends SnapshotCommand {
+  readonly type = "moveCompoundClip";
+  readonly renderImpact = "timeline" as const;
+  constructor(private readonly compoundGroupId: string, private readonly anchorClipId: string, private readonly projectStart: number) { super(); }
+  protected apply(project: EditorProjectV2) {
+    const anchor = locate(project, this.anchorClipId).clip;
+    if (anchor.metadata?.["compoundGroupId"] !== this.compoundGroupId) throw new Error("O clipe não pertence a este composto.");
+    const members = project.tracks.flatMap((owner) => owner.clips.map((clip) => ({ owner, clip }))).filter(({ clip }) => clip.metadata?.["compoundGroupId"] === this.compoundGroupId);
+    if (members.length < 2) throw new Error("O clipe composto não possui camadas suficientes.");
+    const earliest = Math.min(...members.map(({ clip }) => Number(clip.projectStart)));
+    const requestedDelta = this.projectStart - Number(anchor.projectStart);
+    const delta = Math.max(-earliest, requestedDelta);
+    for (const { owner, clip } of members) {
+      if (owner.locked) throw new Error(`Trilha bloqueada: ${owner.name}`);
+      shiftClip(clip, delta);
+      const cue = captionCue(project, clip);
+      if (cue) {
+        cue.start = asProjectTime(Number(cue.start) + delta);
+        cue.end = asProjectTime(Number(cue.end) + delta);
+        cue.words?.forEach((word) => { word.start = asProjectTime(Number(word.start) + delta); word.end = asProjectTime(Number(word.end) + delta); });
+      }
+    }
+    project.selection = { itemIds: members.map(({ clip }) => clip.id), primaryId: this.anchorClipId, surface: "timeline" };
+    return project;
+  }
+  serialize() { return { type: this.type, payload: { compoundGroupId: this.compoundGroupId, anchorClipId: this.anchorClipId, projectStart: this.projectStart } }; }
+}
+
+/** Groups existing timeline items without flattening their editable layers. */
+export class CreateCompoundClipCommand extends SnapshotCommand {
+  readonly type = "createCompoundClip";
+  readonly renderImpact = "timeline" as const;
+  constructor(private readonly clipIds: string[], private readonly compoundGroupId: string, private readonly name: string) { super(); }
+  protected apply(project: EditorProjectV2) {
+    const ids = [...new Set(this.clipIds)];
+    if (ids.length < 2) throw new Error("Selecione pelo menos dois itens para criar um clipe composto.");
+    const members = ids.map((id) => locate(project, id));
+    for (const { owner } of members) if (owner.locked) throw new Error(`Trilha bloqueada: ${owner.name}`);
+    for (const { clip } of members) clip.metadata = { ...clip.metadata, compoundGroupId: this.compoundGroupId, compoundName: this.name };
+    project.selection = { itemIds: ids, primaryId: ids.at(-1) ?? null, surface: "timeline" };
+    return project;
+  }
+  serialize() { return { type: this.type, payload: { clipIds: this.clipIds, compoundGroupId: this.compoundGroupId, name: this.name } }; }
+}
+
+export class DissolveCompoundClipCommand extends SnapshotCommand {
+  readonly type = "dissolveCompoundClip";
+  readonly renderImpact = "timeline" as const;
+  constructor(private readonly compoundGroupId: string) { super(); }
+  protected apply(project: EditorProjectV2) {
+    const members = project.tracks.flatMap((owner) => owner.clips.map((clip) => ({ owner, clip }))).filter(({ clip }) => clip.metadata?.["compoundGroupId"] === this.compoundGroupId);
+    if (!members.length) throw new Error("Clipe composto não encontrado.");
+    for (const { owner, clip } of members) {
+      if (owner.locked) throw new Error(`Trilha bloqueada: ${owner.name}`);
+      const { compoundGroupId: _group, compoundName: _name, ...metadata } = clip.metadata ?? {};
+      clip.metadata = metadata;
+    }
+    project.selection = { itemIds: members.map(({ clip }) => clip.id), primaryId: members.at(-1)?.clip.id ?? null, surface: "timeline" };
+    return project;
+  }
+  serialize() { return { type: this.type, payload: { compoundGroupId: this.compoundGroupId } }; }
+}
+
 export class AddMediaClipCommand extends SnapshotCommand {
   readonly type = "addMediaClip";
   readonly renderImpact = "full" as const;
@@ -352,6 +416,20 @@ export class UpdateTrackCommand extends SnapshotCommand {
   serialize() { return { type: this.type, payload: { trackId: this.trackId, patch: this.patch } }; }
 }
 
+export class AddTrackCommand extends SnapshotCommand {
+  readonly type = "addTrack";
+  readonly renderImpact = "full" as const;
+  constructor(private readonly newTrack: Track) { super(); }
+  protected apply(project: EditorProjectV2) {
+    if (project.tracks.some((item) => item.id === this.newTrack.id)) throw new Error(`A camada já existe: ${this.newTrack.name}`);
+    if (this.newTrack.kind === "video" || this.newTrack.kind === "captions") throw new Error("Use uma camada de sobreposição ou áudio adicional.");
+    project.tracks.push(cloneProjectValue(this.newTrack));
+    project.tracks.sort((a, b) => a.order - b.order);
+    return project;
+  }
+  serialize() { return { type: this.type, payload: { track: this.newTrack } }; }
+}
+
 export class UpdateAssetAnalysisCommand extends SnapshotCommand {
   readonly type = "updateAssetAnalysis";
   readonly renderImpact = "none" as const;
@@ -420,11 +498,24 @@ export class DuplicateClipsCommand extends SnapshotCommand {
     const selectionEnd = Math.max(...sources.map(({ clip }) => Number(clip.projectEnd)));
     const shift = this.offset ?? Math.max(0.04, selectionEnd - selectionStart);
     const copies: Clip[] = [];
+    const compoundCounts = new Map<string, number>();
+    for (const { clip } of sources) {
+      const groupId = clip.metadata?.["compoundGroupId"];
+      if (typeof groupId === "string") compoundCounts.set(groupId, (compoundCounts.get(groupId) ?? 0) + 1);
+    }
     for (const { clip, owner } of sources) {
       if (owner.locked) throw new Error(`Trilha bloqueada: ${owner.name}`);
       const copy = cloneProjectValue(clip);
       copy.id = `${clip.id}-copy-${this.suffix}-${copies.length + 1}`;
       copy.name = `${clip.name} · cópia`;
+      const sourceCompoundId = copy.metadata?.["compoundGroupId"];
+      if (typeof sourceCompoundId === "string") {
+        if ((compoundCounts.get(sourceCompoundId) ?? 0) > 1) copy.metadata = { ...copy.metadata, compoundGroupId: `${sourceCompoundId}-copy-${this.suffix}` };
+        else {
+          const { compoundGroupId: _group, compoundName: _name, ...metadata } = copy.metadata ?? {};
+          copy.metadata = metadata;
+        }
+      }
       shiftClip(copy, shift);
       if (copy.kind === "caption" && owner.kind === "captions" && "cues" in owner) {
         const sourceCue = owner.cues.find((cue) => cue.id === clip.metadata?.["captionCueId"]);

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Captions, ChevronDown, Copy, Eye, EyeOff, Film, FlipHorizontal2, FlipVertical2, Gauge, Headphones, Image, Lock, Magnet, Music2, Pause, Play, Rewind, RotateCcw, Scissors, Sparkles, Timer, Trash2, Unlock, Volume2, VolumeX, Waves } from "lucide-react";
-import { formatProjectTime, isTrackCompatible, snapProjectTime, visibleTimelineRange, type AnimatableProperty, type Clip, type EditorProjectV2, type Track } from "@/lib/editor-v2";
+import { Captions, ChevronDown, Copy, Eye, EyeOff, Film, FlipHorizontal2, FlipVertical2, Gauge, Group, Headphones, Image, Layers3, Lock, Magnet, Music2, Pause, Play, Rewind, RotateCcw, Scissors, Sparkles, Timer, Trash2, Ungroup, Unlock, Volume2, VolumeX, Waves } from "lucide-react";
+import { formatProjectTime, isTrackCompatible, snapProjectTime, visibleTimelineRange, type AnimatableProperty, type Clip, type EditorProjectV2, type Track, type TrackKind } from "@/lib/editor-v2";
 
 interface TimelineProps {
   project: EditorProjectV2;
@@ -26,6 +26,9 @@ interface TimelineProps {
   onBatchSpeed: (speed: number) => void;
   onBatchToggleReverse: () => void;
   onBatchToggleFlip: (axis: "horizontal" | "vertical") => void;
+  onCreateCompound: () => void;
+  onDissolveCompound: () => void;
+  onAddTrack: (kind: Exclude<TrackKind, "video" | "captions">) => void;
   onToggleSnap: () => void;
   onToggleRipple: () => void;
   onTrackPatch: (trackId: string, patch: Partial<Pick<Track, "muted" | "solo" | "gain" | "hidden" | "locked">>) => void;
@@ -40,11 +43,12 @@ const TRACK_HEIGHT = 48;
 const RULER_HEIGHT = 28;
 
 export function TimelineV2(props: TimelineProps) {
-  const { project, currentTime, playing, zoom, assetThumbnails, assetWaveforms, onZoom, onSeek, onSelect, onMove, onTrim, onMoveKeyframe, onSplit, onAutoSplit, onRemoveSilence, removingSilence, onDuplicate, onDelete, onTogglePlayback, onSkip, onBatchSpeed, onBatchToggleReverse, onBatchToggleFlip, onToggleSnap, onToggleRipple, onTrackPatch, onDropLibraryItem, onSelectTransition, onResizeTransition } = props;
+  const { project, currentTime, playing, zoom, assetThumbnails, assetWaveforms, onZoom, onSeek, onSelect, onMove, onTrim, onMoveKeyframe, onSplit, onAutoSplit, onRemoveSilence, removingSilence, onDuplicate, onDelete, onTogglePlayback, onSkip, onBatchSpeed, onBatchToggleReverse, onBatchToggleFlip, onCreateCompound, onDissolveCompound, onAddTrack, onToggleSnap, onToggleRipple, onTrackPatch, onDropLibraryItem, onSelectTransition, onResizeTransition } = props;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [autoCutOpen, setAutoCutOpen] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
+  const [layerOpen, setLayerOpen] = useState(false);
   const [transitionDraft, setTransitionDraft] = useState<{ id: string; duration: number } | null>(null);
   const [autoCutInterval, setAutoCutInterval] = useState(2);
   const [autoCutMode, setAutoCutMode] = useState<"interval" | "silence">("interval");
@@ -54,6 +58,8 @@ export function TimelineV2(props: TimelineProps) {
   const width = Math.max(900, project.settings.duration * pxPerSecond + 120);
   const visible = visibleTimelineRange(viewport.scrollLeft, viewport.width, TRACK_LABEL_WIDTH, pxPerSecond);
   const ticks = useMemo(() => Array.from({ length: Math.ceil(project.settings.duration) + 1 }, (_, index) => index), [project.settings.duration]).filter((tick) => tick >= visible.start - 1 && tick <= visible.end + 1);
+  const selectedClips = project.tracks.flatMap((track) => track.clips).filter((clip) => project.selection.itemIds.includes(clip.id));
+  const selectedCompoundIds = [...new Set(selectedClips.map((clip) => clip.metadata?.["compoundGroupId"]).filter((id): id is string => typeof id === "string"))];
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -208,12 +214,20 @@ export function TimelineV2(props: TimelineProps) {
               <button type="button" onClick={() => { onBatchToggleFlip("horizontal"); setBatchOpen(false); }} className="editor-tool-button justify-center"><FlipHorizontal2 className="size-3.5" />Horizontal</button>
               <button type="button" onClick={() => { onBatchToggleFlip("vertical"); setBatchOpen(false); }} className="editor-tool-button justify-center"><FlipVertical2 className="size-3.5" />Vertical</button>
             </div>
+            <div className="mt-2 grid grid-cols-2 gap-1 border-t border-white/8 pt-2">
+              <button type="button" disabled={selectedClips.length < 2} onClick={() => { onCreateCompound(); setBatchOpen(false); }} className="editor-tool-button justify-center disabled:cursor-not-allowed disabled:opacity-35"><Group className="size-3.5" />Criar composto</button>
+              <button type="button" disabled={selectedCompoundIds.length !== 1} onClick={() => { onDissolveCompound(); setBatchOpen(false); }} className="editor-tool-button justify-center disabled:cursor-not-allowed disabled:opacity-35"><Ungroup className="size-3.5" />Desagrupar</button>
+            </div>
           </div>}
         </div>
         <button type="button" onClick={onDelete} disabled={!project.selection.itemIds.length} className="editor-tool-button text-muted-foreground hover:text-destructive disabled:cursor-not-allowed disabled:opacity-30" aria-label="Excluir itens selecionados"><Trash2 className="size-3.5" /><span className="hidden xl:inline">Excluir</span></button>
         <span className="mx-1 h-5 w-px bg-white/8" />
         <button type="button" onClick={onToggleSnap} aria-pressed={project.settings.snapEnabled} className={`editor-tool-button ${project.settings.snapEnabled ? "text-primary" : ""}`}><Magnet className="size-3.5" /><span className="hidden md:inline">Ajuste</span></button>
         <button type="button" onClick={onToggleRipple} aria-pressed={project.settings.rippleEnabled} className={`editor-tool-button ${project.settings.rippleEnabled ? "text-primary" : ""}`}><Waves className="size-3.5" /><span className="hidden md:inline">Ripple</span></button>
+        <div className="relative">
+          <button type="button" onClick={() => setLayerOpen((open) => !open)} aria-expanded={layerOpen} className={`editor-tool-button ${layerOpen ? "text-primary" : ""}`}><Layers3 className="size-3.5" /><span className="hidden xl:inline">Camada</span><ChevronDown className="size-3" /></button>
+          {layerOpen && <div className="editor-auto-cut-popover absolute right-0 top-9 z-50 w-56 rounded-xl border border-white/10 p-2 shadow-2xl"><p className="px-2 pb-1 text-[9px] font-semibold text-foreground">Adicionar camada</p>{([['overlay','Sobreposição'],['voice','Voz'],['music','Música'],['sfx','Efeito sonoro']] as const).map(([kind, label]) => <button key={kind} type="button" onClick={() => { onAddTrack(kind); setLayerOpen(false); }} className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-[9px] text-muted-foreground hover:bg-primary/12 hover:text-primary"><TrackIcon kind={kind} />{label}</button>)}</div>}
+        </div>
         <div className="ml-auto flex items-center gap-2"><label htmlFor="timeline-zoom" className="text-[10px] text-muted-foreground">Zoom</label><input id="timeline-zoom" aria-label="Zoom da timeline" type="range" min="0.55" max="3" step="0.05" value={zoom} onChange={(event) => onZoom(Number(event.target.value))} className="w-20 accent-violet-500 sm:w-32" /><span className="w-8 text-right text-[10px] tabular-nums text-muted-foreground">{Math.round(zoom * 100)}%</span></div>
       </header>
 
@@ -232,7 +246,7 @@ export function TimelineV2(props: TimelineProps) {
                   const value = draft?.id === clip.id ? draft : { start: Number(clip.projectStart), end: Number(clip.projectEnd) };
                   const selected = project.selection.itemIds.includes(clip.id);
                   const thumbnail = clip.assetId ? assetThumbnails[clip.assetId] : undefined;
-                  const badges = [Math.abs(clip.playbackRate - 1) > .001 ? `${clip.playbackRate.toFixed(2).replace(/0$/, "")}×` : "", clip.reversed ? "REV" : "", clip.flipHorizontal ? "↔" : "", clip.flipVertical ? "↕" : ""].filter(Boolean);
+                  const badges = [clip.metadata?.["compoundGroupId"] ? "COMPOSTO" : "", Math.abs(clip.playbackRate - 1) > .001 ? `${clip.playbackRate.toFixed(2).replace(/0$/, "")}×` : "", clip.reversed ? "REV" : "", clip.flipHorizontal ? "↔" : "", clip.flipVertical ? "↕" : ""].filter(Boolean);
                   return <div key={clip.id} data-clip-id={clip.id} data-clip-kind={clip.kind} role="button" tabIndex={0} aria-label={`${clip.name}, de ${formatProjectTime(value.start)} até ${formatProjectTime(value.end)}`} aria-pressed={selected} onPointerDown={(event) => beginClipGesture(event, clip, "move")} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(clip.id, event.ctrlKey || event.metaKey || event.shiftKey); } }} className={`editor-v2-clip editor-v2-clip-${track.kind} absolute top-1.5 flex h-9 min-w-8 touch-none items-center overflow-hidden rounded-md px-2 text-[10px] font-medium text-white outline-none ring-inset transition-shadow focus-visible:ring-2 focus-visible:ring-white ${selected ? "is-selected ring-2 ring-white/80" : ""}`} style={{ left: value.start * pxPerSecond, width: Math.max(24, (value.end - value.start) * pxPerSecond), ...(thumbnail ? { backgroundImage: `linear-gradient(90deg,rgba(21,11,48,.28),rgba(21,11,48,.68)),url(${thumbnail})`, backgroundSize: "auto 100%", backgroundRepeat: "repeat-x" } : {}) }}>
                     {(track.kind === "voice" || track.kind === "music" || track.kind === "sfx") && <Waveform {...(clip.assetId && assetWaveforms[clip.assetId] ? { peaks: assetWaveforms[clip.assetId] } : {})} />}
                     <span className="relative z-10 truncate drop-shadow-sm">{clip.name}</span>

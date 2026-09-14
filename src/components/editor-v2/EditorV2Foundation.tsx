@@ -6,6 +6,7 @@ import {
   AddClipCommand,
   AddCaptionBatchCommand,
   AddMediaClipCommand,
+  AddTrackCommand,
   InsertMediaClipCommand,
   AutoSplitClipsCommand,
   RemoveSilenceCommand,
@@ -19,9 +20,11 @@ import {
   CompositionClock,
   DeleteClipsCommand,
   DeleteTransitionCommand,
+  DissolveCompoundClipCommand,
   DuplicateClipsCommand,
   EditorCommandBus,
   MoveClipCommand,
+  MoveCompoundClipCommand,
   MoveKeyframeCommand,
   RegisterExtractedAudioCommand,
   RestoreOriginalAudioCommand,
@@ -36,6 +39,7 @@ import {
   UpdateAssetAnalysisCommand,
   UpdateMediaAssetCommand,
   UpdateTransformAtTimeCommand,
+  CreateCompoundClipCommand,
   UpsertKeyframeCommand,
   UpsertAudioEnvelopePointCommand,
   analyzeAudioFile,
@@ -233,8 +237,14 @@ export function EditorV2Foundation() {
       return run(new SelectItemCommand([], surface));
     }
     lastSelectedClipIdRef.current = id;
-    const current = busRef.current.getState().selection.itemIds;
-    const ids = additive ? current.includes(id) ? current.filter((item) => item !== id) : [...current, id] : [id];
+    const state = busRef.current.getState();
+    const current = state.selection.itemIds;
+    const clicked = findClip(state, id);
+    const compoundGroupId = clicked?.metadata?.["compoundGroupId"];
+    const compoundIds = typeof compoundGroupId === "string"
+      ? state.tracks.flatMap((track) => track.clips).filter((clip) => clip.metadata?.["compoundGroupId"] === compoundGroupId).map((clip) => clip.id)
+      : [];
+    const ids = additive ? current.includes(id) ? current.filter((item) => item !== id) : [...current, id] : compoundIds.length > 1 ? compoundIds : [id];
     lastSelectedClipIdsRef.current = ids;
     run(new SelectItemCommand(ids, surface));
   }, [run]);
@@ -504,6 +514,29 @@ export function EditorV2Foundation() {
     const enabled = !targets.every((clip) => Boolean(clip[key]));
     run(new UpdateClipsCommand(targets.map((clip) => ({ clipId: clip.id, patch: { [key]: enabled } }))), `${targets.length} ${targets.length === 1 ? "item espelhado" : "itens espelhados"}.`);
   }, [run, selectedClipsForBatch]);
+
+  const createCompound = useCallback(() => {
+    const state = busRef.current.getState();
+    const ids = state.selection.itemIds.filter((id) => Boolean(findClip(state, id)));
+    if (ids.length < 2) return setMessage("Selecione pelo menos dois itens com Ctrl+clique para criar um clipe composto.");
+    const serial = state.revisions.document + 1;
+    run(new CreateCompoundClipCommand(ids, `compound-${serial}`, `Composto ${serial}`), `${ids.length} camadas agrupadas em um clipe composto editável.`);
+  }, [run]);
+
+  const dissolveCompound = useCallback(() => {
+    const state = busRef.current.getState();
+    const groups = [...new Set(state.selection.itemIds.map((id) => findClip(state, id)?.metadata?.["compoundGroupId"]).filter((id): id is string => typeof id === "string"))];
+    if (groups.length !== 1) return setMessage("Selecione um único clipe composto para desagrupar.");
+    run(new DissolveCompoundClipCommand(groups[0]!), "Clipe composto desagrupado; todas as camadas continuam editáveis.");
+  }, [run]);
+
+  const addTrack = useCallback((kind: "overlay" | "voice" | "music" | "sfx") => {
+    const state = busRef.current.getState();
+    const count = state.tracks.filter((track) => track.kind === kind).length + 1;
+    const labels = { overlay: "Sobreposição", voice: "Voz", music: "Música", sfx: "Efeitos sonoros" } as const;
+    const id = `track-${kind}-${state.revisions.document + 1}-${count}`;
+    run(new AddTrackCommand({ id, kind, name: `${labels[kind]} ${count}`, order: state.tracks.length, locked: false, hidden: false, muted: false, solo: false, gain: 1, clips: [] }), `${labels[kind]} ${count} adicionada à timeline.`);
+  }, [run]);
 
   const patchClipSelectionAware = useCallback((clipId: string, patch: Partial<Clip>) => {
     const state = busRef.current.getState();
@@ -1086,7 +1119,13 @@ export function EditorV2Foundation() {
     onZoom: setTimelineZoom,
     onSeek: seek,
     onSelect: (id: string, additive: boolean) => selectClip(id, additive, "timeline"),
-    onMove: (id: string, trackId: string, start: number) => run(new MoveClipCommand(id, trackId, start), "Clipe movido."),
+    onMove: (id: string, trackId: string, start: number) => {
+      const state = busRef.current.getState();
+      const clip = findClip(state, id);
+      const compoundGroupId = clip?.metadata?.["compoundGroupId"];
+      if (typeof compoundGroupId === "string") run(new MoveCompoundClipCommand(compoundGroupId, id, start), "Clipe composto movido com todas as camadas.");
+      else run(new MoveClipCommand(id, trackId, start), "Clipe movido.");
+    },
     onTrim: (id: string, start: number, end: number) => run(new TrimClipCommand(id, start, end), "Duração atualizada."),
     onMoveKeyframe: (id: string, property: AnimatableProperty, keyframeId: string, localTime: number) => run(new MoveKeyframeCommand(id, property, keyframeId, localTime), "Keyframe movido."),
     onSplit: split,
@@ -1100,6 +1139,9 @@ export function EditorV2Foundation() {
     onBatchSpeed: setSelectedSpeed,
     onBatchToggleReverse: toggleSelectedReverse,
     onBatchToggleFlip: toggleSelectedFlip,
+    onCreateCompound: createCompound,
+    onDissolveCompound: dissolveCompound,
+    onAddTrack: addTrack,
     onToggleSnap: () => run(new UpdateProjectSettingsCommand({ snapEnabled: !project.settings.snapEnabled })),
     onToggleRipple: () => run(new UpdateProjectSettingsCommand({ rippleEnabled: !project.settings.rippleEnabled })),
     onTrackPatch: (trackId: string, patch: Partial<Pick<Track, "muted" | "solo" | "gain" | "hidden" | "locked">>) => run(new UpdateTrackCommand(trackId, patch)),
