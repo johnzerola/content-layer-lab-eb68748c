@@ -1,12 +1,25 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ArrowRight, Check, Eye, EyeOff, Loader2, Sparkles, Zap } from "lucide-react";
+import {
+  ArrowRight,
+  Captions,
+  Check,
+  Eye,
+  EyeOff,
+  Heart,
+  Loader2,
+  Play,
+  Send,
+  Sparkles,
+  TrendingUp,
+  Zap,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resetPassword, signIn, signUp } from "@/lib/cloud";
 import { toast } from "sonner";
 
 const HIGHLIGHTS = [
-  { label: "Cortes virais gerados", value: "128K", tone: "primary" as const },
-  { label: "Vídeos publicados por dia", value: "3,4K", tone: "accent" as const },
+  { label: "Cortes virais gerados", value: 128, suffix: "K", tone: "primary" as const },
+  { label: "Vídeos publicados por dia", value: 3.4, suffix: "K", tone: "accent" as const },
 ];
 
 const FEATURES = [
@@ -14,6 +27,32 @@ const FEATURES = [
   "Legendas, vozes e branding aplicados em lote",
   "Publicação direta em TikTok, Reels e Shorts",
 ];
+
+function AnimatedNumber({ value, suffix }: { value: number; suffix: string }) {
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setDisplay(value);
+      return;
+    }
+
+    const duration = 1100;
+    const startedAt = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(value * eased);
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+
+  const formatted = value % 1 === 0 ? Math.round(display).toString() : display.toFixed(1).replace(".", ",");
+  return <>{formatted}{suffix}</>;
+}
 
 /**
  * Tela de acesso em split-screen: vitrine à esquerda (glow + motion),
@@ -80,12 +119,19 @@ export function AuthScreen({
   };
 
   return (
-    <div className="auth-screen auth-enter grid max-h-[94vh] w-full overflow-y-auto rounded-3xl border border-border bg-surface lg:max-h-[88vh] lg:grid-cols-[1.05fr_1fr] lg:overflow-hidden">
+    <div className="auth-screen auth-enter grid max-h-[94vh] w-full overflow-y-auto rounded-3xl border border-border bg-surface md:max-h-[90vh] md:grid-cols-[0.94fr_1fr] md:overflow-hidden lg:grid-cols-[1.05fr_1fr]">
       {/* ---------- vitrine ---------- */}
-      <aside className="auth-stage relative hidden flex-col justify-between overflow-hidden p-8 lg:flex">
-        <span aria-hidden className="auth-orb auth-orb-a" />
-        <span aria-hidden className="auth-orb auth-orb-b" />
+      <aside className="auth-stage relative hidden flex-col justify-between overflow-hidden p-6 md:flex lg:p-8">
+        <span aria-hidden className="auth-beam auth-beam-a" />
+        <span aria-hidden className="auth-beam auth-beam-b" />
         <span aria-hidden className="auth-grid" />
+        <div aria-hidden className="auth-floaters">
+          <span className="auth-floater auth-floater-play"><Play /></span>
+          <span className="auth-floater auth-floater-heart"><Heart /></span>
+          <span className="auth-floater auth-floater-send"><Send /></span>
+          <span className="auth-floater auth-floater-caption"><Captions /></span>
+          <span className="auth-floater auth-floater-trend"><TrendingUp /></span>
+        </div>
 
         <div className="relative">
           <span className="inline-flex items-center gap-2 rounded-full border border-border-hover bg-surface-2/70 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -106,7 +152,7 @@ export function AuthScreen({
           {HIGHLIGHTS.map((h, i) => (
             <div
               key={h.label}
-              className="auth-card rounded-2xl border border-border bg-surface-2/60 p-4"
+              className="auth-card rounded-xl border border-border bg-surface-2/60 p-3.5 lg:p-4"
               style={{ animationDelay: `${120 + i * 90}ms` }}
             >
               <p
@@ -114,7 +160,7 @@ export function AuthScreen({
                   h.tone === "primary" ? "text-gradient" : "text-foreground"
                 }`}
               >
-                {h.value}
+                <AnimatedNumber value={h.value} suffix={h.suffix} />
               </p>
               <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{h.label}</p>
             </div>
