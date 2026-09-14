@@ -1167,7 +1167,7 @@ export function TemplateEditor({
         </header>
 
         {/* Área de trabalho: ferramentas · palco · propriedades */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:min-h-[520px] lg:grid-cols-[276px_minmax(0,1fr)_348px] lg:overflow-hidden">
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[276px_minmax(0,1fr)_348px] lg:overflow-hidden">
           {/* Coluna esquerda: camadas e ajustes do template */}
           <aside className="flex min-h-0 flex-col border-border lg:border-r">
             <div className="grid grid-cols-4 gap-1 border-b border-border p-2">
@@ -1794,7 +1794,7 @@ export function TemplateEditor({
                 style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
               >
               <TemplateCanvas
-                frameClassName="aspect-[9/16] h-full max-h-[64vh] min-h-[300px] w-auto max-w-full rounded-xl shadow-[0_24px_60px_-24px_rgba(0,0,0,0.8)]"
+                frameClassName="aspect-[9/16] h-full max-h-[58vh] min-h-[200px] w-auto max-w-full rounded-xl shadow-[0_24px_60px_-24px_rgba(0,0,0,0.8)]"
                 template={t}
                 previewFile={previewFile ?? null}
                 timelineTime={time}
@@ -1872,7 +1872,7 @@ export function TemplateEditor({
             </span>
           </button>
           {timelineOpen && (
-            <div className="max-h-[34vh] min-h-[180px] overflow-y-auto px-3 pb-3">
+            <div className="max-h-[30vh] min-h-[120px] overflow-y-auto px-3 pb-3">
               <TemplateTimeline
                 template={t}
                 onChange={setT}
