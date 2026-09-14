@@ -180,7 +180,8 @@ export function AuthScreen({
           </div>
 
           <form
-            className="mt-5 space-y-4"
+            key={mode}
+            className="auth-swap mt-5 space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
               void submit();
