@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-09-13",
+  "purpose": "AUD-03 isolated Windows research runtime for the B2 MelBand-RoFormer recipe",
+  "status": "RESEARCH_RUNTIME_PASS",
+  "production_status": "NOT_INTEGRATED",
+  "runtime": {
+    "python": "3.11.9",
+    "environment": "C:/Users/DINO/AppData/Local/Temp/vaiviral-audio-separator-gpu",
+    "audio_separator": "0.47.0",
+    "torch": "2.14.0+cu130",
+    "torchvision": "0.29.0+cu130",
+    "onnxruntime_gpu": "1.30.0",
+    "cuda_runtime": "13.0"
+  },
+  "gpu": {
+    "name": "NVIDIA GeForce RTX 2060",
+    "driver": "610.47",
+    "memory_mib": 6144,
+    "compute_capability": "7.5"
+  },
+  "verified": {
+    "torch_cuda_available": true,
+    "cuda_matmul": true,
+    "onnxruntime_providers": [
+      "TensorrtExecutionProvider",
+      "CUDAExecutionProvider",
+      "CPUExecutionProvider"
+    ],
+    "pip_check": "No broken requirements found.",
+    "b2_synthetic_smoke": "output/audio-separation/aud03-b2-technical--15-run04/run-report.json",
+    "b2_real_smoke": "output/audio-separation/aud03-b2-real-smoke/run-report.json"
+  },
+  "artifact_evidence": {
+    "registry": "research/audio-separation/model-registry.json",
+    "freeze": "output/audio-separation/aud03-b2-runtime-freeze.txt"
+  },
+  "limits": [
+    "The environment path is a local research runtime and is not a production image.",
+    "The pip freeze records transitive versions, but production promotion still requires a locked build/image and security review.",
+    "Model quality and commercial checkpoint use remain separate gates."
+  ]
+}

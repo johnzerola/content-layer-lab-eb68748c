@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "scope": "SYNTHETIC_ENGINEERING_ONLY",
+  "human_speech": false,
+  "license": "Project-generated mathematical signals; no external media",
+  "sample_rate": 44100,
+  "channels": 2,
+  "sample_count": 88200,
+  "split": "development-controls",
+  "fixtures": [
+    {
+      "id": "technical--15",
+      "ratio_db": -15,
+      "music_gain": 4.6108471918358305,
+      "common_gain": 1.0,
+      "activity_samples": [
+        8821,
+        79380
+      ],
+      "files": {
+        "dialogue": {
+          "path": "../../output/audio-separation/aud00-controls/ratio--15-dialogue.wav",
+          "sha256": "359cad213d172f68241adac6bfdf05ca9db25f9e18337b44faf55fb0cb22d9bb"
+        },
+        "music": {
+          "path": "../../output/audio-separation/aud00-controls/ratio--15-music.wav",
+          "sha256": "5953860be7538fed440a080cf498fe3842b6f627dc9cf3952ca3b813c415a121"
+        },
+        "input": {
+          "path": "../../output/audio-separation/aud00-controls/ratio--15-input.wav",
+          "sha256": "fd41931c060ecbbab28023fc46406167ab3e004f8fd80254e0a8636641122886"
+        }
+      }
+    },
+    {
+      "id": "technical--10",
+      "ratio_db": -10,
+      "music_gain": 2.592869920107161,
+      "common_gain": 1.0,
+      "activity_samples": [
+        8821,
+        79380
+      ],
+      "files": {
+        "dialogue": {
+          "path": "../../output/audio-separation/aud00-controls/ratio--10-dialogue.wav",
+          "sha256": "359cad213d172f68241adac6bfdf05ca9db25f9e18337b44faf55fb0cb22d9bb"
+        },
+        "music": {
+          "path": "../../output/audio-separation/aud00-controls/ratio--10-music.wav",
+          "sha256": "56a0b8ef3ce2ec1aefb40b6af01d052ece64099d31e21de42f308cd00fc58ee7"
+        },
+        "input": {
+          "path": "../../output/audio-separation/aud00-controls/ratio--10-input.wav",
+          "sha256": "cd27aa388babd2d7ab2af6ba1acc447741ba7664d62d11e1292dc52e5bf0c880"
+        }
+      }
+    },
+    {
+      "id": "technical--5",
+      "ratio_db": -5,
+      "music_gain": 1.4580779069192555,
+      "common_gain": 1.0,
+      "activity_samples": [
+        8821,
+        79380
+      ],
+      "files": {
+        "dialogue": {
+          "path": "../../output/audio-separation/aud00-controls/ratio--5-dialogue.wav",
+          "sha256": "359cad213d172f68241adac6bfdf05ca9db25f9e18337b44faf55fb0cb22d9bb"
+        },
+        "music": {
+          "path": "../../output/audio-separation/aud00-controls/ratio--5-music.wav",
+          "sha256": "98cb27a54149999cb77a5d493d8a8c1f077c9c3bb965c430de0c74ab512b0281"
+        },
+        "input": {
+          "path": "../../output/audio-separation/aud00-controls/ratio--5-input.wav",
+          "sha256": "98bb8e299a2430e172632ac6bbbb8fa6e6a47f16555e566a8d0a3b32c44684a4"
+        }
+      }
+    },
+    {
+      "id": "technical-0",
+      "ratio_db": 0,
+      "music_gain": 0.8199374624077446,
+      "common_gain": 1.0,
+      "activity_samples": [
+        8821,
+        79380
+      ],
+      "files": {
+        "dialogue": {
+          "path": "../../output/audio-separation/aud00-controls/ratio-0-dialogue.wav",
+          "sha256": "359cad213d172f68241adac6bfdf05ca9db25f9e18337b44faf55fb0cb22d9bb"
+        },
+        "music": {
+          "path": "../../output/audio-separation/aud00-controls/ratio-0-music.wav",
+          "sha256": "d246addf3e9d8f66a1720f69fc4d70bc5f3bfc7208b6ebff5bb161d1e3f99581"
+        },
+        "input": {
+          "path": "../../output/audio-separation/aud00-controls/ratio-0-input.wav",
+          "sha256": "dab2c68ad9014909ddeaa4f5d0c9ff897cdf3eb36f312a9246e9b846b43f1ee1"
+        }
+      }
+    },
+    {
+      "id": "technical-5",
+      "ratio_db": 5,
+      "music_gain": 0.4610847191835831,
+      "common_gain": 1.0,
+      "activity_samples": [
+        8821,
+        79380
+      ],
+      "files": {
+        "dialogue": {
+          "path": "../../output/audio-separation/aud00-controls/ratio-5-dialogue.wav",
+          "sha256": "359cad213d172f68241adac6bfdf05ca9db25f9e18337b44faf55fb0cb22d9bb"
+        },
+        "music": {
+          "path": "../../output/audio-separation/aud00-controls/ratio-5-music.wav",
+          "sha256": "d94ac2c99365d8801158f7130aae6ed00a72871248e04c886eb190e10e57bf4c"
+        },
+        "input": {
+          "path": "../../output/audio-separation/aud00-controls/ratio-5-input.wav",
+          "sha256": "d33cf3c5c8a1c4a5ca5e747cbafb7df7e71eaf7c9af5f5b1b9502ebf4deb25f1"
+        }
+      }
+    },
+    {
+      "id": "technical-10",
+      "ratio_db": 10,
+      "music_gain": 0.2592869920107161,
+      "common_gain": 1.0,
+      "activity_samples": [
+        8821,
+        79380
+      ],
+      "files": {
+        "dialogue": {
+          "path": "../../output/audio-separation/aud00-controls/ratio-10-dialogue.wav",
+          "sha256": "359cad213d172f68241adac6bfdf05ca9db25f9e18337b44faf55fb0cb22d9bb"
+        },
+        "music": {
+          "path": "../../output/audio-separation/aud00-controls/ratio-10-music.wav",
+          "sha256": "9109621a27ab05d977d8dc1e0cc2ac622e05563735e8889dfb3d0208730932cd"
+        },
+        "input": {
+          "path": "../../output/audio-separation/aud00-controls/ratio-10-input.wav",
+          "sha256": "b9e56bb23d8567852c85b5f0d8e02ac28563e6d0c399612f1ece6f5f83ff656d"
+        }
+      }
+    }
+  ],
+  "perceptual_holdout": [],
+  "recipes": [
+    {
+      "id": "b0-htdemucs-cpu",
+      "model": "htdemucs",
+      "device": "cpu",
+      "timeout_seconds": 900,
+      "shifts": 0,
+      "segment": 7,
+      "overlap": 0.25
+    }
+  ]
+}

@@ -1,18 +1,22 @@
 /** Network lifecycle is separate from Web Audio so it can be regression tested. */
 export interface StemTicket {
+  jobId?: string;
   base: string;
   uploadToken: string;
   controlToken: string;
   resultToken: string;
   maxDuration: number;
+  recipe?: { id: string; revision: string };
 }
+
+export type StemJobNetworkStatus = "uploaded" | "queued" | "processing" | "downloading";
 
 export async function runStemJob(
   ticket: StemTicket,
   wav: Blob,
-  options: { signal?: AbortSignal; onStage?: (stage: string) => void } = {},
-): Promise<{ voice: Blob; music: Blob; duration: number }> {
-  const { signal, onStage } = options;
+  options: { signal?: AbortSignal; onStage?: (stage: string) => void; onStatus?: (status: StemJobNetworkStatus) => void | Promise<void>; pollIntervalMs?: number } = {},
+): Promise<{ voice: Blob; music: Blob; duration: number; engine?: string; model?: string; quality?: string }> {
+  const { signal, onStage, onStatus, pollIntervalMs = 2500 } = options;
   let started = false;
   const deadline = AbortSignal.timeout(17 * 60_000);
   const combined = signal ? AbortSignal.any([signal, deadline]) : deadline;
@@ -38,6 +42,7 @@ export async function runStemJob(
       body: wav,
       headers: { "content-type": "audio/wav" },
     });
+    await onStatus?.("uploaded");
     await request("/start", ticket.controlToken, { method: "POST" });
     onStage?.("Demucs separando voz e acompanhamento na Hostear…");
     while (true) {
@@ -45,6 +50,9 @@ export async function runStemJob(
         status: string;
         error?: string;
         duration?: number;
+        engine?: string;
+        model?: string;
+        quality?: string;
       };
       if (state.status === "failed" || state.status === "cancelled")
         throw new Error(state.error ?? "Separação cancelada.");
@@ -56,6 +64,7 @@ export async function runStemJob(
         )
           throw new Error("Duração inválida nas trilhas separadas.");
         onStage?.("Baixando as duas trilhas…");
+        await onStatus?.("downloading");
         const [voice, music] = await Promise.all(
           ["voice", "music"].map(async (stem) => {
             const response = await request(`/stems/${stem}`, ticket.resultToken);
@@ -67,9 +76,19 @@ export async function runStemJob(
             return blob;
           }),
         );
-        return { voice: voice!, music: music!, duration: state.duration! };
+        return {
+          voice: voice!,
+          music: music!,
+          duration: state.duration!,
+          ...(state.engine ? { engine: state.engine } : {}),
+          ...(state.model ? { model: state.model } : {}),
+          ...(state.quality ? { quality: state.quality } : {}),
+        };
       }
-      if (state.status !== "processing")
+      if (state.status === "queued") { onStage?.("Na fila para separar diálogo e música…"); await onStatus?.("queued"); }
+      else if (state.status === "uploaded") onStage?.("Áudio recebido; aguardando o processamento…");
+      else if (state.status === "processing") { onStage?.("Separando diálogo e música…"); await onStatus?.("processing"); }
+      else
         throw new Error("Estado inesperado no processamento de áudio.");
       await new Promise<void>((resolve, reject) => {
         const abort = () => {
@@ -79,7 +98,7 @@ export async function runStemJob(
         const timer = setTimeout(() => {
           combined.removeEventListener("abort", abort);
           resolve();
-        }, 2500);
+        }, Math.max(0, pollIntervalMs));
         combined.addEventListener("abort", abort, { once: true });
         if (combined.aborted) {
           combined.removeEventListener("abort", abort);

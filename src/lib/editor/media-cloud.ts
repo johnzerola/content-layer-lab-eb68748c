@@ -16,6 +16,14 @@ function safeName(name: string): string {
   return name.replace(/[^a-z0-9.\-_]+/gi, "-").slice(-80) || "video.mp4";
 }
 
+function audioExtension(type: string): string {
+  if (type.includes("mpeg") || type.includes("mp3")) return "mp3";
+  if (type.includes("mp4") || type.includes("aac")) return "m4a";
+  if (type.includes("ogg")) return "ogg";
+  if (type.includes("flac")) return "flac";
+  return "wav";
+}
+
 /** Envia o vídeo de origem e devolve o caminho salvo (ou null se não deu). */
 export async function uploadSourceFile(
   sourceId: string,
@@ -35,6 +43,24 @@ export async function uploadSourceFile(
   onProgress?.(1);
   if (error) return null;
   return path;
+}
+
+/** Persists a separated result under a job-owned private prefix. */
+export async function uploadAudioStem(
+  jobId: string,
+  role: "dialogue" | "music",
+  file: File,
+): Promise<string | null> {
+  if (!/^[0-9a-f-]{36}$/i.test(jobId) || file.size < 128 || file.size > MAX_UPLOAD) return null;
+  const { data: auth } = await supabase.auth.getUser();
+  const userId = auth.user?.id;
+  if (!userId) return null;
+  const path = `${userId}/audio-jobs/${jobId}/${role}.${audioExtension(file.type)}`;
+  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
+    upsert: true,
+    contentType: file.type || "audio/wav",
+  });
+  return error ? null : path;
 }
 
 /** Baixa o vídeo de origem salvo na conta. */

@@ -41,4 +41,5 @@ backend/storage/
 *.sw?
 # Local browser QA artifacts (may contain private project data)
 output/playwright/
+output/audio-separation/
 .playwright-mcp/

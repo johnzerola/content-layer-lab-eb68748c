@@ -23,22 +23,23 @@ function openDb(): Promise<IDBDatabase | null> {
   });
 }
 
-export async function persistSourceFile(sourceId: string, file: File): Promise<void> {
-  if (file.size > MAX_BYTES) return;
+export async function persistSourceFile(sourceId: string, file: File): Promise<boolean> {
+  if (file.size > MAX_BYTES) return false;
   const db = await openDb();
-  if (!db) return;
-  await new Promise<void>((resolve) => {
+  if (!db) return false;
+  const stored = await new Promise<boolean>((resolve) => {
     try {
       const tx = db.transaction(STORE, "readwrite");
       tx.objectStore(STORE).put({ name: file.name, type: file.type, blob: file }, sourceId);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => resolve();
-      tx.onabort = () => resolve();
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+      tx.onabort = () => resolve(false);
     } catch {
-      resolve();
+      resolve(false);
     }
   });
   db.close();
+  return stored;
 }
 
 export async function readSourceFile(sourceId: string): Promise<File | null> {

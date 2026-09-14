@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-09-13",
+  "policy": "A recipe remains blocked until every model/config file has an HTTPS source, SHA-256 and APPROVED_FOR_RESEARCH license status.",
+  "package_artifacts": [
+    {
+      "name": "demucs",
+      "version": "4.1.0",
+      "source_url": "https://files.pythonhosted.org/packages/68/93/6f338f3f5c53522406dc32cd3b8a59abde20ac80d33604aa9dc8c82450e5/demucs-4.1.0-py3-none-any.whl",
+      "sha256": "4916a804702033ce934a6cdfa7e38dde03f7a7a6e85f41d0120eefe9e2966758",
+      "license": "MIT",
+      "local_evidence": "G:/dowloand/teste/audio-separation-research-20260913/packages/demucs-4.1.0-py3-none-any.whl"
+    },
+    {
+      "name": "audio-separator",
+      "version": "0.47.0",
+      "source_url": "https://files.pythonhosted.org/packages/8c/ba/24b4a5d2147acf35012758c3de7d910399a55a8a4aa74f7a039af530a00d/audio_separator-0.47.0-py3-none-any.whl",
+      "sha256": "756f3b620d78e581a117c6b6d96fe4f0eafc3432ab2824cb11532b4868bfd9a8",
+      "license": "MIT",
+      "local_evidence": "G:/dowloand/teste/audio-separation-research-20260913/audio_separator-0.47.0-py3-none-any.whl"
+    },
+    {
+      "name": "torch",
+      "version": "2.14.0+cu130",
+      "source_url": "https://download.pytorch.org/whl/cu130/torch-2.14.0%2Bcu130-cp311-cp311-win_amd64.whl",
+      "sha256": "00fb5440e7560b3b21e5e24567c6096fec4ef65b50a7ef1a105ebed5755eef7e",
+      "license": "BSD-3-Clause",
+      "local_evidence": "G:/dowloand/teste/audio-separation-research-20260913/packages/torch-2.14.0+cu130-cp311-cp311-win_amd64.whl"
+    },
+    {
+      "name": "torchvision",
+      "version": "0.29.0+cu130",
+      "source_url": "https://download.pytorch.org/whl/cu130/torchvision-0.29.0%2Bcu130-cp311-cp311-win_amd64.whl",
+      "sha256": "a580d805c23960847317f3974f7586dd321af6e177018c459b90e493007aeb08",
+      "license": "BSD-3-Clause",
+      "local_evidence": "G:/dowloand/teste/audio-separation-research-20260913/packages/torchvision-0.29.0+cu130-cp311-cp311-win_amd64.whl"
+    }
+  ],
+  "recipes": [
+    {
+      "id": "b0-htdemucs-cpu",
+      "engine": "demucs",
+      "engine_version": "4.1.0",
+      "package_license": "MIT",
+      "code_repository": "https://github.com/facebookresearch/demucs",
+      "code_revision": "pypi-4.1.0+sha256:4916a804702033ce934a6cdfa7e38dde03f7a7a6e85f41d0120eefe9e2966758",
+      "model_name": "htdemucs",
+      "model_files": [
+        {
+          "filename": "955717e8-8726e21a.th",
+          "sha256": "8726e21a993978c7ba086d3872e7608d7d5bfca646ca4aca459ffda844faa8b4",
+          "source_url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/955717e8-8726e21a.th",
+          "artifact_license": "MIT",
+          "license_evidence_url": "https://github.com/facebookresearch/demucs/blob/main/LICENSE",
+          "license_status": "APPROVED_FOR_RESEARCH"
+        },
+        {
+          "filename": "htdemucs.yaml",
+          "sha256": "239c445d0b14454d541ad8bd9bb271c9e536d267e8a4625208744cbb2e7bb66c",
+          "source_url": "https://raw.githubusercontent.com/facebookresearch/demucs/main/demucs/remote/htdemucs.yaml",
+          "artifact_license": "MIT",
+          "license_evidence_url": "https://github.com/facebookresearch/demucs/blob/main/LICENSE",
+          "license_status": "APPROVED_FOR_RESEARCH"
+        }
+      ],
+      "expected_native_stems": ["drums", "bass", "other", "vocals"],
+      "output_semantics": {"vocals": "dialogue_candidate", "no_vocals": "music_background_candidate"},
+      "research_use_status": "APPROVED",
+      "commercial_use_status": "REVIEW_REQUIRED",
+      "redistribution_status": "REVIEW_REQUIRED",
+      "attribution": "Demucs and its authors; retain MIT notice.",
+      "known_training_datasets": ["MUSDB HQ", "private extra set of 800 songs"],
+      "provenance_unknowns": ["terms and composition of the private 800-song training set"],
+      "device": "cpu",
+      "precision": "fp32",
+      "sample_rate": 44100,
+      "channels": 2,
+      "timeout_seconds": 900,
+      "segment_seconds": 7,
+      "overlap": 0.25,
+      "shifts": 0,
+      "execution_status": "READY_FOR_RESEARCH",
+      "notes": "Existing production baseline frozen from the official Demucs release. Local verified cache: G:/dowloand/teste/audio-separation-research-20260913/models/demucs-4.1.0."
+    },
+    {
+      "id": "b1-htdemucs-ft-cpu",
+      "engine": "demucs",
+      "engine_version": "4.1.0",
+      "package_license": "MIT",
+      "code_repository": "https://github.com/facebookresearch/demucs",
+      "code_revision": "pypi-4.1.0+sha256:4916a804702033ce934a6cdfa7e38dde03f7a7a6e85f41d0120eefe9e2966758",
+      "model_name": "htdemucs_ft",
+      "model_files": [
+        {
+          "filename": "htdemucs_ft.th",
+          "sha256": null,
+          "source_url": null,
+          "artifact_license": "UNVERIFIED",
+          "license_evidence_url": null,
+          "license_status": "UNVERIFIED"
+        }
+      ],
+      "expected_native_stems": ["drums", "bass", "other", "vocals"],
+      "output_semantics": {"vocals": "dialogue_candidate", "no_vocals": "music_background_candidate"},
+      "research_use_status": "BLOCKED",
+      "commercial_use_status": "REVIEW_REQUIRED",
+      "redistribution_status": "REVIEW_REQUIRED",
+      "attribution": "Demucs and its authors; retain MIT notice.",
+      "known_training_datasets": ["MUSDB HQ", "private extra set of 800 songs"],
+      "provenance_unknowns": ["four checkpoint hashes and exact license evidence", "terms and composition of the private 800-song training set"],
+      "device": "cpu",
+      "precision": "fp32",
+      "sample_rate": 44100,
+      "channels": 2,
+      "timeout_seconds": 1800,
+      "segment_seconds": 7,
+      "overlap": 0.5,
+      "shifts": 1,
+      "execution_status": "BLOCKED_REGISTRY_INCOMPLETE",
+      "notes": "Quality control; expected to be materially slower and must be measured rather than assumed."
+    },
+    {
+      "id": "b2-melband-roformer-vocals-cuda",
+      "engine": "audio-separator",
+      "engine_version": "0.47.0",
+      "package_license": "MIT",
+      "code_repository": "https://github.com/nomadkaraoke/python-audio-separator",
+      "code_revision": "pypi-0.47.0+sha256:756f3b620d78e581a117c6b6d96fe4f0eafc3432ab2824cb11532b4868bfd9a8",
+      "model_name": "vocals_mel_band_roformer.ckpt",
+      "model_files": [
+        {
+          "filename": "vocals_mel_band_roformer.ckpt",
+          "sha256": "87201f4d31afb5bc79993230fc49446918425574db48c01c405e44f365c7559e",
+          "source_url": "https://github.com/nomadkaraoke/python-audio-separator/releases/download/model-configs/vocals_mel_band_roformer.ckpt",
+          "artifact_license": "MIT",
+          "license_evidence_url": "https://huggingface.co/KimberleyJSN/melbandroformer/commit/ac9b0614ab3cd7f77219e18ba494dfd93956c348",
+          "license_status": "APPROVED_FOR_RESEARCH"
+        },
+        {
+          "filename": "vocals_mel_band_roformer.yaml",
+          "sha256": "b958b29c8f7195f0d86bee6759a33980db675c4ecaf2fcaa80fa125828e6cd38",
+          "source_url": "https://github.com/nomadkaraoke/python-audio-separator/releases/download/model-configs/vocals_mel_band_roformer.yaml",
+          "artifact_license": "MIT",
+          "license_evidence_url": "https://github.com/nomadkaraoke/python-audio-separator/blob/main/LICENSE",
+          "license_status": "APPROVED_FOR_RESEARCH"
+        }
+      ],
+      "expected_native_stems": ["Vocals", "Other"],
+      "output_semantics": {"Vocals": "dialogue_candidate", "Other": "music_background_candidate"},
+      "research_use_status": "APPROVED",
+      "commercial_use_status": "REVIEW_REQUIRED",
+      "redistribution_status": "REVIEW_REQUIRED",
+      "attribution": "Kimberley Jensen; Mel-Band RoFormer authors; python-audio-separator and its contributors. Retain MIT notices.",
+      "known_training_datasets": [],
+      "provenance_unknowns": ["training dataset composition and terms"],
+      "device": "cuda",
+      "precision": "autocast",
+      "sample_rate": 44100,
+      "channels": 2,
+      "timeout_seconds": 1800,
+      "segment_seconds": null,
+      "overlap": null,
+      "shifts": 0,
+      "execution_status": "READY_FOR_RESEARCH",
+      "notes": "The adapter release checkpoint hashes exactly to the author's published source SHA-256. Verified cache: G:/dowloand/teste/audio-separation-research-20260913/models/audio-separator-0.47.0. Commercial use and redistribution remain gated separately from research execution."
+    },
+    {
+      "id": "b3-mdx-inst-hq5-cuda",
+      "engine": "audio-separator",
+      "engine_version": "0.47.0",
+      "package_license": "MIT",
+      "code_repository": "https://github.com/nomadkaraoke/python-audio-separator",
+      "code_revision": "pypi-0.47.0+sha256:756f3b620d78e581a117c6b6d96fe4f0eafc3432ab2824cb11532b4868bfd9a8",
+      "model_name": "UVR-MDX-NET-Inst_HQ_5.onnx",
+      "model_files": [
+        {
+          "filename": "UVR-MDX-NET-Inst_HQ_5.onnx",
+          "sha256": null,
+          "source_url": null,
+          "artifact_license": "UNVERIFIED",
+          "license_evidence_url": null,
+          "license_status": "UNVERIFIED"
+        }
+      ],
+      "expected_native_stems": ["Vocals", "Instrumental"],
+      "output_semantics": {"Vocals": "dialogue_candidate", "Instrumental": "music_background_candidate"},
+      "research_use_status": "BLOCKED",
+      "commercial_use_status": "BLOCKED_PENDING_REVIEW",
+      "redistribution_status": "BLOCKED_PENDING_REVIEW",
+      "attribution": "Wrapper, UVR, MDX-Net and checkpoint author attribution pending final evidence.",
+      "known_training_datasets": [],
+      "provenance_unknowns": ["checkpoint license", "training datasets", "full SHA-256 value"],
+      "device": "cuda",
+      "precision": "fp32",
+      "sample_rate": 44100,
+      "channels": 2,
+      "timeout_seconds": 1200,
+      "segment_seconds": null,
+      "overlap": 0.25,
+      "shifts": 0,
+      "execution_status": "BLOCKED_REGISTRY_INCOMPLETE",
+      "notes": "Bundled catalog entry; included as an independent MDX control, not as an ensemble member."
+    }
+  ]
+}

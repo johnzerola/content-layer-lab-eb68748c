@@ -55,6 +55,28 @@ describe("real audio separation", () => {
     expect(fetcher.mock.calls.some(([url]) => url.includes("/stems/"))).toBe(false);
   });
 
+  it("treats queued as a real resumable state instead of an error", async () => {
+    const states = [
+      { status: "queued" },
+      { status: "processing" },
+      { status: "completed", duration: 5 },
+    ];
+    const stages: string[] = [];
+    const statuses: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.endsWith("/upload") || url.endsWith("/start")) return json({});
+      if (url.includes("/stems/")) return new Response(new Uint8Array(256), { headers: { "content-type": "audio/wav" } });
+      return json(states.shift());
+    }));
+
+    const result = await runStemJob(ticket, new Blob(["wav"]), { pollIntervalMs: 0, onStage: stage => stages.push(stage), onStatus: status => statuses.push(status) });
+
+    expect(result.duration).toBe(5);
+    expect(stages).toContain("Na fila para separar diálogo e música…");
+    expect(stages).toContain("Separando diálogo e música…");
+    expect(statuses).toEqual(["uploaded", "queued", "processing", "downloading"]);
+  });
+
   it("cancels when a start response is lost", async () => {
     const fetcher = vi.fn(async (url: string) => {
       if (url.endsWith("/start")) throw new Error("network");

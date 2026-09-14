@@ -1,0 +1,23 @@
+{
+  "status": "NEURAL_BASELINE_NOT_RUN",
+  "reason": "Demucs absent in current Python; licensed speech/music GT not yet supplied",
+  "python": "3.13.5 (tags/v3.13.5:6cb20a2, Jun 11 2025, 16:15:46) [MSC v.1943 64 bit (AMD64)]",
+  "revision": "fed54ca732ac7f05e85e6ffa40a0c6173f956c3e",
+  "files": {
+    "scripts/benchmark_audio_separation.py": "962bbd3333e1f0de98ae544fc7d0e43f08cff5244b0e8a810ad3a4a65d79cc20",
+    "scripts/validate_audio_stems.py": "c7a13b6977a5cc4b5216efdb7e8731737511a8392adde5cbfcbc5a0a89713ac4",
+    "backend/app/audio_separation.py": "c6e755943a296c3ff86edfa55e3ac791b301dd1a2279b3c0bf5103e249e86ff5",
+    "src/lib/editor/stems.ts": "d055e298d60c14d088e9786571550b5bc391a67b8530ec931882e186ab3ca627"
+  },
+  "ffmpeg": "ffmpeg version 8.1.1-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+  "perceptual_quality": null,
+  "engineering_tests": 27,
+  "engineering_status": "PASS_INITIAL_CONTROLS",
+  "neural_inference": "NOT_RUN",
+  "human_listening": "NOT_RUN",
+  "remaining": [
+    "licensed speech/music fixtures",
+    "external cancellation request validation",
+    "real B0 baseline"
+  ]
+}
