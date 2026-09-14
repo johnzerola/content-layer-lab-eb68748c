@@ -15,11 +15,14 @@ export function AuthGate({
   title = "Entre para usar o CleanerIA",
   description = "Os jobs de limpeza ficam salvos na sua conta com histórico e link de download.",
   fallbackExtra,
+  variant = "card",
 }: {
   children: ReactNode;
   title?: string;
   description?: string;
   fallbackExtra?: ReactNode;
+  /** "split" mostra a tela de acesso completa (vitrine + formulário). */
+  variant?: "card" | "split";
 }) {
   const [user, setUser] = useState<CloudUser | null>(null);
   const [ready, setReady] = useState(false);
