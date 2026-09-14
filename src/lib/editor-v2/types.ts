@@ -131,6 +131,10 @@ export interface Clip {
   sourceIn: number;
   sourceOut: number;
   playbackRate: number;
+  /** Plays the visual source from sourceOut back to sourceIn. Embedded audio is muted. */
+  reversed?: boolean;
+  flipHorizontal?: boolean;
+  flipVertical?: boolean;
   enabled: boolean;
   effects: EffectInstance[];
   animations: AnimationTrack[];

@@ -10,12 +10,19 @@ export interface ClockSnapshot {
 export function projectToSourceTime(clip: Clip, time: ProjectTime): number | null {
   const value = Number(time);
   if (value < Number(clip.projectStart) || value > Number(clip.projectEnd)) return null;
-  return Math.min(clip.sourceOut, clip.sourceIn + (value - Number(clip.projectStart)) * clip.playbackRate);
+  const elapsed = Math.max(0, value - Number(clip.projectStart));
+  const sourceTime = clip.reversed
+    ? clip.sourceOut - elapsed * clip.playbackRate
+    : clip.sourceIn + elapsed * clip.playbackRate;
+  return Math.max(clip.sourceIn, Math.min(clip.sourceOut, sourceTime));
 }
 
 export function sourceToProjectTime(clip: Clip, sourceTime: number): ProjectTime | null {
   if (sourceTime < clip.sourceIn || sourceTime > clip.sourceOut) return null;
-  return asProjectTime(Number(clip.projectStart) + (sourceTime - clip.sourceIn) / clip.playbackRate);
+  const elapsed = clip.reversed
+    ? (clip.sourceOut - sourceTime) / clip.playbackRate
+    : (sourceTime - clip.sourceIn) / clip.playbackRate;
+  return asProjectTime(Number(clip.projectStart) + elapsed);
 }
 
 export class CompositionClock {

@@ -69,7 +69,7 @@ describe("real audio separation", () => {
       return json(states.shift());
     }));
 
-    const result = await runStemJob(ticket, new Blob(["wav"]), { pollIntervalMs: 0, onStage: stage => stages.push(stage), onStatus: status => statuses.push(status) });
+    const result = await runStemJob(ticket, new Blob(["wav"]), { pollIntervalMs: 0, onStage: stage => { stages.push(stage); }, onStatus: status => { statuses.push(status); } });
 
     expect(result.duration).toBe(5);
     expect(stages).toContain("Na fila para separar diálogo e música…");

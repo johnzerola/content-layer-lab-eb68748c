@@ -4,6 +4,8 @@ import { FrameReader, type DecodedFrame } from "@/lib/decode";
 import { pickAudioCodec, pickBitrate, pickVideoCodec } from "@/lib/encode-presets";
 import { drawSticker, type StickerId } from "@/lib/editor/stickers";
 import { resolveAudioMixFrame } from "./audio";
+import { asProjectTime } from "./types";
+import { projectToSourceTime } from "./clock";
 import {
   createEditorRenderManifest,
   editorProjectFromManifest,
@@ -44,9 +46,9 @@ function activeAudioAssetIds(manifest: EditorRenderManifestV2): Set<string> {
     if (group.musicClipId) groupsByClip.set(group.musicClipId, group);
   }
   for (const clip of manifest.audioClips) {
-    const group = groupsByClip.get(clip.clipId);
-    if (!group || group.activeRepresentation === "extracted" && group.extractedClipId === clip.clipId
-      || group.activeRepresentation === "separated" && (group.dialogueClipId === clip.clipId || group.musicClipId === clip.clipId)) {
+    const group = groupsByClip.get(clip.id);
+    if (!group || group.activeRepresentation === "extracted" && group.extractedClipId === clip.id
+      || group.activeRepresentation === "separated" && (group.dialogueClipId === clip.id || group.musicClipId === clip.id)) {
       result.add(clip.assetId);
     }
   }
@@ -118,7 +120,8 @@ async function renderAudioFromManifest(
         for (let channel = 0; channel < channels; channel += 1) {
           const sourceChannel = source.getChannelData(Math.min(channel, source.numberOfChannels - 1));
           const value = sourceChannel[left]! * (1 - fraction) + sourceChannel[left + 1]! * fraction;
-          planes[channel]![offset + index] += value * layer.gain;
+          const plane = planes[channel];
+          if (plane) plane[offset + index] = (plane[offset + index] ?? 0) + value * layer.gain;
         }
       }
     }
@@ -131,7 +134,7 @@ async function renderAudioFromManifest(
   const limiterGain = peak > 1 ? 1 / peak : 1;
   if (limiterGain < 1) {
     for (const plane of planes) {
-      for (let index = 0; index < plane.length; index += 1) plane[index] *= limiterGain;
+      for (let index = 0; index < plane.length; index += 1) plane[index] = (plane[index] ?? 0) * limiterGain;
     }
   }
   return { planes, channels, sampleRate };
@@ -275,7 +278,10 @@ async function drawLayer(
   ctx.globalAlpha = Math.max(0, Math.min(1, transform.opacity * layer.transition.opacity * layer.presentation.opacity));
   ctx.translate(centerX, centerY);
   ctx.rotate((transform.rotation + layer.presentation.rotation) * Math.PI / 180);
-  ctx.scale(transform.scale * layer.transition.scale * layer.presentation.scale, transform.scale * layer.transition.scale * layer.presentation.scale);
+  const visualScale = transform.scale * layer.transition.scale * layer.presentation.scale;
+  const flipX = (clip.kind === "video" || clip.kind === "image") && clip.flipHorizontal ? -1 : 1;
+  const flipY = (clip.kind === "video" || clip.kind === "image") && clip.flipVertical ? -1 : 1;
+  ctx.scale(visualScale * flipX, visualScale * flipY);
   ctx.filter = layer.presentation.filter;
   if (clip.assetId && clip.kind === "image") {
     const image = images.get(clip.assetId);
@@ -283,7 +289,7 @@ async function drawLayer(
   } else if (clip.assetId && clip.kind === "video") {
     const cursor = videos.get(clip.assetId);
     if (!cursor) throw new Error(`Vídeo indisponível para o clipe ${clip.name}.`);
-    const sourceTime = clip.sourceIn + Math.max(0, time - Number(clip.projectStart)) * clip.playbackRate;
+    const sourceTime = projectToSourceTime(clip, asProjectTime(time)) ?? clip.sourceIn;
     const frame = await frameAt(cursor, sourceTime);
     objectCover(ctx, frame, frame.displayWidth, frame.displayHeight, boxWidth, boxHeight);
   } else if (layer.caption) {

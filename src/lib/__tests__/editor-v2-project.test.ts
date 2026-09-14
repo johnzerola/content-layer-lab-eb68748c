@@ -1,6 +1,7 @@
 ﻿import { describe, expect, it } from "vitest";
 import { AddCaptionBatchCommand, AddCaptionCueCommand, AddClipCommand, AddMediaClipCommand, ApplyCaptionPresetCommand, ApplySeparatedAudioCommand, ApplyTemplateCommand, ApplyTransitionCommand, CompositionClock, DeleteAudioEnvelopePointCommand, DeleteClipCommand, DeleteClipsCommand, DeleteKeyframeCommand, DuplicateClipsCommand, EditorCommandBus, MoveClipCommand, MoveKeyframeCommand, RegisterExtractedAudioCommand, RestoreOriginalAudioCommand, SelectItemCommand, SetAudioRepresentationCommand, SplitClipCommand, TrimClipCommand, UpdateClipCommand, UpdateProjectSettingsCommand, UpdateTrackCommand, UpdateTransformAtTimeCommand, UpsertAudioEnvelopePointCommand, UpsertKeyframeCommand, adaptEditorProjectV1, asProjectTime, buildExtractedAudioMedia, buildSeparatedAudioMedia, clipAudioGainAt, createCaptionBatch, createCaptionBatchFromTimedWords, createEditorProjectV2, createEditorRenderManifest, createStemAsset, editorProjectFromManifest, interpolateKeyframes, isEditorV2Enabled, isTrackCompatible, parseTimedText, projectToSourceTime, resolveAnimatedTransform, resolveAudioMixFrame, resolveAudioRenderFrameFromManifest, resolveCaptionInsertion, resolveClipPresentation, resolveCompositionFrame, resolveCompositionFrameFromManifest, resolveLibraryInsertion, resolveTemplateApplication, snapProjectTime, sourceToProjectTime, summarizeWaveform, visibleTimelineRange, type AudioSourceGroup, type Clip, type MediaAsset } from "@/lib/editor-v2";
 import { BUILT_IN_LIBRARY_ITEMS, type CaptionPresetDefinition, type LibraryItem, type TemplateDefinition } from "@/lib/editor-v2/library";
+import { AutoSplitClipsCommand } from "@/lib/editor-v2";
 import { createEditorProject } from "@/lib/editor/project";
 
 function clip(): Clip {
@@ -23,6 +24,13 @@ describe("ProjectTime e CompositionClock", () => {
     expect(projectToSourceTime(clip(), asProjectTime(1))).toBeNull();
   });
 
+  it("mapeia vídeo revertido sem criar outro relógio", () => {
+    const reversed = { ...clip(), reversed: true };
+    expect(projectToSourceTime(reversed, asProjectTime(2))).toBe(15);
+    expect(projectToSourceTime(reversed, asProjectTime(7))).toBe(10);
+    expect(sourceToProjectTime(reversed, 10)).toBe(7);
+  });
+
   it("publica o clip ativo sem criar um segundo relógio", () => {
     const clock = new CompositionClock(() => [clip()]);
     expect(clock.seek(8)).toMatchObject({ projectTime: 8, sourceTime: 11, activeClipId: "clip-1" });
@@ -43,6 +51,33 @@ describe("Command bus", () => {
     expect(bus.getState().tracks[0]!.clips).toHaveLength(1);
     bus.redo();
     expect(bus.getState().tracks[0]!.clips).toHaveLength(2);
+  });
+
+  it("divide vídeos automaticamente em uma ação reversível", () => {
+    const source = { ...clip(), projectStart: asProjectTime(0), projectEnd: asProjectTime(6.5), sourceIn: 0, sourceOut: 6.5 };
+    const bus = new EditorCommandBus(createEditorProjectV2({ duration: 6.5 }));
+    bus.execute(new AddClipCommand(source));
+    const command = new AutoSplitClipsCommand([source.id], 2, "fixture");
+    bus.execute(command);
+    expect(bus.getState().tracks[0]!.clips.map((item) => [item.projectStart, item.projectEnd, item.sourceIn, item.sourceOut])).toEqual([
+      [0, 2, 0, 2], [2, 4, 2, 4], [4, 6, 4, 6], [6, 6.5, 6, 6.5],
+    ]);
+    expect(bus.getState().selection.itemIds).toHaveLength(4);
+    expect(command.serialize()).toMatchObject({ type: "autoSplitClips", payload: { interval: 2 } });
+    bus.undo();
+    expect(bus.getState().tracks[0]!.clips).toHaveLength(1);
+    bus.redo();
+    expect(bus.getState().tracks[0]!.clips).toHaveLength(4);
+  });
+
+  it("preserva a ordem da fonte ao cortar um vídeo revertido", () => {
+    const reversed = { ...clip(), projectStart: asProjectTime(0), projectEnd: asProjectTime(6), sourceIn: 0, sourceOut: 6, reversed: true };
+    const bus = new EditorCommandBus(createEditorProjectV2({ duration: 6 }));
+    bus.execute(new AddClipCommand(reversed));
+    bus.execute(new AutoSplitClipsCommand([reversed.id], 2, "reverse"));
+    expect(bus.getState().tracks[0]!.clips.map((item) => [item.sourceIn, item.sourceOut, item.reversed])).toEqual([
+      [4, 6, true], [2, 4, true], [0, 2, true],
+    ]);
   });
 
   it("faz trim com undo e preserva mapeamento da fonte", () => {
@@ -421,6 +456,22 @@ describe("áudio e performance da Fase 5", () => {
     expect(resolveAudioMixFrame(project, 33).find((layer) => layer.clipId === video.id)).toMatchObject({ gain: 0, muted: true });
   });
 
+  it("mantém o áudio incorporado ligado aos cortes e o silencia quando o trecho é revertido", () => {
+    const project = createEditorProjectV2({ duration: 6 });
+    const video: Clip = { ...clip(), id: "cut-video", assetId: "cut-asset", projectStart: asProjectTime(0), projectEnd: asProjectTime(6), sourceIn: 0, sourceOut: 6 };
+    project.tracks.find((track) => track.id === "track-video")!.clips.push(video);
+    project.audioGroups.push({ id: "cut-group", sourceAssetId: video.assetId!, sourceStreamIndex: 0, sourceVideoClipId: video.id, activeRepresentation: "embedded", linkedEditing: true, sourceRevision: 0 });
+    const bus = new EditorCommandBus(project);
+    bus.execute(new AutoSplitClipsCommand([video.id], 2, "audio"));
+    const middle = bus.getState().tracks[0]!.clips[1]!;
+    expect(resolveAudioMixFrame(bus.getState(), 3)).toMatchObject([{ clipId: middle.id, sourceTime: 3, muted: false }]);
+    bus.execute(new UpdateClipCommand(middle.id, { reversed: true }));
+    expect(resolveAudioMixFrame(bus.getState(), 3)).toMatchObject([{ clipId: middle.id, gain: 0, muted: true }]);
+    bus.execute(new DeleteClipCommand(video.id));
+    expect(bus.getState().audioGroups[0]?.sourceVideoClipId).toBe(middle.id);
+    expect(resolveAudioMixFrame(bus.getState(), 5).map((layer) => layer.clipId)).toEqual([bus.getState().tracks[0]!.clips[1]!.id]);
+  });
+
   it("importa vídeo e seu grupo embutido na mesma revisão com undo e redo", () => {
     const project = createEditorProjectV2({ duration: 8 });
     const license: MediaAsset["license"] = { provider: "teste", sourceUrl: "fixture", licenseType: "fixture", licenseUrl: "fixture", author: "teste", attributionRequired: false, commercialUseAllowed: true, redistributionAllowed: false };
@@ -458,11 +509,14 @@ describe("pacote criativo profissional", () => {
     expect(frame.translateX).toBeLessThan(0);
     expect(frame.filter).toContain("saturate");
     expect(frame.overlay).toBe("#ffffff");
+    creative.reversed = true;
+    creative.flipHorizontal = true;
+    creative.flipVertical = true;
     const project = createEditorProjectV2({ duration: 4 });
     project.tracks[0]!.clips.push(creative);
     expect(resolveCompositionFrame(project, .5)[0]!.presentation).toEqual(frame);
     const manifest = JSON.parse(JSON.stringify(createEditorRenderManifest(project)));
-    expect(manifest.visualClips[0]).toMatchObject({ effects: [{ definitionId: "flash" }], motion: { in: { id: "slide-left" } } });
+    expect(manifest.visualClips[0]).toMatchObject({ reversed: true, flipHorizontal: true, flipVertical: true, effects: [{ definitionId: "flash" }], motion: { in: { id: "slide-left" } } });
     expect(resolveCompositionFrameFromManifest(manifest, .5)).toEqual(resolveCompositionFrame(project, .5));
   });
 

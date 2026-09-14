@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Captions, Copy, Eye, EyeOff, Film, Headphones, Image, Lock, Magnet, Music2, Scissors, Sparkles, Unlock, Volume2, VolumeX, Waves } from "lucide-react";
+import { Captions, Copy, Eye, EyeOff, Film, Headphones, Image, Lock, Magnet, Music2, Scissors, Sparkles, Timer, Unlock, Volume2, VolumeX, Waves } from "lucide-react";
 import { formatProjectTime, isTrackCompatible, snapProjectTime, visibleTimelineRange, type AnimatableProperty, type Clip, type EditorProjectV2, type Track } from "@/lib/editor-v2";
 
 interface TimelineProps {
@@ -15,6 +15,7 @@ interface TimelineProps {
   onTrim: (clipId: string, start: number, end: number) => void;
   onMoveKeyframe: (clipId: string, property: AnimatableProperty, keyframeId: string, localTime: number) => void;
   onSplit: () => void;
+  onAutoSplit: (interval: number) => void;
   onDuplicate: () => void;
   onToggleSnap: () => void;
   onToggleRipple: () => void;
@@ -28,9 +29,11 @@ const TRACK_HEIGHT = 48;
 const RULER_HEIGHT = 28;
 
 export function TimelineV2(props: TimelineProps) {
-  const { project, currentTime, zoom, assetThumbnails, assetWaveforms, onZoom, onSeek, onSelect, onMove, onTrim, onMoveKeyframe, onSplit, onDuplicate, onToggleSnap, onToggleRipple, onTrackPatch, onDropLibraryItem } = props;
+  const { project, currentTime, zoom, assetThumbnails, assetWaveforms, onZoom, onSeek, onSelect, onMove, onTrim, onMoveKeyframe, onSplit, onAutoSplit, onDuplicate, onToggleSnap, onToggleRipple, onTrackPatch, onDropLibraryItem } = props;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [autoCutOpen, setAutoCutOpen] = useState(false);
+  const [autoCutInterval, setAutoCutInterval] = useState(2);
   const [viewport, setViewport] = useState({ scrollLeft: 0, width: 1200 });
   const pxPerSecond = 52 * zoom;
   const width = Math.max(900, project.settings.duration * pxPerSecond + 120);
@@ -116,6 +119,16 @@ export function TimelineV2(props: TimelineProps) {
     <section className="editor-v2-timeline flex h-full min-h-0 flex-col" aria-label="Timeline multitrack">
       <header className="editor-v2-timeline-toolbar flex h-11 shrink-0 items-center gap-1 px-2 sm:px-3">
         <button type="button" onClick={onSplit} className="editor-tool-button"><Scissors className="size-3.5" /><span className="hidden sm:inline">Dividir</span></button>
+        <div className="relative">
+          <button type="button" aria-label="Cortes automáticos" title="Cortar seleção por intervalo" onClick={() => setAutoCutOpen((open) => !open)} aria-expanded={autoCutOpen} className={`editor-tool-button ${autoCutOpen ? "text-primary" : ""}`}><Timer className="size-3.5" /><span className="hidden xl:inline">Cortes automáticos</span></button>
+          {autoCutOpen && <form onSubmit={(event) => { event.preventDefault(); onAutoSplit(autoCutInterval); setAutoCutOpen(false); }} className="editor-auto-cut-popover absolute left-0 top-9 z-50 w-64 rounded-xl border border-white/10 p-3 shadow-2xl">
+            <p className="text-[11px] font-semibold text-foreground">Cortar por intervalo</p>
+            <p className="mt-1 text-[9px] leading-relaxed text-muted-foreground">Divide todos os vídeos selecionados em partes iguais. Uma ação, um Ctrl+Z.</p>
+            <label className="mt-3 block text-[9px] text-muted-foreground">Intervalo em segundos<input autoFocus aria-label="Intervalo dos cortes automáticos em segundos" type="number" min="0.25" max="60" step="0.25" value={autoCutInterval} onChange={(event) => setAutoCutInterval(Number(event.target.value))} className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-black/30 px-2 text-xs tabular-nums text-foreground" /></label>
+            <div className="mt-2 grid grid-cols-4 gap-1">{[1, 2, 3, 5].map((value) => <button key={value} type="button" onClick={() => setAutoCutInterval(value)} className={`h-7 rounded-md text-[9px] ${autoCutInterval === value ? "bg-primary text-white" : "bg-white/5 text-muted-foreground hover:text-white"}`}>{value}s</button>)}</div>
+            <button type="submit" className="editor-primary-button mt-3 h-8 w-full rounded-lg text-[10px] font-semibold text-white">Aplicar cortes</button>
+          </form>}
+        </div>
         <button type="button" onClick={onDuplicate} className="editor-tool-button"><Copy className="size-3.5" /><span className="hidden sm:inline">Duplicar</span></button>
         <span className="mx-1 h-5 w-px bg-white/8" />
         <button type="button" onClick={onToggleSnap} aria-pressed={project.settings.snapEnabled} className={`editor-tool-button ${project.settings.snapEnabled ? "text-primary" : ""}`}><Magnet className="size-3.5" /><span className="hidden md:inline">Ajuste</span></button>
@@ -138,9 +151,11 @@ export function TimelineV2(props: TimelineProps) {
                   const value = draft?.id === clip.id ? draft : { start: Number(clip.projectStart), end: Number(clip.projectEnd) };
                   const selected = project.selection.itemIds.includes(clip.id);
                   const thumbnail = clip.assetId ? assetThumbnails[clip.assetId] : undefined;
-                  return <div key={clip.id} data-clip-id={clip.id} role="button" tabIndex={0} aria-label={`${clip.name}, de ${formatProjectTime(value.start)} até ${formatProjectTime(value.end)}`} aria-pressed={selected} onPointerDown={(event) => beginClipGesture(event, clip, "move")} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(clip.id, event.shiftKey); } }} className={`absolute top-1.5 flex h-9 min-w-8 touch-none items-center overflow-hidden rounded-md px-2 text-[10px] font-medium outline-none ring-inset transition-shadow focus-visible:ring-2 focus-visible:ring-white ${selected ? "bg-primary text-white ring-2 ring-white/80" : track.kind === "captions" ? "bg-amber-500/65 text-amber-50" : track.kind === "voice" || track.kind === "music" || track.kind === "sfx" ? "bg-cyan-700/65 text-cyan-50" : "bg-indigo-700/70 text-indigo-50"}`} style={{ left: value.start * pxPerSecond, width: Math.max(24, (value.end - value.start) * pxPerSecond), ...(thumbnail ? { backgroundImage: `linear-gradient(90deg,rgba(15,12,35,.32),rgba(15,12,35,.7)),url(${thumbnail})`, backgroundSize: "auto 100%", backgroundRepeat: "repeat-x" } : {}) }}>
+                  const badges = [Math.abs(clip.playbackRate - 1) > .001 ? `${clip.playbackRate.toFixed(2).replace(/0$/, "")}×` : "", clip.reversed ? "REV" : "", clip.flipHorizontal ? "↔" : "", clip.flipVertical ? "↕" : ""].filter(Boolean);
+                  return <div key={clip.id} data-clip-id={clip.id} data-clip-kind={clip.kind} role="button" tabIndex={0} aria-label={`${clip.name}, de ${formatProjectTime(value.start)} até ${formatProjectTime(value.end)}`} aria-pressed={selected} onPointerDown={(event) => beginClipGesture(event, clip, "move")} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(clip.id, event.shiftKey); } }} className={`editor-v2-clip editor-v2-clip-${track.kind} absolute top-1.5 flex h-9 min-w-8 touch-none items-center overflow-hidden rounded-md px-2 text-[10px] font-medium text-white outline-none ring-inset transition-shadow focus-visible:ring-2 focus-visible:ring-white ${selected ? "is-selected ring-2 ring-white/80" : ""}`} style={{ left: value.start * pxPerSecond, width: Math.max(24, (value.end - value.start) * pxPerSecond), ...(thumbnail ? { backgroundImage: `linear-gradient(90deg,rgba(21,11,48,.28),rgba(21,11,48,.68)),url(${thumbnail})`, backgroundSize: "auto 100%", backgroundRepeat: "repeat-x" } : {}) }}>
                     {(track.kind === "voice" || track.kind === "music" || track.kind === "sfx") && <Waveform {...(clip.assetId && assetWaveforms[clip.assetId] ? { peaks: assetWaveforms[clip.assetId] } : {})} />}
                     <span className="relative z-10 truncate drop-shadow-sm">{clip.name}</span>
+                    {badges.length > 0 && <span className="relative z-10 ml-auto flex shrink-0 gap-0.5 pl-1" aria-label={badges.join(", ")}>{badges.map((badge) => <i key={badge} className="rounded bg-black/45 px-1 py-0.5 text-[7px] not-italic font-bold tracking-wide text-white/90">{badge}</i>)}</span>}
                     {selected && clip.animations.flatMap((animation) => animation.keyframes.map((keyframe) => <button key={`${animation.property}-${keyframe.id}`} type="button" data-keyframe-id={keyframe.id} aria-label={`${animation.property} em ${formatProjectTime(Number(clip.projectStart) + Number(keyframe.time))}`} onPointerDown={(event) => beginKeyframeGesture(event, clip, animation.property, keyframe.id, Number(keyframe.time))} onClick={(event) => { event.stopPropagation(); onSeek(Number(clip.projectStart) + Number(keyframe.time)); }} className="absolute top-1/2 z-30 size-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[2px] border border-white bg-primary shadow-[0_0_0_2px_rgba(8,8,15,.75)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" style={{ left: Number(keyframe.time) * pxPerSecond }} />))}
                     {!track.locked && <><button type="button" aria-label={`Aparar início de ${clip.name}`} onPointerDown={(event) => beginClipGesture(event, clip, "trim-start")} className="absolute inset-y-0 left-0 z-20 w-2 cursor-ew-resize bg-white/0 hover:bg-white/30 focus-visible:bg-white/35" /><button type="button" aria-label={`Aparar fim de ${clip.name}`} onPointerDown={(event) => beginClipGesture(event, clip, "trim-end")} className="absolute inset-y-0 right-0 z-20 w-2 cursor-ew-resize bg-white/0 hover:bg-white/30 focus-visible:bg-white/35" /></>}
                   </div>;

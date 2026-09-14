@@ -2,6 +2,7 @@ import type { Easing } from "@/lib/video-template/types";
 import { asProjectTime, type AnimatableProperty, type AudioRepresentation, type AudioSourceGroup, type CaptionCue, type Clip, type ClipStyle, type ClipTransform, type EditorProjectV2, type MediaAsset, type ProjectSettings, type RenderImpact, type SelectionState, type TemplateInstance, type Track, type Transition } from "./types";
 import { cloneProject, normalizeProject } from "./project";
 import { isTrackCompatible } from "./interactions";
+import { projectToSourceTime } from "./clock";
 
 export interface SerializedEditorCommand {
   type: string;
@@ -65,6 +66,33 @@ function captionCue(project: EditorProjectV2, clip: Clip) {
   const owner = project.tracks.find((item) => item.id === clip.trackId);
   if (owner?.kind !== "captions" || !("cues" in owner)) return null;
   return owner.cues.find((cue) => cue.id === clip.metadata?.["captionCueId"]) ?? null;
+}
+
+function animationsForRange(clip: Clip, localStart: number, localEnd: number) {
+  return clip.animations.map((animation) => ({
+    ...cloneProjectValue(animation),
+    keyframes: animation.keyframes
+      .filter((keyframe) => Number(keyframe.time) >= localStart && Number(keyframe.time) <= localEnd)
+      .map((keyframe) => ({ ...cloneProjectValue(keyframe), time: asProjectTime(Number(keyframe.time) - localStart) })),
+  })).filter((animation) => animation.keyframes.length > 0);
+}
+
+function sourceRangeForProjectRange(clip: Clip, projectStart: number, projectEnd: number) {
+  const first = projectToSourceTime(clip, asProjectTime(projectStart));
+  const last = projectToSourceTime(clip, asProjectTime(projectEnd));
+  if (first === null || last === null) throw new Error("Intervalo fora do clipe.");
+  return { sourceIn: Math.min(first, last), sourceOut: Math.max(first, last) };
+}
+
+function reconnectSplitReferences(project: EditorProjectV2, originalId: string, segmentIds: string[]) {
+  const lastId = segmentIds.at(-1) ?? originalId;
+  project.transitions.forEach((transition) => {
+    if (transition.fromClipId === originalId) transition.fromClipId = lastId;
+  });
+  project.templates.forEach((instance) => {
+    const index = instance.clipIds.indexOf(originalId);
+    if (index >= 0) instance.clipIds.splice(index, 1, ...segmentIds);
+  });
 }
 
 export class SelectItemCommand extends SnapshotCommand {
@@ -440,8 +468,13 @@ export class TrimClipCommand extends SnapshotCommand {
     const sourceEndDelta = Math.max(0, previousEnd - end) * clip.playbackRate;
     clip.projectStart = asProjectTime(project.settings.rippleEnabled ? previousStart : start);
     clip.projectEnd = asProjectTime(project.settings.rippleEnabled ? previousStart + requestedDuration : end);
-    clip.sourceIn = Math.min(clip.sourceOut, clip.sourceIn + sourceStartDelta);
-    clip.sourceOut = Math.max(clip.sourceIn, clip.sourceOut - sourceEndDelta);
+    if (clip.reversed) {
+      clip.sourceOut = Math.max(clip.sourceIn, clip.sourceOut - sourceStartDelta);
+      clip.sourceIn = Math.min(clip.sourceOut, clip.sourceIn + sourceEndDelta);
+    } else {
+      clip.sourceIn = Math.min(clip.sourceOut, clip.sourceIn + sourceStartDelta);
+      clip.sourceOut = Math.max(clip.sourceIn, clip.sourceOut - sourceEndDelta);
+    }
     const cue = captionCue(project, clip);
     if (cue) {
       cue.start = clip.projectStart;
@@ -466,23 +499,33 @@ export class SplitClipCommand extends SnapshotCommand {
     if (this.at <= Number(clip.projectStart) + 0.04 || this.at >= Number(clip.projectEnd) - 0.04) {
       throw new Error("O corte precisa ficar dentro do clipe.");
     }
-    const sourceAt = clip.sourceIn + (this.at - Number(clip.projectStart)) * clip.playbackRate;
+    const originalStart = Number(clip.projectStart);
+    const originalEnd = Number(clip.projectEnd);
+    const originalSourceIn = clip.sourceIn;
+    const originalSourceOut = clip.sourceOut;
+    const sourceAudioGroup = project.audioGroups.find((group) => group.sourceVideoClipId === clip.id || group.id === clip.audioGroupId);
+    const sourceAt = projectToSourceTime(clip, asProjectTime(this.at));
+    if (sourceAt === null) throw new Error("O corte precisa ficar dentro do clipe.");
     const splitLocalTime = this.at - Number(clip.projectStart);
     const right: Clip = {
       ...cloneProjectValue(clip),
       id: this.rightClipId,
       name: `${clip.name} · 2`,
       projectStart: asProjectTime(this.at),
-      sourceIn: sourceAt,
-      animations: clip.animations.map((animation) => ({
-        ...cloneProjectValue(animation),
-        keyframes: animation.keyframes.filter((keyframe) => Number(keyframe.time) >= splitLocalTime).map((keyframe) => ({ ...cloneProjectValue(keyframe), time: asProjectTime(Number(keyframe.time) - splitLocalTime) })),
-      })).filter((animation) => animation.keyframes.length > 0),
+      sourceIn: clip.reversed ? originalSourceIn : sourceAt,
+      sourceOut: clip.reversed ? sourceAt : originalSourceOut,
+      animations: animationsForRange(clip, splitLocalTime, originalEnd - originalStart),
     };
-    clip.animations = clip.animations.map((animation) => ({ ...animation, keyframes: animation.keyframes.filter((keyframe) => Number(keyframe.time) <= splitLocalTime) })).filter((animation) => animation.keyframes.length > 0);
+    if (sourceAudioGroup) {
+      clip.audioGroupId = sourceAudioGroup.id;
+      right.audioGroupId = sourceAudioGroup.id;
+    }
+    clip.animations = animationsForRange(clip, 0, splitLocalTime);
     clip.projectEnd = asProjectTime(this.at);
-    clip.sourceOut = sourceAt;
+    clip.sourceIn = clip.reversed ? sourceAt : originalSourceIn;
+    clip.sourceOut = clip.reversed ? originalSourceOut : sourceAt;
     owner.clips.splice(index + 1, 0, right);
+    reconnectSplitReferences(project, clip.id, [clip.id, right.id]);
     if (owner.kind === "captions" && "cues" in owner) {
       const originalCue = owner.cues.find((cue) => cue.id === clip.metadata?.["captionCueId"]);
       if (originalCue) {
@@ -499,6 +542,53 @@ export class SplitClipCommand extends SnapshotCommand {
     return project;
   }
   serialize() { return { type: this.type, payload: { clipId: this.clipId, at: this.at, rightClipId: this.rightClipId } }; }
+}
+
+export class AutoSplitClipsCommand extends SnapshotCommand {
+  readonly type = "autoSplitClips";
+  readonly renderImpact = "timeline" as const;
+  constructor(private readonly clipIds: string[], private readonly interval: number, private readonly suffix: string) { super(); }
+  protected apply(project: EditorProjectV2) {
+    if (!Number.isFinite(this.interval)) throw new Error("Informe um intervalo válido.");
+    const interval = Math.max(0.25, Math.min(60, this.interval));
+    const selected: string[] = [];
+    let cutCount = 0;
+    for (const clipId of this.clipIds) {
+      const { clip, owner, index } = locate(project, clipId);
+      if (owner.locked) throw new Error(`Trilha bloqueada: ${owner.name}`);
+      if (clip.kind !== "video") continue;
+      const start = Number(clip.projectStart);
+      const end = Number(clip.projectEnd);
+      const duration = end - start;
+      if (duration <= interval + 0.04) continue;
+      const sourceAudioGroup = project.audioGroups.find((group) => group.sourceVideoClipId === clip.id || group.id === clip.audioGroupId);
+      const segments: Clip[] = [];
+      for (let localStart = 0, part = 1; localStart < duration - 0.001; localStart += interval, part += 1) {
+        const localEnd = Math.min(duration, localStart + interval);
+        const segmentStart = start + localStart;
+        const segmentEnd = start + localEnd;
+        const range = sourceRangeForProjectRange(clip, segmentStart, segmentEnd);
+        const segment = cloneProjectValue(clip);
+        segment.id = part === 1 ? clip.id : `${clip.id}-auto-${this.suffix}-${part}`;
+        segment.name = `${clip.name} · ${part}`;
+        segment.projectStart = asProjectTime(segmentStart);
+        segment.projectEnd = asProjectTime(segmentEnd);
+        segment.sourceIn = range.sourceIn;
+        segment.sourceOut = range.sourceOut;
+        if (sourceAudioGroup) segment.audioGroupId = sourceAudioGroup.id;
+        segment.animations = animationsForRange(clip, localStart, localEnd);
+        segments.push(segment);
+      }
+      owner.clips.splice(index, 1, ...segments);
+      reconnectSplitReferences(project, clip.id, segments.map((segment) => segment.id));
+      selected.push(...segments.map((segment) => segment.id));
+      cutCount += segments.length - 1;
+    }
+    if (!cutCount) throw new Error("Nenhum vídeo selecionado é maior que o intervalo informado.");
+    project.selection = { itemIds: selected, primaryId: selected.at(-1) ?? null, surface: "timeline" };
+    return project;
+  }
+  serialize() { return { type: this.type, payload: { clipIds: this.clipIds, interval: this.interval, suffix: this.suffix } }; }
 }
 
 export class DeleteClipCommand extends SnapshotCommand {
@@ -745,7 +835,10 @@ function assertRepresentationAvailable(project: EditorProjectV2, group: AudioSou
 function unlinkAudioClips(project: EditorProjectV2, clipIds: Set<string>) {
   project.audioGroups = project.audioGroups.map((group) => {
     const next = cloneProjectValue(group);
-    if (next.sourceVideoClipId && clipIds.has(next.sourceVideoClipId)) delete next.sourceVideoClipId;
+    if (next.sourceVideoClipId && clipIds.has(next.sourceVideoClipId)) {
+      const replacement = project.tracks.flatMap((owner) => owner.clips).find((clip) => clip.kind === "video" && clip.audioGroupId === next.id && !clipIds.has(clip.id));
+      if (replacement) next.sourceVideoClipId = replacement.id; else delete next.sourceVideoClipId;
+    }
     if (next.extractedClipId && clipIds.has(next.extractedClipId)) delete next.extractedClipId;
     if (next.dialogueClipId && clipIds.has(next.dialogueClipId)) delete next.dialogueClipId;
     if (next.musicClipId && clipIds.has(next.musicClipId)) delete next.musicClipId;

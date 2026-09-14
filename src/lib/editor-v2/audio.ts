@@ -1,4 +1,5 @@
 import type { AudioEnvelopePoint, AudioRepresentation, Clip, EditorProjectV2, MediaAsset } from "./types";
+import { projectToSourceTime } from "./clock";
 
 export interface WaveformAnalysis {
   cacheKey: string;
@@ -56,8 +57,12 @@ export function resolveAudioMixFrame(project: EditorProjectV2, projectTime: numb
 
   const embedded = groups.flatMap((group) => {
     if (group.activeRepresentation !== "embedded" || !group.sourceVideoClipId) return [];
-    const owner = project.tracks.find((candidate) => candidate.clips.some((clip) => clip.id === group.sourceVideoClipId));
-    const clip = owner?.clips.find((candidate) => candidate.id === group.sourceVideoClipId);
+    const owner = project.tracks.find((candidate) => candidate.clips.some((clip) =>
+      (clip.id === group.sourceVideoClipId || clip.audioGroupId === group.id) && isActiveAt(clip, projectTime),
+    ));
+    const clip = owner?.clips.find((candidate) =>
+      (candidate.id === group.sourceVideoClipId || candidate.audioGroupId === group.id) && isActiveAt(candidate, projectTime),
+    );
     if (!owner || !clip?.assetId || !clip.enabled || !isActiveAt(clip, projectTime)) return [];
     return [{ track: owner, clip, group }];
   });
@@ -68,7 +73,7 @@ export function resolveAudioMixFrame(project: EditorProjectV2, projectTime: numb
   const voiceActive = explicit.some(({ track, clip }) => (clip.audio?.stemRole === "voice" || track.kind === "voice") && !track.muted && (!soloActive || track.solo) && clipAudioGainAt(clip, projectTime) > 0);
   return active.filter(({ clip }) => Boolean(clip.assetId)).map(({ track, clip, group }) => {
     const role = clip.audio?.stemRole ?? (track.kind === "voice" ? "voice" : track.kind === "sfx" ? "sfx" : "music");
-    const muted = track.muted || (soloActive && !track.solo) || Boolean(clip.audio?.muted);
+    const muted = track.muted || (soloActive && !track.solo) || Boolean(clip.audio?.muted) || Boolean(group?.activeRepresentation === "embedded" && clip.reversed);
     const duck = project.settings.audio.duckingEnabled && voiceActive && role === "music" ? 1 - project.settings.audio.duckAmount : 1;
     const clipGain = clip.audio ? clipAudioGainAt(clip, projectTime) : 1;
     const gain = muted ? 0 : Math.max(0, Math.min(2, track.gain * clipGain * project.settings.audio.masterGain * duck));
@@ -78,7 +83,7 @@ export function resolveAudioMixFrame(project: EditorProjectV2, projectTime: numb
       ...(group ? { audioGroupId: group.id } : {}),
       representation: group?.activeRepresentation ?? "independent",
       sourceKind: group?.activeRepresentation === "embedded" ? "embedded" : "asset",
-      sourceTime: clip.sourceIn + (projectTime - Number(clip.projectStart)) * clip.playbackRate,
+      sourceTime: projectToSourceTime(clip, projectTime as Clip["projectStart"]) ?? clip.sourceIn,
       playbackRate: clip.playbackRate,
       gain,
       muted: gain <= 0,

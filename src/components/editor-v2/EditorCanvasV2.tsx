@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ImagePlus, Move, RotateCw } from "lucide-react";
-import { DEFAULT_CLIP_TRANSFORM, findClip, resolveCompositionFrame, type CaptionCue, type Clip, type ClipTransform, type EditorProjectV2, type ResolvedClipPresentation } from "@/lib/editor-v2";
+import { DEFAULT_CLIP_TRANSFORM, asProjectTime, findClip, projectToSourceTime, resolveCompositionFrame, type CaptionCue, type Clip, type ClipTransform, type EditorProjectV2, type ResolvedClipPresentation } from "@/lib/editor-v2";
 import { StickerVisualV2 } from "./StickerVisualV2";
 
 interface CanvasProps {
@@ -110,15 +110,17 @@ function CaptionVisual({ clip, cue, preset, currentTime }: { clip: Clip; cue: Ca
 
 function MediaVisual({ clip, url, currentTime, playing }: { clip: Clip; url: string; currentTime: number; playing: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
-  const sourceTime = clip.sourceIn + Math.max(0, currentTime - Number(clip.projectStart)) * clip.playbackRate;
+  const sourceTime = projectToSourceTime(clip, asProjectTime(currentTime)) ?? clip.sourceIn;
+  const mediaTransform = `scaleX(${clip.flipHorizontal ? -1 : 1}) scaleY(${clip.flipVertical ? -1 : 1})`;
   useEffect(() => {
     const video = ref.current;
     if (!video) return;
-    if (Math.abs(video.currentTime - sourceTime) > 0.12) video.currentTime = sourceTime;
-    if (playing) void video.play().catch(() => undefined); else video.pause();
-  }, [playing, sourceTime]);
-  if (clip.kind === "image") return <img src={url} alt="" draggable={false} className="pointer-events-none h-full w-full object-cover" />;
-  return <video ref={ref} src={url} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" />;
+    video.playbackRate = Math.max(0.05, Math.min(4, clip.playbackRate));
+    if (Math.abs(video.currentTime - sourceTime) > (clip.reversed ? 1 / 60 : 0.12)) video.currentTime = sourceTime;
+    if (playing && !clip.reversed) void video.play().catch(() => undefined); else video.pause();
+  }, [clip.playbackRate, clip.reversed, playing, sourceTime]);
+  if (clip.kind === "image") return <img src={url} alt="" draggable={false} className="pointer-events-none h-full w-full object-cover" style={{ transform: mediaTransform }} />;
+  return <video ref={ref} src={url} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" style={{ transform: mediaTransform }} />;
 }
 
 function snapTransform(transform: ClipTransform): ClipTransform {

@@ -1240,6 +1240,20 @@
 .editor-v2-track[data-track-kind="voice"] .editor-v2-track-label > svg { color: var(--editor-cyan); }
 .editor-v2-track[data-track-kind="music"] .editor-v2-track-label > svg,
 .editor-v2-track[data-track-kind="sfx"] .editor-v2-track-label > svg { color: var(--editor-pink); }
+.editor-v2-track[data-track-kind="sfx"] .editor-v2-track-label > svg { color: oklch(0.78 0.18 156); }
+
+.editor-v2-clip-video { background-color: #5b42d4; background-image: linear-gradient(100deg, #4432a8, #6751eb); }
+.editor-v2-clip-overlay { background-color: #b633a9; background-image: linear-gradient(100deg, #8d2c9c, #d43f9d); }
+.editor-v2-clip-captions { background-color: #bd6b10; background-image: linear-gradient(100deg, #a8550d, #e69a18); }
+.editor-v2-clip-voice { background-color: #087f9f; background-image: linear-gradient(100deg, #08718f, #0fa8bf); }
+.editor-v2-clip-music { background-color: #b72d79; background-image: linear-gradient(100deg, #8f256d, #d73b8b); }
+.editor-v2-clip-sfx { background-color: #16815c; background-image: linear-gradient(100deg, #126c51, #18a873); }
+
+.editor-auto-cut-popover {
+  background: oklch(0.135 0.03 278 / 0.98);
+  box-shadow: 0 20px 50px rgb(0 0 0 / 0.58), 0 0 24px oklch(0.68 0.2 292 / 0.14);
+  backdrop-filter: blur(18px);
+}
 
 .editor-v2-timeline [data-clip-id] {
   box-shadow: inset 0 1px rgb(255 255 255 / 0.2), 0 5px 14px rgb(0 0 0 / 0.3);
@@ -1254,6 +1268,26 @@
 
 .editor-v2-timeline [data-clip-id][aria-pressed="true"] {
   box-shadow: inset 0 1px rgb(255 255 255 / 0.34), 0 0 0 1px white, 0 0 22px oklch(0.7 0.22 292 / 0.36);
+}
+
+.editor-clip-action,
+.editor-speed-hero {
+  background: oklch(0.155 0.026 278 / 0.72);
+  box-shadow: inset 0 1px rgb(255 255 255 / 0.035);
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 160ms ease, transform 140ms ease;
+}
+
+.editor-clip-action:hover,
+.editor-speed-hero:hover {
+  border-color: oklch(0.74 0.17 292 / 0.4);
+  background: oklch(0.2 0.045 281 / 0.8);
+  transform: translateY(-1px);
+}
+
+.editor-clip-action.is-active,
+.editor-speed-hero[aria-pressed="true"] {
+  background: linear-gradient(135deg, oklch(0.3 0.12 292 / 0.66), oklch(0.22 0.09 240 / 0.58));
+  box-shadow: 0 0 18px oklch(0.68 0.2 292 / 0.15), inset 0 1px rgb(255 255 255 / 0.08);
 }
 
 .editor-v2-shell button[aria-pressed="true"],

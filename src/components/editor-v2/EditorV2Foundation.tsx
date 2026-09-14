@@ -6,6 +6,7 @@ import {
   AddCaptionCueCommand,
   AddCaptionBatchCommand,
   AddMediaClipCommand,
+  AutoSplitClipsCommand,
   AudioSeparationJobRepository,
   ApplyCaptionPresetCommand,
   ApplySeparatedAudioCommand,
@@ -68,6 +69,7 @@ import {
   type Track,
   validateRelinkFile,
   resolveAudioMixFrame,
+  sourceToProjectTime,
 } from "@/lib/editor-v2";
 import { prepareAudioSeparation, updateAudioSeparationJob } from "@/lib/audio.functions";
 import { downloadSourceFile, uploadAudioStem } from "@/lib/editor/media-cloud";
@@ -273,6 +275,13 @@ export function EditorV2Foundation() {
     run(new SplitClipCommand(clip.id, Number(clockRef.current.getSnapshot().projectTime), `${clip.id}-split-${state.revisions.document + 1}`), "Clipe dividido na agulha.");
   }, [run]);
 
+  const autoSplit = useCallback((interval: number) => {
+    const state = busRef.current.getState();
+    const ids = state.selection.itemIds.filter((id) => findClip(state, id)?.kind === "video");
+    if (!ids.length) return setMessage("Selecione um ou mais vídeos antes de aplicar os cortes automáticos.");
+    run(new AutoSplitClipsCommand(ids, interval, String(state.revisions.document + 1)), `Vídeos divididos a cada ${interval.toLocaleString("pt-BR")}s. Ctrl+Z desfaz todos os cortes.`);
+  }, [run]);
+
   const removeSelected = useCallback(() => {
     const ids = busRef.current.getState().selection.itemIds.filter((id) => findClip(busRef.current.getState(), id));
     if (!ids.length) return;
@@ -368,7 +377,7 @@ export function EditorV2Foundation() {
   const extractSelectedAudio = useCallback(async () => {
     const state = busRef.current.getState();
     const selected = findClip(state, state.selection.primaryId);
-    const group = selected ? state.audioGroups.find((item) => item.sourceVideoClipId === selected.id || item.extractedClipId === selected.id || item.dialogueClipId === selected.id || item.musicClipId === selected.id) : undefined;
+    const group = selected ? state.audioGroups.find((item) => item.id === selected.audioGroupId || item.sourceVideoClipId === selected.id || item.extractedClipId === selected.id || item.dialogueClipId === selected.id || item.musicClipId === selected.id) : undefined;
     const videoClip = group?.sourceVideoClipId ? findClip(state, group.sourceVideoClipId) : undefined;
     const sourceAsset = videoClip?.assetId ? state.assets.find((asset) => asset.id === videoClip.assetId) : undefined;
     const sourceFile = sourceAsset ? sourceFilesRef.current.get(sourceAsset.id) : undefined;
@@ -422,7 +431,7 @@ export function EditorV2Foundation() {
     if (audioSeparationRef.current) return;
     const initial = busRef.current.getState();
     const selected = findClip(initial, initial.selection.primaryId);
-    const initialGroup = selected ? initial.audioGroups.find((item) => item.sourceVideoClipId === selected.id || item.extractedClipId === selected.id || item.dialogueClipId === selected.id || item.musicClipId === selected.id) : undefined;
+    const initialGroup = selected ? initial.audioGroups.find((item) => item.id === selected.audioGroupId || item.sourceVideoClipId === selected.id || item.extractedClipId === selected.id || item.dialogueClipId === selected.id || item.musicClipId === selected.id) : undefined;
     const videoClip = initialGroup?.sourceVideoClipId ? findClip(initial, initialGroup.sourceVideoClipId) : undefined;
     const sourceAsset = videoClip?.assetId ? initial.assets.find((asset) => asset.id === videoClip.assetId) : undefined;
     if (!initialGroup || !videoClip || !sourceAsset) { setMessage("Selecione um vídeo ou uma de suas trilhas de áudio."); return; }
@@ -681,14 +690,15 @@ export function EditorV2Foundation() {
           setMessage(`Gerando legendas… ${progress}%`);
         },
       });
-      const projectStart = Number(video.projectStart);
-      const rate = Math.max(0.01, video.playbackRate);
-      const mapTime = (sourceTime: number) => projectStart + (sourceTime - sourceIn) / rate;
+      const mapRange = (start: number, end: number) => {
+        const first = Number(sourceToProjectTime(video, start) ?? video.projectStart);
+        const last = Number(sourceToProjectTime(video, end) ?? video.projectEnd);
+        return { start: Math.min(first, last), end: Math.max(first, last) };
+      };
       const mapped = cues.map((cue) => ({
-        start: mapTime(cue.start),
-        end: mapTime(cue.end),
-        words: cue.words.map((word) => ({ ...word, start: mapTime(word.start), end: mapTime(word.end) })),
-      }));
+        ...mapRange(cue.start, cue.end),
+        words: cue.words.map((word) => ({ ...word, ...mapRange(word.start, word.end) })),
+      })).sort((left, right) => left.start - right.start);
       if (!mapped.length) throw new Error("Nenhuma fala foi encontrada no trecho selecionado.");
       run(new AddCaptionBatchCommand(createCaptionBatchFromTimedWords(mapped, presetItem.definition, state.revisions.document + 1)), `${mapped.length} blocos de legenda gerados e sincronizados.`);
       setMobileSurface("timeline");
@@ -743,7 +753,7 @@ export function EditorV2Foundation() {
 
   const selectedClip = findClip(project, project.selection.primaryId);
   const selectedTrack = selectedClip ? project.tracks.find((track) => track.id === selectedClip.trackId) : undefined;
-  const selectedAudioGroup = selectedClip ? project.audioGroups.find((group) => group.sourceVideoClipId === selectedClip.id || group.extractedClipId === selectedClip.id || group.dialogueClipId === selectedClip.id || group.musicClipId === selectedClip.id) : undefined;
+  const selectedAudioGroup = selectedClip ? project.audioGroups.find((group) => group.id === selectedClip.audioGroupId || group.sourceVideoClipId === selectedClip.id || group.extractedClipId === selectedClip.id || group.dialogueClipId === selectedClip.id || group.musicClipId === selectedClip.id) : undefined;
   const activeAudioAssetIds = selectedAudioGroup ? audioAssetIdsForRepresentation(project, selectedAudioGroup) : [];
   const selectedAssetId = selectedClip?.assetId;
   const missingAsset = project.assets.find((asset) => missingAssetIds.includes(asset.id) && (activeAudioAssetIds.includes(asset.id) || asset.id === selectedAssetId)) ?? null;
@@ -808,6 +818,7 @@ export function EditorV2Foundation() {
     onTrim: (id: string, start: number, end: number) => run(new TrimClipCommand(id, start, end), "Duração atualizada."),
     onMoveKeyframe: (id: string, property: AnimatableProperty, keyframeId: string, localTime: number) => run(new MoveKeyframeCommand(id, property, keyframeId, localTime), "Keyframe movido."),
     onSplit: split,
+    onAutoSplit: autoSplit,
     onDuplicate: duplicateSelected,
     onToggleSnap: () => run(new UpdateProjectSettingsCommand({ snapEnabled: !project.settings.snapEnabled })),
     onToggleRipple: () => run(new UpdateProjectSettingsCommand({ rippleEnabled: !project.settings.rippleEnabled })),

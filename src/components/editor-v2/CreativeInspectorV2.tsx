@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, RotateCcw, Sparkles, Trash2 } from "lucide-react";
+import { Check, FlipHorizontal2, FlipVertical2, Rewind, RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import { NEUTRAL_VIDEO_ADJUSTMENTS, videoAdjustmentFilter, type Clip, type ClipMotionSettings, type EffectInstance, type MotionPreset, type MotionSlot, type VideoAdjustments } from "@/lib/editor-v2";
 
 const motionOptions: Record<MotionSlot, { id: string; label: string }[]> = {
@@ -41,9 +41,22 @@ export function CreativeInspectorV2({ clip, onPatch }: { clip: Clip; onPatch: (p
     </div>
     {tab === "basic" && <div className="space-y-3">
       <Toggle label="Visível" checked={clip.enabled} onChange={(enabled) => onPatch({ enabled })} />
+      {(clip.kind === "video" || clip.kind === "image") && <div className="grid grid-cols-2 gap-2">
+        <ActionToggle label="Espelhar horizontal" active={Boolean(clip.flipHorizontal)} onClick={() => onPatch({ flipHorizontal: !clip.flipHorizontal })}><FlipHorizontal2 /></ActionToggle>
+        <ActionToggle label="Espelhar vertical" active={Boolean(clip.flipVertical)} onClick={() => onPatch({ flipVertical: !clip.flipVertical })}><FlipVertical2 /></ActionToggle>
+        {clip.kind === "video" && <ActionToggle label="Reverter vídeo" active={Boolean(clip.reversed)} onClick={() => onPatch({ reversed: !clip.reversed })} className="col-span-2"><Rewind /></ActionToggle>}
+      </div>}
+      {clip.kind === "video" && clip.reversed && <p className="rounded-lg border border-amber-400/20 bg-amber-400/[0.06] px-2.5 py-2 text-[9px] leading-relaxed text-amber-100/80">O vídeo será reproduzido do fim para o início. O áudio incorporado fica silencioso; trilhas de voz e música extraídas continuam editáveis.</p>}
       {clip.sticker && <><label className="block text-[10px] text-muted-foreground">Texto<input value={clip.sticker.text} onChange={(event) => onPatch({ sticker: { ...clip.sticker!, text: event.target.value } })} className="mt-1.5 h-9 w-full rounded-lg border border-white/10 bg-black/20 px-2 text-xs text-foreground" /></label><div className="grid grid-cols-2 gap-2"><Color label="Principal" value={clip.sticker.color} onChange={(color) => onPatch({ sticker: { ...clip.sticker!, color } })} /><Color label="Contraste" value={clip.sticker.accent} onChange={(accent) => onPatch({ sticker: { ...clip.sticker!, accent } })} /></div><Range label="Velocidade da animação" value={clip.sticker.speed} min={.25} max={3} step={.05} onChange={(speed) => onPatch({ sticker: { ...clip.sticker!, speed } })} /></>}
     </div>}
-    {tab === "speed" && <div><Range label="Velocidade" value={clip.playbackRate} min={.1} max={4} step={.05} display={`${clip.playbackRate.toFixed(2)}×`} onChange={setSpeed} /><div className="mt-3 grid grid-cols-5 gap-1">{[.5, .75, 1, 1.5, 2].map((speed) => <button key={speed} type="button" onClick={() => setSpeed(speed)} className={`h-8 rounded-lg text-[10px] ${Math.abs(clip.playbackRate - speed) < .001 ? "bg-primary text-white" : "bg-white/5 text-muted-foreground"}`}>{speed}×</button>)}</div><p className="mt-3 text-[9px] leading-relaxed text-muted-foreground">A duração do clipe é recalculada a partir do trecho original e compartilhada com a exportação.</p></div>}
+    {tab === "speed" && <div>
+      <button type="button" onClick={() => setSpeed(.5)} aria-pressed={Math.abs(clip.playbackRate - .5) < .001} className="editor-speed-hero mb-3 flex w-full items-center gap-3 rounded-xl border border-cyan-300/20 p-3 text-left">
+        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-cyan-300/12 text-cyan-200"><Rewind className="size-4" /></span><span><span className="block text-[10px] font-semibold text-foreground">Câmera lenta suave</span><span className="mt-0.5 block text-[9px] text-muted-foreground">Aplica 0,5× e duplica a duração do trecho.</span></span>
+      </button>
+      <Range label="Velocidade" value={clip.playbackRate} min={.1} max={4} step={.05} display={`${clip.playbackRate.toFixed(2)}×`} onChange={setSpeed} />
+      <div className="mt-3 grid grid-cols-6 gap-1">{[.25, .5, .75, 1, 1.5, 2].map((speed) => <button key={speed} type="button" onClick={() => setSpeed(speed)} className={`h-8 rounded-lg text-[10px] ${Math.abs(clip.playbackRate - speed) < .001 ? "bg-primary text-white" : "bg-white/5 text-muted-foreground hover:bg-white/8 hover:text-white"}`}>{speed}×</button>)}</div>
+      <p className="mt-3 text-[9px] leading-relaxed text-muted-foreground">A prévia, a duração e a exportação usam a mesma velocidade do projeto.</p>
+    </div>}
     {tab === "motion" && <MotionEditor motion={clip.motion ?? {}} onChange={(motion) => onPatch({ motion })} />}
     {tab === "adjust" && <AdjustmentEditor adjustments={adjustments} onChange={(next) => onPatch({ adjustments: next })} />}
     {tab === "effects" && <EffectStack effects={clip.effects} onChange={(effects) => onPatch({ effects })} />}
@@ -96,4 +109,5 @@ function EffectStack({ effects, onChange }: { effects: EffectInstance[]; onChang
 
 function Range({ label, value, min, max, step, display, onChange }: { label: string; value: number; min: number; max: number; step: number; display?: string; onChange: (value: number) => void }) { return <label className="mt-3 block text-[9px] text-muted-foreground"><span>{label}</span><span className="float-right tabular-nums text-foreground">{display ?? Math.round(value * 100)}</span><input type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} className="mt-1.5 w-full accent-violet-500" /></label>; }
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) { return <label className="flex items-center justify-between text-[10px]"><span>{label}</span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="accent-violet-500" /></label>; }
+function ActionToggle({ label, active, className = "", onClick, children }: { label: string; active: boolean; className?: string; onClick: () => void; children: React.ReactNode }) { return <button type="button" aria-pressed={active} onClick={onClick} className={`editor-clip-action flex min-h-14 items-center gap-2 rounded-xl border px-2.5 text-left text-[9px] font-medium ${active ? "is-active border-primary/60 text-white" : "border-white/8 text-muted-foreground"} ${className}`}><span className="grid size-7 shrink-0 place-items-center rounded-lg bg-white/6 [&>svg]:size-3.5">{children}</span>{label}</button>; }
 function Color({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label className="flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-2 text-[9px] text-muted-foreground"><input type="color" value={value} onChange={(event) => onChange(event.target.value)} className="size-5 border-0 bg-transparent" />{label}</label>; }
