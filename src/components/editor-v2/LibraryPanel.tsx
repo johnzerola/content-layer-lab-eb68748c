@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Check, Heart, Plus, Search, SlidersHorizontal } from "lucide-react";
+import { Captions, Check, Heart, LoaderCircle, Plus, Search, SlidersHorizontal } from "lucide-react";
 import { LibraryRegistry, loadLibraryUserState, markRecent, saveLibraryUserState, toggleFavorite, type LibraryItem, type LibraryItemType } from "@/lib/editor-v2/library";
 import { LibraryPreview } from "./LibraryPreview";
 
@@ -20,9 +20,12 @@ interface LibraryPanelProps {
   selectedId: string | null;
   onSelect: (item: LibraryItem) => void;
   onAdd: (item: LibraryItem) => void;
+  onGenerateCaptions: () => void;
+  generatingCaptions: boolean;
+  captionProgress: number;
 }
 
-export function LibraryPanel({ registry, selectedId, onSelect, onAdd }: LibraryPanelProps) {
+export function LibraryPanel({ registry, selectedId, onSelect, onAdd, onGenerateCaptions, generatingCaptions, captionProgress }: LibraryPanelProps) {
   const [section, setSection] = useState("Modelos");
   const [scope, setScope] = useState<Scope>("built-in");
   const [query, setQuery] = useState("");
@@ -30,6 +33,7 @@ export function LibraryPanel({ registry, selectedId, onSelect, onAdd }: LibraryP
   const [userState, setUserState] = useState(loadLibraryUserState);
   const result = useMemo(() => registry.search({ text: query, types: sections.find((item) => item.label === section)?.types ?? [], pageSize: 60 }), [registry, query, section]);
   const items = result.items.filter((item) => scope === "favorites" ? userState.favorites.includes(item.id) : scope === "recent" ? userState.recent.includes(item.id) : item.source === "built-in");
+  const selectedCaptionStyle = selectedId ? registry.get(selectedId) : null;
 
   const select = (item: LibraryItem) => {
     const next = markRecent(userState, item.id);
@@ -64,6 +68,12 @@ export function LibraryPanel({ registry, selectedId, onSelect, onAdd }: LibraryP
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 vaiviral-scrollbar">
+        {section === "Legendas" && <div className="mb-3 rounded-xl border border-primary/25 bg-[linear-gradient(135deg,hsl(var(--primary)/.14),hsl(var(--accent)/.06))] p-3 shadow-[0_0_26px_hsl(var(--primary)/.08)]">
+          <div className="flex items-start gap-2"><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/18 text-primary"><Captions className="size-4" /></span><div><p className="text-[11px] font-semibold text-foreground">Legendas automáticas</p><p className="mt-1 text-[9px] leading-relaxed text-muted-foreground">Transcreve as falas, sincroniza cada palavra e usa o estilo escolhido abaixo.</p></div></div>
+          <div className="mt-3 flex items-center justify-between rounded-lg border border-white/8 bg-black/15 px-2.5 py-2 text-[9px]"><span className="text-muted-foreground">Estilo</span><span className="max-w-36 truncate font-semibold text-foreground">{selectedCaptionStyle?.type === "caption" ? selectedCaptionStyle.name : "Verde Impacto"}</span></div>
+          <button type="button" disabled={generatingCaptions} onClick={onGenerateCaptions} className="editor-primary-button mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-lg px-3 text-[11px] font-semibold text-primary-foreground disabled:cursor-wait disabled:opacity-65">{generatingCaptions ? <LoaderCircle className="size-3.5 animate-spin" /> : <Captions className="size-3.5" />}{generatingCaptions ? `Gerando… ${captionProgress}%` : "Gerar legendas automáticas"}</button>
+          <p className="mt-2 text-center text-[8px] leading-relaxed text-muted-foreground">Selecione um vídeo ou deixe o editor usar o primeiro vídeo disponível.</p>
+        </div>}
         {items.length ? <div className="grid grid-cols-2 gap-2">{items.map((item) => {
           const selected = selectedId === item.id;
           const favorite = userState.favorites.includes(item.id);
@@ -75,7 +85,7 @@ export function LibraryPanel({ registry, selectedId, onSelect, onAdd }: LibraryP
             </button>
             <div className="flex items-center border-t border-white/5 px-1.5 py-1">
               <button type="button" onClick={() => { const next = toggleFavorite(userState, item.id); setUserState(next); saveLibraryUserState(next); }} aria-label={favorite ? `Remover ${item.name} dos favoritos` : `Favoritar ${item.name}`} className={`grid size-7 place-items-center rounded-md hover:bg-white/10 ${favorite ? "text-rose-400" : "text-muted-foreground"}`}><Heart className="size-3.5" fill={favorite ? "currentColor" : "none"} /></button>
-              <button type="button" onClick={() => item.type === "transition" ? select(item) : add(item)} className="editor-primary-button ml-auto flex h-7 items-center gap-1 rounded-md px-2 text-[10px] font-semibold text-primary-foreground">{item.type === "transition" ? <SlidersHorizontal className="size-3" /> : <Plus className="size-3" />} {item.type === "transition" ? "Configurar" : "Inserir"}</button>
+              <button type="button" onClick={() => item.type === "transition" ? select(item) : add(item)} className="editor-primary-button ml-auto flex h-7 items-center gap-1 rounded-md px-2 text-[10px] font-semibold text-primary-foreground">{item.type === "transition" ? <SlidersHorizontal className="size-3" /> : item.type === "caption" ? <Captions className="size-3" /> : <Plus className="size-3" />} {item.type === "transition" ? "Configurar" : item.type === "caption" ? "Escolher" : "Inserir"}</button>
             </div>
           </article>;
         })}</div> : <div className="grid min-h-44 place-items-center rounded-xl border border-dashed border-white/10 px-5 text-center"><div><p className="text-xs font-medium">Nada por aqui</p><p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">Tente outra busca ou volte aos recursos incluídos.</p></div></div>}

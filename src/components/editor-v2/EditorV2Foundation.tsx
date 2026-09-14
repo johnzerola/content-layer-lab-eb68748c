@@ -3,7 +3,6 @@ import { ArrowLeft, Captions, Check, ChevronDown, Film, FolderOpen, Import, Libr
 import { Link } from "@tanstack/react-router";
 import {
   AddClipCommand,
-  AddCaptionCueCommand,
   AddCaptionBatchCommand,
   AddMediaClipCommand,
   AutoSplitClipsCommand,
@@ -52,7 +51,6 @@ import {
   readEditorMedia,
   readEditorProject,
   resolveLibraryInsertion,
-  resolveCaptionInsertion,
   parseTimedText,
   createCaptionBatch,
   createCaptionBatchFromTimedWords,
@@ -256,10 +254,10 @@ export function EditorV2Foundation() {
       if (selected?.kind === "caption") {
         run(new ApplyCaptionPresetCommand(selected.id, preset.id, preset.style, preset.transform, preset as unknown as Record<string, unknown>), `${item.name} aplicado à legenda.`);
       } else {
-        const insertion = resolveCaptionInsertion(state, item as LibraryItem<CaptionPresetDefinition>, at, state.revisions.document + 1);
-        run(new AddCaptionCueCommand(insertion.cue, insertion.clip), `${item.name} inserido com palavras temporizadas.`);
+        run(new SelectItemCommand([item.id], "library"));
+        setMessage(`${item.name} selecionado. Agora clique em “Gerar legendas automáticas”.`);
       }
-      setMobileSurface("canvas");
+      setMobileSurface(selected?.kind === "caption" ? "canvas" : "inspector");
       return;
     }
     const clip = resolveLibraryInsertion(state, item, at, state.revisions.document + 1);
@@ -685,7 +683,7 @@ export function EditorV2Foundation() {
 
   const generateAutomaticCaptions = useCallback(async () => {
     const state = busRef.current.getState();
-    const selected = findClip(state, state.selection.primaryId);
+    const selected = findClip(state, state.selection.primaryId) ?? findClip(state, lastSelectedClipIdRef.current);
     const video = selected?.kind === "video"
       ? selected
       : state.tracks.flatMap((track) => track.clips).find((clip) => clip.kind === "video" && clip.assetId && sourceFilesRef.current.has(clip.assetId));
@@ -694,7 +692,8 @@ export function EditorV2Foundation() {
       setMessage("Importe e selecione um vídeo local para gerar legendas automáticas.");
       return;
     }
-    const presetItem = registry.get("builtin.caption.word-highlight") as LibraryItem<CaptionPresetDefinition> | null;
+    const chosenStyle = state.selection.surface === "library" ? registry.get(state.selection.primaryId ?? "") : null;
+    const presetItem = (chosenStyle?.type === "caption" ? chosenStyle : registry.get("builtin.caption.word-highlight")) as LibraryItem<CaptionPresetDefinition> | null;
     if (!presetItem) return setMessage("O preset padrão de legenda não está disponível.");
     setTranscribing(true);
     setCaptionProgress(0);
@@ -721,7 +720,7 @@ export function EditorV2Foundation() {
         words: cue.words.map((word) => ({ ...word, ...mapRange(word.start, word.end) })),
       })).sort((left, right) => left.start - right.start);
       if (!mapped.length) throw new Error("Nenhuma fala foi encontrada no trecho selecionado.");
-      run(new AddCaptionBatchCommand(createCaptionBatchFromTimedWords(mapped, presetItem.definition, state.revisions.document + 1)), `${mapped.length} blocos de legenda gerados e sincronizados.`);
+      run(new AddCaptionBatchCommand(createCaptionBatchFromTimedWords(mapped, presetItem.definition, state.revisions.document + 1)), `${mapped.length} blocos de legenda gerados com o estilo ${presetItem.name}.`);
       setMobileSurface("timeline");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível gerar as legendas.");
@@ -889,7 +888,7 @@ export function EditorV2Foundation() {
         <ResizablePanelGroup orientation="vertical" id="editor-v2-vertical">
           <ResizablePanel defaultSize="68%" minSize={360}>
             <ResizablePanelGroup orientation="horizontal" id="editor-v2-workspace">
-              <ResizablePanel defaultSize={300} minSize={250} maxSize={430}><LibraryPanel registry={registry} selectedId={project.selection.surface === "library" ? project.selection.primaryId : null} onSelect={selectLibrary} onAdd={addLibraryItem} /></ResizablePanel>
+              <ResizablePanel defaultSize={300} minSize={250} maxSize={430}><LibraryPanel registry={registry} selectedId={project.selection.surface === "library" ? project.selection.primaryId : null} onSelect={selectLibrary} onAdd={addLibraryItem} onGenerateCaptions={() => void generateAutomaticCaptions()} generatingCaptions={transcribing} captionProgress={captionProgress} /></ResizablePanel>
               <ResizableHandle withHandle className="bg-white/8 hover:bg-primary/50" />
               <ResizablePanel defaultSize="55%" minSize={420}><EditorCanvasV2 {...canvasProps} /></ResizablePanel>
               <ResizableHandle withHandle className="bg-white/8 hover:bg-primary/50" />
@@ -905,7 +904,7 @@ export function EditorV2Foundation() {
         <nav className="editor-v2-mobile-nav grid h-11 shrink-0 grid-cols-4" aria-label="Áreas do editor">
           {([['library', Library, 'Biblioteca'], ['canvas', Film, 'Prévia'], ['inspector', PanelRight, 'Inspector'], ['timeline', FolderOpen, 'Timeline']] as const).map(([id, Icon, label]) => <button key={id} type="button" onClick={() => setMobileSurface(id)} aria-pressed={mobileSurface === id} className={`flex items-center justify-center gap-1.5 text-[10px] ${mobileSurface === id ? "bg-primary/12 text-primary" : "text-muted-foreground"}`}><Icon className="size-3.5" />{label}</button>)}
         </nav>
-        <div className="min-h-0 flex-1">{mobileSurface === "library" ? <LibraryPanel registry={registry} selectedId={project.selection.surface === "library" ? project.selection.primaryId : null} onSelect={selectLibrary} onAdd={addLibraryItem} /> : mobileSurface === "canvas" ? <EditorCanvasV2 {...canvasProps} /> : mobileSurface === "inspector" ? <InspectorV2 {...inspectorProps} /> : <TimelineV2 {...timelineProps} />}</div>
+        <div className="min-h-0 flex-1">{mobileSurface === "library" ? <LibraryPanel registry={registry} selectedId={project.selection.surface === "library" ? project.selection.primaryId : null} onSelect={selectLibrary} onAdd={addLibraryItem} onGenerateCaptions={() => void generateAutomaticCaptions()} generatingCaptions={transcribing} captionProgress={captionProgress} /> : mobileSurface === "canvas" ? <EditorCanvasV2 {...canvasProps} /> : mobileSurface === "inspector" ? <InspectorV2 {...inspectorProps} /> : <TimelineV2 {...timelineProps} />}</div>
       </div>
 
       <footer className="editor-v2-statusbar flex h-9 shrink-0 items-center gap-2 px-2.5" aria-live="polite">
