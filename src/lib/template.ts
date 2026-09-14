@@ -342,8 +342,13 @@ export interface Template {
   headline: TextLayer;
   cta: TextLayer;
   captions?: CaptionStyle;
+  /** fundo em gradiente (quando ausente, usa a cor sólida de `background`) */
+  bgGradient?: BgGradient | null;
+  /** gradiente/vinheta aplicado nas bordas do quadro */
+  edgeFx?: EdgeFx | null;
   extras?: ExtraLayer[];
   fonts?: CustomFont[];
+
   mirror: boolean;
   speed: number;
   antiDup?: AntiDupConfig;
