@@ -1,7 +1,7 @@
 ﻿import { describe, expect, it } from "vitest";
 import { AddCaptionBatchCommand, AddCaptionCueCommand, AddClipCommand, AddMediaClipCommand, ApplyCaptionPresetCommand, ApplySeparatedAudioCommand, ApplyTemplateCommand, ApplyTransitionCommand, CompositionClock, DeleteAudioEnvelopePointCommand, DeleteClipCommand, DeleteClipsCommand, DeleteKeyframeCommand, DuplicateClipsCommand, EditorCommandBus, MoveClipCommand, MoveKeyframeCommand, RegisterExtractedAudioCommand, RestoreOriginalAudioCommand, SelectItemCommand, SetAudioRepresentationCommand, SplitClipCommand, TrimClipCommand, UpdateClipCommand, UpdateProjectSettingsCommand, UpdateTrackCommand, UpdateTransformAtTimeCommand, UpsertAudioEnvelopePointCommand, UpsertKeyframeCommand, adaptEditorProjectV1, asProjectTime, buildExtractedAudioMedia, buildSeparatedAudioMedia, clampTransitionDuration, clipAudioGainAt, createCaptionBatch, createCaptionBatchFromTimedWords, createEditorProjectV2, createEditorRenderManifest, createPlaybackSurfaceKeys, createStemAsset, editorProjectFromManifest, findTransitionTarget, interpolateKeyframes, isEditorV2Enabled, isTrackCompatible, parseTimedText, projectToSourceTime, resolveAnimatedTransform, resolveAudioMixFrame, resolveAudioRenderFrameFromManifest, resolveCaptionInsertion, resolveClipPresentation, resolveCompositionFrame, resolveCompositionFrameFromManifest, resolveLibraryInsertion, resolveTemplateApplication, snapProjectTime, sourceToProjectTime, summarizeWaveform, visibleTimelineRange, type AudioSourceGroup, type Clip, type MediaAsset } from "@/lib/editor-v2";
 import { BUILT_IN_LIBRARY_ITEMS, type CaptionPresetDefinition, type LibraryItem, type TemplateDefinition } from "@/lib/editor-v2/library";
-import { AutoSplitClipsCommand } from "@/lib/editor-v2";
+import { AutoSplitClipsCommand, UpdateClipsCommand } from "@/lib/editor-v2";
 import { createEditorProject } from "@/lib/editor/project";
 
 function clip(): Clip {
@@ -134,6 +134,27 @@ describe("Command bus", () => {
     expect(bus.getState().tracks[0]!.clips[0]!.transform).toMatchObject({ x: 35, rotation: 8, opacity: 0.7 });
     bus.undo();
     expect(bus.getState().tracks[0]!.clips[0]!.transform).toBeUndefined();
+  });
+
+  it("aplica velocidade e inversão em lote como uma única ação reversível", () => {
+    const first = { ...clip(), id: "clip-1", projectStart: asProjectTime(0), projectEnd: asProjectTime(4), sourceIn: 0, sourceOut: 4 };
+    const second = { ...clip(), id: "clip-2", projectStart: asProjectTime(4), projectEnd: asProjectTime(8), sourceIn: 2, sourceOut: 6 };
+    const bus = new EditorCommandBus(createEditorProjectV2({ duration: 12 }));
+    bus.execute(new AddClipCommand(first));
+    bus.execute(new AddClipCommand(second));
+    const command = new UpdateClipsCommand([
+      { clipId: "clip-1", patch: { playbackRate: .5, projectEnd: asProjectTime(8), reversed: true } },
+      { clipId: "clip-2", patch: { playbackRate: .5, projectEnd: asProjectTime(12), reversed: true } },
+    ]);
+    expect(command.serialize()).toMatchObject({ type: "updateClips", payload: { updates: expect.any(Array) } });
+    bus.execute(command);
+    expect(bus.getState().tracks[0]!.clips.map((item) => [item.id, item.playbackRate, item.projectEnd, item.reversed])).toEqual([
+      ["clip-1", .5, 8, true], ["clip-2", .5, 12, true],
+    ]);
+    bus.undo();
+    expect(bus.getState().tracks[0]!.clips.map((item) => [item.id, item.playbackRate, item.projectEnd, item.reversed])).toEqual([
+      ["clip-1", 1, 4, undefined], ["clip-2", 1, 8, undefined],
+    ]);
   });
 
   it("fecha o espaço ao apagar com ripple ativo", () => {
@@ -330,6 +351,14 @@ describe("interações da UI", () => {
 });
 
 describe("templates e legendas da Fase 4", () => {
+  it("oferece os modelos V2 e os layouts profissionais migrados do editor anterior", () => {
+    const templates = BUILT_IN_LIBRARY_ITEMS.filter((item) => item.type === "template") as LibraryItem<TemplateDefinition>[];
+    expect(templates.length).toBeGreaterThanOrEqual(16);
+    const migrated = templates.find((item) => item.id === "builtin.template.ready-hook-topo")!;
+    expect(migrated.definition.document.layers.length).toBeGreaterThan(0);
+    expect(migrated.definition.document.layers.every((layer) => layer.x >= 0 && layer.x <= 100 && layer.y >= 0 && layer.y <= 100)).toBe(true);
+  });
+
   it("aplica um template como comando atômico e o inclui no manifest", () => {
     const project = createEditorProjectV2({ duration: 20, aspectRatio: "9:16" });
     const item = BUILT_IN_LIBRARY_ITEMS.find((candidate) => candidate.id === "builtin.template.social-focus") as LibraryItem<TemplateDefinition>;

@@ -6,3 +6,4 @@ export * from "./provider";
 export * from "./registry";
 export * from "./types";
 export * from "./user-state";
+export * from "./user-templates";

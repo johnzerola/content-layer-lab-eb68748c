@@ -27,6 +27,7 @@ import {
   SplitClipCommand,
   TrimClipCommand,
   UpdateClipCommand,
+  UpdateClipsCommand,
   UpdateProjectSettingsCommand,
   UpdateTrackCommand,
   UpdateAssetAnalysisCommand,
@@ -73,10 +74,11 @@ import {
 import { prepareAudioSeparation, updateAudioSeparationJob } from "@/lib/audio.functions";
 import { downloadSourceFile, uploadAudioStem } from "@/lib/editor/media-cloud";
 import { runStemJob } from "@/lib/editor/stem-service";
+import { listMyTemplates } from "@/lib/video-template/service";
 import { downloadBlob } from "@/lib/render";
 import { generateCaptions } from "@/lib/captions";
 import type { Easing } from "@/lib/video-template/types";
-import { BUILT_IN_LIBRARY_ITEMS, LibraryRegistry, TRANSITION_DEFINITIONS, type CaptionPresetDefinition, type CreativeEffectDefinition, type FilterPresetDefinition, type LibraryItem, type MotionDefinition, type TemplateDefinition } from "@/lib/editor-v2/library";
+import { BUILT_IN_LIBRARY_ITEMS, LibraryRegistry, TRANSITION_DEFINITIONS, userTemplateLibraryItem, type CaptionPresetDefinition, type CreativeEffectDefinition, type FilterPresetDefinition, type LibraryItem, type MotionDefinition, type TemplateDefinition } from "@/lib/editor-v2/library";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { EditorCanvasV2 } from "./EditorCanvasV2";
 import { InspectorV2 } from "./InspectorV2";
@@ -100,6 +102,7 @@ export function EditorV2Foundation() {
   const [project, setProject] = useState<EditorProjectV2>(() => busRef.current.getState());
   const [clock, setClock] = useState(() => clockRef.current.getSnapshot());
   const [timelineZoom, setTimelineZoom] = useState(1);
+  const [libraryRevision, setLibraryRevision] = useState(0);
   const [mobileSurface, setMobileSurface] = useState<MobileSurface>("canvas");
   const [message, setMessage] = useState("Editor V2 pronto para criar.");
   const [assetSources, setAssetSources] = useState<Record<string, string>>({});
@@ -123,7 +126,24 @@ export function EditorV2Foundation() {
   const audioSeparationRef = useRef<AbortController | null>(null);
   const exportRef = useRef<AbortController | null>(null);
   const lastSelectedClipIdRef = useRef<string | null>(null);
+  const lastSelectedClipIdsRef = useRef<string[]>([]);
   const lastMediaClockAtRef = useRef(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    void listMyTemplates().then((templates) => {
+      if (cancelled) return;
+      let added = 0;
+      for (const template of templates) {
+        const item = userTemplateLibraryItem(template);
+        if (registry.get(item.id)) continue;
+        registry.register(item);
+        added += 1;
+      }
+      if (added) setLibraryRevision((value) => value + 1);
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [registry]);
 
   const installRuntimeMedia = useCallback(async (asset: MediaAsset, file: File) => {
     const objectUrl = URL.createObjectURL(file);
@@ -199,10 +219,15 @@ export function EditorV2Foundation() {
   }, [hydrated, project]);
 
   const selectClip = useCallback((id: string | null, additive = false, surface: "timeline" | "canvas" = "canvas") => {
-    if (!id) return run(new SelectItemCommand([], surface));
+    if (!id) {
+      lastSelectedClipIdRef.current = null;
+      lastSelectedClipIdsRef.current = [];
+      return run(new SelectItemCommand([], surface));
+    }
     lastSelectedClipIdRef.current = id;
     const current = busRef.current.getState().selection.itemIds;
     const ids = additive ? current.includes(id) ? current.filter((item) => item !== id) : [...current, id] : [id];
+    lastSelectedClipIdsRef.current = ids;
     run(new SelectItemCommand(ids, surface));
   }, [run]);
 
@@ -210,6 +235,9 @@ export function EditorV2Foundation() {
   const addLibraryItem = useCallback((item: LibraryItem, at = Number(clockRef.current.getSnapshot().projectTime)) => {
     const state = busRef.current.getState();
     const selected = findClip(state, state.selection.primaryId) ?? findClip(state, lastSelectedClipIdRef.current);
+    const activeClipIds = state.selection.itemIds.filter((id) => Boolean(findClip(state, id)));
+    const rememberedIds = lastSelectedClipIdsRef.current.filter((id) => Boolean(findClip(state, id)));
+    const selectedClips = (activeClipIds.length ? activeClipIds : rememberedIds).map((id) => findClip(state, id)).filter((clip): clip is Clip => Boolean(clip));
     if (item.type === "transition") {
       run(new SelectItemCommand([item.id], "library"));
       setMobileSurface("inspector");
@@ -217,27 +245,26 @@ export function EditorV2Foundation() {
       return;
     }
     if (item.type === "animation") {
-      if (!selected || selected.kind === "audio") { setMessage("Selecione um clipe visual antes de aplicar a animação."); return; }
+      const targets = selectedClips.filter((clip) => clip.kind !== "audio");
+      if (!targets.length) { setMessage("Selecione um ou mais clipes visuais antes de aplicar a animação."); return; }
       const definition = item.definition as MotionDefinition;
-      run(new UpdateClipCommand(selected.id, { motion: { ...(selected.motion ?? {}), [definition.slot]: { id: definition.id.replace(`${definition.slot}-`, ""), duration: definition.duration, intensity: definition.intensity, easing: definition.easing } } }), `${item.name} aplicado em ${definition.slot === "in" ? "entrada" : definition.slot === "out" ? "saída" : "loop"}.`);
-      run(new SelectItemCommand([selected.id], "canvas"));
+      run(new UpdateClipsCommand(targets.map((clip) => ({ clipId: clip.id, patch: { motion: { ...(clip.motion ?? {}), [definition.slot]: { id: definition.id.replace(`${definition.slot}-`, ""), duration: definition.duration, intensity: definition.intensity, easing: definition.easing } } } }))), `${item.name} aplicado em ${targets.length} ${targets.length === 1 ? "item" : "itens"}.`);
       setMobileSurface("inspector");
       return;
     }
     if (item.type === "filter") {
-      if (!selected || !["video", "image"].includes(selected.kind)) { setMessage("Selecione um vídeo ou imagem antes de aplicar o filtro."); return; }
+      const targets = selectedClips.filter((clip) => ["video", "image"].includes(clip.kind));
+      if (!targets.length) { setMessage("Selecione um ou mais vídeos ou imagens antes de aplicar o filtro."); return; }
       const definition = item.definition as FilterPresetDefinition;
-      run(new UpdateClipCommand(selected.id, { adjustments: structuredClone(definition.adjustments), metadata: { ...selected.metadata, filterPresetId: definition.id } }), `${item.name} aplicado ao clipe.`);
-      run(new SelectItemCommand([selected.id], "canvas"));
+      run(new UpdateClipsCommand(targets.map((clip) => ({ clipId: clip.id, patch: { adjustments: structuredClone(definition.adjustments), metadata: { ...clip.metadata, filterPresetId: definition.id } } }))), `${item.name} aplicado em ${targets.length} ${targets.length === 1 ? "item" : "itens"}.`);
       setMobileSurface("inspector");
       return;
     }
     if (item.type === "video-effect") {
-      if (!selected || !["video", "image"].includes(selected.kind)) { setMessage("Selecione um vídeo ou imagem antes de aplicar o efeito."); return; }
+      const targets = selectedClips.filter((clip) => ["video", "image"].includes(clip.kind));
+      if (!targets.length) { setMessage("Selecione um ou mais vídeos ou imagens antes de aplicar o efeito."); return; }
       const definition = item.definition as CreativeEffectDefinition;
-      const effect = { id: `${selected.id}-fx-${definition.id}-${state.revisions.document + 1}`, definitionId: definition.id, enabled: true, parameters: { start: Math.max(0, at - Number(selected.projectStart)), end: Math.min(Number(selected.projectEnd) - Number(selected.projectStart), Math.max(0, at - Number(selected.projectStart)) + definition.duration), intensity: definition.intensity } };
-      run(new UpdateClipCommand(selected.id, { effects: [...selected.effects, effect] }), `${item.name} aplicado ao clipe.`);
-      run(new SelectItemCommand([selected.id], "canvas"));
+      run(new UpdateClipsCommand(targets.map((clip) => ({ clipId: clip.id, patch: { effects: [...clip.effects, { id: `${clip.id}-fx-${definition.id}-${state.revisions.document + 1}`, definitionId: definition.id, enabled: true, parameters: { start: Math.max(0, at - Number(clip.projectStart)), end: Math.min(Number(clip.projectEnd) - Number(clip.projectStart), Math.max(0, at - Number(clip.projectStart)) + definition.duration), intensity: definition.intensity } }] } }))), `${item.name} aplicado em ${targets.length} ${targets.length === 1 ? "item" : "itens"}.`);
       setMobileSurface("inspector");
       return;
     }
@@ -315,6 +342,59 @@ export function EditorV2Foundation() {
     const duplicated = busRef.current.getState().selection.itemIds.map((id) => findClip(busRef.current.getState(), id)).filter((clip): clip is Clip => Boolean(clip));
     if (duplicated.length) seek(Math.min(...duplicated.map((clip) => Number(clip.projectStart))));
   }, [run, seek]);
+
+  const selectedClipsForBatch = useCallback(() => {
+    const state = busRef.current.getState();
+    return state.selection.itemIds.map((id) => findClip(state, id)).filter((clip): clip is Clip => Boolean(clip));
+  }, []);
+
+  const setSelectedSpeed = useCallback((playbackRate: number) => {
+    const targets = selectedClipsForBatch().filter((clip) => clip.kind === "video");
+    if (!targets.length) return setMessage("Selecione um ou mais vídeos para mudar a velocidade.");
+    const speed = Math.max(.1, Math.min(4, playbackRate));
+    run(new UpdateClipsCommand(targets.map((clip) => ({ clipId: clip.id, patch: { playbackRate: speed, projectEnd: (Number(clip.projectStart) + (clip.sourceOut - clip.sourceIn) / speed) as Clip["projectEnd"] } }))), `Velocidade ${speed.toLocaleString("pt-BR")}× aplicada em ${targets.length} ${targets.length === 1 ? "vídeo" : "vídeos"}.`);
+  }, [run, selectedClipsForBatch]);
+
+  const toggleSelectedReverse = useCallback(() => {
+    const targets = selectedClipsForBatch().filter((clip) => clip.kind === "video");
+    if (!targets.length) return setMessage("Selecione um ou mais vídeos para inverter.");
+    const reversed = !targets.every((clip) => clip.reversed);
+    run(new UpdateClipsCommand(targets.map((clip) => ({ clipId: clip.id, patch: { reversed } }))), `${targets.length} ${targets.length === 1 ? "vídeo invertido" : "vídeos invertidos"}.`);
+  }, [run, selectedClipsForBatch]);
+
+  const toggleSelectedFlip = useCallback((axis: "horizontal" | "vertical") => {
+    const targets = selectedClipsForBatch().filter((clip) => clip.kind === "video" || clip.kind === "image");
+    if (!targets.length) return setMessage("Selecione um ou mais vídeos ou imagens para espelhar.");
+    const key = axis === "horizontal" ? "flipHorizontal" : "flipVertical";
+    const enabled = !targets.every((clip) => Boolean(clip[key]));
+    run(new UpdateClipsCommand(targets.map((clip) => ({ clipId: clip.id, patch: { [key]: enabled } }))), `${targets.length} ${targets.length === 1 ? "item espelhado" : "itens espelhados"}.`);
+  }, [run, selectedClipsForBatch]);
+
+  const patchClipSelectionAware = useCallback((clipId: string, patch: Partial<Clip>) => {
+    const state = busRef.current.getState();
+    const ids = state.selection.itemIds.includes(clipId) ? state.selection.itemIds : [clipId];
+    const clips = ids.map((id) => findClip(state, id)).filter((clip): clip is Clip => Boolean(clip));
+    const supportsBatch = clips.length > 1 && ["playbackRate", "reversed", "flipHorizontal", "flipVertical", "adjustments", "motion", "enabled"].some((key) => key in patch);
+    if (!supportsBatch) {
+      run(new UpdateClipCommand(clipId, patch));
+      return;
+    }
+    const targets = clips.filter((clip) => {
+      if ("playbackRate" in patch || "reversed" in patch) return clip.kind === "video";
+      if ("adjustments" in patch || "flipHorizontal" in patch || "flipVertical" in patch) return clip.kind === "video" || clip.kind === "image";
+      if ("motion" in patch) return clip.kind !== "audio";
+      return true;
+    });
+    if (!targets.length) return;
+    const updates = targets.map((clip) => {
+      if (patch.playbackRate !== undefined) {
+        const playbackRate = Math.max(.1, Math.min(4, patch.playbackRate));
+        return { clipId: clip.id, patch: { ...patch, playbackRate, projectEnd: (Number(clip.projectStart) + (clip.sourceOut - clip.sourceIn) / playbackRate) as Clip["projectEnd"] } };
+      }
+      return { clipId: clip.id, patch };
+    });
+    run(new UpdateClipsCommand(updates), `Ajuste aplicado em ${targets.length} itens selecionados.`);
+  }, [run]);
 
   const exportProject = useCallback(async () => {
     if (exporting) { exportRef.current?.abort(); return; }
@@ -795,6 +875,7 @@ export function EditorV2Foundation() {
   };
   const inspectorProps = {
     clip: selectedClip,
+    selectionCount: project.selection.itemIds.filter((id) => Boolean(findClip(project, id))).length,
     track: selectedTrack ?? null,
     libraryItem: selectedLibraryItem,
     currentTime: Number(clock.projectTime),
@@ -802,7 +883,7 @@ export function EditorV2Foundation() {
     audioGroup: selectedAudioGroup ?? null,
     missingAsset,
     onRelink: (assetId: string) => requestRelink(assetId),
-    onPatchClip: (id: string, patch: Partial<Clip>) => run(new UpdateClipCommand(id, patch)),
+    onPatchClip: patchClipSelectionAware,
     onTransform: (id: string, transform: ClipTransform, easing: Easing) => run(new UpdateTransformAtTimeCommand(id, Number(clock.projectTime), transform, easing, String(project.revisions.document + 1))),
     onUpsertKeyframe: (property: AnimatableProperty, value: number, easing: Easing, keyframeId?: string) => { if (selectedClip) run(new UpsertKeyframeCommand(selectedClip.id, property, clipLocalTime(selectedClip, Number(clock.projectTime)), value, easing, keyframeId ?? `${selectedClip.id}-${property}-${project.revisions.document + 1}`), "Keyframe adicionado."); },
     onDeleteKeyframe: (property: AnimatableProperty, keyframeId: string) => { if (selectedClip) run(new DeleteKeyframeCommand(selectedClip.id, property, keyframeId), "Keyframe removido."); },
@@ -858,6 +939,12 @@ export function EditorV2Foundation() {
     onSplit: split,
     onAutoSplit: autoSplit,
     onDuplicate: duplicateSelected,
+    onDelete: removeSelected,
+    onTogglePlayback: togglePlayback,
+    onSkip: (seconds: number) => seek(Number(clockRef.current.getSnapshot().projectTime) + seconds),
+    onBatchSpeed: setSelectedSpeed,
+    onBatchToggleReverse: toggleSelectedReverse,
+    onBatchToggleFlip: toggleSelectedFlip,
     onToggleSnap: () => run(new UpdateProjectSettingsCommand({ snapEnabled: !project.settings.snapEnabled })),
     onToggleRipple: () => run(new UpdateProjectSettingsCommand({ rippleEnabled: !project.settings.rippleEnabled })),
     onTrackPatch: (trackId: string, patch: Partial<Pick<Track, "muted" | "solo" | "gain" | "hidden" | "locked">>) => run(new UpdateTrackCommand(trackId, patch)),
@@ -888,7 +975,7 @@ export function EditorV2Foundation() {
         <ResizablePanelGroup orientation="vertical" id="editor-v2-vertical">
           <ResizablePanel defaultSize="68%" minSize={360}>
             <ResizablePanelGroup orientation="horizontal" id="editor-v2-workspace">
-              <ResizablePanel defaultSize={300} minSize={250} maxSize={430}><LibraryPanel registry={registry} selectedId={project.selection.surface === "library" ? project.selection.primaryId : null} onSelect={selectLibrary} onAdd={addLibraryItem} onGenerateCaptions={() => void generateAutomaticCaptions()} generatingCaptions={transcribing} captionProgress={captionProgress} /></ResizablePanel>
+              <ResizablePanel defaultSize={300} minSize={250} maxSize={430}><LibraryPanel registry={registry} revision={libraryRevision} selectedId={project.selection.surface === "library" ? project.selection.primaryId : null} onSelect={selectLibrary} onAdd={addLibraryItem} onGenerateCaptions={() => void generateAutomaticCaptions()} generatingCaptions={transcribing} captionProgress={captionProgress} /></ResizablePanel>
               <ResizableHandle withHandle className="bg-white/8 hover:bg-primary/50" />
               <ResizablePanel defaultSize="55%" minSize={420}><EditorCanvasV2 {...canvasProps} /></ResizablePanel>
               <ResizableHandle withHandle className="bg-white/8 hover:bg-primary/50" />
@@ -904,7 +991,7 @@ export function EditorV2Foundation() {
         <nav className="editor-v2-mobile-nav grid h-11 shrink-0 grid-cols-4" aria-label="Áreas do editor">
           {([['library', Library, 'Biblioteca'], ['canvas', Film, 'Prévia'], ['inspector', PanelRight, 'Inspector'], ['timeline', FolderOpen, 'Timeline']] as const).map(([id, Icon, label]) => <button key={id} type="button" onClick={() => setMobileSurface(id)} aria-pressed={mobileSurface === id} className={`flex items-center justify-center gap-1.5 text-[10px] ${mobileSurface === id ? "bg-primary/12 text-primary" : "text-muted-foreground"}`}><Icon className="size-3.5" />{label}</button>)}
         </nav>
-        <div className="min-h-0 flex-1">{mobileSurface === "library" ? <LibraryPanel registry={registry} selectedId={project.selection.surface === "library" ? project.selection.primaryId : null} onSelect={selectLibrary} onAdd={addLibraryItem} onGenerateCaptions={() => void generateAutomaticCaptions()} generatingCaptions={transcribing} captionProgress={captionProgress} /> : mobileSurface === "canvas" ? <EditorCanvasV2 {...canvasProps} /> : mobileSurface === "inspector" ? <InspectorV2 {...inspectorProps} /> : <TimelineV2 {...timelineProps} />}</div>
+        <div className="min-h-0 flex-1">{mobileSurface === "library" ? <LibraryPanel registry={registry} revision={libraryRevision} selectedId={project.selection.surface === "library" ? project.selection.primaryId : null} onSelect={selectLibrary} onAdd={addLibraryItem} onGenerateCaptions={() => void generateAutomaticCaptions()} generatingCaptions={transcribing} captionProgress={captionProgress} /> : mobileSurface === "canvas" ? <EditorCanvasV2 {...canvasProps} /> : mobileSurface === "inspector" ? <InspectorV2 {...inspectorProps} /> : <TimelineV2 {...timelineProps} />}</div>
       </div>
 
       <footer className="editor-v2-statusbar flex h-9 shrink-0 items-center gap-2 px-2.5" aria-live="polite">

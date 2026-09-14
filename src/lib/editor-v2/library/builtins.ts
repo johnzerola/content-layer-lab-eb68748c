@@ -4,6 +4,7 @@ import { EFFECT_DEFINITIONS, TRANSITION_DEFINITIONS } from "./definitions";
 import { CAPTION_PRESETS } from "@/lib/editor/caption-styles";
 import { EFFECTS as LEGACY_EFFECTS } from "@/lib/editor/effects";
 import { STICKERS } from "@/lib/editor/stickers";
+import { READY_TEMPLATES } from "@/lib/editor/template-presets";
 import { NEUTRAL_VIDEO_ADJUSTMENTS } from "../creative";
 import type { CaptionPresetDefinition, CreativeEffectDefinition, FilterPresetDefinition, LibraryItem, LibraryItemType, LibraryPreview, MotionDefinition, StickerDefinition, TemplateDefinition, TextPresetDefinition } from "./types";
 
@@ -111,4 +112,17 @@ const templates = [
   makeTemplate("product-glow", "Product Glow", 9, "9:16", "#090c13", [shapeLayer("glow", 50, 42, 64, 38, "#714cff", "circle"), shapeLayer("product", 50, 44, 52, 42, "#22283a"), textLayer("eyebrow", "DESCOBRIR", 50, 70, 78, 6, "#70e6c1", 24), textLayer("headline", "SEU PRODUTO EM FOCO", 50, 80, 80, 15, "#ffffff", 58)], [{ id: "product", kind: "media" }, { id: "headline", kind: "text" }], ["produto", "ugc"]),
 ];
 
-export const BUILT_IN_LIBRARY_ITEMS: LibraryItem[] = [...templates, ...transitions, ...effects, ...filters, ...text, ...captions, ...captionAliases, ...animations, ...stickers, ...shapes];
+// Reuse the mature template collection from the original editor. Those
+// documents store x/y as the layer's top-left; Editor V2 transforms use the
+// center, so the adapter makes that coordinate contract explicit.
+const readyTemplates = READY_TEMPLATES.map((preset) => {
+  const layers = preset.build([], { handle: "seuperfil", name: "SUA MARCA", role: "CRIADOR" }).map((layer) => ({
+    ...layer,
+    x: layer.x + layer.width / 2,
+    y: layer.y + layer.height / 2,
+  }));
+  const textPlaceholders = layers.filter((layer) => layer.type === "text").map((layer) => ({ id: layer.id, kind: "text" as const }));
+  return makeTemplate(`ready-${preset.id}`, preset.label, 8, "9:16", preset.swatch[1], layers, textPlaceholders, ["editor clássico", "pronto", preset.hint]);
+});
+
+export const BUILT_IN_LIBRARY_ITEMS: LibraryItem[] = [...templates, ...readyTemplates, ...transitions, ...effects, ...filters, ...text, ...captions, ...captionAliases, ...animations, ...stickers, ...shapes];

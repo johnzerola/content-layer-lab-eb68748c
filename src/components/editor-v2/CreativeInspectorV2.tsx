@@ -29,13 +29,14 @@ const adjustmentPresets: Array<{ id: string; label: string; hint: string; colors
   { id: "mono", label: "P&B", hint: "Clássico com textura", colors: ["#e7e7ea", "#30333a"], patch: { saturation: -1, contrast: .22, grain: .08 } },
 ];
 
-export function CreativeInspectorV2({ clip, onPatch }: { clip: Clip; onPatch: (patch: Partial<Clip>) => void }) {
+export function CreativeInspectorV2({ clip, selectionCount = 1, onPatch }: { clip: Clip; selectionCount?: number; onPatch: (patch: Partial<Clip>) => void }) {
   const [tab, setTab] = useState<"basic" | "speed" | "motion" | "adjust" | "effects">("basic");
   if (!["video", "image", "sticker", "shape"].includes(clip.kind)) return null;
   const tabs: Array<{ id: "basic" | "speed" | "motion" | "adjust" | "effects"; label: string }> = [{ id: "basic", label: "Básico" }, ...(clip.kind === "video" ? [{ id: "speed" as const, label: "Velocidade" }] : []), { id: "motion", label: "Animação" }, ...(clip.kind === "video" || clip.kind === "image" ? [{ id: "adjust" as const, label: "Ajuste" }, { id: "effects" as const, label: "Efeitos" }] : [])];
   const adjustments = { ...NEUTRAL_VIDEO_ADJUSTMENTS, ...clip.adjustments };
   const setSpeed = (playbackRate: number) => onPatch({ playbackRate, projectEnd: (Number(clip.projectStart) + (clip.sourceOut - clip.sourceIn) / Math.max(.05, playbackRate)) as Clip["projectEnd"] });
   return <section className="border-b border-white/8 py-4">
+    {selectionCount > 1 && <div className="mb-3 rounded-lg border border-primary/20 bg-primary/[0.06] px-2.5 py-2 text-[9px] leading-relaxed text-primary">Modo em lote ativo: velocidade, inversão, espelhamento, animação e cor serão aplicados aos {selectionCount} itens compatíveis.</div>}
     <div className="-mx-1 flex gap-1 overflow-x-auto pb-3 vaiviral-scrollbar" role="tablist" aria-label="Propriedades criativas">
       {tabs.map((item) => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={`editor-creative-tab shrink-0 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold ${tab === item.id ? "is-active text-primary" : "text-muted-foreground hover:text-white"}`}>{item.label}</button>)}
     </div>

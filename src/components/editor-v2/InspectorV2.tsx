@@ -17,6 +17,7 @@ interface TransitionContext {
 
 interface InspectorProps {
   clip: Clip | null;
+  selectionCount: number;
   track: Track | null;
   libraryItem: LibraryItem | null;
   currentTime: number;
@@ -49,7 +50,7 @@ interface InspectorProps {
 }
 
 export function InspectorV2(props: InspectorProps) {
-  const { clip, track, libraryItem, currentTime, transitionContext, audioGroup, missingAsset, onPatchClip, onTransform, onUpsertKeyframe, onDeleteKeyframe, onSeek, onApplyTransition, onDeleteTransition, onPreviewTransition, onUpsertAudioEnvelope, onDeleteAudioEnvelope, audioSettings, onAudioSettings, onTrackAudio, onAudioRepresentation, onExtractAudio, onCancelAudioExtraction, onSeparateAudio, onCancelAudioSeparation, onRestoreOriginalAudio, onRelink, extractingAudio, separatingAudio, onAddLibraryItem } = props;
+  const { clip, selectionCount, track, libraryItem, currentTime, transitionContext, audioGroup, missingAsset, onPatchClip, onTransform, onUpsertKeyframe, onDeleteKeyframe, onSeek, onApplyTransition, onDeleteTransition, onPreviewTransition, onUpsertAudioEnvelope, onDeleteAudioEnvelope, audioSettings, onAudioSettings, onTrackAudio, onAudioRepresentation, onExtractAudio, onCancelAudioExtraction, onSeparateAudio, onCancelAudioSeparation, onRestoreOriginalAudio, onRelink, extractingAudio, separatingAudio, onAddLibraryItem } = props;
   const [easing, setEasing] = useState<Easing>("easeInOut");
   const [transitionKind, setTransitionKind] = useState("fade");
   const [transitionDuration, setTransitionDuration] = useState(0.45);
@@ -75,7 +76,7 @@ export function InspectorV2(props: InspectorProps) {
   const patchStyle = (patch: Partial<ClipStyle>) => onPatchClip(clip.id, { style: { ...style, ...patch } });
   return (
     <aside className="editor-v2-panel editor-v2-inspector flex h-full min-h-0 flex-col" aria-label="Inspector de propriedades">
-      <header className="editor-v2-panel-header px-4 py-3"><div className="flex items-center gap-2"><SlidersHorizontal className="size-4 text-primary" /><h2 className="text-sm font-semibold">Inspector</h2></div><p className="mt-1 truncate text-[11px] text-muted-foreground">{clip.name}</p></header>
+      <header className="editor-v2-panel-header px-4 py-3"><div className="flex items-center gap-2"><SlidersHorizontal className="size-4 text-primary" /><h2 className="text-sm font-semibold">{selectionCount > 1 ? `${selectionCount} itens selecionados` : "Inspector"}</h2></div><p className="mt-1 truncate text-[11px] text-muted-foreground">{selectionCount > 1 ? `${clip.name} é o item principal · ajustes compatíveis serão aplicados ao grupo` : clip.name}</p></header>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 vaiviral-scrollbar">
         {missingAsset && <div role="alert" className="mt-3 rounded-xl border border-amber-300/25 bg-amber-300/[0.07] p-3"><div className="flex gap-2"><AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-300" /><div><p className="text-[10px] font-semibold text-amber-100">Arquivo ausente</p><p className="mt-1 text-[9px] leading-relaxed text-muted-foreground">{missingAsset.name} não está mais disponível neste navegador. O projeto foi preservado.</p></div></div><button type="button" onClick={() => onRelink(missingAsset.id)} className="mt-2 min-h-9 w-full rounded-lg border border-amber-200/25 bg-amber-200/10 px-3 text-[10px] font-semibold text-amber-100 hover:bg-amber-200/15">Religar arquivo</button></div>}
         {audioGroup && <InspectorSection title="Áudio da mídia">
@@ -107,7 +108,7 @@ export function InspectorV2(props: InspectorProps) {
           <div className="mt-3 flex items-end gap-2"><label className="min-w-0 flex-1 text-[10px] text-muted-foreground">Opacidade <span className="float-right tabular-nums text-foreground">{Math.round(transform.opacity * 100)}%</span><input type="range" min="0" max="1" step="0.01" value={transform.opacity} onChange={(event) => patchTransform("opacity", Number(event.target.value))} className="mt-2 w-full accent-violet-500" /></label><KeyframeButton label="Opacidade" activeKeyframe={keyframeAt(clip, "opacity", localTime)} value={transform.opacity} property="opacity" easing={easing} onUpsert={onUpsertKeyframe} onDelete={onDeleteKeyframe} /></div>
         </InspectorSection>}
 
-        <CreativeInspectorV2 clip={clip} onPatch={(patch) => onPatchClip(clip.id, patch)} />
+        <CreativeInspectorV2 clip={clip} selectionCount={selectionCount} onPatch={(patch) => onPatchClip(clip.id, patch)} />
 
         {clip.kind !== "audio" && <InspectorSection title="Keyframes">
           <div className="flex items-center gap-2"><KeyRound className="size-3.5 text-primary" /><label className="flex flex-1 items-center gap-2 text-[10px] text-muted-foreground">Interpolação<select aria-label="Interpolação de keyframe" value={easing} onChange={(event) => setEasing(event.target.value as Easing)} className="ml-auto h-8 rounded-lg border border-white/10 bg-black/25 px-2 text-[10px] text-foreground"><option value="linear">Linear</option><option value="easeIn">Entrada suave</option><option value="easeOut">Saída suave</option><option value="easeInOut">Suave</option></select></label></div>

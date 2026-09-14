@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Captions, Copy, Eye, EyeOff, Film, Headphones, Image, Lock, Magnet, Music2, Scissors, Sparkles, Timer, Unlock, Volume2, VolumeX, Waves } from "lucide-react";
+import { Captions, ChevronDown, Copy, Eye, EyeOff, Film, FlipHorizontal2, FlipVertical2, Gauge, Headphones, Image, Lock, Magnet, Music2, Pause, Play, Rewind, RotateCcw, Scissors, Sparkles, Timer, Trash2, Unlock, Volume2, VolumeX, Waves } from "lucide-react";
 import { formatProjectTime, isTrackCompatible, snapProjectTime, visibleTimelineRange, type AnimatableProperty, type Clip, type EditorProjectV2, type Track } from "@/lib/editor-v2";
 
 interface TimelineProps {
@@ -18,6 +18,12 @@ interface TimelineProps {
   onSplit: () => void;
   onAutoSplit: (interval: number) => void;
   onDuplicate: () => void;
+  onDelete: () => void;
+  onTogglePlayback: () => void;
+  onSkip: (seconds: number) => void;
+  onBatchSpeed: (speed: number) => void;
+  onBatchToggleReverse: () => void;
+  onBatchToggleFlip: (axis: "horizontal" | "vertical") => void;
   onToggleSnap: () => void;
   onToggleRipple: () => void;
   onTrackPatch: (trackId: string, patch: Partial<Pick<Track, "muted" | "solo" | "gain" | "hidden" | "locked">>) => void;
@@ -30,10 +36,11 @@ const TRACK_HEIGHT = 48;
 const RULER_HEIGHT = 28;
 
 export function TimelineV2(props: TimelineProps) {
-  const { project, currentTime, playing, zoom, assetThumbnails, assetWaveforms, onZoom, onSeek, onSelect, onMove, onTrim, onMoveKeyframe, onSplit, onAutoSplit, onDuplicate, onToggleSnap, onToggleRipple, onTrackPatch, onDropLibraryItem } = props;
+  const { project, currentTime, playing, zoom, assetThumbnails, assetWaveforms, onZoom, onSeek, onSelect, onMove, onTrim, onMoveKeyframe, onSplit, onAutoSplit, onDuplicate, onDelete, onTogglePlayback, onSkip, onBatchSpeed, onBatchToggleReverse, onBatchToggleFlip, onToggleSnap, onToggleRipple, onTrackPatch, onDropLibraryItem } = props;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [autoCutOpen, setAutoCutOpen] = useState(false);
+  const [batchOpen, setBatchOpen] = useState(false);
   const [autoCutInterval, setAutoCutInterval] = useState(2);
   const [viewport, setViewport] = useState({ scrollLeft: 0, width: 1200 });
   const pxPerSecond = 52 * zoom;
@@ -74,10 +81,26 @@ export function TimelineV2(props: TimelineProps) {
     return project.tracks[index]!;
   };
 
+  const beginPlayheadGesture = (event: React.PointerEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const update = (clientX: number) => onSeek(timeFromPointer(clientX));
+    update(event.clientX);
+    const move = (next: PointerEvent) => update(next.clientX);
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up, { once: true });
+  };
+
   const beginClipGesture = (event: React.PointerEvent, clip: Clip, mode: Draft["mode"]) => {
     event.preventDefault();
     event.stopPropagation();
-    onSelect(clip.id, event.shiftKey);
+    const additive = event.ctrlKey || event.metaKey || event.shiftKey;
+    onSelect(clip.id, additive);
+    if (additive) return;
     const pointerStart = timeFromPointer(event.clientX);
     const initialStart = Number(clip.projectStart);
     const initialEnd = Number(clip.projectEnd);
@@ -130,6 +153,11 @@ export function TimelineV2(props: TimelineProps) {
   return (
     <section className="editor-v2-timeline flex h-full min-h-0 flex-col" aria-label="Timeline multitrack">
       <header className="editor-v2-timeline-toolbar flex h-11 shrink-0 items-center gap-1 px-2 sm:px-3">
+        <div className="mr-1 flex items-center gap-0.5 rounded-lg border border-white/8 bg-black/20 p-0.5" role="group" aria-label="Controles de reprodução">
+          <button type="button" onClick={() => onSkip(-5)} className="editor-icon-button size-7" aria-label="Voltar 5 segundos"><RotateCcw className="size-3.5" /></button>
+          <button type="button" onClick={onTogglePlayback} className="editor-icon-button size-7 bg-primary/18 text-primary" aria-label={playing ? "Pausar" : "Reproduzir"}>{playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}</button>
+          <button type="button" onClick={() => onSkip(5)} className="editor-icon-button size-7" aria-label="Avançar 5 segundos"><RotateCcw className="size-3.5 scale-x-[-1]" /></button>
+        </div>
         <button type="button" onClick={onSplit} className="editor-tool-button"><Scissors className="size-3.5" /><span className="hidden sm:inline">Dividir</span></button>
         <div className="relative">
           <button type="button" aria-label="Cortes automáticos" title="Cortar seleção por intervalo" onClick={() => setAutoCutOpen((open) => !open)} aria-expanded={autoCutOpen} className={`editor-tool-button ${autoCutOpen ? "text-primary" : ""}`}><Timer className="size-3.5" /><span className="hidden xl:inline">Cortes automáticos</span></button>
@@ -142,6 +170,21 @@ export function TimelineV2(props: TimelineProps) {
           </form>}
         </div>
         <button type="button" onClick={onDuplicate} className="editor-tool-button"><Copy className="size-3.5" /><span className="hidden sm:inline">Duplicar</span></button>
+        <div className="relative">
+          <button type="button" disabled={!project.selection.itemIds.length} onClick={() => setBatchOpen((open) => !open)} aria-expanded={batchOpen} className={`editor-tool-button disabled:cursor-not-allowed disabled:opacity-35 ${batchOpen ? "text-primary" : ""}`}><Gauge className="size-3.5" /><span className="hidden xl:inline">Ações</span>{project.selection.itemIds.length > 0 && <span className="rounded bg-primary/18 px-1.5 py-0.5 text-[8px] font-bold text-primary">{project.selection.itemIds.length}</span>}<ChevronDown className="size-3" /></button>
+          {batchOpen && <div className="editor-auto-cut-popover absolute left-0 top-9 z-50 w-72 rounded-xl border border-white/10 p-3 shadow-2xl">
+            <p className="text-[11px] font-semibold text-foreground">Editar {project.selection.itemIds.length} itens</p>
+            <p className="mt-1 text-[9px] leading-relaxed text-muted-foreground">Ctrl+clique adiciona ou remove trechos. Cada ação abaixo usa um único Ctrl+Z.</p>
+            <p className="mt-3 text-[9px] font-semibold text-foreground">Velocidade dos vídeos</p>
+            <div className="mt-1 grid grid-cols-4 gap-1">{[.5, .75, 1, 1.5].map((speed) => <button key={speed} type="button" onClick={() => { onBatchSpeed(speed); setBatchOpen(false); }} className="h-8 rounded-lg bg-white/5 text-[9px] font-semibold text-muted-foreground hover:bg-primary/15 hover:text-primary">{speed}×</button>)}</div>
+            <div className="mt-2 grid grid-cols-3 gap-1">
+              <button type="button" onClick={() => { onBatchToggleReverse(); setBatchOpen(false); }} className="editor-tool-button justify-center"><Rewind className="size-3.5" />Inverter</button>
+              <button type="button" onClick={() => { onBatchToggleFlip("horizontal"); setBatchOpen(false); }} className="editor-tool-button justify-center"><FlipHorizontal2 className="size-3.5" />Horizontal</button>
+              <button type="button" onClick={() => { onBatchToggleFlip("vertical"); setBatchOpen(false); }} className="editor-tool-button justify-center"><FlipVertical2 className="size-3.5" />Vertical</button>
+            </div>
+          </div>}
+        </div>
+        <button type="button" onClick={onDelete} disabled={!project.selection.itemIds.length} className="editor-tool-button text-muted-foreground hover:text-destructive disabled:cursor-not-allowed disabled:opacity-30" aria-label="Excluir itens selecionados"><Trash2 className="size-3.5" /><span className="hidden xl:inline">Excluir</span></button>
         <span className="mx-1 h-5 w-px bg-white/8" />
         <button type="button" onClick={onToggleSnap} aria-pressed={project.settings.snapEnabled} className={`editor-tool-button ${project.settings.snapEnabled ? "text-primary" : ""}`}><Magnet className="size-3.5" /><span className="hidden md:inline">Ajuste</span></button>
         <button type="button" onClick={onToggleRipple} aria-pressed={project.settings.rippleEnabled} className={`editor-tool-button ${project.settings.rippleEnabled ? "text-primary" : ""}`}><Waves className="size-3.5" /><span className="hidden md:inline">Ripple</span></button>
@@ -152,19 +195,19 @@ export function TimelineV2(props: TimelineProps) {
         <div className="relative min-h-full" style={{ width: width + TRACK_LABEL_WIDTH }}>
           <div className="editor-v2-ruler sticky top-0 z-30 flex h-7 backdrop-blur">
             <div className="sticky left-0 z-40 flex shrink-0 items-center border-r border-white/8 bg-[oklch(0.105_0.012_270)] px-3 text-[9px] font-medium text-muted-foreground" style={{ width: TRACK_LABEL_WIDTH }}>{formatProjectTime(currentTime)}</div>
-            <div className="relative" style={{ width }} onPointerDown={(event) => onSeek(timeFromPointer(event.clientX))}>{ticks.map((tick) => <span key={tick} className="absolute bottom-0 h-2 border-l border-white/18 text-[8px] tabular-nums text-muted-foreground" style={{ left: tick * pxPerSecond }}><span className="absolute left-1 top-[-10px]">{tick % 5 === 0 ? formatProjectTime(tick).slice(0, 5) : ""}</span></span>)}</div>
+            <div className="relative cursor-ew-resize touch-none" style={{ width }} onPointerDown={beginPlayheadGesture}>{ticks.map((tick) => <span key={tick} className="pointer-events-none absolute bottom-0 h-2 border-l border-white/18 text-[8px] tabular-nums text-muted-foreground" style={{ left: tick * pxPerSecond }}><span className="absolute left-1 top-[-10px]">{tick % 5 === 0 ? formatProjectTime(tick).slice(0, 5) : ""}</span></span>)}</div>
           </div>
           {project.tracks.map((track) => {
             const target = draft?.targetTrackId === track.id;
             return <div key={track.id} data-track-id={track.id} data-track-kind={track.kind} className={`editor-v2-track group/track flex ${target ? draft.compatible ? "bg-primary/[0.07]" : "bg-destructive/[0.08]" : ""}`} style={{ height: TRACK_HEIGHT }}>
               <div className="editor-v2-track-label sticky left-0 z-20 flex shrink-0 items-center gap-1.5 px-2" style={{ width: TRACK_LABEL_WIDTH }}><TrackIcon kind={track.kind} /><span className="min-w-0 flex-1 truncate text-[10px] font-medium">{track.name}</span>{(track.kind === "voice" || track.kind === "music" || track.kind === "sfx") && <TrackButton label={track.solo ? `Desativar solo de ${track.name}` : `Ouvir somente ${track.name}`} active={track.solo} onClick={() => onTrackPatch(track.id, { solo: !track.solo })}><Headphones /></TrackButton>}<TrackButton label={track.muted ? `Ativar som de ${track.name}` : `Silenciar ${track.name}`} active={track.muted} onClick={() => onTrackPatch(track.id, { muted: !track.muted })}>{track.muted ? <VolumeX /> : <Volume2 />}</TrackButton><TrackButton label={track.hidden ? `Mostrar ${track.name}` : `Ocultar ${track.name}`} active={track.hidden} onClick={() => onTrackPatch(track.id, { hidden: !track.hidden })}>{track.hidden ? <EyeOff /> : <Eye />}</TrackButton><TrackButton label={track.locked ? `Desbloquear ${track.name}` : `Bloquear ${track.name}`} active={track.locked} onClick={() => onTrackPatch(track.id, { locked: !track.locked })}>{track.locked ? <Lock /> : <Unlock />}</TrackButton></div>
-              <div className="relative bg-black/5" style={{ width }} onPointerDown={(event) => onSeek(timeFromPointer(event.clientX))}>
+              <div className="relative bg-black/5" style={{ width }} onPointerDown={beginPlayheadGesture}>
                 {track.clips.filter((clip) => Number(clip.projectEnd) >= visible.start && Number(clip.projectStart) <= visible.end).map((clip) => {
                   const value = draft?.id === clip.id ? draft : { start: Number(clip.projectStart), end: Number(clip.projectEnd) };
                   const selected = project.selection.itemIds.includes(clip.id);
                   const thumbnail = clip.assetId ? assetThumbnails[clip.assetId] : undefined;
                   const badges = [Math.abs(clip.playbackRate - 1) > .001 ? `${clip.playbackRate.toFixed(2).replace(/0$/, "")}×` : "", clip.reversed ? "REV" : "", clip.flipHorizontal ? "↔" : "", clip.flipVertical ? "↕" : ""].filter(Boolean);
-                  return <div key={clip.id} data-clip-id={clip.id} data-clip-kind={clip.kind} role="button" tabIndex={0} aria-label={`${clip.name}, de ${formatProjectTime(value.start)} até ${formatProjectTime(value.end)}`} aria-pressed={selected} onPointerDown={(event) => beginClipGesture(event, clip, "move")} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(clip.id, event.shiftKey); } }} className={`editor-v2-clip editor-v2-clip-${track.kind} absolute top-1.5 flex h-9 min-w-8 touch-none items-center overflow-hidden rounded-md px-2 text-[10px] font-medium text-white outline-none ring-inset transition-shadow focus-visible:ring-2 focus-visible:ring-white ${selected ? "is-selected ring-2 ring-white/80" : ""}`} style={{ left: value.start * pxPerSecond, width: Math.max(24, (value.end - value.start) * pxPerSecond), ...(thumbnail ? { backgroundImage: `linear-gradient(90deg,rgba(21,11,48,.28),rgba(21,11,48,.68)),url(${thumbnail})`, backgroundSize: "auto 100%", backgroundRepeat: "repeat-x" } : {}) }}>
+                  return <div key={clip.id} data-clip-id={clip.id} data-clip-kind={clip.kind} role="button" tabIndex={0} aria-label={`${clip.name}, de ${formatProjectTime(value.start)} até ${formatProjectTime(value.end)}`} aria-pressed={selected} onPointerDown={(event) => beginClipGesture(event, clip, "move")} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(clip.id, event.ctrlKey || event.metaKey || event.shiftKey); } }} className={`editor-v2-clip editor-v2-clip-${track.kind} absolute top-1.5 flex h-9 min-w-8 touch-none items-center overflow-hidden rounded-md px-2 text-[10px] font-medium text-white outline-none ring-inset transition-shadow focus-visible:ring-2 focus-visible:ring-white ${selected ? "is-selected ring-2 ring-white/80" : ""}`} style={{ left: value.start * pxPerSecond, width: Math.max(24, (value.end - value.start) * pxPerSecond), ...(thumbnail ? { backgroundImage: `linear-gradient(90deg,rgba(21,11,48,.28),rgba(21,11,48,.68)),url(${thumbnail})`, backgroundSize: "auto 100%", backgroundRepeat: "repeat-x" } : {}) }}>
                     {(track.kind === "voice" || track.kind === "music" || track.kind === "sfx") && <Waveform {...(clip.assetId && assetWaveforms[clip.assetId] ? { peaks: assetWaveforms[clip.assetId] } : {})} />}
                     <span className="relative z-10 truncate drop-shadow-sm">{clip.name}</span>
                     {badges.length > 0 && <span className="relative z-10 ml-auto flex shrink-0 gap-0.5 pl-1" aria-label={badges.join(", ")}>{badges.map((badge) => <i key={badge} className="rounded bg-black/45 px-1 py-0.5 text-[7px] not-italic font-bold tracking-wide text-white/90">{badge}</i>)}</span>}
@@ -176,7 +219,7 @@ export function TimelineV2(props: TimelineProps) {
               </div>
             </div>;
           })}
-          <div className="pointer-events-none absolute bottom-0 top-0 z-40 w-px bg-white shadow-[0_0_0_1px_rgba(124,92,255,.9)]" style={{ left: TRACK_LABEL_WIDTH + currentTime * pxPerSecond }}><span className="absolute -top-0.5 -left-1.5 h-3 w-3 rotate-45 rounded-[2px] bg-primary" /></div>
+          <button type="button" aria-label={`Mover agulha, posição ${formatProjectTime(currentTime)}`} onPointerDown={beginPlayheadGesture} className="absolute bottom-0 top-0 z-40 w-3 -translate-x-1/2 cursor-ew-resize touch-none bg-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary" style={{ left: TRACK_LABEL_WIDTH + currentTime * pxPerSecond }}><span className="pointer-events-none absolute bottom-0 left-1/2 top-0 w-px -translate-x-1/2 bg-white shadow-[0_0_0_1px_rgba(124,92,255,.9)]" /><span className="pointer-events-none absolute -top-0.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 rounded-[2px] bg-primary shadow-[0_0_12px_rgba(124,92,255,.8)]" /></button>
         </div>
       </div>
     </section>

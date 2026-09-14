@@ -661,6 +661,37 @@ export class UpdateClipCommand extends SnapshotCommand {
   serialize() { return { type: this.type, payload: { clipId: this.clipId, patch: this.patch } }; }
 }
 
+export interface ClipBatchUpdate {
+  clipId: string;
+  patch: Partial<Omit<Clip, "id" | "trackId">>;
+}
+
+/** Applies a multi-selection edit as one history entry. */
+export class UpdateClipsCommand extends SnapshotCommand {
+  readonly type = "updateClips";
+  readonly renderImpact = "full" as const;
+  constructor(private readonly updates: ClipBatchUpdate[]) { super(); }
+  protected apply(project: EditorProjectV2) {
+    if (!this.updates.length) throw new Error("Selecione ao menos um clipe para editar.");
+    for (const update of this.updates) {
+      const { clip, owner } = locate(project, update.clipId);
+      if (owner.locked) throw new Error(`Trilha bloqueada: ${owner.name}`);
+      Object.assign(clip, cloneProjectValue(update.patch));
+      if (clip.kind === "caption" && update.patch.style?.text && owner.kind === "captions" && "cues" in owner) {
+        const cue = owner.cues.find((item) => item.id === clip.metadata?.["captionCueId"]);
+        if (cue) {
+          cue.text = update.patch.style.text;
+          const words = cue.text.split(/\s+/).filter(Boolean);
+          const duration = Number(cue.end) - Number(cue.start);
+          cue.words = words.map((text, index) => ({ id: `${cue.id}-word-${index + 1}`, text, start: asProjectTime(Number(cue.start) + duration * index / words.length), end: asProjectTime(Number(cue.start) + duration * (index + 1) / words.length) }));
+        }
+      }
+    }
+    return project;
+  }
+  serialize() { return { type: this.type, payload: { updates: this.updates } }; }
+}
+
 export class UpsertKeyframeCommand extends SnapshotCommand {
   readonly type = "upsertKeyframe";
   readonly renderImpact = "visual" as const;
