@@ -1039,3 +1039,124 @@
 @keyframes tp-whipv { 0% { transform: translateY(90%); filter: blur(6px) } 55% { filter: blur(2px) } 75%,100% { transform: translateY(0); filter: blur(0) } }
 @keyframes tp-drift { 0% { opacity: 0; transform: translate(14%, 8%) scale(1.08) } 70%,100% { opacity: 1; transform: translate(0,0) scale(1) } }
 @keyframes tp-swing { 0% { opacity: 0; transform: rotate(-12deg) scale(0.9) } 65%,100% { opacity: 1; transform: rotate(0) scale(1) } }
+
+/* =========================================================
+   TELA DE ACESSO — split screen com glow e motion
+   ========================================================= */
+.auth-screen {
+  box-shadow: var(--shadow-float);
+}
+.auth-stage {
+  background:
+    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--primary) 16%, transparent), transparent 60%),
+    linear-gradient(160deg, var(--surface-2), var(--background));
+}
+.auth-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--border) 60%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--border) 60%, transparent) 1px, transparent 1px);
+  background-size: 52px 52px;
+  mask-image: radial-gradient(90% 70% at 20% 10%, #000, transparent 75%);
+  opacity: 0.5;
+  pointer-events: none;
+}
+.auth-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  pointer-events: none;
+}
+.auth-orb-a {
+  width: 22rem;
+  height: 22rem;
+  top: -6rem;
+  left: -5rem;
+  background: color-mix(in srgb, var(--primary-glow) 55%, transparent);
+  opacity: 0.35;
+  animation: vv-auth-float 11s ease-in-out infinite;
+}
+.auth-orb-b {
+  width: 18rem;
+  height: 18rem;
+  bottom: -5rem;
+  right: -3rem;
+  background: color-mix(in srgb, #21d4d8 45%, transparent);
+  opacity: 0.22;
+  animation: vv-auth-float 14s ease-in-out -4s infinite reverse;
+}
+@keyframes vv-auth-float {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(2rem, -1.5rem, 0) scale(1.08); }
+}
+.auth-live {
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 60%, transparent);
+  animation: vv-auth-live 2.2s ease-out infinite;
+}
+@keyframes vv-auth-live {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 55%, transparent); }
+  70% { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.auth-shine {
+  background-image: linear-gradient(
+    100deg,
+    var(--foreground) 35%,
+    color-mix(in srgb, var(--primary-glow) 85%, white) 50%,
+    var(--foreground) 65%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: vv-auth-shine 6s linear infinite;
+}
+@keyframes vv-auth-shine {
+  from { background-position: 180% 0; }
+  to { background-position: -80% 0; }
+}
+.auth-card {
+  animation: vv-rise var(--dur-panel, 240ms) var(--ease-out-expo, cubic-bezier(0.2, 0.8, 0.2, 1)) both;
+}
+.auth-logo {
+  background-image: var(--gradient-primary);
+  box-shadow: 0 10px 30px -12px var(--primary-glow), 0 0 0 1px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+.auth-field {
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+.auth-field:hover {
+  border-color: var(--border-hover);
+}
+.auth-field:focus {
+  border-color: color-mix(in srgb, var(--primary) 70%, transparent);
+  box-shadow: 0 0 0 4px var(--primary-subtle);
+}
+.auth-cta {
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 14px 34px -16px var(--primary-glow);
+  transition: transform 160ms var(--ease-out-expo, cubic-bezier(0.2, 0.8, 0.2, 1)), box-shadow 200ms ease;
+}
+.auth-cta:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 44px -14px var(--primary-glow);
+}
+.auth-cta:not(:disabled)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 35%, rgba(255, 255, 255, 0.28) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: vv-auth-sweep 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes vv-auth-sweep {
+  0%, 60% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-orb, .auth-live, .auth-shine, .auth-cta::after { animation: none !important; }
+  .auth-shine { color: var(--foreground); -webkit-text-fill-color: currentColor; }
+}
