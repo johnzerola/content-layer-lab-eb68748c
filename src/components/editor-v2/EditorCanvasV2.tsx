@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ImagePlus, Move, RotateCw } from "lucide-react";
-import { DEFAULT_CLIP_TRANSFORM, asProjectTime, findClip, projectToSourceTime, resolveCompositionFrame, sourceToProjectTime, type CaptionCue, type Clip, type ClipTransform, type EditorProjectV2, type ResolvedClipPresentation } from "@/lib/editor-v2";
+import { DEFAULT_CLIP_TRANSFORM, asProjectTime, createPlaybackSurfaceKeys, findClip, projectToSourceTime, resolveCompositionFrame, sourceToProjectTime, type CaptionCue, type Clip, type ClipTransform, type EditorProjectV2, type ResolvedClipPresentation } from "@/lib/editor-v2";
 import { StickerVisualV2 } from "./StickerVisualV2";
 
 interface CanvasProps {
@@ -21,6 +21,7 @@ export function EditorCanvasV2({ project, currentTime, playing, assetSources, on
   const [draft, setDraft] = useState<{ id: string; transform: ClipTransform } | null>(null);
   const resolvedLayers = useMemo(() => resolveCompositionFrame(project, currentTime), [project, currentTime]);
   const activeClips = useMemo(() => resolvedLayers.map((layer) => findClip(project, layer.clipId)).filter((clip): clip is Clip => Boolean(clip)), [project, resolvedLayers]);
+  const playbackSurfaceKeys = useMemo(() => createPlaybackSurfaceKeys(project), [project]);
   const playbackClockClipId = activeClips.find((clip) => clip.kind === "video" && !clip.reversed && project.tracks.find((track) => track.id === clip.trackId)?.kind === "video")?.id ?? null;
   const primary = findClip(project, project.selection.primaryId);
 
@@ -75,7 +76,7 @@ export function EditorCanvasV2({ project, currentTime, playing, assetSources, on
             const transition = layer.transition;
             const selected = project.selection.itemIds.includes(clip.id);
             const assetUrl = clip.assetId ? assetSources[clip.assetId] : undefined;
-            return <CanvasClip key={clip.id} clip={clip} transform={transform} transition={transition} presentation={layer.presentation} selected={selected} primary={primary?.id === clip.id} currentTime={currentTime} playing={playing} drivesPlaybackClock={playbackClockClipId === clip.id} onPlaybackTime={onPlaybackTime} {...(layer.caption ? { caption: layer.caption } : {})} {...(assetUrl ? { assetUrl } : {})} onSelect={(additive) => onSelect(clip.id, additive)} onMove={(event) => beginGesture(event, clip, "move")} onResize={(event) => beginGesture(event, clip, "resize")} onRotate={(event) => beginGesture(event, clip, "rotate")} onKeyboardTransform={(next) => onTransform(clip.id, next)} />;
+            return <CanvasClip key={playbackSurfaceKeys[clip.id] ?? clip.id} clip={clip} transform={transform} transition={transition} presentation={layer.presentation} selected={selected} primary={primary?.id === clip.id} currentTime={currentTime} playing={playing} drivesPlaybackClock={playbackClockClipId === clip.id} onPlaybackTime={onPlaybackTime} {...(layer.caption ? { caption: layer.caption } : {})} {...(assetUrl ? { assetUrl } : {})} onSelect={(additive) => onSelect(clip.id, additive)} onMove={(event) => beginGesture(event, clip, "move")} onResize={(event) => beginGesture(event, clip, "resize")} onRotate={(event) => beginGesture(event, clip, "rotate")} onKeyboardTransform={(next) => onTransform(clip.id, next)} />;
           })}
           <div className="pointer-events-none absolute inset-[5%] border border-dashed border-white/10" aria-hidden />
           {draft && (Math.abs(draft.transform.x - 50) < 0.01 || Math.abs(draft.transform.y - 50) < 0.01) && <><span className="pointer-events-none absolute inset-y-0 left-1/2 w-px bg-primary/65" /><span className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-primary/65" /></>}
@@ -146,7 +147,7 @@ function MediaVisual({ clip, url, currentTime, playing, drivesPlaybackClock, onP
     return () => video.removeEventListener("timeupdate", report);
   }, [clip, drivesPlaybackClock, onPlaybackTime, playing]);
   if (clip.kind === "image") return <img src={url} alt="" draggable={false} className="pointer-events-none h-full w-full object-cover" style={{ transform: mediaTransform }} />;
-  return <video ref={ref} src={url} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" style={{ transform: mediaTransform }} />;
+  return <video ref={ref} src={url} muted playsInline preload="auto" className="pointer-events-none h-full w-full object-cover" style={{ transform: mediaTransform }} />;
 }
 
 function snapTransform(transform: ClipTransform): ClipTransform {

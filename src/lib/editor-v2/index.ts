@@ -11,6 +11,7 @@ export * from "./commands";
 export * from "./interactions";
 export * from "./local-media";
 export * from "./media-persistence";
+export * from "./playback-surfaces";
 export * from "./feature-flags";
 export * from "./project";
 export * from "./render-manifest";

@@ -98,7 +98,11 @@ export function resolveCompositionFrameFromManifest(manifest: EditorRenderManife
 export function resolveCompositionFrame(project: EditorProjectV2, projectTime: number): ResolvedVisualLayer[] {
   return project.tracks.filter((track) => !track.hidden).flatMap((track) => track.clips.map((clip) => ({ clip, order: track.order }))).filter(({ clip }) => {
     if (clip.kind === "audio" || !clip.enabled) return false;
-    if (projectTime >= Number(clip.projectStart) && projectTime <= Number(clip.projectEnd)) return true;
+    const start = Number(clip.projectStart);
+    const end = Number(clip.projectEnd);
+    const atProjectEnd = Math.abs(projectTime - project.settings.duration) < 0.000_001
+      && Math.abs(end - project.settings.duration) < 0.000_001;
+    if (projectTime >= start && (projectTime < end || atProjectEnd)) return true;
     return project.transitions.some((transition) => {
       if (transition.toClipId !== clip.id) return false;
       const from = project.tracks.flatMap((track) => track.clips).find((item) => item.id === transition.fromClipId);

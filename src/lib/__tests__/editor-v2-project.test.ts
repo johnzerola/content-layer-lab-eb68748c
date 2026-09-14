@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it } from "vitest";
-import { AddCaptionBatchCommand, AddCaptionCueCommand, AddClipCommand, AddMediaClipCommand, ApplyCaptionPresetCommand, ApplySeparatedAudioCommand, ApplyTemplateCommand, ApplyTransitionCommand, CompositionClock, DeleteAudioEnvelopePointCommand, DeleteClipCommand, DeleteClipsCommand, DeleteKeyframeCommand, DuplicateClipsCommand, EditorCommandBus, MoveClipCommand, MoveKeyframeCommand, RegisterExtractedAudioCommand, RestoreOriginalAudioCommand, SelectItemCommand, SetAudioRepresentationCommand, SplitClipCommand, TrimClipCommand, UpdateClipCommand, UpdateProjectSettingsCommand, UpdateTrackCommand, UpdateTransformAtTimeCommand, UpsertAudioEnvelopePointCommand, UpsertKeyframeCommand, adaptEditorProjectV1, asProjectTime, buildExtractedAudioMedia, buildSeparatedAudioMedia, clipAudioGainAt, createCaptionBatch, createCaptionBatchFromTimedWords, createEditorProjectV2, createEditorRenderManifest, createStemAsset, editorProjectFromManifest, interpolateKeyframes, isEditorV2Enabled, isTrackCompatible, parseTimedText, projectToSourceTime, resolveAnimatedTransform, resolveAudioMixFrame, resolveAudioRenderFrameFromManifest, resolveCaptionInsertion, resolveClipPresentation, resolveCompositionFrame, resolveCompositionFrameFromManifest, resolveLibraryInsertion, resolveTemplateApplication, snapProjectTime, sourceToProjectTime, summarizeWaveform, visibleTimelineRange, type AudioSourceGroup, type Clip, type MediaAsset } from "@/lib/editor-v2";
+import { AddCaptionBatchCommand, AddCaptionCueCommand, AddClipCommand, AddMediaClipCommand, ApplyCaptionPresetCommand, ApplySeparatedAudioCommand, ApplyTemplateCommand, ApplyTransitionCommand, CompositionClock, DeleteAudioEnvelopePointCommand, DeleteClipCommand, DeleteClipsCommand, DeleteKeyframeCommand, DuplicateClipsCommand, EditorCommandBus, MoveClipCommand, MoveKeyframeCommand, RegisterExtractedAudioCommand, RestoreOriginalAudioCommand, SelectItemCommand, SetAudioRepresentationCommand, SplitClipCommand, TrimClipCommand, UpdateClipCommand, UpdateProjectSettingsCommand, UpdateTrackCommand, UpdateTransformAtTimeCommand, UpsertAudioEnvelopePointCommand, UpsertKeyframeCommand, adaptEditorProjectV1, asProjectTime, buildExtractedAudioMedia, buildSeparatedAudioMedia, clipAudioGainAt, createCaptionBatch, createCaptionBatchFromTimedWords, createEditorProjectV2, createEditorRenderManifest, createPlaybackSurfaceKeys, createStemAsset, editorProjectFromManifest, interpolateKeyframes, isEditorV2Enabled, isTrackCompatible, parseTimedText, projectToSourceTime, resolveAnimatedTransform, resolveAudioMixFrame, resolveAudioRenderFrameFromManifest, resolveCaptionInsertion, resolveClipPresentation, resolveCompositionFrame, resolveCompositionFrameFromManifest, resolveLibraryInsertion, resolveTemplateApplication, snapProjectTime, sourceToProjectTime, summarizeWaveform, visibleTimelineRange, type AudioSourceGroup, type Clip, type MediaAsset } from "@/lib/editor-v2";
 import { BUILT_IN_LIBRARY_ITEMS, type CaptionPresetDefinition, type LibraryItem, type TemplateDefinition } from "@/lib/editor-v2/library";
 import { AutoSplitClipsCommand } from "@/lib/editor-v2";
 import { createEditorProject } from "@/lib/editor/project";
@@ -68,6 +68,28 @@ describe("Command bus", () => {
     expect(bus.getState().tracks[0]!.clips).toHaveLength(1);
     bus.redo();
     expect(bus.getState().tracks[0]!.clips).toHaveLength(4);
+  });
+
+  it("mantém uma superfície contínua nos cortes secos e troca exatamente para o clipe da direita", () => {
+    const source = { ...clip(), projectStart: asProjectTime(0), projectEnd: asProjectTime(6), sourceIn: 0, sourceOut: 6, assetId: "asset-video" };
+    const bus = new EditorCommandBus(createEditorProjectV2({ duration: 6 }));
+    bus.execute(new AddClipCommand(source));
+    bus.execute(new AutoSplitClipsCommand([source.id], 2, "continuity"));
+    const project = bus.getState();
+    const segments = project.tracks[0]!.clips;
+    const keys = createPlaybackSurfaceKeys(project);
+    expect(new Set(segments.map((segment) => keys[segment.id])).size).toBe(1);
+    expect(resolveCompositionFrame(project, 2).filter((layer) => segments.some((segment) => segment.id === layer.clipId)).map((layer) => layer.clipId)).toEqual([segments[1]!.id]);
+  });
+
+  it("reserva superfícies diferentes quando há uma transição real", () => {
+    const project = createEditorProjectV2({ duration: 4 });
+    const left = { ...clip(), id: "left", assetId: "asset-video", projectStart: asProjectTime(0), projectEnd: asProjectTime(2), sourceIn: 0, sourceOut: 2 };
+    const right = { ...clip(), id: "right", assetId: "asset-video", projectStart: asProjectTime(2), projectEnd: asProjectTime(4), sourceIn: 2, sourceOut: 4 };
+    project.tracks[0]!.clips.push(left, right);
+    project.transitions.push({ id: "transition", definitionId: "crossfade", fromClipId: left.id, toClipId: right.id, duration: .5, easing: "linear", fallback: "cut", parameters: {} });
+    const keys = createPlaybackSurfaceKeys(project);
+    expect(keys[left.id]).not.toBe(keys[right.id]);
   });
 
   it("preserva a ordem da fonte ao cortar um vídeo revertido", () => {
