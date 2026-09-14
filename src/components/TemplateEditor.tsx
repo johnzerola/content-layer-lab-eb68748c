@@ -1094,19 +1094,23 @@ export function TemplateEditor({
               {tab === "layers" && (
                 <>
                   <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => addExtra("text")}
-                      className="interactive flex items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2 py-2 text-xs font-medium"
-                    >
-                      <Plus className="size-3.5" /> Texto
-                    </button>
-                    <button
-                      onClick={() => addExtra("image")}
-                      className="interactive flex items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2 py-2 text-xs font-medium"
-                    >
-                      <Plus className="size-3.5" /> Imagem
-                    </button>
+                    {(["text", "image"] as const).map((kind) => (
+                      <button
+                        key={kind}
+                        draggable
+                        onDragStart={(ev) => ev.dataTransfer.setData("application/x-vaiviral-layer", kind)}
+                        onClick={() => addExtra(kind)}
+                        title="Clique para adicionar ou arraste até o vídeo"
+                        className="interactive flex cursor-grab items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2 py-2 text-xs font-medium active:cursor-grabbing"
+                      >
+                        <Plus className="size-3.5" /> {kind === "text" ? "Texto" : "Imagem"}
+                      </button>
+                    ))}
                   </div>
+                  <p className="px-1 text-[11px] text-muted-foreground">
+                    Arraste estes botões — ou arquivos de imagem e fontes do seu computador — direto para o vídeo.
+                  </p>
+
 
                   <div className="space-y-1">
                     <p className="studio-label px-1">Elementos do template</p>
