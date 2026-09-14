@@ -298,25 +298,38 @@ export function TemplateCanvas({
     }
   }, [template.avatar.src, template.watermark.src, template.extras]);
 
+  // props de desenho em ref: evita reiniciar o loop a cada render (digitação/arraste)
+  const paintProps = useRef({ template, drawOpts, motionVar, speed, loopStart, loopEnd });
+  const templateRevision = useRef(0);
+  const prev = paintProps.current;
+  if (prev.template !== template || prev.drawOpts !== drawOpts || prev.motionVar !== motionVar ||
+    prev.speed !== speed || prev.loopStart !== loopStart || prev.loopEnd !== loopEnd) {
+    templateRevision.current++;
+  }
+  paintProps.current = { template, drawOpts, motionVar, speed, loopStart, loopEnd };
+
   useEffect(() => {
     if (!inView) return;
     let raf = 0;
     let lastPaint = -Infinity;
     let lastKey = '';
+    // orçamento adaptativo: se um quadro custa caro, pintamos menos vezes por segundo
+    let interval = 1000 / 30;
     const t0 = performance.now();
-    const hasMotion = Boolean(motionVar && motionVar.motion && motionVar.motion.preset !== "none");
-    const hasTiming = !!template.fullscreenClips?.length ||
-      [...ORDER.map(id => layerOf(template, id)), ...(template.extras ?? [])].some(layer => {
-        const l = layer as { tStart?: number; tEnd?: number | null; fadeIn?: number; fadeOut?: number } | null;
-        return l && (l.tStart || l.tEnd != null || l.fadeIn || l.fadeOut);
-      });
     const tick = () => {
       raf = requestAnimationFrame(tick);
       const now = performance.now();
-      if (now - lastPaint < 1000 / 30) return;
+      if (now - lastPaint < interval) return;
       lastPaint = now;
       const ctx = canvasRef.current?.getContext("2d");
       if (ctx) {
+        const { template, drawOpts, motionVar, speed, loopStart, loopEnd } = paintProps.current;
+        const hasMotion = Boolean(motionVar && motionVar.motion && motionVar.motion.preset !== "none");
+        const hasTiming = !!template.fullscreenClips?.length ||
+          [...ORDER.map(id => layerOf(template, id)), ...(template.extras ?? [])].some(layer => {
+            const l = layer as { tStart?: number; tEnd?: number | null; fadeIn?: number; fadeOut?: number } | null;
+            return l && (l.tStart || l.tEnd != null || l.fadeIn || l.fadeOut);
+          });
         const vid = videoEl.current;
         const controlled = timelineState.current;
         const targetTime = controlled.timelineTime === undefined ? undefined : controlled.timelineTime +
@@ -338,7 +351,7 @@ export function TemplateCanvas({
         const time = targetTime ?? vid?.currentTime ?? (hasMotion || hasTiming ? (now - t0) / 1000 : 0);
         const canvas = canvasRef.current!;
         const size = previewSize(W, H, canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio);
-        const key = `${time}:${vid?.currentTime}:${vid?.seeking}:${vid?.readyState}:${p?.src}:${size.width}:${size.height}:${assetRevision.current}`;
+        const key = `${time}:${vid?.currentTime}:${vid?.seeking}:${vid?.readyState}:${p?.src}:${size.width}:${size.height}:${assetRevision.current}:${templateRevision.current}`;
         // A paused, unchanged frame does not need to be composited again.
         if (key === lastKey) return;
         lastKey = key;
@@ -362,11 +375,15 @@ export function TemplateCanvas({
           };
         }
         drawFrame(ctx, template, source, { ...drawOpts, ...extra, time });
+        // um quadro nunca deve ocupar mais que ~metade do tempo disponível
+        const cost = performance.now() - now;
+        interval = Math.min(1000 / 12, Math.max(1000 / 30, cost * 2));
       }
     };
     tick();
     return () => cancelAnimationFrame(raf);
-  }, [template, drawOpts, motionVar, speed, loopStart, loopEnd, inView, W, H]);
+  }, [inView, W, H]);
+
 
 
   const [live, setLive] = useState<{ id: SelId; r: Rect } | null>(null);
