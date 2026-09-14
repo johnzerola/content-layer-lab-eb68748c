@@ -1307,7 +1307,7 @@ export function TemplateEditor({
         </div>
 
         {/* Linha do tempo em toda a largura */}
-        <div className="shrink-0 border-t border-border bg-surface-2/40 p-3">
+        <div className="max-h-[38vh] shrink-0 overflow-y-auto border-t border-border bg-surface-2/40 p-3">
           <TemplateTimeline
             template={t}
             onChange={setT}
