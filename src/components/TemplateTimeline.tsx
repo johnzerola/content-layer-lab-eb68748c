@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pause, Play, Plus, Scissors, Maximize, Trash2, Diamond } from 'lucide-react';
+import { Pause, Play, Plus, Scissors, Maximize, Trash2, Diamond, ZoomIn, LogIn, LogOut, EyeOff } from 'lucide-react';
 import type { BoxLayer, LayerAnim, SelId, Template, TextLayer } from '@/lib/template';
 import { layerOf, LAYER_LABELS, selectableIds } from './TemplateCanvas';
 
@@ -32,13 +32,23 @@ export function TemplateTimeline({ template: t, onChange, selected, onSelect, ti
   const full = t.fullscreenClips?.find(c => c.id === fullId);
   const changeLayer = (patch: Partial<BoxLayer>) => selected && onChange(patchLayer(t, selected, patch));
   const videoKeys = [...(t.videoKeyframes ?? [])].sort((a, b) => a.t - b.t);
-  const addVideoKey = () => onChange({
+  const addVideoKey = (box?: Partial<Pick<BoxLayer, 'x' | 'y' | 'w' | 'h' | 'radius'>>) => onChange({
     ...t,
     videoKeyframes: [
       ...videoKeys.filter(k => Math.abs(k.t - time) > 0.05),
-      { id: crypto.randomUUID(), t: Number(time.toFixed(2)), x: t.video.x, y: t.video.y, w: t.video.w, h: t.video.h, radius: t.video.radius },
+      { id: crypto.randomUUID(), t: Number(time.toFixed(2)), x: t.video.x, y: t.video.y, w: t.video.w, h: t.video.h, radius: t.video.radius, ...box },
     ].sort((a, b) => a.t - b.t),
   });
+  const presetFade = (dir: 'in' | 'out') => {
+    if (!layer) return;
+    changeLayer(dir === 'in' ? { animIn: 'fade', fadeIn: Math.max(layer.fadeIn ?? 0, 0.4) } : { animOut: 'fade', fadeOut: Math.max(layer.fadeOut ?? 0, 0.4) });
+  };
+  const presetSumir = () => {
+    const id = crypto.randomUUID();
+    onChange({ ...t, fullscreenClips: [...(t.fullscreenClips ?? []), { id, start: Math.min(time, Math.max(0, duration - 1)), end: duration, fade: 1.5 }] });
+    setFullId(id);
+  };
+  const presetExpand = () => addVideoKey({ x: 0, y: 0, w: 1080, h: 1920, radius: 0 });
   const changeFull = (patch: Partial<NonNullable<Template['fullscreenClips']>[number]>) => onChange({ ...t, fullscreenClips: (t.fullscreenClips ?? []).map(c => c.id === fullId ? { ...c, ...patch } : c) });
   const addText = (split: boolean) => {
     const base = layer && 'text' in layer ? layer as TextLayer : t.headline;
