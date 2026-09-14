@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { AssetCache, BUILT_IN_LIBRARY_ITEMS, EFFECT_DEFINITIONS, LibraryRegistry, MockLibraryProvider, TRANSITION_DEFINITIONS, canPublishBuiltIn, createEffectInstance, transitionFrame, validateAssetLicense, validateTemplateDefinition, type LibraryItem, type TemplateDefinition } from "@/lib/editor-v2/library";
+import { AssetCache, BUILT_IN_LIBRARY_ITEMS, EFFECT_DEFINITIONS, LibraryRegistry, MockLibraryProvider, TRANSITION_DEFINITIONS, canPublishBuiltIn, createEffectInstance, transitionFrame, validateAssetLicense, validateTemplateDefinition, type CaptionPresetDefinition, type LibraryItem, type TemplateDefinition } from "@/lib/editor-v2/library";
+import { captionWordMotionFrame } from "@/lib/editor-v2/caption-motion";
 
 describe("Library registry", () => {
   it("registra built-ins licenciados, busca e pagina", () => {
@@ -23,6 +24,16 @@ describe("Library registry", () => {
     expect(validateAssetLicense(invalid.license)).toContain("licença conhecida é obrigatória");
     expect(() => new LibraryRegistry([invalid])).toThrow(/licença/);
   });
+
+  it("oferece uma coleção dinâmica e segura para Shorts", () => {
+    const shorts = BUILT_IN_LIBRARY_ITEMS.filter((item) => item.type === "caption" && item.tags.includes("shorts"));
+    expect(shorts.length).toBeGreaterThanOrEqual(13);
+    expect(new Set(shorts.map((item) => item.id)).size).toBe(shorts.length);
+    expect(shorts.every((item) => {
+      const preset = item.definition as CaptionPresetDefinition;
+      return preset.mode !== "line" && preset.motion !== "none" && preset.transform.y >= 68 && preset.transform.y <= 80;
+    })).toBe(true);
+  });
 });
 
 describe("Definitions", () => {
@@ -33,6 +44,14 @@ describe("Definitions", () => {
     expect(createEffectInstance(EFFECT_DEFINITIONS[0]!, "fx-1")).toMatchObject({ id: "fx-1", enabled: true });
     expect(transitionFrame("slide-left", 0).incoming.x).toBe(-1);
     expect(transitionFrame("slide-left", 1).incoming.x).toBe(0);
+  });
+
+  it("resolve movimento de legenda de forma determinística para preview e export", () => {
+    expect(captionWordMotionFrame("pop", 0, 0, 1, 0, true).scale).toBeLessThan(1);
+    expect(captionWordMotionFrame("pop", 0.3, 0, 1, 0, true).scale).toBeCloseTo(1);
+    expect(captionWordMotionFrame("fade", 0, 0, 1, 0, true).opacity).toBe(0);
+    expect(captionWordMotionFrame("pop", 0, 0, 1, 0, false).scale).toBe(1);
+    expect(captionWordMotionFrame("wave", 0.4, 0, 1, 2, false).translateY).not.toBe(0);
   });
 
   it("valida contrato de template estruturado", () => {

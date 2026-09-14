@@ -6,6 +6,7 @@ export * from "./audio-jobs";
 export * from "./creative";
 export * from "./export";
 export * from "./caption-import";
+export * from "./caption-motion";
 export * from "./clock";
 export * from "./commands";
 export * from "./interactions";

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { transitionFrame } from "@/lib/editor-v2/library";
+import { captionWordMotionFrame } from "@/lib/editor-v2/caption-motion";
 import type { CaptionPresetDefinition, LibraryItem, TemplateDefinition } from "@/lib/editor-v2/library";
 import type { StickerDefinition } from "@/lib/editor-v2/library";
 import { StickerVisualV2 } from "./StickerVisualV2";
@@ -101,7 +102,13 @@ function CaptionPreview({ item, progress }: { item: LibraryItem; progress: numbe
   return (
     <span className="relative flex aspect-video items-end justify-center overflow-hidden bg-[linear-gradient(145deg,#20283a,#0d1119)] p-3">
       <span className="max-w-[90%] rounded px-2 py-1 text-center text-[10px] font-black leading-tight" style={{ color: preset.style.color, background: preset.style.backgroundColor }}>
-        {words.map((word, index) => <span key={`${word}-${index}`} style={preset.mode === "line" ? undefined : { color: index === active ? preset.activeWordColor : preset.style.color, opacity: index === active ? 1 : preset.inactiveWordOpacity, display: "inline-block", transform: index === active && preset.motion === "pop" ? "scale(1.08)" : undefined }}>{word}{" "}</span>)}
+        {words.map((word, index) => {
+          if (preset.mode === "line") return <span key={`${word}-${index}`}>{word}{" "}</span>;
+          const isActive = index === active;
+          const frame = captionWordMotionFrame(preset.motion, progress, index / words.length, (index + 1) / words.length, index, isActive);
+          const boxed = isActive && preset.style.highlight === "box";
+          return <span key={`${word}-${index}`} style={{ color: isActive && !boxed ? preset.activeWordColor : preset.style.color, opacity: (isActive ? 1 : preset.inactiveWordOpacity) * frame.opacity, display: "inline-block", transform: `translate(${frame.translateX}em, ${frame.translateY}em) scale(${frame.scale})`, filter: frame.glow ? `drop-shadow(0 0 ${Math.round(3 + frame.glow * 5)}px ${preset.activeWordColor})` : undefined, background: boxed ? preset.activeWordColor : undefined, borderRadius: boxed ? 3 : undefined, padding: boxed ? "0 3px" : undefined, textDecoration: isActive && preset.style.highlight === "underline" ? "underline" : undefined, textDecorationColor: preset.activeWordColor }}>{word}{" "}</span>;
+        })}
       </span>
     </span>
   );

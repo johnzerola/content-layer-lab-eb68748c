@@ -63,13 +63,14 @@ const text = textRows.map(([id, name, category, style]) => {
 
 const captions = CAPTION_PRESETS.map((preset) => {
   const id = preset.id, name = preset.name, mode = preset.style.mode, motion = preset.animation, color = preset.style.color, backgroundColor = preset.style.background ?? "transparent", activeWordColor = preset.style.highlightColor;
+  const sampleText = preset.sampleText ?? "LEGENDA EM TEMPO REAL";
   const definition: CaptionPresetDefinition = {
     id, name, mode, motion, rendererId: id,
-    transform: { x: 50, y: 84, width: 86, height: 14, scale: 1, rotation: 0, opacity: 1 },
-    style: { text: "LEGENDA EM TEMPO REAL", fontFamily: preset.style.fontFamily, fontSize: preset.style.fontSize, fontWeight: preset.style.fontWeight, align: preset.style.align, color, backgroundColor, borderRadius: 10, strokeColor: preset.style.strokeColor, strokeWidth: preset.style.strokeWidth, shadow: preset.style.shadow, uppercase: preset.style.uppercase, highlight: preset.style.highlight, highlightColor: preset.style.highlightColor, maxWords: preset.style.maxWords, maxLines: preset.style.maxLines },
+    transform: { x: 50, y: preset.positionY ?? 84, width: 86, height: 14, scale: 1, rotation: 0, opacity: 1 },
+    style: { text: sampleText, fontFamily: preset.style.fontFamily, fontSize: preset.style.fontSize, fontWeight: preset.style.fontWeight, align: preset.style.align, color, backgroundColor, borderRadius: 10, strokeColor: preset.style.strokeColor, strokeWidth: preset.style.strokeWidth, shadow: preset.style.shadow, uppercase: preset.style.uppercase, highlight: preset.style.highlight, highlightColor: preset.style.highlightColor, maxWords: preset.style.maxWords, maxLines: preset.style.maxLines },
     activeWordColor, inactiveWordOpacity: mode === "karaoke" ? 0.48 : 0.78,
   };
-  return item(id, "caption", name, preset.categories[0] ?? "Legendas", { kind: "caption", rendererId: id, sampleText: "LEGENDA EM TEMPO REAL", colors: [activeWordColor, backgroundColor, color] }, definition, ["legenda", mode, ...preset.categories]);
+  return item(id, "caption", name, preset.categories[0] ?? "Legendas", { kind: "caption", rendererId: id, sampleText, colors: [activeWordColor, backgroundColor, color] }, definition, ["legenda", mode, ...preset.categories]);
 });
 
 // IDs mantidos para projetos e fixtures criados nas fases iniciais do V2.

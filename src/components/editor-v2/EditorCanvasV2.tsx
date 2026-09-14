@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ImagePlus, Move, RotateCw } from "lucide-react";
 import { DEFAULT_CLIP_TRANSFORM, asProjectTime, createPlaybackSurfaceKeys, findClip, projectToSourceTime, resolveCompositionFrame, sourceToProjectTime, type CaptionCue, type Clip, type ClipTransform, type EditorProjectV2, type ResolvedClipPresentation } from "@/lib/editor-v2";
+import { captionWordMotionFrame } from "@/lib/editor-v2/caption-motion";
 import { StickerVisualV2 } from "./StickerVisualV2";
 
 interface CanvasProps {
@@ -110,8 +111,15 @@ function CaptionVisual({ clip, cue, preset, currentTime }: { clip: Clip; cue: Ca
   const motion = String(preset["motion"] ?? "none");
   const words = cue.words?.length ? cue.words : [{ id: `${cue.id}-line`, text: cue.text, start: cue.start, end: cue.end }];
   const activeIndex = Math.max(0, words.findIndex((word) => currentTime >= Number(word.start) && currentTime < Number(word.end)));
+  const reducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   return <div data-caption-cue-id={cue.id} className="flex h-full w-full items-center justify-center px-3 text-center motion-reduce:transition-none" style={{ color: clip.style?.color, background: clip.style?.backgroundColor, borderRadius: clip.style?.borderRadius, fontFamily: clip.style?.fontFamily, fontWeight: clip.style?.fontWeight, fontSize: `clamp(10px, ${Math.max(1, (clip.style?.fontSize ?? 42) / 34)}vw, ${clip.style?.fontSize ?? 42}px)`, textAlign: clip.style?.align, textTransform: clip.style?.uppercase ? "uppercase" : undefined, lineHeight: clip.style?.lineHeight ?? 1.02, WebkitTextStroke: clip.style?.strokeWidth ? `${Math.max(.5, clip.style.strokeWidth / 5)}px ${clip.style.strokeColor ?? "#000"}` : undefined, textShadow: clip.style?.shadow ? `0 2px 10px ${clip.style.strokeColor ?? "#000"}` : undefined }}>
-    <span>{words.map((word, index) => <span key={word.id} data-caption-word-active={index === activeIndex ? "true" : "false"} className="transition-[color,opacity,transform] duration-150 motion-reduce:transition-none" style={mode === "line" ? undefined : { color: index === activeIndex ? activeColor : clip.style?.color, opacity: index === activeIndex ? 1 : inactiveOpacity, transform: index === activeIndex && ["pop", "scale", "bounce"].includes(motion) ? `scale(${motion === "bounce" ? 1.12 : 1.07}) translateY(${motion === "bounce" ? -3 : 0}px)` : motion === "wave" ? `translateY(${Math.sin(index + currentTime * 8) * 3}px)` : motion === "shake" && index === activeIndex ? `translateX(${Math.sin(currentTime * 70) * 2}px)` : undefined, textDecoration: index === activeIndex && clip.style?.highlight === "underline" ? "underline" : undefined, background: index === activeIndex && clip.style?.highlight === "box" ? activeColor : undefined, borderRadius: 4, padding: index === activeIndex && clip.style?.highlight === "box" ? "0 4px" : undefined, display: "inline-block" }}>{word.text}{index < words.length - 1 ? " " : ""}</span>)}</span>
+    <span>{words.map((word, index) => {
+      if (mode === "line") return <span key={word.id}>{word.text}</span>;
+      const active = index === activeIndex;
+      const frame = captionWordMotionFrame(reducedMotion ? "none" : motion, currentTime, Number(word.start), Number(word.end), index, active);
+      const boxed = active && clip.style?.highlight === "box";
+      return <span key={word.id} data-caption-word-active={active ? "true" : "false"} className="transition-[color,opacity,transform,filter] duration-150 motion-reduce:transition-none" style={{ color: active && !boxed ? activeColor : clip.style?.color, opacity: (active ? 1 : inactiveOpacity) * frame.opacity, transform: `translate(${frame.translateX}em, ${frame.translateY}em) scale(${frame.scale})`, filter: frame.glow ? `drop-shadow(0 0 ${Math.round(5 + frame.glow * 7)}px ${activeColor})` : undefined, textDecoration: active && clip.style?.highlight === "underline" ? "underline" : undefined, textDecorationColor: activeColor, textDecorationThickness: active && clip.style?.highlight === "underline" ? ".1em" : undefined, textUnderlineOffset: active && clip.style?.highlight === "underline" ? ".12em" : undefined, background: boxed ? activeColor : undefined, borderRadius: 4, padding: boxed ? "0 4px" : undefined, display: "inline-block" }}>{word.text}{index < words.length - 1 ? " " : ""}</span>;
+    })}</span>
   </div>;
 }
 

@@ -4,6 +4,7 @@ import { FrameReader, type DecodedFrame } from "@/lib/decode";
 import { pickAudioCodec, pickBitrate, pickVideoCodec } from "@/lib/encode-presets";
 import { drawSticker, type StickerId } from "@/lib/editor/stickers";
 import { resolveAudioMixFrame } from "./audio";
+import { captionWordMotionFrame } from "./caption-motion";
 import { asProjectTime } from "./types";
 import { projectToSourceTime } from "./clock";
 import {
@@ -220,17 +221,35 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
 }
 
 function drawCaption(ctx: CanvasRenderingContext2D, clip: Clip, cue: CaptionCue, preset: Record<string, unknown>, time: number, width: number, height: number) {
-  applyTextStyle(ctx, clip, Math.min(width / 1080, height / 1920));
+  const textScale = Math.min(width / 1080, height / 1920);
+  const fontSize = Math.max(10, (clip.style?.fontSize ?? 48) * textScale);
+  applyTextStyle(ctx, clip, textScale);
   const words = cue.words?.length ? cue.words : [{ id: cue.id, text: cue.text, start: cue.start, end: cue.end }];
   const mode = String(preset["mode"] ?? "line");
+  const motion = String(preset["motion"] ?? "none");
+  const background = clip.style?.backgroundColor;
+  if (background && background !== "transparent") {
+    ctx.save();
+    ctx.shadowColor = "transparent";
+    roundedRect(ctx, -width / 2, -height / 2, width, height, (clip.style?.borderRadius ?? 0) * textScale);
+    ctx.fillStyle = background;
+    ctx.fill();
+    ctx.restore();
+  }
   if (mode === "line") {
+    const frame = captionWordMotionFrame(motion, time, Number(cue.start), Number(cue.end), 0, true);
     const lines = wrapText(ctx, cue.text, width * 0.92);
-    const lineHeight = (clip.style?.fontSize ?? 48) * Math.min(width / 1080, height / 1920) * (clip.style?.lineHeight ?? 1.05);
+    const lineHeight = fontSize * (clip.style?.lineHeight ?? 1.05);
+    ctx.save();
+    ctx.globalAlpha *= frame.opacity;
+    ctx.translate(frame.translateX * fontSize, frame.translateY * fontSize);
+    ctx.scale(frame.scale, frame.scale);
     lines.forEach((line, index) => {
       const y = (index - (lines.length - 1) / 2) * lineHeight;
       if (ctx.lineWidth) ctx.strokeText(line, 0, y, width * 0.95);
       ctx.fillText(line, 0, y, width * 0.95);
     });
+    ctx.restore();
     return;
   }
   const active = Math.max(0, words.findIndex((word) => time >= Number(word.start) && time < Number(word.end)));
@@ -240,18 +259,38 @@ function drawCaption(ctx: CanvasRenderingContext2D, clip: Clip, cue: CaptionCue,
   let x = -total / 2;
   words.forEach((word, index) => {
     const wordWidth = widths[index]!;
+    const isActive = index === active;
+    const activeColor = String(preset["activeWordColor"] ?? clip.style?.highlightColor ?? "#a990ff");
+    const frame = captionWordMotionFrame(motion, time, Number(word.start), Number(word.end), index, isActive);
     ctx.save();
-    if (index === active) {
-      const activeColor = String(preset["activeWordColor"] ?? clip.style?.highlightColor ?? "#a990ff");
+    ctx.globalAlpha *= (isActive ? 1 : Number(preset["inactiveWordOpacity"] ?? 1)) * frame.opacity;
+    ctx.translate(x + wordWidth / 2 + frame.translateX * fontSize, frame.translateY * fontSize);
+    ctx.scale(frame.scale, frame.scale);
+    if (frame.glow) {
+      ctx.shadowColor = activeColor;
+      ctx.shadowBlur = (8 + frame.glow * 16) * textScale;
+    }
+    if (isActive) {
       if (clip.style?.highlight === "box") {
-        roundedRect(ctx, x - 5, -ctx.measureText("M").actualBoundingBoxAscent - 5, wordWidth + 10, ctx.measureText("M").actualBoundingBoxAscent * 1.6, 5);
+        roundedRect(ctx, -wordWidth / 2 - 5, -ctx.measureText("M").actualBoundingBoxAscent - 5, wordWidth + 10, ctx.measureText("M").actualBoundingBoxAscent * 1.6, 5);
         ctx.fillStyle = activeColor;
         ctx.fill();
         ctx.fillStyle = clip.style?.color ?? "#fff";
       } else ctx.fillStyle = activeColor;
-    } else ctx.globalAlpha = Number(preset["inactiveWordOpacity"] ?? 1);
-    if (ctx.lineWidth) ctx.strokeText(word.text, x + wordWidth / 2, 0);
-    ctx.fillText(word.text, x + wordWidth / 2, 0);
+      if (clip.style?.highlight === "underline") {
+        ctx.save();
+        ctx.shadowColor = "transparent";
+        ctx.strokeStyle = activeColor;
+        ctx.lineWidth = Math.max(2, fontSize * 0.08);
+        ctx.beginPath();
+        ctx.moveTo(-wordWidth / 2, fontSize * 0.42);
+        ctx.lineTo(wordWidth / 2, fontSize * 0.42);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+    if (ctx.lineWidth) ctx.strokeText(word.text, 0, 0);
+    ctx.fillText(word.text, 0, 0);
     ctx.restore();
     x += wordWidth + gap;
   });

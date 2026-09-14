@@ -8,6 +8,7 @@ export type CaptionCategory =
   | "impacto"
   | "minimalista"
   | "podcast"
+  | "shorts"
   | "viral"
   | "karaoke"
   | "gaming"
@@ -26,6 +27,7 @@ export const CAPTION_CATEGORIES: { id: CaptionCategory; label: string }[] = [
   { id: "impacto", label: "Impacto" },
   { id: "minimalista", label: "Minimalista" },
   { id: "podcast", label: "Podcast" },
+  { id: "shorts", label: "Shorts" },
   { id: "viral", label: "Viral" },
   { id: "karaoke", label: "Karaokê" },
   { id: "gaming", label: "Gaming" },
@@ -72,6 +74,10 @@ export interface CaptionPreset {
   animation: CaptionAnimation;
   /** Fonte web usada pelo preset (carregada no root). */
   font?: string;
+  /** Texto curto mostrado no cartão da biblioteca. */
+  sampleText?: string;
+  /** Posição vertical segura para o formato do preset. */
+  positionY?: number;
 }
 
 const base: CaptionLayerStyle = {
@@ -99,8 +105,9 @@ function preset(
   categories: CaptionCategory[],
   style: Partial<CaptionLayerStyle>,
   animation: CaptionPreset["animation"] = "pop",
+  options: Pick<CaptionPreset, "sampleText" | "positionY"> = {},
 ): CaptionPreset {
-  return { id, name, description, categories, style: { ...base, ...style }, animation };
+  return { id, name, description, categories, style: { ...base, ...style }, animation, ...options };
 }
 
 export const CAPTION_PRESETS: CaptionPreset[] = [
@@ -401,9 +408,59 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
     background: "rgba(20,20,28,.7)", strokeWidth: 0, uppercase: false, fontWeight: 700, maxWords: 5,
     highlight: "color", highlightColor: "#ff5da2",
   }, "fade"),
-  preset("shorts-punch", "Shorts Punch", "Curto e agressivo", ["viral", "impacto"], {
+  preset("shorts-punch", "Shorts Punch", "Curto e agressivo", ["shorts", "viral", "impacto"], {
     maxWords: 3, fontSize: 92, fontFamily: "Anton, sans-serif", fontWeight: 400, strokeWidth: 12, highlightColor: "#ff3b5c",
-  }, "bounce"),
+  }, "bounce", { sampleText: "VOCÊ PRECISA VER", positionY: 76 }),
+
+  // ————— Shorts: hooks, tutorial, podcast e reação —————
+  preset("shorts-hook-lime", "Hook Limão", "Duas palavras com caixa neon para abrir o vídeo", ["shorts", "viral", "impacto"], {
+    mode: "karaoke", maxWords: 2, fontSize: 94, fontFamily: "Anton, sans-serif", fontWeight: 400,
+    strokeWidth: 8, highlight: "box", highlightColor: "#c7ff38",
+  }, "bounce", { sampleText: "OLHA ISSO", positionY: 74 }),
+  preset("shorts-one-word-yellow", "Palavra Gigante", "Uma palavra por vez para frases rápidas", ["shorts", "karaoke", "impacto"], {
+    mode: "word", maxWords: 1, fontSize: 122, fontFamily: "'Bebas Neue', sans-serif", fontWeight: 400,
+    strokeWidth: 12, highlight: "scale", highlightColor: "#ffd400",
+  }, "pop", { sampleText: "SEGREDO", positionY: 70 }),
+  preset("shorts-podcast-blue", "Podcast Azul", "Leitura confortável para entrevistas e cortes", ["shorts", "podcast", "populares"], {
+    mode: "karaoke", maxWords: 4, fontSize: 68, fontFamily: "Poppins, sans-serif", fontWeight: 800,
+    uppercase: false, strokeWidth: 7, highlightColor: "#45c8ff",
+  }, "scale", { sampleText: "isso mudou minha visão", positionY: 78 }),
+  preset("shorts-story-pink", "Story Rosa", "Ritmo leve para histórias e lifestyle", ["shorts", "viral"], {
+    mode: "karaoke", maxWords: 3, fontSize: 76, fontFamily: "Montserrat, sans-serif", fontWeight: 900,
+    strokeWidth: 8, highlightColor: "#ff4fa3",
+  }, "wave", { sampleText: "VOCÊ NÃO IMAGINA", positionY: 76 }),
+  preset("shorts-tutorial-cyan", "Tutorial Ciano", "Destaque sublinhado para passos e explicações", ["shorts", "business", "minimalista"], {
+    mode: "karaoke", maxWords: 4, fontSize: 66, fontFamily: "'Archivo Black', sans-serif", fontWeight: 400,
+    uppercase: false, strokeWidth: 5, highlight: "underline", highlightColor: "#35e7ff",
+  }, "slide", { sampleText: "faça assim em segundos", positionY: 78 }),
+  preset("shorts-sale-red", "Oferta Vermelha", "Impacto alto para preço, urgência e CTA", ["shorts", "impacto", "business"], {
+    mode: "karaoke", maxWords: 2, fontSize: 94, fontFamily: "Anton, sans-serif", fontWeight: 400,
+    strokeWidth: 10, highlight: "box", highlightColor: "#ff3152",
+  }, "pop", { sampleText: "ÚLTIMA CHANCE", positionY: 74 }),
+  preset("shorts-clean-underline", "Clean Sublinhado", "Legenda discreta para conteúdo premium", ["shorts", "minimalista"], {
+    mode: "karaoke", maxWords: 4, fontSize: 64, fontFamily: "Poppins, sans-serif", fontWeight: 700,
+    uppercase: false, strokeWidth: 0, shadow: true, highlight: "underline", highlightColor: "#ffffff",
+  }, "fade", { sampleText: "uma ideia bem simples", positionY: 79 }),
+  preset("shorts-neon-purple", "Neon Roxo", "Brilho pulsante para música e lifestyle", ["shorts", "neon", "viral"], {
+    mode: "karaoke", maxWords: 3, fontSize: 78, fontFamily: "Montserrat, sans-serif", fontWeight: 900,
+    color: "#f7efff", strokeColor: "#210044", strokeWidth: 7, highlightColor: "#b868ff",
+  }, "glow", { sampleText: "ENERGIA LÁ EM CIMA", positionY: 75 }),
+  preset("shorts-reaction-orange", "Reação Laranja", "Pulo rápido para comentários e reações", ["shorts", "viral", "impacto"], {
+    mode: "karaoke", maxWords: 2, fontSize: 90, fontFamily: "'Luckiest Guy', cursive", fontWeight: 400,
+    strokeWidth: 11, highlightColor: "#ff8a2b",
+  }, "bounce", { sampleText: "NÃO ACREDITO", positionY: 72 }),
+  preset("shorts-gaming-electric", "Gaming Elétrico", "Movimento intenso para clips e highlights", ["shorts", "gaming", "neon"], {
+    mode: "karaoke", maxWords: 2, fontSize: 82, fontFamily: "'Archivo Black', sans-serif", fontWeight: 400,
+    strokeColor: "#071a2b", strokeWidth: 10, highlightColor: "#00f0ff",
+  }, "shake", { sampleText: "JOGADA INSANA", positionY: 73 }),
+  preset("shorts-fact-green", "Fato Verde", "Destaque confiável para curiosidades e listas", ["shorts", "news", "viral"], {
+    mode: "karaoke", maxWords: 4, fontSize: 70, fontFamily: "Poppins, sans-serif", fontWeight: 900,
+    strokeWidth: 8, highlightColor: "#45f28d",
+  }, "pop", { sampleText: "VOCÊ SABIA DISSO?", positionY: 77 }),
+  preset("shorts-caption-card", "Card de Conversa", "Caixa legível para falas longas em tela pequena", ["shorts", "podcast", "basico"], {
+    mode: "karaoke", maxWords: 5, fontSize: 62, fontFamily: "Poppins, sans-serif", fontWeight: 700,
+    uppercase: false, background: "rgba(8,10,18,.78)", strokeWidth: 0, highlight: "box", highlightColor: "#7c5cff",
+  }, "fade", { sampleText: "o ponto principal é este", positionY: 79 }),
 ];
 
 export const CAPTION_MODES: { id: CaptionLayerStyle["mode"]; label: string; maxWords: number }[] = [
