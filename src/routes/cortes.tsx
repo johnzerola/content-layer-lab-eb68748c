@@ -22,7 +22,6 @@ import {
   type CutRecord,
 } from "@/lib/editor/cuts";
 import { publishCuts } from "@/lib/editor/cuts.service";
-import { AiCutSuggestions } from "@/components/cuts/AiCutSuggestions";
 import { LinkImport } from "@/components/editor/LinkImport";
 import { nicheContext, NICHES } from "@/lib/viral-library";
 import { markPendingTool } from "@/lib/handoff";
@@ -76,7 +75,6 @@ function CutsPage() {
   const [applying, setApplying] = useState(false);
   const [libraryKey, setLibraryKey] = useState(0);
   const [publishing, setPublishing] = useState(false);
-  const [tab, setTab] = useState<"sugestoes" | "cortes">("sugestoes");
   const [nicheId, setNicheId] = useState<string>("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -207,57 +205,26 @@ function CutsPage() {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:p-8">
       <header className="space-y-1">
-        <p className="mono-label">Cortes · IA</p>
-        <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Corte IA + Cortes em um só lugar</h1>
+        <p className="mono-label">Cortes</p>
+        <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Gerar cortes do vídeo</h1>
         <p className="text-sm text-muted-foreground">
-          Comece pelas sugestões de corte por categoria e gere os cortes reais do seu vídeo na mesma tela.
+          Escolha um vídeo, defina o estilo e gere os cortes reais na mesma tela.
         </p>
       </header>
 
-      <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Áreas de corte">
-        {([
-          { id: "sugestoes", label: "Sugestões da IA" },
-          { id: "cortes", label: "Gerar cortes do vídeo" },
-        ] as const).map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
-            className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
-              tab === t.id
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border/60 text-muted-foreground hover:border-primary/50"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="flex justify-end">
         <button
           type="button"
           onClick={() => {
             markPendingTool("clip");
             void navigate({ to: "/" });
           }}
-          className="ml-auto rounded-xl border border-border/60 px-3 py-2 text-sm text-muted-foreground transition hover:border-primary/50 hover:text-primary"
+          className="rounded-xl border border-border/60 px-3 py-2 text-sm text-muted-foreground transition hover:border-primary/50 hover:text-primary"
         >
           Cortar em lote no estúdio
         </button>
       </div>
 
-      {tab === "sugestoes" && (
-        <AiCutSuggestions
-          onUseNiche={(id) => {
-            setNicheId(id);
-            setTab("cortes");
-            toast.success(`Estilo aplicado: ${NICHES.find((n) => n.id === id)?.label ?? id}`);
-          }}
-        />
-      )}
-
-      {tab === "cortes" && (
-      <>
       <section className="rounded-2xl border border-border/60 bg-card/50 p-4">
         <div className="flex flex-wrap items-center gap-3">
           <select
@@ -428,8 +395,6 @@ function CutsPage() {
           else if (file) registerSourceFile(sourceIdFor(file), file);
         }}
       />
-      </>
-      )}
     </div>
   );
 }
