@@ -1364,8 +1364,8 @@ export function TemplateEditor({
             </div>
 
             <p className="text-center text-[11px] text-muted-foreground">
-              Arraste para mover · alças nos 8 pontos para redimensionar · Shift mantém proporção · Alt redimensiona
-              pelo centro · setas movem 1px (Shift 10px)
+              Solte imagens e fontes aqui · arraste para mover · alças nos 8 pontos para redimensionar · Shift mantém
+              proporção · Alt redimensiona pelo centro · setas movem 1px (Shift 10px)
             </p>
           </section>
 
