@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isAudioSeparationJobsSchemaUnavailable } from "@/lib/audio-job-errors";
 
 const jobContextSchema = z.object({
   projectId: z.string().min(1).max(200),
@@ -71,6 +72,7 @@ export const prepareAudioSeparation = createServerFn({ method: "POST" })
         `ensemble=${caps.ensemble?.enabled ? caps.ensemble.model ?? "enabled" : "off"}`,
       ].join(";"),
     };
+    let persistenceReady = true;
     if (data) {
       const { error } = await context.supabase
         .from("audio_separation_jobs" as never)
@@ -88,7 +90,10 @@ export const prepareAudioSeparation = createServerFn({ method: "POST" })
           recipe_revision: recipe.revision,
           status: "pending_upload",
         } as never);
-      if (error) throw new Error(`Não foi possível registrar o processamento de áudio: ${error.message}`);
+      if (error) {
+        if (isAudioSeparationJobsSchemaUnavailable(error)) persistenceReady = false;
+        else throw new Error(`Não foi possível registrar o processamento de áudio: ${error.message}`);
+      }
     }
     return {
       jobId,
@@ -98,6 +103,7 @@ export const prepareAudioSeparation = createServerFn({ method: "POST" })
       resultToken: jobToken(jobId, "result", 1800),
       maxDuration: Math.min(180, caps.max_duration ?? 180),
       recipe,
+      persistenceReady,
     };
   });
 
@@ -121,7 +127,12 @@ export const updateAudioSeparationJob = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .select("id,status,result_revision,updated_at")
       .maybeSingle();
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (isAudioSeparationJobsSchemaUnavailable(error)) {
+        return { id: data.id, status: data.status, result_revision: 0, updated_at: new Date().toISOString() };
+      }
+      throw new Error(error.message);
+    }
     if (!row) throw new Error("Processamento de áudio não encontrado.");
     return row as unknown as { id: string; status: string; result_revision: number; updated_at: string };
   });

@@ -592,7 +592,13 @@ export function EditorV2Foundation() {
         });
         setProject(next);
         setMobileSurface("timeline");
-        setMessage(dialogueCloudPath && musicCloudPath ? "Diálogo e música foram separados, salvos na conta e aplicados em duas faixas. Use solo ou mudo para comparar." : dialoguePersisted && musicPersisted ? "Diálogo e música foram aplicados e salvos neste navegador; a cópia na nuvem precisa ser tentada novamente." : "Diálogo e música foram aplicados nesta sessão; o armazenamento não salvou uma ou mais trilhas.");
+        setMessage(dialogueCloudPath && musicCloudPath
+          ? ticket.persistenceReady
+            ? "Diálogo e música foram separados, salvos na conta e aplicados em duas faixas. Use solo ou mudo para comparar."
+            : "Diálogo e música foram separados, salvos e aplicados. O histórico do processamento será ativado após a atualização do banco."
+          : dialoguePersisted && musicPersisted
+            ? "Diálogo e música foram aplicados e salvos neste navegador; a cópia na nuvem precisa ser tentada novamente."
+            : "Diálogo e música foram aplicados nesta sessão; o armazenamento não salvou uma ou mais trilhas.");
       } catch (error) {
         URL.revokeObjectURL(dialogueUrl);
         URL.revokeObjectURL(musicUrl);
