@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pause, Play, Plus, Scissors, Maximize, Trash2 } from 'lucide-react';
+import { Pause, Play, Plus, Scissors, Maximize, Trash2, Diamond } from 'lucide-react';
 import type { BoxLayer, LayerAnim, SelId, Template, TextLayer } from '@/lib/template';
 import { layerOf, LAYER_LABELS, selectableIds } from './TemplateCanvas';
 
