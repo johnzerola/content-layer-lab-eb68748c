@@ -10,6 +10,8 @@ export interface CaptionCue {
   start: number;
   end: number;
   words: CaptionWord[];
+  /** Origem da sincronia; `word` usa timestamps do ASR. */
+  timing?: "word" | "estimated";
 }
 
 /** Segmento de fala detectado por energia do áudio. */
@@ -22,11 +24,12 @@ const SR = 16000;
 
 async function decodeMono(file: File): Promise<AudioBuffer> {
   const Ctx =
-    window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const ac = new Ctx();
   const decoded = await ac.decodeAudioData(await file.arrayBuffer());
   void ac.close();
-  const len = Math.max(1, Math.floor((decoded.duration * SR)));
+  const len = Math.max(1, Math.floor(decoded.duration * SR));
   const off = new OfflineAudioContext(1, len, SR);
   const src = off.createBufferSource();
   src.buffer = decoded;
@@ -143,6 +146,28 @@ function wordsFor(text: string, seg: Segment): CaptionWord[] {
   });
 }
 
+/** Converte timestamps relativos do ASR para o relógio absoluto do vídeo. */
+export function timedWordsFor(
+  words: Array<{ word: string; start: number; end: number }>,
+  seg: Segment,
+): CaptionWord[] {
+  const span = Math.max(0, seg.end - seg.start);
+  return words.flatMap((word) => {
+    const text = word.word.trim();
+    const localStart = Math.max(0, Math.min(span, word.start));
+    const localEnd = Math.max(localStart, Math.min(span, word.end));
+    if (!text || localEnd - localStart < 0.01) return [];
+    return [{ text, start: seg.start + localStart, end: seg.start + localEnd }];
+  });
+}
+
+export function captionTimingSummary(cues: CaptionCue[]) {
+  const exact = cues.filter((cue) => cue.timing === "word").length;
+  if (exact === cues.length && exact > 0) return "sincronia por palavra";
+  if (exact > 0) return "sincronia mista";
+  return "sincronia estimada";
+}
+
 export interface CaptionProgress {
   done: number;
   total: number;
@@ -170,7 +195,9 @@ export async function generateCaptions(
   const from = Math.max(0, opts.clip?.start ?? 0);
   const to = Math.min(buf.duration, opts.clip?.end ?? buf.duration);
   if (to - from < 0.4) {
-    throw new Error("O trecho selecionado é curto demais para transcrever (mínimo 0,4s). Aumente o corte.");
+    throw new Error(
+      "O trecho selecionado é curto demais para transcrever (mínimo 0,4s). Aumente o corte.",
+    );
   }
 
   // validação de áudio: silêncio total / faixa muda
@@ -186,7 +213,9 @@ export async function generateCaptions(
   }
   const avg = energy / Math.max(1, Math.floor((i1 - i0) / 7));
   if (peak < 0.005) {
-    throw new Error("Este vídeo está mudo (sem sinal de áudio no trecho). Sem fala não dá para gerar legendas.");
+    throw new Error(
+      "Este vídeo está mudo (sem sinal de áudio no trecho). Sem fala não dá para gerar legendas.",
+    );
   }
   if (avg < 0.0015) {
     throw new Error(
@@ -219,8 +248,16 @@ export async function generateCaptions(
         const res = await transcribeChunk({
           data: { audio, ...(opts.language ? { language: opts.language } : {}) },
         });
-        const words = wordsFor(res.text ?? "", seg);
-        if (words.length) results[index] = { start: seg.start, end: seg.end, words };
+        const timed = timedWordsFor(res.words ?? [], seg);
+        const words = timed.length ? timed : wordsFor(res.text ?? "", seg);
+        if (words.length) {
+          results[index] = {
+            start: words[0]!.start,
+            end: words[words.length - 1]!.end,
+            words,
+            timing: timed.length ? "word" : "estimated",
+          };
+        }
         return;
       } catch (err) {
         const raw = String((err as Error)?.message ?? err);
@@ -304,8 +341,6 @@ async function refreshSession(): Promise<boolean> {
   }
 }
 
-
-
 export function cuesToText(cues: CaptionCue[]) {
   return cues.map((c) => c.words.map((w) => w.text).join(" ")).join(" ");
 }
@@ -323,7 +358,6 @@ export function demoCues(text = "isso aqui muda o seu jogo agora mesmo"): Captio
   ];
 }
 
-
 /** Exporta as legendas em SRT (útil pra subir junto no editor de terceiros). */
 export function cuesToSrt(cues: CaptionCue[]) {
   const fmt = (s: number) => {
@@ -335,7 +369,10 @@ export function cuesToSrt(cues: CaptionCue[]) {
     return `${hh}:${mm}:${ss},${String(ms).padStart(3, "0")}`;
   };
   return cues
-    .map((c, i) => `${i + 1}\n${fmt(c.start)} --> ${fmt(c.end)}\n${c.words.map((w) => w.text).join(" ")}\n`)
+    .map(
+      (c, i) =>
+        `${i + 1}\n${fmt(c.start)} --> ${fmt(c.end)}\n${c.words.map((w) => w.text).join(" ")}\n`,
+    )
     .join("\n");
 }
 
@@ -346,5 +383,6 @@ export function shiftCues(cues: CaptionCue[], offset: number, speed: number): Ca
     start: f(c.start),
     end: f(c.end),
     words: c.words.map((w) => ({ ...w, start: f(w.start), end: f(w.end) })),
+    ...(c.timing ? { timing: c.timing } : {}),
   }));
 }

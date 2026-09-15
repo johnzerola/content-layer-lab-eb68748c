@@ -3,38 +3,59 @@ import { z } from "zod";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+export interface TranscribedWord {
+  word: string;
+  /** Tempo relativo ao início do chunk enviado, em segundos. */
+  start: number;
+  end: number;
+}
+
 /**
  * Transcreve um trecho de áudio (WAV base64) usando a Lovable AI.
- * Retorna apenas o texto — os tempos são calculados no cliente por segmento.
+ * Pede timestamps por palavra. Gateways que ainda não oferecem esse formato
+ * voltam automaticamente ao texto simples, sem impedir a geração da legenda.
  */
 export const transcribeChunk = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .validator((input: unknown) => 
-    z.object({ 
-      audio: z.string().min(100), 
-      language: z.string().optional() 
-    }).parse(input)
+  .validator((input: unknown) =>
+    z
+      .object({
+        audio: z.string().min(100),
+        language: z.string().optional(),
+      })
+      .parse(input),
   )
   .handler(async ({ data }) => {
     const key = process.env["LOVABLE_API_KEY"];
-    if (!key) throw new Error("A IA de transcrição não está configurada neste projeto (chave ausente).");
+    if (!key)
+      throw new Error("A IA de transcrição não está configurada neste projeto (chave ausente).");
 
     const bin = Uint8Array.from(atob(data.audio), (c) => c.charCodeAt(0));
-    if (bin.byteLength < 2048) return { text: "" };
+    if (bin.byteLength < 2048) return { text: "", words: [] as TranscribedWord[] };
     if (bin.byteLength > 24 * 1024 * 1024) {
       throw new Error("Trecho de áudio grande demais para transcrever. Reduza a duração do corte.");
     }
 
-    const form = new FormData();
-    form.append("model", "openai/gpt-4o-transcribe");
-    form.append("file", new Blob([bin], { type: "audio/wav" }), "chunk.wav");
-    if (data.language) form.append("language", data.language);
+    const request = (withTimestamps: boolean) => {
+      const form = new FormData();
+      form.append("model", "openai/gpt-4o-transcribe");
+      form.append("file", new Blob([bin], { type: "audio/wav" }), "chunk.wav");
+      if (data.language) form.append("language", data.language);
+      if (withTimestamps) {
+        form.append("response_format", "verbose_json");
+        form.append("timestamp_granularities[]", "word");
+      }
+      return fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}` },
+        body: form,
+      });
+    };
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}` },
-      body: form,
-    });
+    let res = await request(true);
+    // Alguns gateways compatíveis aceitam a transcrição, mas ainda recusam
+    // verbose_json. Nesse caso mantemos o fluxo antigo como fallback.
+    if (res.status === 400 || res.status === 422) res = await request(false);
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
@@ -52,10 +73,23 @@ export const transcribeChunk = createServerFn({ method: "POST" })
       throw new Error(`[${res.status}] ${msg}`);
     }
 
-
-
-    const json = (await res.json()) as { text?: string };
-    return { text: json.text ?? "" };
+    const json = (await res.json()) as {
+      text?: string;
+      words?: Array<{ word?: unknown; text?: unknown; start?: unknown; end?: unknown }>;
+      segments?: Array<{
+        words?: Array<{ word?: unknown; text?: unknown; start?: unknown; end?: unknown }>;
+      }>;
+    };
+    const rawWords = json.words ?? json.segments?.flatMap((segment) => segment.words ?? []) ?? [];
+    const words: TranscribedWord[] = rawWords.flatMap((raw) => {
+      const word = String(raw.word ?? raw.text ?? "").trim();
+      const start = Number(raw.start);
+      const end = Number(raw.end);
+      return word && Number.isFinite(start) && Number.isFinite(end) && end > start
+        ? [{ word, start, end }]
+        : [];
+    });
+    return { text: json.text ?? words.map((word) => word.word).join(" "), words };
   });
 
 /**
@@ -76,7 +110,8 @@ export const refineTranscriptWords = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const key = process.env["LOVABLE_API_KEY"];
-    if (!key) throw new Error("A IA de legendas não está configurada neste projeto (chave ausente).");
+    if (!key)
+      throw new Error("A IA de legendas não está configurada neste projeto (chave ausente).");
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -120,7 +155,8 @@ export const refineTranscriptWords = createServerFn({ method: "POST" })
     } catch {
       out = null;
     }
-    if (!Array.isArray(out)) throw new Error("A IA devolveu a legenda em formato inesperado. Tente novamente.");
+    if (!Array.isArray(out))
+      throw new Error("A IA devolveu a legenda em formato inesperado. Tente novamente.");
     const words = out.map((w) => String(w ?? "").trim());
     return { words: data.words.map((orig, i) => words[i] || orig) };
   });

@@ -103,7 +103,9 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
     // 1) já é um arquivo de vídeo?
     if (
       !excluded.has("direct") &&
-      /\.(mp4|mov|m4v|webm|mkv|ogv|3gp|avi|mpeg|mpg|ts)(\?|$)/i.test(target.pathname + target.search)
+      /\.(mp4|mov|m4v|webm|mkv|ogv|3gp|avi|mpeg|mpg|ts)(\?|$)/i.test(
+        target.pathname + target.search,
+      )
     ) {
       const ticket = mediaProxyTicket(target.toString());
       return {
@@ -117,7 +119,10 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
     }
 
     // 2) resolvers específicos por plataforma
-    const byPlatform: Record<string, (u: string) => Promise<import("./resolvers.server").ResolverHit | null>> = {
+    const byPlatform: Record<
+      string,
+      (u: string) => Promise<import("./resolvers.server").ResolverHit | null>
+    > = {
       tiktok: resolveTikTok,
       twitter: resolveTwitter,
       reddit: resolveReddit,
@@ -180,8 +185,6 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
       };
     }
 
-
-
     // 2) raspar a página em busca de og:video / <video src>
     let html = "";
     try {
@@ -196,13 +199,18 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
     }
 
     const title =
-      pickMeta(html, ["og:title", "twitter:title"]) ?? html.match(/<title[^>]*>([^<]{1,120})/i)?.[1]?.trim();
+      pickMeta(html, ["og:title", "twitter:title"]) ??
+      html.match(/<title[^>]*>([^<]{1,120})/i)?.[1]?.trim();
     const thumbnail = pickMeta(html, ["og:image", "twitter:image"]);
 
     const candidates = [
       pickMeta(html, ["og:video:secure_url", "og:video:url", "og:video", "twitter:player:stream"]),
-      html.match(/<video[^>]+src=["']([^"']+\.(?:mp4|m4v|webm|mov|mkv|ogv|3gp|avi|mpeg|mpg|ts)[^"']*)["']/i)?.[1],
-      html.match(/<source[^>]+src=["']([^"']+\.(?:mp4|m4v|webm|mov|mkv|ogv|3gp|avi|mpeg|mpg|ts)[^"']*)["']/i)?.[1],
+      html.match(
+        /<video[^>]+src=["']([^"']+\.(?:mp4|m4v|webm|mov|mkv|ogv|3gp|avi|mpeg|mpg|ts)[^"']*)["']/i,
+      )?.[1],
+      html.match(
+        /<source[^>]+src=["']([^"']+\.(?:mp4|m4v|webm|mov|mkv|ogv|3gp|avi|mpeg|mpg|ts)[^"']*)["']/i,
+      )?.[1],
       html.match(/"(?:contentUrl|video_url|playAddr|downloadAddr)"\s*:\s*"([^"]+)"/i)?.[1],
       html.match(/https?:\\?\/\\?\/[^"'\s]+\.(?:mp4|m4v|webm|mov|mkv)[^"'\s]*/i)?.[0],
     ].filter(Boolean) as string[];
@@ -211,10 +219,14 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
       /\/embed\/|\/player|youtube\.com|youtu\.be|player\.vimeo\.com/.test(u.host + u.pathname) &&
       !/\.(mp4|m4v|mov|webm|mkv|ogv|3gp|avi|mpeg|mpg|ts)(\?|$)/i.test(u.pathname + u.search);
 
-
     for (const raw of excluded.has("scrape") ? [] : candidates) {
-      const cleaned = raw.replace(/\\u0026/g, "&").replace(/\\\//g, "/").replace(/&amp;/g, "&");
-      const abs = safeRemoteUrl(cleaned.startsWith("http") ? cleaned : new URL(cleaned, target).toString());
+      const cleaned = raw
+        .replace(/\\u0026/g, "&")
+        .replace(/\\\//g, "/")
+        .replace(/&amp;/g, "&");
+      const abs = safeRemoteUrl(
+        cleaned.startsWith("http") ? cleaned : new URL(cleaned, target).toString(),
+      );
       if (abs && !isPlayerPage(abs)) {
         const ticket = mediaProxyTicket(abs.toString());
         return {
@@ -229,7 +241,15 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
       }
     }
 
-    const needsService = ["youtube", "instagram", "facebook", "twitch", "pinterest", "kwai"].includes(platform);
+    const needsService = [
+      "youtube",
+      "instagram",
+      "tiktok",
+      "facebook",
+      "twitch",
+      "pinterest",
+      "kwai",
+    ].includes(platform);
     return {
       ok: false,
       ...(title ? { title } : {}),
@@ -241,5 +261,4 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
           : `Não consegui baixar esse vídeo do ${platform} porque nenhum motor robusto de importação está configurado. Defina CLEANER_WORKER_URL/CLEANER_WORKER_SECRET ou COBALT_API_URL no Lovable, ou baixe o arquivo e arraste aqui.`
         : "Não encontrei um arquivo de vídeo nessa página. Cole um link direto do arquivo ou envie o vídeo.",
     };
-
   });

@@ -9,6 +9,7 @@ export function normalizeCues(cues: CaptionCue[]): CaptionCue[] {
         start: words[0]?.start ?? c.start,
         end: words[words.length - 1]?.end ?? c.end,
         words,
+        ...(c.timing ? { timing: c.timing } : {}),
       };
     })
     .filter((c) => c.words.length)
@@ -72,7 +73,7 @@ export function retextCue(cue: CaptionCue, text: string): CaptionCue {
     t += d;
     return w;
   });
-  return { start, end: words[words.length - 1]!.end, words };
+  return { start, end: words[words.length - 1]!.end, words, timing: "estimated" };
 }
 
 /** Junta um bloco com o seguinte. */
@@ -80,7 +81,12 @@ export function mergeWithNext(cues: CaptionCue[], index: number): CaptionCue[] {
   const a = cues[index];
   const b = cues[index + 1];
   if (!a || !b) return cues;
-  const merged: CaptionCue = { start: a.start, end: b.end, words: [...a.words, ...b.words] };
+  const merged: CaptionCue = {
+    start: a.start,
+    end: b.end,
+    words: [...a.words, ...b.words],
+    timing: a.timing === "word" && b.timing === "word" ? "word" : "estimated",
+  };
   return normalizeCues([...cues.slice(0, index), merged, ...cues.slice(index + 2)]);
 }
 
@@ -160,11 +166,17 @@ export function autoFixText(cues: CaptionCue[]): { cues: CaptionCue[]; count: nu
 /** Reagrupa as legendas em blocos de no máximo `perCue` palavras. */
 export function regroup(cues: CaptionCue[], perCue: number): CaptionCue[] {
   const words = cues.flatMap((c) => c.words).sort((a, b) => a.start - b.start);
+  const timing = cues.length > 0 && cues.every((cue) => cue.timing === "word") ? "word" : "estimated";
   const out: CaptionCue[] = [];
   for (let i = 0; i < words.length; i += perCue) {
     const chunk = words.slice(i, i + perCue);
     if (!chunk.length) continue;
-    out.push({ start: chunk[0]!.start, end: chunk[chunk.length - 1]!.end, words: chunk });
+    out.push({
+      start: chunk[0]!.start,
+      end: chunk[chunk.length - 1]!.end,
+      words: chunk,
+      timing,
+    });
   }
   return out;
 }

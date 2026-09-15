@@ -139,7 +139,14 @@ import {
 } from "@/lib/zip";
 import { batchPolicy } from "@/lib/batch-policy";
 
-import { cuesToSrt, cuesToText, demoCues, generateCaptions, type CaptionCue } from "@/lib/captions";
+import {
+  captionTimingSummary,
+  cuesToSrt,
+  cuesToText,
+  demoCues,
+  generateCaptions,
+  type CaptionCue,
+} from "@/lib/captions";
 import { registerFonts } from "@/lib/fonts";
 const CaptionStudio = deferred(() =>
   import("@/components/CaptionStudio").then((m) => ({ default: m.CaptionStudio })),
@@ -1029,7 +1036,7 @@ function Home() {
                   ...x,
                   captions: cues,
                   capError: false,
-                  capStatus: `${cues.length} blocos · ${cues.reduce((n, c) => n + c.words.length, 0)} palavras`,
+                  capStatus: `${cues.length} blocos · ${cues.reduce((n, c) => n + c.words.length, 0)} palavras · ${captionTimingSummary(cues)}`,
                 }
               : x,
           ),
@@ -1365,7 +1372,12 @@ function Home() {
                 setItems((p) =>
                   p.map((x) =>
                     x.id === id
-                      ? { ...x, captions: got, capError: false, capStatus: `${got.length} blocos` }
+                      ? {
+                          ...x,
+                          captions: got,
+                          capError: false,
+                          capStatus: `${got.length} blocos · ${captionTimingSummary(got)}`,
+                        }
                       : x,
                   ),
                 );
@@ -2858,7 +2870,7 @@ function Home() {
                     {!!selected.captions?.length && (
                       <div className="mt-2 flex items-center gap-2">
                         <span className="text-[12px] text-primary">
-                          ● {selected.captions.length} blocos prontos
+                          ✓ {selected.captions.length} blocos · {captionTimingSummary(selected.captions)}
                         </span>
                         <button
                           className="text-[12px] text-muted-foreground underline"

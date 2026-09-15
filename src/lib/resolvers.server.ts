@@ -28,19 +28,57 @@ async function getJson(url: string, init?: RequestInit): Promise<any | null> {
   }
 }
 
-/** TikTok — API pública tikwm (sem chave). */
+function isTikTokPage(raw: string) {
+  try {
+    const host = new URL(raw).hostname.toLowerCase().replace(/^www\./, "");
+    return host === "tiktok.com" || host.endsWith(".tiktok.com");
+  } catch {
+    return false;
+  }
+}
+
+/** Resolve vt.tiktok.com/vm.tiktok.com sem deixar a cadeia sair do TikTok. */
+export async function expandTikTokUrl(raw: string): Promise<string> {
+  let current = raw;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    if (!isTikTokPage(current)) return raw;
+    try {
+      const response = await fetch(current, {
+        method: "HEAD",
+        redirect: "manual",
+        headers: { "user-agent": UA, accept: "text/html,*/*" },
+      });
+      const location = response.headers.get("location");
+      if (!location) return response.url && isTikTokPage(response.url) ? response.url : current;
+      const next = new URL(location, current).toString();
+      if (!isTikTokPage(next)) return current;
+      current = next;
+    } catch {
+      return current;
+    }
+  }
+  return current;
+}
+
+/** TikTok — URL canônica + API pública tikwm (sem chave). */
 export async function resolveTikTok(url: string): Promise<ResolverHit | null> {
-  const j = await getJson(`https://www.tikwm.com/api/?hd=1&url=${encodeURIComponent(url)}`);
-  const d = j?.data;
-  const play: string | undefined = d?.hdplay || d?.play || d?.wmplay;
-  if (!play) return null;
-  const abs = play.startsWith("http") ? play : `https://www.tikwm.com${play}`;
-  return {
-    videoUrl: abs,
-    ...(d?.title ? { title: String(d.title).slice(0, 80) } : {}),
-    ...(d?.cover ? { thumbnail: String(d.cover) } : {}),
-    source: "tiktok",
-  };
+  const canonical = await expandTikTokUrl(url);
+  const candidates = [...new Set([canonical, url])];
+  for (const candidate of candidates) {
+    const j = await getJson(`https://www.tikwm.com/api/?hd=1&url=${encodeURIComponent(candidate)}`);
+    const d = j?.data;
+    const play: string | undefined = d?.hdplay || d?.play || d?.wmplay;
+    if (!play) continue;
+    const abs = play.startsWith("http") ? play : `https://www.tikwm.com${play}`;
+    return {
+      videoUrl: abs,
+      headers: { "user-agent": UA, referer: "https://www.tiktok.com/" },
+      ...(d?.title ? { title: String(d.title).slice(0, 80) } : {}),
+      ...(d?.cover ? { thumbnail: String(d.cover) } : {}),
+      source: "tiktok",
+    };
+  }
+  return null;
 }
 
 /** X / Twitter — API pública fxtwitter. */
@@ -100,7 +138,6 @@ export async function resolveVimeo(url: string): Promise<ResolverHit | null> {
   };
 }
 
-
 /* ------------------------------------------------------------------ */
 /* YouTube — instâncias públicas Piped / Invidious (sem chave)          */
 /* ------------------------------------------------------------------ */
@@ -112,15 +149,12 @@ const PIPED = [
   "https://pipedapi.reallyaweso.me",
 ];
 
-const INVIDIOUS = [
-  "https://inv.nadeko.net",
-  "https://invidious.nerdvpn.de",
-  "https://yewtu.be",
-];
+const INVIDIOUS = ["https://inv.nadeko.net", "https://invidious.nerdvpn.de", "https://yewtu.be"];
 
 export function youtubeId(url: string): string | null {
-  const m =
-    url.match(/(?:youtube\.com\/(?:watch\?[^#]*v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{6,})/i)?.[1];
+  const m = url.match(
+    /(?:youtube\.com\/(?:watch\?[^#]*v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{6,})/i,
+  )?.[1];
   return m ?? null;
 }
 
@@ -172,7 +206,9 @@ export async function resolveYouTube(url: string): Promise<ResolverHit | null> {
 /* Instagram — espelhos públicos que expõem og:video                    */
 /* ------------------------------------------------------------------ */
 
-async function ogVideo(url: string): Promise<{ video?: string; title?: string; thumb?: string } | null> {
+async function ogVideo(
+  url: string,
+): Promise<{ video?: string; title?: string; thumb?: string } | null> {
   try {
     const res = await fetch(url, {
       headers: { "user-agent": "facebookexternalhit/1.1", accept: "text/html" },
@@ -181,8 +217,12 @@ async function ogVideo(url: string): Promise<{ video?: string; title?: string; t
     if (!res.ok) return null;
     const html = (await res.text()).slice(0, 800_000);
     const meta = (k: string) =>
-      html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${k}["'][^>]*content=["']([^"']+)["']`, "i"))?.[1] ??
-      html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']${k}["']`, "i"))?.[1];
+      html.match(
+        new RegExp(`<meta[^>]+(?:property|name)=["']${k}["'][^>]*content=["']([^"']+)["']`, "i"),
+      )?.[1] ??
+      html.match(
+        new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']${k}["']`, "i"),
+      )?.[1];
     const video = meta("og:video:secure_url") ?? meta("og:video:url") ?? meta("og:video");
     const out: { video?: string; title?: string; thumb?: string } = {};
     if (video) out.video = video.replace(/&amp;/g, "&");
@@ -198,7 +238,11 @@ async function ogVideo(url: string): Promise<{ video?: string; title?: string; t
 
 export async function resolveInstagram(url: string): Promise<ResolverHit | null> {
   const path = url.replace(/^https?:\/\/(?:www\.)?instagram\.com/i, "").split("?")[0] ?? "";
-  const mirrors = [`https://www.ddinstagram.com${path}`, `https://d.ddinstagram.com${path}`, `https://kkinstagram.com${path}`];
+  const mirrors = [
+    `https://www.ddinstagram.com${path}`,
+    `https://d.ddinstagram.com${path}`,
+    `https://kkinstagram.com${path}`,
+  ];
   for (const m of mirrors) {
     const og = await ogVideo(m);
     if (og?.video) {
@@ -231,7 +275,10 @@ export async function resolveOpenGraph(url: string): Promise<ResolverHit | null>
  * Configure COBALT_API_URL (e COBALT_API_KEY, se a instância exigir).
  */
 function cobaltBases(): string[] {
-  const list = [process.env["COBALT_API_URL"] ?? "", ...(process.env["COBALT_API_URLS"] ?? "").split(",")];
+  const list = [
+    process.env["COBALT_API_URL"] ?? "",
+    ...(process.env["COBALT_API_URLS"] ?? "").split(","),
+  ];
   return list.map((s) => s.trim().replace(/\/$/, "")).filter(Boolean);
 }
 
@@ -258,12 +305,21 @@ async function cobaltCall(base: string, url: string): Promise<ResolverHit | null
         "user-agent": UA,
         ...(key ? { authorization: key.startsWith("Api-Key") ? key : `Api-Key ${key}` } : {}),
       },
-      body: JSON.stringify({ url, videoQuality: "1080", filenameStyle: "basic", downloadMode: "auto" }),
+      body: JSON.stringify({
+        url,
+        videoQuality: "1080",
+        filenameStyle: "basic",
+        downloadMode: "auto",
+      }),
     });
     const j: any = await res.json().catch(() => null);
     if (!j) return null;
     if (j.status === "redirect" || j.status === "tunnel" || j.status === "stream") {
-      return { videoUrl: j.url, ...(j.filename ? { title: String(j.filename) } : {}), source: "cobalt" };
+      return {
+        videoUrl: j.url,
+        ...(j.filename ? { title: String(j.filename) } : {}),
+        source: "cobalt",
+      };
     }
     if (j.status === "picker") {
       const first = (j.picker as any[])?.find((p) => p?.type === "video" || p?.url);
