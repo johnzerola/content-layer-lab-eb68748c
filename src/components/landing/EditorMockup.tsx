@@ -79,7 +79,7 @@ export function EditorMockup() {
                   <span
                     key={i}
                     className="flex-1 rounded-sm bg-foreground/20"
-                    style={{ height: `${18 + Math.abs(Math.sin(i * 1.7)) * 70}%` }}
+                    style={{ height: `${Math.round(18 + Math.abs(Math.sin(i * 1.7)) * 70)}%` }}
                   />
                 ))}
               </div>
