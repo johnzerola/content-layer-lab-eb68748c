@@ -23,6 +23,9 @@ def make_case(base, variant='static', frames=12):
             gt = 255 - gt
         mask = np.zeros(gt.shape[:2], np.uint8)
         cv2.putText(mask, 'TEST', (32, 72), cv2.FONT_HERSHEY_SIMPLEX, .65, 255, 2, cv2.LINE_8)
+        # OpenCV 4.13 can emit intermediate edge values even with LINE_8.
+        # Benchmark masks are categorical, so persist an explicit binary mask.
+        mask = np.where(mask > 0, 255, 0).astype(np.uint8)
         frame = gt.copy()
         frame[mask > 0] = 255
         for key, data in [('input', frame), ('mask', mask), ('ground_truth', gt)]:
