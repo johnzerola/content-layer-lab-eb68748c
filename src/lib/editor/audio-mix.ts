@@ -1,5 +1,6 @@
 import { decodeSourceAudio, type AudioTrack } from "@/lib/audio-track";
 import { duckGainAt, type AudioClip, type EditorAudio } from "./audio";
+import { resolveMediaUrl } from "@/lib/media-store";
 
 export type AudioRange = { start: number; end: number; speed?: number };
 
@@ -42,7 +43,10 @@ export async function renderEditorAudio(
   audio: EditorAudio,
   speech: AudioRange[] = [],
 ): Promise<AudioTrack | null> {
-  const duration = segments.reduce((sum, s) => sum + Math.max(0, s.end - s.start), 0);
+  const duration = segments.reduce(
+    (sum, s) => sum + Math.max(0, s.end - s.start) / Math.max(0.05, s.speed ?? 1),
+    0,
+  );
   if (duration <= 0) return null;
   const sampleRate = 48000;
   const ctx = new OfflineAudioContext(2, Math.ceil(duration * sampleRate), sampleRate);
@@ -81,7 +85,8 @@ export async function renderEditorAudio(
   }
   for (const clip of audio.tracks) {
     if (clip.muted || clip.volume <= 0) continue;
-    const response = await fetch(clip.url, { signal: AbortSignal.timeout(30_000) });
+    const clipUrl = await resolveMediaUrl(clip.url);
+    const response = await fetch(clipUrl, { signal: AbortSignal.timeout(30_000) });
     if (!response.ok) throw new Error(`Não consegui carregar a trilha ${clip.name}.`);
     const buffer = await ctx.decodeAudioData(await response.arrayBuffer());
     for (const window of clipWindows(clip, buffer.duration, segments)) {

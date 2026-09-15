@@ -1,0 +1,167 @@
+---
+name: "design-review"
+description: "Core visual quality gate with evidence, coverage, modal, terminology, and motion review."
+---
+
+# Design Review Skill
+
+## Core Pack — Always Active
+This is a core skill. Apply it on ALL visual and frontend work, no exceptions. You do not need permission or a specific trigger to use this.
+
+## Visual foundation contract
+
+Read `../agentic-design-system/contracts/visual-foundation.v2.json` before build or review.
+Confirmed `never` rules block presentation.
+
+- Never put a border on only one edge of a rounded rectangle. A complete perimeter remains valid.
+- Never recreate that one-edge treatment with a zero-blur or inset shadow.
+- Never force uppercase styling. Authored interface copy uses sentence case or title case, with a
+  narrow exception for literal external identifiers that would become inaccurate if changed.
+- Never use em dashes in interface copy.
+- Never use static or animated status dots. Status remains readable without color; add an icon only
+  when it materially improves scanning or comprehension.
+- Use a real icon when a control has an icon equivalent. Preserve one coherent project family;
+  otherwise use licensed Nucleo or one open family, never a mix.
+- Utility work starts with the product font, a system sans, or another conventional general-purpose
+  family. Expressive typography requires an eligible surface or an explicit outcome.
+- Custom letter spacing and line height come from a declared type role, not decorative improvisation.
+- Avoid colons in interface copy when a normal phrase works. Literal time, links, code, protocols,
+  structured data, and verbatim external data remain valid.
+- Use whitespace and grouping before adding dividers. Divider density stays an independent review
+  judgment rather than a brittle automatic gate.
+
+## When to Use
+- Before presenting ANY visual or UX work.
+- Treat this as a quality gate, not optional polish.
+- Sub-agents doing design/frontend work MUST run this before announcing completion.
+
+## Pre-Work: Read Before Building
+
+### 1. Read the project's guidelines
+- Read `guidelines.md` or equivalent design system doc first if it exists.
+- Follow the project's existing components, tokens, and patterns before inventing anything.
+- If no formal guidelines exist, inspect the existing product and match its logic.
+
+### 2. Research before designing
+- Check how similar tools solve the same problem before inventing a pattern.
+- Use proven references when they exist.
+- Quality bar references:
+  - UX Tools — editorial restraint, typography, calm hierarchy
+  - Inflight by Ridd — motion, depth, data viz polish
+  - Linear — dense information, excellent hierarchy, no noise
+  - Vercel dashboard — spacing, typography, dark mode discipline
+
+### 3. Check design memory
+- If the project keeps prior design decisions or rejected patterns, read its `DESIGN.md`, guidelines,
+  or decision log before building. Skip this step when no project-owned record exists.
+- If memory says the user rejected a pattern, don't repeat it.
+- Follow any project-owned source linked from that record.
+
+## Core principles
+- Restraint IS the design.
+- Spacing is the #1 tell.
+- Typography hierarchy > color for information architecture.
+- Match references at pixel level before adding your own ideas.
+- Existing patterns > new patterns.
+- Interactive elements should feel polished, not dead.
+- If the foundation is wrong, no polish fixes it.
+- Good design is centripetal, not centrifugal.
+
+## Reference Files
+Read only what the task needs. Keep this SKILL lean, load detail on demand:
+
+- `references/typography.md` — hierarchy, scale, pairing, measure
+- `references/color.md` — restrained palettes, tinted neutrals, contrast, OKLCH
+- `references/spacing.md` — spacing system, rhythm, grouping, layout density
+- `references/motion.md` — timing, easing, reduced motion, interactive feel, named motion vocabulary
+- `references/mobile.md` — mobile review profile: design-judgment vs platform-defect passes, decision forks, severity tiers
+- `references/anti-patterns.md` — common agent patterns to reject
+- `references/ux-writing.md` — interface copy, terminology consistency, labels, errors, and empty states
+
+### For sub-agents
+- Read the relevant reference files based on what you're building.
+- New layout or dashboard? Read spacing + anti-patterns.
+- Type-heavy screen? Read typography + spacing.
+- Color or theming work? Read color + anti-patterns.
+- Interactive polish? Read motion + anti-patterns.
+- Mobile / responsive / app / PWA review? Read mobile + responsive.
+- Interface copy or competing names for the same concept? Read ux-writing.
+- If in doubt, at minimum read spacing + anti-patterns.
+
+## Pre-Flight Checklist
+Run this every time before presenting work.
+
+### Step 1: Visual verification
+- [ ] Take a screenshot of the rendered result.
+- [ ] Compare side-by-side with the reference if one exists.
+- [ ] Check the target viewport, not an arbitrary devtools width.
+- [ ] Exercise reachable modal surfaces. Verify initial focus, Tab and Shift+Tab containment,
+  Escape dismissal, focus return, and inert background content. If the capture cannot open the
+  modal through a visible enabled `aria-controls` trigger, record `not verified`. A `failed` or
+  `not verified` required dialog blocks completion.
+
+### Step 2: Design audit
+- [ ] Spacing check — enough breathing room? Default to more.
+- [ ] Color check — did you add color that wasn't necessary?
+- [ ] Typography check — is hierarchy clear without leaning on color?
+- [ ] Pattern check — are you using the project's existing components?
+- [ ] Interaction check — hover, focus, active states exist and feel intentional.
+- [ ] Terminology check — each user-facing concept has one primary name; aliases are introduced
+  once and do not compete with the primary term.
+- [ ] Integrity check — no placeholders, dead states, broken assets, or missing data handling.
+
+### Step 3: Honesty check
+- [ ] Is it actually done?
+- [ ] Does it meet the brief, not an adjacent brief?
+- [ ] Would this hold up in a cold review?
+
+### Step 4: Run source pre-flight scripts
+if you have access to the scripts directory, run these advisory checks before presenting. replace
+`<skills-root>` with the directory containing the installed skill folders:
+
+```bash
+# check for common agent anti-patterns
+python3 <skills-root>/design-review/scripts/anti-pattern-check.py <your-file.tsx>
+
+# verify loading, empty, and error states exist
+python3 <skills-root>/design-review/scripts/state-check.py <your-file.tsx>
+
+# check semantic HTML, aria labels, alt text, heading hierarchy
+python3 <skills-root>/design-review/scripts/accessibility-check.py <your-file.tsx>
+```
+
+investigate the warnings before presenting. these checks grep source and are intentionally cheap and gameable; a comment containing “loading, empty, error” can satisfy the state check without rendering any state. they advise, but they do not clear the work.
+
+when visual verification is in scope, run the authoritative rendered capture:
+
+```bash
+node <skills-root>/agentic-design-system/scripts/run-capture.mjs "<running-route-url>" \
+  --states default,loading,empty,error --out evidence/<slug>
+```
+
+gate the verdict on the established rendered fields. evidence format 2 also records rounded one-edge
+borders, one-edge shadow candidates, forced uppercase, typography outliers, symbol-only controls,
+status-dot candidates, divider count, colons, and em dashes. those new measurements remain
+report-only until their fixture precision is proven.
+
+the rendered capture writes `modal-interaction-receipt.json` and mirrors its summary at
+`evidence.json#gates.modalInteractions`. every declared `aria-modal="true"` surface must be
+reachable through a deterministic visible enabled `aria-controls` trigger and pass initial-focus,
+Tab/Shift+Tab containment, Escape dismissal, focus-return, and inert-background checks. `failed`,
+`not_verified`, or a missing receipt blocks completion. captures with no declared dialogs record
+`required=false` and pass this gate. motion-bearing `:hover` rules that lack
+`(hover: hover) and (pointer: fine)` remain report-only during calibration.
+
+for CI integration, copy `ci/design-eval.py` and `ci/design-eval.yml` into your project to run all three checks on every PR.
+
+### Step 5: Present with evidence
+- Screenshot of the result
+- What you referenced
+- Known gaps or uncertainties
+- Link to live/deployed version if applicable
+
+## Updating This Skill
+- After the user gives design feedback, capture it.
+- Add redirects to `references/anti-patterns.md` or the relevant reference file.
+- Add project-specific decisions to `DESIGN.md`, guidelines, or the project decision log.
+- Goal: don't get the same design feedback twice.

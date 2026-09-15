@@ -1,5 +1,6 @@
 ﻿import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Upload,
   Link as LinkIcon,
@@ -52,10 +53,35 @@ import {
   logExports,
   type ProjectSnapshot,
 } from "@/lib/cloud";
-import { ClipStudio } from "@/components/ClipStudio";
-import { VideoStudio } from "@/components/VideoStudio";
+// estúdios pesados carregam só quando aparecem na tela
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function deferred<T extends React.ComponentType<any>>(load: () => Promise<{ default: T }>): T {
+  const Lazy = lazy(load);
+  const Deferred = (props: React.ComponentProps<T>) => {
+    return (
+      <Suspense
+        fallback={
+          <div className="rounded-xl border border-border bg-surface-2 p-6 text-sm text-muted-foreground">
+            Carregando…
+          </div>
+        }
+      >
+        <Lazy {...(props as React.ComponentProps<typeof Lazy>)} />
+      </Suspense>
+    );
+  };
+  return Deferred as unknown as T;
+}
+const ClipStudio = deferred(() =>
+  import("@/components/ClipStudio").then((m) => ({ default: m.ClipStudio })),
+);
+const VideoStudio = deferred(() =>
+  import("@/components/VideoStudio").then((m) => ({ default: m.VideoStudio })),
+);
 import { AuthGate } from "@/components/AuthGate";
-import { AITemplateStudio } from "@/components/AITemplateStudio";
+const AITemplateStudio = deferred(() =>
+  import("@/components/AITemplateStudio").then((m) => ({ default: m.AITemplateStudio })),
+);
 import { applyLook } from "@/lib/looks";
 
 import { currentUser, onAuth, pullTemplates, type CloudUser } from "@/lib/cloud";
@@ -85,6 +111,7 @@ import {
 } from "@/lib/template";
 import { downloadBlob, grabPoster, outputIsWebm, renderVideo } from "@/lib/render";
 import { poolSize } from "@/lib/render-pool";
+import { withRenderSlot } from "@/lib/render-gate";
 import { webCodecsSupported } from "@/lib/encode";
 import {
   MOTION_PRESETS,
@@ -114,7 +141,9 @@ import { batchPolicy } from "@/lib/batch-policy";
 
 import { cuesToSrt, cuesToText, demoCues, generateCaptions, type CaptionCue } from "@/lib/captions";
 import { registerFonts } from "@/lib/fonts";
-import { CaptionStudio } from "@/components/CaptionStudio";
+const CaptionStudio = deferred(() =>
+  import("@/components/CaptionStudio").then((m) => ({ default: m.CaptionStudio })),
+);
 import { CaptionTimeline } from "@/components/CaptionTimeline";
 import { canBrowserDecode, guessMime, isVideoFile, VIDEO_ACCEPT, VIDEO_EXT_RE } from "@/lib/media";
 import { toast } from "sonner";
@@ -1427,7 +1456,7 @@ function Home() {
               stage: stageLabel,
               meta: autoScheduleConfig ? { nextAction: autoScheduleConfig } : {},
             });
-            const { blob, ext } = await renderVideo(sourceFile, tpl, {
+            const { blob, ext } = await withRenderSlot(() => renderVideo(sourceFile, tpl, {
               variation: variationOf(item, k),
               offsetX: item.offsetX,
               offsetY: item.offsetY,
@@ -1459,7 +1488,7 @@ function Home() {
                 taskProgress.set(at, p);
                 pushProgress();
               },
-            });
+            }));
             taskProgress.set(at, 1);
             pushProgress();
             const label = [outs.length > 1 ? plat.short : "", n > 1 ? `v${k + 1}` : ""]
@@ -3649,27 +3678,24 @@ function Home() {
           }))}
       />
 
-      {!user && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/40 backdrop-blur-md p-4">
-          <div className="w-full max-w-md scale-105 transform shadow-2xl">
-            <div className="mb-6 flex flex-col items-center text-center">
-              <div className="mb-4 grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary">
-                <Sparkles className="size-8" />
-              </div>
-              <h2 className="text-2xl font-bold tracking-tight">VaiViral Pro</h2>
-              <p className="mt-2 text-muted-foreground">Entre para começar a criar conteúdos virais em massa.</p>
-            </div>
-            <AuthGate>
+      {!user && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[60] overflow-y-auto bg-background/90 p-3 backdrop-blur-xl sm:p-6">
+          <div className="mx-auto flex min-h-full w-full max-w-5xl items-center">
+            <AuthGate
+              variant="split"
+              title="Acesse sua conta"
+              description="Entre ou crie sua conta para começar"
+              fallbackExtra={
+                <Link to="/vendas" className="text-[12px] text-muted-foreground hover:text-foreground">
+                  Ainda não conhece o VaiViral? Ver planos
+                </Link>
+              }
+            >
               <div className="hidden">Logado!</div>
             </AuthGate>
-            <p className="mt-4 text-center text-xs text-muted-foreground">
-              Ainda não conhece o VaiViral?{" "}
-              <Link to="/vendas" className="text-primary underline-offset-4 hover:underline">
-                Ver planos e o que a plataforma faz
-              </Link>
-            </p>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </AppShell>
   );

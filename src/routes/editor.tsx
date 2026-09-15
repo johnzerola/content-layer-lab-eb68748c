@@ -1,8 +1,22 @@
 /** Editor standalone: prévia, captura de áudio, narração por IA e exportação até 4K — sem passar pelo ViralBatch. */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Mic, Play, Sparkles, Square, Video as VideoIcon } from "lucide-react";
+import {
+  ArrowRight,
+  Captions,
+  Clapperboard,
+  Clock3,
+  Download,
+  Layers3,
+  Mic,
+  Play,
+  Scissors,
+  Sparkles,
+  Square,
+  UploadCloud,
+  Video as VideoIcon,
+} from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { RouteShell } from "@/components/RouteShell";
 import { SavedProjects } from "@/components/editor/SavedProjects";
@@ -13,6 +27,8 @@ import { createEditorProjectRecord } from "@/lib/editor/project.service";
 import { createAudioClip, defaultEditorAudio, type AudioClip } from "@/lib/editor/audio";
 import { EXPORT_QUALITIES, loadExportQuality, saveExportQuality, type ExportQuality } from "@/lib/editor/export-quality";
 import { NARRATION_VOICES, generateNarration } from "@/lib/tts.functions";
+import { uploadMediaBlob } from "@/lib/media-store";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/editor")({
   head: () => ({
@@ -57,7 +73,10 @@ async function probe(file: File): Promise<{ duration: number; width: number; hei
   }
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
+/** Guarda a gravação no armazenamento da conta; se não der, embute como antes. */
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  const ref = await uploadMediaBlob("editor-recording", blob);
+  if (ref) return ref;
   return new Promise((res, rej) => {
     const fr = new FileReader();
     fr.onload = () => res(String(fr.result));
@@ -73,6 +92,7 @@ function EditorLauncher() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [meta, setMeta] = useState<{ duration: number; width: number; height: number } | null>(null);
   const [quality, setQuality] = useState<ExportQuality>("1080");
+  const [dragging, setDragging] = useState(false);
 
   // trilhas preparadas antes de abrir o editor (gravação e narração)
   const [clips, setClips] = useState<AudioClip[]>([]);
@@ -168,186 +188,200 @@ function EditorLauncher() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-8 p-4 md:p-8">
-      <header>
-        <p className="mono-label">Editor standalone</p>
-        <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Editor profissional</h1>
-        <p className="text-sm text-muted-foreground">
-          Prévia em tempo real, captura de áudio, narração por IA, timeline com keyframes, transições e exportação até
-          4K.
-        </p>
+    <div className="studio min-h-screen bg-background text-foreground">
+      <header className="border-b border-border/70 bg-background/90">
+        <div className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center gap-4 px-4 py-3 md:px-8">
+          <Link to="/vendas" className="flex items-center gap-2 font-display text-base font-bold">
+            <span className="auth-logo grid size-8 place-items-center rounded-lg text-primary-foreground">V</span>
+            VaiViral
+          </Link>
+          <span className="hidden h-5 w-px bg-border sm:block" />
+          <span className="studio-label">Meu estúdio</span>
+          <nav className="ml-auto flex items-center gap-2">
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/projetos">Todos os projetos</Link>
+            </Button>
+            <Button asChild size="sm" className="lp-cta-glow">
+              <Link to="/editor-demo">Ver demonstração</Link>
+            </Button>
+          </nav>
+        </div>
       </header>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,320px)_1fr]">
-        {/* prévia em tempo real */}
-        <section className="glass space-y-3 rounded-2xl border border-border/60 p-4">
-          <p className="mono-label">Prévia</p>
-          <div className="relative aspect-[9/16] overflow-hidden rounded-xl border border-border/60 bg-black/60">
-            {previewUrl ? (
-              <video src={previewUrl} controls playsInline className="h-full w-full object-contain" />
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
-                <VideoIcon className="h-6 w-6 opacity-60" />
-                Escolha um vídeo para ver a prévia
-              </div>
-            )}
-          </div>
-          {meta && (
-            <p className="font-mono text-[11px] text-muted-foreground">
-              {Math.round(meta.duration)}s · {meta.width}×{meta.height}
+      <main className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-12">
+        <section className="grid items-center gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="max-w-3xl animate-fade-in">
+            <p className="studio-label text-primary">Editor profissional · 9:16</p>
+            <h1 className="studio-title mt-3 text-3xl leading-tight sm:text-4xl lg:text-5xl">
+              Seus projetos, cortes e exportações em um só lugar.
+            </h1>
+            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+              Envie seu vídeo para abrir a timeline completa, cortar pela transcrição, criar legendas e exportar em MP4.
             </p>
-          )}
-          <label className="interactive block cursor-pointer rounded-lg bg-primary px-4 py-2 text-center text-sm text-primary-foreground">
-            {file ? "Trocar vídeo" : "Escolher vídeo"}
+            <div className="mt-6 flex flex-wrap gap-2">
+              {[{ icon: Scissors, label: "Cortes precisos" }, { icon: Captions, label: "Legendas sincronizadas" }, { icon: Layers3, label: "Timeline multifaixa" }, { icon: Download, label: "MP4 até 4K" }].map(({ icon: Icon, label }) => (
+                <span key={label} className="lp-glass inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-muted-foreground">
+                  <Icon className="size-3.5 text-primary" /> {label}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <label
+            className={`lp-glass relative flex min-h-64 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border border-dashed p-6 text-center transition-[border-color,background-color,transform] ${dragging ? "border-primary bg-primary/10 scale-[1.01]" : "border-border hover:border-primary/60"}`}
+            onDragEnter={(event) => { event.preventDefault(); setDragging(true); }}
+            onDragOver={(event) => event.preventDefault()}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragging(false);
+              const dropped = event.dataTransfer.files?.[0];
+              if (dropped?.type.startsWith("video/")) void pick(dropped);
+              else toast.error("Escolha um arquivo de vídeo.");
+            }}
+          >
+            <span className="lp-chip3d mb-4"><UploadCloud /></span>
+            <span className="studio-title text-base">Arraste seu vídeo aqui</span>
+            <span className="mt-2 text-xs text-muted-foreground">ou clique para escolher um arquivo</span>
+            <span className="mt-4 rounded-md bg-surface-3 px-2 py-1 font-mono text-[10px] text-muted-foreground">MP4 · MOV · WEBM</span>
             <input
               type="file"
               accept="video/*"
               className="sr-only"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void pick(f);
-                 e.currentTarget.value = "";
+              onChange={(event) => {
+                const selected = event.target.files?.[0];
+                if (selected) void pick(selected);
+                event.currentTarget.value = "";
               }}
             />
           </label>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void open(file)}
-              className="interactive flex-1 rounded-lg border border-border/60 px-3 py-2 text-sm disabled:opacity-50"
-            >
-              <Play className="mr-1 inline h-3.5 w-3.5" />
-              {busy ? "Abrindo…" : "Abrir no editor"}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void open(null)}
-              className="interactive rounded-lg border border-border/60 px-3 py-2 text-sm disabled:opacity-50"
-            >
-              Em branco
-            </button>
+        </section>
+
+        <section className="mt-10 grid gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
+          <div className="lp-glass overflow-hidden rounded-2xl p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="studio-label">Prévia vertical</p>
+                <p className="mt-1 text-xs text-muted-foreground">Seu vídeo no formato do feed</p>
+              </div>
+              {meta && <span className="rounded-md bg-surface-3 px-2 py-1 font-mono text-[10px] text-muted-foreground">{Math.round(meta.duration)}s</span>}
+            </div>
+            <div className="relative mx-auto aspect-[9/16] max-h-[31rem] overflow-hidden rounded-xl border border-border bg-surface-3">
+              {previewUrl ? (
+                <video src={previewUrl} controls playsInline className="h-full w-full object-contain" />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-xs text-muted-foreground">
+                  <VideoIcon className="size-7 text-primary" />
+                  A prévia aparece aqui antes de abrir a timeline.
+                </div>
+              )}
+            </div>
+            {file && (
+              <div className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-surface-2 p-2">
+                <Clapperboard className="size-4 shrink-0 text-primary" />
+                <span className="min-w-0 flex-1 truncate text-xs">{file.name}</span>
+                <span className="font-mono text-[10px] text-muted-foreground">{meta ? `${meta.width}×${meta.height}` : "…"}</span>
+              </div>
+            )}
+            <Button className="mt-3 w-full lp-cta-glow" loading={busy} onClick={() => void open(file)}>
+              <Play className="size-4" /> {file ? "Abrir vídeo na timeline" : "Criar projeto em branco"}
+            </Button>
+          </div>
+
+          <div className="space-y-5">
+            <section className="lp-glass rounded-2xl p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="studio-label">Preparação rápida</p>
+                  <h2 className="studio-title mt-1 text-lg">Voz e qualidade do projeto</h2>
+                </div>
+                <span className="flex items-center gap-2 text-xs text-muted-foreground"><Clock3 className="size-3.5" /> Salvo automaticamente</span>
+              </div>
+
+              <div className="mt-5 grid gap-5 xl:grid-cols-2">
+                <div className="space-y-3 rounded-xl border border-border bg-surface/60 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold">Narração e microfone</p>
+                    <Button variant={recording ? "destructive" : "outline"} size="sm" onClick={() => (recording ? stopRec() : void startRec())}>
+                      {recording ? <Square /> : <Mic />} {recording ? "Parar" : "Gravar"}
+                    </Button>
+                  </div>
+                  <textarea
+                    value={script}
+                    onChange={(event) => setScript(event.target.value)}
+                    rows={3}
+                    placeholder="Escreva uma narração em português…"
+                    className="w-full resize-none rounded-lg border border-border bg-surface-2 p-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <select aria-label="Voz da narração" value={voice} onChange={(event) => setVoice(event.target.value)} className="min-h-9 flex-1 rounded-lg border border-border bg-surface-2 px-2 text-xs">
+                      {NARRATION_VOICES.map((item) => <option key={item.id} value={item.id}>{item.label} — {item.hint}</option>)}
+                    </select>
+                    <Button size="sm" loading={narrating} disabled={!script.trim()} onClick={() => void narrate()}>
+                      <Sparkles /> Gerar voz
+                    </Button>
+                  </div>
+                  <label className="flex items-center gap-3 text-xs text-muted-foreground">
+                    Velocidade
+                    <input className="min-w-0 flex-1" type="range" min={0.6} max={1.6} step={0.05} value={speed} onChange={(event) => setSpeed(Number(event.target.value))} />
+                    <span className="w-10 font-mono text-foreground">{speed.toFixed(2)}x</span>
+                  </label>
+                </div>
+
+                <div className="rounded-xl border border-border bg-surface/60 p-4">
+                  <p className="text-sm font-semibold">Qualidade de exportação</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
+                    {EXPORT_QUALITIES.map((item) => (
+                      <Button
+                        key={item.id}
+                        type="button"
+                        variant={quality === item.id ? "default" : "outline"}
+                        className="h-auto justify-between px-3 py-2 text-left"
+                        onClick={() => { setQuality(item.id); saveExportQuality(item.id); }}
+                      >
+                        <span>{item.label}</span><span className={quality === item.id ? "text-primary-foreground/70" : "text-muted-foreground"}>{item.hint}</span>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {clips.length > 0 && (
+                <ul className="mt-4 space-y-2">
+                  {clips.map((clip) => (
+                    <li key={clip.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface-2 p-2">
+                      <span className="min-w-28 flex-1 truncate text-xs">{clip.name}</span>
+                      <audio src={clip.url} controls className="h-8 max-w-full" />
+                      <Button variant="ghost" size="sm" onClick={() => setClips((list) => list.filter((item) => item.id !== clip.id))}>Remover</Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="grid gap-3 sm:grid-cols-3">
+              {[{ n: "01", t: "Envie", d: "Arquivo ou projeto em branco" }, { n: "02", t: "Edite", d: "Cortes, camadas e legendas" }, { n: "03", t: "Exporte", d: "MP4 pronto para publicar" }].map((step) => (
+                <div key={step.n} className="rounded-xl border border-border bg-surface/50 p-4">
+                  <span className="font-mono text-[10px] text-primary">{step.n}</span>
+                  <p className="mt-2 text-sm font-semibold">{step.t}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{step.d}</p>
+                </div>
+              ))}
+            </section>
           </div>
         </section>
 
-        <div className="space-y-5">
-          {/* captura de áudio + narração */}
-          <section className="glass space-y-4 rounded-2xl border border-border/60 p-4">
-            <p className="mono-label">Áudio</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => (recording ? stopRec() : void startRec())}
-                className={`interactive flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${
-                  recording ? "bg-destructive text-destructive-foreground" : "border border-border/60"
-                }`}
-              >
-                {recording ? <Square className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
-                {recording ? "Parar gravação" : "Gravar microfone"}
-              </button>
-              <span className="text-xs text-muted-foreground">
-                A voz captada entra no editor já como trilha, pronta para ajustar volume e ducking.
-              </span>
+        <section className="mt-12 border-t border-border pt-8">
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="studio-label">Continue de onde parou</p>
+              <h2 className="studio-title mt-1 text-2xl">Projetos recentes</h2>
             </div>
-
-            <div className="space-y-2 rounded-xl border border-border/60 p-3">
-              <p className="font-mono text-[11px] uppercase text-muted-foreground">Narração por IA (pt-BR)</p>
-              <textarea
-                value={script}
-                onChange={(e) => setScript(e.target.value)}
-                rows={3}
-                placeholder="Texto que a voz vai narrar…"
-                className="w-full rounded-lg border border-border/60 bg-transparent p-2 text-sm"
-              />
-              <div className="flex flex-wrap items-center gap-2">
-                <select
-                  aria-label="Voz da narração"
-                  value={voice}
-                  onChange={(e) => setVoice(e.target.value)}
-                  className="rounded-lg border border-border/60 bg-transparent px-2 py-1.5 text-xs"
-                >
-                  {NARRATION_VOICES.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.label} — {v.hint}
-                    </option>
-                  ))}
-                </select>
-                <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                  Velocidade
-                  <input
-                    type="range"
-                    min={0.6}
-                    max={1.6}
-                    step={0.05}
-                    value={speed}
-                    onChange={(e) => setSpeed(Number(e.target.value))}
-                  />
-                  <span className="font-mono">{speed.toFixed(2)}x</span>
-                </label>
-                <button
-                  type="button"
-                  disabled={narrating || !script.trim()}
-                  onClick={() => void narrate()}
-                  className="interactive ml-auto flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50"
-                >
-                  <Sparkles className="h-3.5 w-3.5" /> {narrating ? "Gerando…" : "Gerar narração"}
-                </button>
-              </div>
-            </div>
-
-            {clips.length > 0 && (
-              <ul className="space-y-2">
-                {clips.map((c) => (
-                  <li key={c.id} className="flex items-center gap-2 rounded-lg border border-border/60 p-2">
-                    <span className="flex-1 truncate text-xs">{c.name}</span>
-                    <audio src={c.url} controls className="h-8" />
-                    <button
-                      type="button"
-                      onClick={() => setClips((list) => list.filter((x) => x.id !== c.id))}
-                      className="interactive rounded px-2 py-1 text-[11px] text-muted-foreground"
-                    >
-                      Remover
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          {/* exportação */}
-          <section className="glass space-y-3 rounded-2xl border border-border/60 p-4">
-            <p className="mono-label">Exportação</p>
-            <div className="grid gap-2 sm:grid-cols-3">
-              {EXPORT_QUALITIES.map((q) => (
-                <button
-                  key={q.id}
-                  type="button"
-                  onClick={() => {
-                    setQuality(q.id);
-                    saveExportQuality(q.id);
-                    toast.success(`Exportação em ${q.label}.`);
-                  }}
-                  className={`interactive rounded-xl border p-3 text-left text-xs ${
-                    quality === q.id ? "border-primary bg-primary/10" : "border-border/60"
-                  }`}
-                >
-                  <p className="text-sm font-medium">{q.label}</p>
-                  <p className="text-muted-foreground">{q.hint}</p>
-                </button>
-              ))}
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              A qualidade escolhida vale para todas as renderizações do editor profissional (MP4 H.264 vertical).
-            </p>
-          </section>
-        </div>
-      </div>
-
-      <section className="space-y-3">
-        <h2 className="text-sm font-medium">Projetos recentes</h2>
-        <SavedProjects />
-      </section>
+            <Button variant="outline" onClick={() => void open(null)} disabled={busy}>Novo projeto <ArrowRight /></Button>
+          </div>
+          <SavedProjects />
+        </section>
+      </main>
     </div>
   );
 }

@@ -18,10 +18,15 @@ export const Route = createFileRoute("/biblioteca")({
       {
         name: "description",
         content:
-          "Histórico completo de todos os vídeos exportados, organizados por lote e plataforma.",
+          "Histórico dos vídeos exportados, com download e publicação oficial no TikTok e outras redes.",
       },
       { property: "og:title", content: "Biblioteca de Resultados — VaiViral" },
+      {
+        property: "og:description",
+        content: "Baixe vídeos prontos ou publique-os nas contas sociais conectadas.",
+      },
       { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
 });

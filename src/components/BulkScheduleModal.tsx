@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { CalendarClock, FolderOpen, Image as ImageIcon, Loader2, Video, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { publishPostNow } from "@/lib/publish.functions";
 import {
   buildSchedulePlan,
   daySlots,
@@ -56,6 +58,9 @@ type Props = {
   /** Ação extra no rodapé (ex.: "Agendar no lote" do ViralBatch). */
   secondaryAction?: { label: string; run: (config: BulkScheduleConfig) => void };
   subtitle?: string;
+  /** Publica cada item logo após o upload, sem aguardar o horário da fila. */
+  publishImmediately?: boolean;
+  onPublished?: (result: { permalink: string | null; providerPostId: string | null }) => void;
 };
 
 
@@ -87,9 +92,12 @@ export function BulkScheduleModal({
   hideFilePicker,
   secondaryAction,
   subtitle,
+  publishImmediately,
+  onPublished,
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
+  const publishNow = useServerFn(publishPostNow);
 
   const [entries, setEntries] = useState<BulkScheduleItem[]>(
     items ?? (initialFiles ?? []).map((file) => ({ file })),
@@ -190,6 +198,14 @@ export function BulkScheduleModal({
           mediaType: media,
           consent: true,
         });
+        if (publishImmediately && postId) {
+          const published = await publishNow({ data: { postId } });
+          if (!published.ok) throw new Error(published.error);
+          onPublished?.({
+            permalink: published.permalink,
+            providerPostId: published.providerPostId,
+          });
+        }
         await onItemScheduled?.(entry, (postId as string | null) ?? null);
         ok++;
       } catch (e) {
@@ -199,7 +215,13 @@ export function BulkScheduleModal({
     }
 
     setBusy(false);
-    if (ok > 0) toast.success(`${ok} publicação(ões) agendada(s) em ${days.length} dia(s).`);
+    if (ok > 0) {
+      toast.success(
+        publishImmediately
+          ? `${ok} publicação(ões) enviada(s).`
+          : `${ok} publicação(ões) agendada(s) em ${days.length} dia(s).`,
+      );
+    }
     if (failed.length > 0) toast.error(`${failed.length} falharam. ${failed[0] ?? ""}`);
     if (ok > 0) {
       setEntries([]);
@@ -216,7 +238,7 @@ export function BulkScheduleModal({
           <div>
             <p className="flex items-center gap-2 text-base font-semibold">
               <CalendarClock className="size-4 text-primary" />
-              Agendamento em massa
+              {publishImmediately ? "Publicar vídeo" : "Agendamento em massa"}
             </p>
             <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
               {subtitle ?? "suba a pasta inteira e o sistema divide por dia automaticamente"}
@@ -471,7 +493,9 @@ export function BulkScheduleModal({
           </label>
           <div className="flex items-center justify-between gap-3">
             <p className="font-mono text-[11px] text-muted-foreground">
-              {busy ? `enviando ${progress.done}/${progress.total}…` : `${ordered.length} arquivo(s) na fila`}
+              {busy
+                ? `${publishImmediately ? "publicando" : "enviando"} ${progress.done}/${progress.total}…`
+                : `${ordered.length} arquivo(s) na fila`}
             </p>
             <div className="flex gap-2">
               <Button variant="outline" onClick={onClose} disabled={busy}>
@@ -500,7 +524,7 @@ export function BulkScheduleModal({
               )}
               <Button onClick={run} disabled={busy || ordered.length === 0}>
                 {busy ? <Loader2 className="mr-1 size-4 animate-spin" /> : <CalendarClock className="mr-1 size-4" />}
-                Agendar tudo
+                {publishImmediately ? "Publicar agora" : "Agendar tudo"}
               </Button>
             </div>
 

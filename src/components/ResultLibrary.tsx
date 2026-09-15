@@ -23,6 +23,21 @@ import { ptBR } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useMediaUrl } from "@/hooks/useMediaUrl";
+
+/** Miniatura que resolve arquivos guardados na conta. */
+function ExportThumb({ src, name }: { src: string; name: string }) {
+  const url = useMediaUrl(src);
+  if (!url) return null;
+  return (
+    <img
+      src={url}
+      alt={`Miniatura de ${name}`}
+      loading="lazy"
+      className="size-full object-cover"
+    />
+  );
+}
 
 export function ResultLibrary() {
   const [exports, setExports] = useState<ExportRow[]>([]);
@@ -30,7 +45,9 @@ export function ResultLibrary() {
   const [search, setSearch] = useState("");
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [preparing, setPreparing] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
   const [publishItem, setPublishItem] = useState<BulkScheduleItem | null>(null);
+  const [publishedLink, setPublishedLink] = useState<string | null>(null);
 
   useEffect(() => {
     listExports(100)
@@ -39,6 +56,29 @@ export function ResultLibrary() {
       .finally(() => setLoading(false));
     listAccounts().then(setAccounts).catch(() => undefined);
   }, []);
+
+  /** Baixa o arquivo guardado na conta usando um link temporário. */
+  const download = async (row: ExportRow) => {
+    if (!row.storage_path) return;
+    setDownloading(row.id);
+    try {
+      const { data, error } = await supabase.storage
+        .from("posts")
+        .createSignedUrl(row.storage_path, 60 * 10, { download: row.file_name });
+      if (error || !data?.signedUrl) throw error ?? new Error("Link indisponível.");
+      const a = document.createElement("a");
+      a.href = data.signedUrl;
+      a.download = row.file_name;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível baixar o arquivo.");
+    } finally {
+      setDownloading(null);
+    }
+  };
 
   const openPublish = async (row: ExportRow) => {
     if (!row.storage_path) return;
@@ -119,12 +159,7 @@ export function ResultLibrary() {
             >
               <div className="relative grid aspect-[16/9] place-items-center overflow-hidden border-b border-border/60 bg-surface-2">
                 {e.thumb_url ? (
-                  <img
-                    src={e.thumb_url}
-                    alt={`Miniatura de ${e.file_name}`}
-                    loading="lazy"
-                    className="size-full object-cover"
-                  />
+                  <ExportThumb src={e.thumb_url} name={e.file_name} />
                 ) : (
                   <FileVideo className="size-8 text-primary/70" />
                 )}
@@ -175,19 +210,35 @@ export function ResultLibrary() {
                 </div>
 
                 {e.storage_path ? (
-                  <Button
-                    size="sm"
-                    className="h-9 w-full gap-2"
-                    onClick={() => void openPublish(e)}
-                    disabled={preparing === e.id}
-                  >
-                    {preparing === e.id ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Send className="size-4" />
-                    )}
-                    Publicar
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-2"
+                      onClick={() => void download(e)}
+                      disabled={downloading === e.id}
+                    >
+                      {downloading === e.id ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Download className="size-4" />
+                      )}
+                      Baixar
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-9 gap-2"
+                      onClick={() => void openPublish(e)}
+                      disabled={preparing === e.id}
+                    >
+                      {preparing === e.id ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Send className="size-4" />
+                      )}
+                      Publicar
+                    </Button>
+                  </div>
                 ) : (
                   <Button
                     variant="outline"
@@ -212,8 +263,23 @@ export function ResultLibrary() {
         items={publishItem ? [publishItem] : []}
         hideFilePicker
         subtitle="Publique este clipe da biblioteca na conta escolhida."
+        publishImmediately
+        onPublished={(result) => setPublishedLink(result.permalink)}
         onDone={() => setPublishItem(null)}
       />
+      {publishedLink && (
+        <div className="fixed bottom-4 right-4 z-50 flex max-w-sm items-center gap-3 border border-emerald-500/40 bg-surface p-4 shadow-lg">
+          <p className="text-sm text-foreground">Vídeo publicado com sucesso.</p>
+          <Button asChild size="sm">
+            <a href={publishedLink} target="_blank" rel="noreferrer">
+              <ExternalLink className="size-4" /> Abrir post
+            </a>
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setPublishedLink(null)}>
+            Fechar
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

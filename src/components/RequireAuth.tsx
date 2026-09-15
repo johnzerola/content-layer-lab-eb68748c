@@ -16,6 +16,7 @@ export function RequireAuth({
 }) {
   return (
     <AuthGate
+      variant="split"
       title={title}
       description={description}
       fallbackExtra={

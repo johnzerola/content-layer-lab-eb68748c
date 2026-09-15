@@ -35,7 +35,22 @@ export interface BoxLayer {
   fadeIn?: number;
   /** duração do fade de saída, em segundos */
   fadeOut?: number;
+  /** efeito de entrada da camada */
+  animIn?: LayerAnim;
+  /** efeito de saída da camada */
+  animOut?: LayerAnim;
 }
+
+/** Efeitos de entrada/saída aplicados no intervalo de fade da camada. */
+export type LayerAnim =
+  | "fade"
+  | "up"
+  | "down"
+  | "left"
+  | "right"
+  | "zoom"
+  | "pop";
+
 
 
 export interface TextLayer extends BoxLayer {
@@ -66,6 +81,41 @@ export interface VideoLayer extends BoxLayer {
 }
 
 export type ExtraLayer = (TextLayer | ImageLayer) & { id: string; label: string };
+
+/** fundo em gradiente do quadro */
+export interface BgGradient {
+  kind: "linear" | "radial";
+  from: string;
+  to: string;
+  /** ângulo em graus (só para linear) */
+  angle: number;
+}
+
+export type EdgeFxKind = "vignette" | "top" | "bottom" | "both" | "frame";
+
+/** gradiente aplicado nas bordas, por cima de tudo */
+export interface EdgeFx {
+  kind: EdgeFxKind;
+  color: string;
+  /** 0 a 1 */
+  strength: number;
+  /** tamanho da faixa em % do lado (5 a 60) */
+  size: number;
+}
+
+export const GRADIENT_PRESETS: { id: string; label: string; value: BgGradient }[] = [
+  { id: "noite", label: "Noite", value: { kind: "linear", from: "#0b1020", to: "#1b1140", angle: 160 } },
+  { id: "violeta", label: "Violeta", value: { kind: "linear", from: "#7c5cff", to: "#21d4d8", angle: 135 } },
+  { id: "fogo", label: "Fogo", value: { kind: "linear", from: "#ff6b35", to: "#e84393", angle: 120 } },
+  { id: "oceano", label: "Oceano", value: { kind: "linear", from: "#0c2340", to: "#2d8a9e", angle: 180 } },
+  { id: "spot", label: "Holofote", value: { kind: "radial", from: "#2a2f45", to: "#05070d", angle: 0 } },
+  { id: "papel", label: "Papel", value: { kind: "linear", from: "#f5f3ee", to: "#d9d3c7", angle: 160 } },
+];
+
+export function defaultEdgeFx(kind: EdgeFxKind = "vignette"): EdgeFx {
+  return { kind, color: "#000000", strength: 0.55, size: 28 };
+}
+
 
 /** Estilo das legendas automáticas. */
 export interface CaptionStyle extends BoxLayer {
@@ -312,6 +362,8 @@ export const CLEANUP_PRESETS: { id: string; label: string; region: Partial<Clean
 export interface Template {
   timelineDuration?: number;
   fullscreenClips?: { id: string; start: number; end: number; fade: number }[];
+  /** Keyframes de posição/tamanho do vídeo: entre eles o movimento é interpolado. */
+  videoKeyframes?: { id: string; t: number; x: number; y: number; w: number; h: number; radius: number }[];
   id: string;
   name: string;
   version?: number;
@@ -327,8 +379,13 @@ export interface Template {
   headline: TextLayer;
   cta: TextLayer;
   captions?: CaptionStyle;
+  /** fundo em gradiente (quando ausente, usa a cor sólida de `background`) */
+  bgGradient?: BgGradient | null;
+  /** gradiente/vinheta aplicado nas bordas do quadro */
+  edgeFx?: EdgeFx | null;
   extras?: ExtraLayer[];
   fonts?: CustomFont[];
+
   mirror: boolean;
   speed: number;
   antiDup?: AntiDupConfig;
@@ -713,6 +770,8 @@ export function migrate(t: Template): Template {
     extras: t.extras ?? [],
     fonts: t.fonts ?? [],
     antiDup: { ...defaultAntiDup(), ...(t.antiDup ?? {}) },
+    bgGradient: t.bgGradient ?? null,
+    edgeFx: t.edgeFx ?? null,
   };
 }
 

@@ -2,19 +2,16 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Layers,
-  Palette,
   KeyRound,
   FolderKanban,
   Scissors,
   Library,
-  Cloud,
   CalendarClock,
   History,
   PanelLeftClose,
   PanelLeftOpen,
   Sparkle,
   Wand2,
-  HardDrive,
   Radio,
   Settings2,
   BarChart3,
@@ -22,6 +19,7 @@ import {
   Images,
   Users,
   Menu,
+  MessageSquare,
   X,
 } from "lucide-react";
 
@@ -125,6 +123,7 @@ const ROUTE_PATHS = [
   "/admin",
   "/fotos",
   "/limpar-ia",
+  "/chatscene",
 ] as const;
 
 interface Props {
@@ -330,6 +329,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
         {routeLink("/cortes", "Corte IA & Cortes", Scissors, expanded, close)}
 
         {routeLink("/estudio", "Estúdio de gravação", Radio, expanded, close)}
+        {routeLink("/chatscene", "ChatScene", MessageSquare, expanded, close)}
         {routeLink("/fotos", "FotoViral", Images, expanded, close)}
       </nav>
 
@@ -345,23 +345,10 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           }}
         />
         {routeLink("/templates", "Templates de vídeo", Layers, expanded, close)}
-        {routeLink("/estilos", "Estilos reutilizáveis", Palette, expanded, close)}
-        {routeLink("/comparar", "Comparar layouts", Layers, expanded, close)}
-
         {routeLink("/editor", "Editor profissional", Wand2, expanded, close)}
         {EDITOR_V2_ENABLED && routeLink("/editor-v2", "Editor V2 · Library", Library, expanded, close)}
         {routeLink("/projetos", "Projetos", FolderKanban, expanded, close)}
         {routeLink("/biblioteca", "Resultados", History, expanded, close)}
-        {routeLink("/armazenamento", "Armazenamento", HardDrive, expanded, close)}
-        <NavItem
-          open={expanded}
-          label="Nuvem"
-          icon={Cloud}
-          onClick={() => {
-            onCloud();
-            close?.();
-          }}
-        />
       </div>
 
       <div className="mt-4 flex flex-col gap-0.5 px-3">
@@ -371,6 +358,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
         {routeLink("/perfis", "Perfis", Users, expanded, close)}
         {routeLink("/live", "Monitora Live", Radio, expanded, close)}
         {routeLink("/metricas", "Métricas", BarChart3, expanded, close)}
+        {routeLink("/portfolio", "Portfólio", Images, expanded, close)}
       </div>
 
       <div className="mt-4 flex flex-col gap-0.5 px-3">

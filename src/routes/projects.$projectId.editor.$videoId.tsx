@@ -20,6 +20,9 @@ import {
   Type,
   Wand2,
   Mic,
+  Download,
+  Undo2,
+  Redo2,
 } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { TranscriptPanel } from "@/components/editor/TranscriptPanel";
@@ -93,6 +96,7 @@ import { listMyTemplates } from "@/lib/video-template/service";
 import { applyTemplateToVideo } from "@/lib/video-template/bindings";
 import type { CaptionLayer, TemplateLayer, VideoTemplateRecord } from "@/lib/video-template/types";
 import { createCaptionLayer } from "@/lib/video-template/factory";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/projects/$projectId/editor/$videoId")({
   head: () => ({
@@ -850,23 +854,19 @@ function EditorPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground lg:h-dvh">
       {/* HEADER */}
-      <header className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-[oklch(0.16_0.018_275)] px-2 py-2 text-white shadow-lg sm:px-3">
-        <Link to="/" className="rounded-lg px-2 py-1 font-semibold tracking-tight hover:bg-white/10">
-          VaiViral <span className="text-[10px] font-normal text-white/45">EDITOR</span>
+      <header className="flex flex-wrap items-center gap-2 border-b border-border bg-surface px-2 py-2 shadow-lg sm:px-3">
+        <Link to="/editor" className="rounded-lg px-2 py-1 font-semibold tracking-tight transition-colors hover:bg-surface-2">
+          VaiViral <span className="text-[10px] font-normal text-muted-foreground">EDITOR</span>
         </Link>
-        <button type="button" onClick={() => history.undo()} className="rounded-md border border-border/60 px-2 py-1 text-xs">
-          Desfazer
-        </button>
-        <button type="button" onClick={() => history.redo()} className="rounded-md border border-border/60 px-2 py-1 text-xs">
-          Refazer
-        </button>
+        <Button type="button" variant="ghost" size="icon" onClick={() => history.undo()} title="Desfazer"><Undo2 /></Button>
+        <Button type="button" variant="ghost" size="icon" onClick={() => history.redo()} title="Refazer"><Redo2 /></Button>
         <input
           value={doc.title}
           onChange={(e) => patchDoc({ title: e.target.value }, "titulo")}
           aria-label="Nome do projeto"
-          className="min-w-40 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-sm text-white outline-none focus:border-primary/70"
+          className="min-w-40 rounded-md border border-border bg-surface-2 px-2 py-1 text-sm text-foreground outline-none focus:border-primary/70"
         />
-        <span className="text-xs text-white/55">
+        <span className="text-xs text-muted-foreground">
           {saveState === "saving" ? "Salvando..." : saveState === "dirty" ? "Alterações pendentes" : saveState === "error" ? "Falha ao salvar" : saveState === "saved" ? "Salvo" : "Ainda não salvo"}
         </span>
         <MediaSourceBar
@@ -912,39 +912,43 @@ function EditorPage() {
               </option>
             ))}
           </select>
-          <button
+          <Button
             type="button"
             onClick={() => void renderAndPublish(false)}
             disabled={rendering}
-            className="rounded-lg border border-border/60 px-3 py-1.5 text-sm disabled:opacity-50"
+            variant="outline"
+            size="sm"
           >
             {rendering ? `Renderizando ${Math.round(renderPct * 100)}%` : "Renderizar"}
-          </button>
-          {rendering && <button type="button" onClick={() => renderAbortRef.current?.abort()} className="rounded-lg border border-destructive/50 px-2 py-1.5 text-xs text-destructive">Cancelar</button>}
+          </Button>
+          {rendering && <Button type="button" variant="destructive" size="sm" onClick={() => renderAbortRef.current?.abort()}>Cancelar</Button>}
           {rendered && (
-            <button
+            <Button
               type="button"
               onClick={() => void saveRenderedVideo(rendered)}
-              className="rounded-lg border border-border/60 px-3 py-1.5 text-sm"
+              variant="outline"
+              size="sm"
             >
-              Baixar MP4
-            </button>
+              <Download /> Baixar MP4
+            </Button>
           )}
-          <button
+          <Button
             type="button"
             onClick={() => void renderAndPublish(true)}
             disabled={rendering}
-            className="rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 px-4 py-1.5 text-sm font-semibold text-white shadow-lg shadow-fuchsia-950/30 disabled:opacity-50"
+            size="sm"
+            className="lp-cta-glow"
           >
             Exportar vídeo
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={() => setBatchOpen(true)}
-            className="rounded-lg border border-primary/50 px-3 py-1.5 text-sm font-medium text-primary"
+            variant="outline"
+            size="sm"
           >
             Aplicar em lote
-          </button>
+          </Button>
 
         </div>
       </header>

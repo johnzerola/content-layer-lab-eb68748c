@@ -31,16 +31,51 @@ export async function getEditorProject(id: string): Promise<EditorProjectRecord 
   return data ? toRecord(data as Row) : null;
 }
 
-export async function listEditorProjects(limit = 60): Promise<EditorProjectRecord[]> {
+/** Cabeçalho de um projeto salvo, sem o conteúdo pesado da edição. */
+export interface EditorProjectSummary {
+  id: string;
+  name: string;
+  updated_at: string;
+  videoId: string;
+  duration: number | null;
+}
+
+/**
+ * Listagem leve: lê só nome, data e dois campos do documento. O projeto
+ * inteiro (que pode ter megabytes de timeline) só é carregado ao reabrir.
+ */
+export async function listEditorProjects(limit = 30): Promise<EditorProjectSummary[]> {
   const { data, error } = await supabase
     .from("projects")
-    .select("*")
+    .select("id,name,updated_at,videoId:data->>videoId,duration:data->media->>duration")
     .eq("mode", EDITOR_PROJECT_MODE)
     .order("updated_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return (data ?? []).map((row) => toRecord(row as Row));
+  return (data ?? []).map((row) => {
+    const r = row as unknown as Record<string, unknown>;
+    return {
+      id: r["id"] as string,
+      name: (r["name"] as string) ?? "Projeto",
+      updated_at: (r["updated_at"] as string) ?? new Date().toISOString(),
+      videoId: (r["videoId"] as string) ?? "",
+      duration: r["duration"] == null ? null : Number(r["duration"]),
+    };
+  });
 }
+
+/** Renomeia a linha e o título dentro do documento, para o editor não voltar ao nome antigo. */
+export async function renameEditorProject(id: string, name: string): Promise<void> {
+  const { data, error: readError } = await supabase.from("projects").select("data").eq("id", id).maybeSingle();
+  if (readError) throw readError;
+  const doc = ((data as { data?: unknown } | null)?.data ?? {}) as Record<string, unknown>;
+  const { error } = await supabase
+    .from("projects")
+    .update({ name, data: { ...doc, title: name } as unknown as Json } as never)
+    .eq("id", id);
+  if (error) throw error;
+}
+
 
 export async function createEditorProjectRecord(
   doc: EditorProjectDoc,

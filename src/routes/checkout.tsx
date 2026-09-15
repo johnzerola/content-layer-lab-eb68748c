@@ -87,7 +87,7 @@ function CheckoutForm() {
       await activatePlan(selected);
       setDone(true);
       toast.success(`Pagamento simulado aprovado — plano ${plan.name} ativo.`);
-      window.setTimeout(() => void navigate({ to: "/" }), 900);
+      window.setTimeout(() => void navigate({ to: "/editor" }), 900);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Não foi possível ativar o plano.");
     } finally {

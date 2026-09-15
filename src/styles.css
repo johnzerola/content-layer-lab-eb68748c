@@ -1,4 +1,4 @@
-@import "tailwindcss" source(none);
+﻿@import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
 
@@ -58,7 +58,7 @@
   --radius: 10px;
   color-scheme: dark;
 
-  /* superfícies neutras — o conteúdo é que carrega a cor */
+  /* superfÃ­cies neutras â€” o conteÃºdo Ã© que carrega a cor */
   --background: #070a10;
   --background-2: #0b1018;
   --surface: #101620;
@@ -70,7 +70,7 @@
   --popover-foreground: #f7f8fa;
   --foreground: #f7f8fa;
 
-  /* ação / seleção / progresso — e só isso */
+  /* aÃ§Ã£o / seleÃ§Ã£o / progresso â€” e sÃ³ isso */
   --primary: #6d5dfb;
   --primary-hover: #7d6eff;
   --primary-subtle: rgba(109, 93, 251, 0.12);
@@ -88,6 +88,9 @@
   --destructive: #f06b78;
   --destructive-foreground: #17070a;
   --warn: #f6b94a;
+  /* aliases usados por vitrine/landing */
+  --warning: var(--warn);
+  --cyan: #21d4d8;
   --success: #2dd4a3;
   --info: #59a8ff;
   --social-meta: #f06b78;
@@ -107,7 +110,7 @@
   --dur-panel: 220ms;
   --dur-slow: 280ms;
 
-  /* espaçamento base 4px */
+  /* espaÃ§amento base 4px */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -138,7 +141,7 @@
   --shadow-float: 0 12px 32px -12px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
-/* cada ferramenta mantém um matiz de identidade, aplicado só em ação/seleção */
+/* cada ferramenta mantÃ©m um matiz de identidade, aplicado sÃ³ em aÃ§Ã£o/seleÃ§Ã£o */
 .theme-lote {
   --primary: #6d5dfb;
   --primary-hover: #7d6eff;
@@ -237,7 +240,7 @@
     transform: scale(0.985);
   }
 
-  /* sliders nativos dentro da paleta: trilha escura, polegar primário */
+  /* sliders nativos dentro da paleta: trilha escura, polegar primÃ¡rio */
   input[type="range"] {
     appearance: none;
     -webkit-appearance: none;
@@ -299,12 +302,59 @@
   border-radius: var(--radius-xl);
 }
 
+/* EstÃºdio de ediÃ§Ã£o: tipografia dedicada (Sora + Manrope) */
+@utility studio {
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+}
+
+@utility studio-title {
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+/* rÃ³tulo de seÃ§Ã£o dentro do estÃºdio */
+@utility studio-label {
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+/* item selecionÃ¡vel (camada, ferramenta, efeito) */
+@utility studio-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+  text-align: left;
+  transition:
+    background-color var(--dur-fast) var(--ease-out-expo),
+    border-color var(--dur-fast) var(--ease-out-expo),
+    color var(--dur-fast) var(--ease-out-expo);
+  &:hover {
+    background-color: var(--surface-2);
+    border-color: var(--border-hover);
+  }
+}
+
+@utility studio-item-active {
+  background-color: color-mix(in srgb, var(--color-primary) 16%, transparent);
+  border-color: color-mix(in srgb, var(--color-primary) 55%, transparent);
+  color: var(--color-foreground);
+}
+
 @utility font-display {
   font-family: var(--font-display);
   letter-spacing: -0.011em;
 }
 
-/* título editorial (serifa alta) — inspirado em capas de revista */
+/* tÃ­tulo editorial (serifa alta) â€” inspirado em capas de revista */
 @utility title-editorial {
   font-family: var(--font-editorial);
   font-weight: 400;
@@ -315,7 +365,7 @@
   text-wrap: balance;
 }
 
-/* palavra de destaque dentro do título editorial */
+/* palavra de destaque dentro do tÃ­tulo editorial */
 @utility title-em {
   font-family: var(--font-editorial);
   font-style: italic;
@@ -329,7 +379,7 @@
   color: transparent;
 }
 
-/* linha de contexto acima do título: 01 / SEÇÃO */
+/* linha de contexto acima do tÃ­tulo: 01 / SEÃ‡ÃƒO */
 @utility eyebrow {
   display: inline-flex;
   align-items: center;
@@ -347,7 +397,7 @@
   font-size: 0.75rem;
 }
 
-/* botão discreto de ação secundária dentro de painéis */
+/* botÃ£o discreto de aÃ§Ã£o secundÃ¡ria dentro de painÃ©is */
 @utility btn-ghost {
   display: inline-flex;
   align-items: center;
@@ -367,7 +417,7 @@
   }
 }
 
-/* botão de ação principal */
+/* botÃ£o de aÃ§Ã£o principal */
 @utility btn-primary {
   display: inline-flex;
   align-items: center;
@@ -395,7 +445,7 @@
 }
 
 
-/* campo de texto padrão em painéis (input / textarea nativos) */
+/* campo de texto padrÃ£o em painÃ©is (input / textarea nativos) */
 @utility field {
   width: 100%;
   border-radius: var(--radius-md);
@@ -419,7 +469,7 @@
   }
 }
 
-/* estado ativo do dropzone de importação */
+/* estado ativo do dropzone de importaÃ§Ã£o */
 @utility drop-active {
   border-color: var(--color-primary) !important;
   background-color: var(--primary-subtle);
@@ -494,7 +544,7 @@
   animation: vv-pulse-ring 2s var(--ease-out-expo) infinite;
 }
 
-/* linhas e cards clicáveis: elevação discreta, sem "voar" */
+/* linhas e cards clicÃ¡veis: elevaÃ§Ã£o discreta, sem "voar" */
 @utility interactive {
   transition:
     transform var(--dur-fast) var(--ease-out-expo),
@@ -527,7 +577,7 @@
   animation: vv-dots 1.2s var(--ease-out-expo) infinite;
 }
 
-/* vidro só em elementos elevados: action bar, popover, modal, toolbar flutuante */
+/* vidro sÃ³ em elementos elevados: action bar, popover, modal, toolbar flutuante */
 @utility glass {
   background: color-mix(in srgb, var(--surface-2) 88%, transparent);
   backdrop-filter: blur(14px) saturate(130%);
@@ -623,8 +673,8 @@
 }
 
 /* =========================================================
-   VAIVIRAL AURORA — linguagem de interação visual
-   borda animada (1–1.25px), glow discreto, sempre por estado
+   VAIVIRAL AURORA â€” linguagem de interaÃ§Ã£o visual
+   borda animada (1â€“1.25px), glow discreto, sempre por estado
    ========================================================= */
 
 @property --aurora-angle {
@@ -665,7 +715,7 @@
   }
 }
 
-/* base: nenhum aurora visível — só borda neutra */
+/* base: nenhum aurora visÃ­vel â€” sÃ³ borda neutra */
 @utility aurora {
   position: relative;
   isolation: isolate;
@@ -718,7 +768,7 @@
   }
 }
 
-/* estado ativo: a luz percorre o perímetro */
+/* estado ativo: a luz percorre o perÃ­metro */
 @utility aurora-on {
   &::before {
     opacity: 1;
@@ -730,13 +780,13 @@
   }
 }
 
-/* aceleração temporária: "o sistema recebeu o comando" */
+/* aceleraÃ§Ã£o temporÃ¡ria: "o sistema recebeu o comando" */
 @utility aurora-boost {
   --aurora-speed: 1.8s;
   --aurora-glow-opacity: 0.2;
 }
 
-/* conclusão: multicolor → verde suave */
+/* conclusÃ£o: multicolor â†’ verde suave */
 @utility aurora-success {
   &::before {
     background: conic-gradient(from var(--aurora-angle), #2dd4a3, #3f9e69, #2dd4a3);
@@ -749,7 +799,7 @@
   }
 }
 
-/* erro: movimento reduz, borda vermelha discreta — sem piscar */
+/* erro: movimento reduz, borda vermelha discreta â€” sem piscar */
 @utility aurora-error {
   --aurora-speed: 9s;
   --aurora-glow-opacity: 0.08;
@@ -799,7 +849,7 @@
   }
 }
 
-/* conteúdo principal entra sem apagar o shell */
+/* conteÃºdo principal entra sem apagar o shell */
 @keyframes vv-page-in {
   from {
     opacity: 0.85;
@@ -815,7 +865,7 @@
   animation: vv-page-in 190ms var(--ease-out-expo) both;
 }
 
-/* botão morph: a borda acende ao passar/focar, sem mexer no layout */
+/* botÃ£o morph: a borda acende ao passar/focar, sem mexer no layout */
 @utility aurora-hover {
   &:hover::before,
   &:focus-visible::before {
@@ -848,7 +898,7 @@
   }
 }
 
-/* superfície do item ativo de tabs — desliza junto com o trilho */
+/* superfÃ­cie do item ativo de tabs â€” desliza junto com o trilho */
 @utility aurora-slider {
   transition:
     transform var(--dur-panel) var(--ease-out-expo),
@@ -886,7 +936,7 @@
 }
 
 
-/* ——— animações de legenda (prévia dos presets e overlay do editor) ——— */
+/* â€”â€”â€” animaÃ§Ãµes de legenda (prÃ©via dos presets e overlay do editor) â€”â€”â€” */
 @keyframes cap-pop {
   0% { transform: scale(0.72); opacity: 0.35; }
   55% { transform: scale(1.16); opacity: 1; }
@@ -943,7 +993,7 @@
   [class*="cap-anim-"] { animation: none !important; }
 }
 
-/* ——— animações de camadas do editor de templates (prévia no canvas) ——— */
+/* â€”â€”â€” animaÃ§Ãµes de camadas do editor de templates (prÃ©via no canvas) â€”â€”â€” */
 @keyframes tpl-fadeIn { from { opacity: 0 } to { opacity: 1 } }
 @keyframes tpl-slideUp { from { opacity: 0; transform: translateY(26%) } to { opacity: 1; transform: none } }
 @keyframes tpl-slideDown { from { opacity: 0; transform: translateY(-26%) } to { opacity: 1; transform: none } }
@@ -961,7 +1011,7 @@
 @keyframes tpl-shake { 0%, 100% { transform: translateX(0) } 25% { transform: translateX(-4%) } 75% { transform: translateX(4%) } }
 @keyframes tpl-float { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-6%) } }
 
-/* --- Prévia animada das transições (galeria do editor) --- */
+/* --- PrÃ©via animada das transiÃ§Ãµes (galeria do editor) --- */
 .tp-anim {
   animation-name: var(--tp-anim, none);
   animation-duration: 1.15s;
@@ -993,7 +1043,7 @@
 @keyframes tp-drift { 0% { opacity: 0; transform: translate(14%, 8%) scale(1.08) } 70%,100% { opacity: 1; transform: translate(0,0) scale(1) } }
 @keyframes tp-swing { 0% { opacity: 0; transform: rotate(-12deg) scale(0.9) } 65%,100% { opacity: 1; transform: rotate(0) scale(1) } }
 
-/* Editor V2: chrome de ferramenta, compacto e previsível. */
+/* Editor V2: chrome de ferramenta, compacto e previsÃ­vel. */
 .editor-v2-shell {
   color-scheme: dark;
   accent-color: oklch(0.72 0.2 292);
@@ -1392,7 +1442,7 @@
   display: inline-block;
   margin-right: .4rem;
   color: var(--editor-violet);
-  content: "›";
+  content: "â€º";
   transition: transform 140ms ease;
 }
 .editor-adjust-details[open] summary::before { transform: rotate(90deg); }
@@ -1438,4 +1488,602 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+/* =========================================================
+   TELA DE ACESSO â€” split screen com glow e motion leve
+   ========================================================= */
+.auth-screen {
+  box-shadow: var(--shadow-float);
+}
+.auth-stage {
+  isolation: isolate;
+  background:
+    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 55%),
+    linear-gradient(160deg, var(--surface-2), var(--background));
+}
+.auth-stage > * { z-index: 1; }
+.auth-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--border) 45%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--border) 45%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(90% 70% at 20% 10%, #000, transparent 80%);
+  opacity: 0.35;
+  pointer-events: none;
+}
+.auth-beam {
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  transform-origin: center;
+}
+.auth-beam-a {
+  width: 30rem;
+  height: 7rem;
+  top: 10%;
+  left: -40%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--primary) 18%, transparent), transparent);
+  filter: blur(34px);
+  transform: rotate(-22deg);
+  animation: vv-auth-beam 12s ease-in-out infinite alternate;
+}
+.auth-beam-b {
+  width: 24rem;
+  height: 6rem;
+  right: -36%;
+  bottom: 12%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 14%, transparent), transparent);
+  filter: blur(36px);
+  transform: rotate(28deg);
+  animation: vv-auth-beam 16s ease-in-out -4s infinite alternate-reverse;
+}
+@keyframes vv-auth-beam {
+  from { translate: -1rem -0.3rem; opacity: 0.35; }
+  to { translate: 2rem 1rem; opacity: 0.65; }
+}
+.auth-social-field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  mask-image: linear-gradient(to bottom, transparent, #000 11%, #000 86%, transparent);
+}
+.auth-social-float {
+  position: absolute;
+  bottom: -4rem;
+  left: 8%;
+  animation: vv-auth-social-rise 18s linear infinite;
+  will-change: transform, opacity;
+}
+.auth-social-icon {
+  position: relative;
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 2.25rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, currentColor 22%, var(--border));
+  border-radius: 0.7rem;
+  color: color-mix(in srgb, var(--primary) 65%, var(--foreground));
+  background: color-mix(in srgb, var(--surface-2) 58%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 16%, transparent),
+    0 0 22px color-mix(in srgb, currentColor 18%, transparent);
+  backdrop-filter: blur(8px) saturate(125%);
+  opacity: 0.66;
+  animation: vv-auth-social-glow 4.2s ease-in-out infinite alternate;
+}
+.auth-social-icon svg { width: 1rem; height: 1rem; }
+.auth-counter {
+  display: inline-block;
+  min-width: 4.5ch;
+  font-variant-numeric: tabular-nums;
+  animation: vv-auth-counter-rise 5.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes vv-auth-counter-rise {
+  0%, 20% { transform: translateY(0.32em); opacity: 0.45; filter: brightness(0.82); }
+  74% { transform: translateY(-0.04em); opacity: 1; filter: brightness(1.24); text-shadow: 0 0 18px var(--primary-glow); }
+  100% { transform: translateY(0); opacity: 1; filter: brightness(1); }
+}
+.auth-social-instagram { color: color-mix(in srgb, var(--accent) 75%, var(--foreground)); }
+.auth-social-tiktok { color: color-mix(in srgb, var(--cyan) 78%, var(--foreground)); }
+.auth-social-kwai { color: color-mix(in srgb, var(--warning) 75%, var(--foreground)); }
+.auth-social-youtube { color: color-mix(in srgb, var(--destructive) 78%, var(--foreground)); }
+.auth-social-facebook { color: color-mix(in srgb, var(--primary) 70%, var(--foreground)); }
+.auth-social-float:nth-child(1) { left: 7%; animation-delay: -2s; animation-duration: 19s; }
+.auth-social-float:nth-child(2) { left: 31%; animation-delay: -11s; animation-duration: 23s; }
+.auth-social-float:nth-child(3) { left: 57%; animation-delay: -6s; animation-duration: 20s; }
+.auth-social-float:nth-child(4) { left: 82%; animation-delay: -15s; animation-duration: 25s; }
+.auth-social-float:nth-child(5) { left: 70%; animation-delay: -1s; animation-duration: 22s; }
+.auth-social-float:nth-child(6) { left: 18%; animation-delay: -16s; animation-duration: 24s; }
+.auth-social-float:nth-child(7) { left: 44%; animation-delay: -4s; animation-duration: 26s; }
+.auth-social-float:nth-child(8) { left: 89%; animation-delay: -9s; animation-duration: 21s; }
+.auth-social-float:nth-child(9) { left: 52%; animation-delay: -19s; animation-duration: 27s; }
+.auth-social-float:nth-child(10) { left: 25%; animation-delay: -7s; animation-duration: 22s; }
+.auth-social-float:nth-child(3n) .auth-social-icon { width: 1.9rem; height: 1.9rem; opacity: 0.46; filter: blur(0.35px); }
+.auth-social-float:nth-child(4n) .auth-social-icon { width: 2.7rem; height: 2.7rem; opacity: 0.76; }
+@keyframes vv-auth-social-rise {
+  0% { transform: translate3d(0, 0, 0) rotate(-3deg); opacity: 0; }
+  8% { opacity: 0.68; }
+  35% { transform: translate3d(0.8rem, -34vh, 0) rotate(2deg); }
+  68% { transform: translate3d(-0.65rem, -68vh, 0) rotate(-2deg); }
+  92% { opacity: 0.58; }
+  100% { transform: translate3d(0.45rem, -108vh, 0) rotate(3deg); opacity: 0; }
+}
+@keyframes vv-auth-social-glow {
+  from { transform: scale(0.94) translateX(-2px); filter: saturate(0.8); }
+  to { transform: scale(1.05) translateX(2px); filter: saturate(1.18); }
+}
+.auth-glass-sheen {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(105deg, transparent 8%, color-mix(in srgb, var(--foreground) 4%, transparent) 34%, transparent 54%),
+    radial-gradient(80% 52% at 48% 8%, color-mix(in srgb, var(--foreground) 5%, transparent), transparent 72%);
+  border-right: 1px solid color-mix(in srgb, var(--foreground) 5%, transparent);
+  box-shadow: inset -18px 0 34px color-mix(in srgb, var(--background) 18%, transparent);
+  animation: vv-auth-glass 9s ease-in-out infinite alternate;
+}
+@keyframes vv-auth-glass {
+  from { transform: translateX(-1.5%); opacity: 0.48; }
+  to { transform: translateX(1.5%); opacity: 0.72; }
+}
+.auth-live {
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 40%, transparent);
+  animation: vv-auth-live 3.2s ease-out infinite;
+}
+@keyframes vv-auth-live {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 40%, transparent); }
+  70% { box-shadow: 0 0 0 5px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.auth-shine {
+  background-image: linear-gradient(
+    100deg,
+    var(--foreground) 40%,
+    color-mix(in srgb, var(--primary-glow) 70%, white) 52%,
+    var(--foreground) 64%
+  );
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: vv-auth-shine 10s linear infinite;
+}
+@keyframes vv-auth-shine {
+  from { background-position: 200% 0; }
+  to { background-position: -60% 0; }
+}
+.auth-card {
+  animation: vv-rise var(--dur-panel, 240ms) var(--ease-out-expo, cubic-bezier(0.2, 0.8, 0.2, 1)) both;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent);
+}
+/* Liquid glass: material translÃºcido para cards, badge, abas e painel */
+.auth-glass {
+  position: relative;
+  background: color-mix(in srgb, var(--surface-2) 46%, transparent);
+  backdrop-filter: blur(14px) saturate(150%);
+  border-color: color-mix(in srgb, var(--foreground) 10%, var(--border));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 12%, transparent),
+    0 10px 30px -22px color-mix(in srgb, var(--background) 80%, transparent);
+  transition:
+    transform 220ms var(--ease-out-expo, cubic-bezier(0.2, 0.8, 0.2, 1)),
+    box-shadow 220ms ease,
+    border-color 220ms ease;
+}
+.auth-glass-lift:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--primary) 32%, var(--border));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 16%, transparent),
+    0 16px 36px -24px var(--primary-glow);
+}
+.auth-panel-glass {
+  background: color-mix(in srgb, var(--surface-2) 34%, transparent);
+  backdrop-filter: blur(18px) saturate(140%);
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .auth-glass { background: color-mix(in srgb, var(--surface-2) 92%, transparent); }
+  .auth-panel-glass { background: color-mix(in srgb, var(--surface-2) 88%, transparent); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .auth-glass,
+  .auth-panel-glass,
+  .auth-social-icon {
+    backdrop-filter: none;
+    background: var(--surface-2);
+  }
+}
+@media (max-width: 768px) {
+  .auth-glass { backdrop-filter: blur(9px) saturate(135%); }
+  .auth-panel-glass { backdrop-filter: blur(10px) saturate(130%); }
+}
+.auth-logo {
+  background-image: var(--gradient-primary);
+  box-shadow: 0 8px 24px -10px var(--primary-glow), 0 0 0 1px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+.auth-field {
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+.auth-field:hover {
+  border-color: var(--border-hover);
+}
+.auth-field:focus {
+  border-color: color-mix(in srgb, var(--primary) 70%, transparent);
+  box-shadow: 0 0 0 3px var(--primary-subtle);
+}
+.auth-cta {
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 10px 26px -14px var(--primary-glow);
+  transition: transform 160ms var(--ease-out-expo, cubic-bezier(0.2, 0.8, 0.2, 1)), box-shadow 200ms ease;
+}
+.auth-cta:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 34px -12px var(--primary-glow);
+}
+.auth-cta:not(:disabled)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 40%, rgba(255, 255, 255, 0.18) 50%, transparent 60%);
+  transform: translateX(-120%);
+  animation: vv-auth-sweep 5.5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes vv-auth-sweep {
+  0%, 70% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+/* Entrada suave da tela inteira (evita "abrir de uma vez") */
+.auth-enter {
+  animation: vv-auth-enter 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes vv-auth-enter {
+  from { opacity: 0; transform: translateY(10px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* TransiÃ§Ã£o suave ao trocar Entrar <-> Criar conta */
+.auth-swap {
+  animation: vv-auth-swap 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes vv-auth-swap {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-beam, .auth-social-float, .auth-social-icon, .auth-glass-sheen, .auth-counter, .auth-live, .auth-shine, .auth-cta::after, .auth-enter, .auth-swap { animation: none !important; }
+  .auth-shine { color: var(--foreground); -webkit-text-fill-color: currentColor; }
+}
+
+@media (min-width: 768px) and (max-height: 680px) {
+  .auth-stage { padding-top: 1.25rem; padding-bottom: 1.25rem; }
+  .auth-stage h1 { margin-top: 1rem; font-size: 1.85rem; }
+  .auth-stage ul { margin-top: 1rem; }
+  .auth-stage > div:nth-of-type(3) { margin-top: 1rem; }
+}
+
+/* =========================================================
+   TELA DE ACESSO â€” rio vertical de prÃªmios + vidro premium
+   ========================================================= */
+.auth-river {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 84%, transparent);
+}
+.auth-trail {
+  position: absolute;
+  top: -10%;
+  bottom: -10%;
+  width: 1px;
+  background: linear-gradient(
+    to top,
+    transparent,
+    color-mix(in srgb, var(--primary) 34%, transparent) 30%,
+    color-mix(in srgb, var(--primary-glow) 50%, transparent) 55%,
+    transparent
+  );
+  filter: blur(0.4px);
+  opacity: 0.4;
+  animation: vv-trail 7s ease-in-out infinite alternate;
+}
+.auth-trail-a { left: 22%; }
+.auth-trail-b { left: 54%; animation-delay: -2.5s; opacity: 0.28; }
+.auth-trail-c { left: 79%; animation-delay: -4.5s; opacity: 0.22; }
+@keyframes vv-trail {
+  from { transform: translateY(-2%) scaleY(0.96); opacity: 0.18; }
+  to { transform: translateY(2%) scaleY(1); opacity: 0.45; }
+}
+.auth-chip {
+  position: absolute;
+  bottom: -5rem;
+  left: 10%;
+  will-change: transform, opacity;
+  animation: vv-river 22s linear infinite;
+}
+.auth-chip-glass {
+  display: grid;
+  width: 2.3rem;
+  height: 2.3rem;
+  place-items: center;
+  border-radius: 0.8rem;
+  color: currentColor;
+  border: 1px solid color-mix(in srgb, currentColor 24%, var(--border));
+  background: color-mix(in srgb, var(--surface-2) 52%, transparent);
+  backdrop-filter: blur(10px) saturate(135%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 15%, transparent),
+    0 0 24px color-mix(in srgb, currentColor 16%, transparent);
+  animation: vv-chip-glow 4.6s ease-in-out infinite alternate;
+}
+.auth-chip-glass svg { width: 1rem; height: 1rem; }
+.auth-tone-primary { color: color-mix(in srgb, var(--primary) 72%, var(--foreground)); }
+.auth-tone-accent { color: color-mix(in srgb, var(--accent) 72%, var(--foreground)); }
+.auth-tone-cyan { color: color-mix(in srgb, var(--cyan, var(--primary)) 74%, var(--foreground)); }
+.auth-tone-warning { color: color-mix(in srgb, var(--warning) 76%, var(--foreground)); }
+.auth-tone-danger { color: color-mix(in srgb, var(--destructive) 74%, var(--foreground)); }
+.auth-chip:nth-child(4) { left: 8%; animation-duration: 21s; animation-delay: -3s; }
+.auth-chip:nth-child(5) { left: 27%; animation-duration: 25s; animation-delay: -12s; }
+.auth-chip:nth-child(6) { left: 47%; animation-duration: 23s; animation-delay: -7s; }
+.auth-chip:nth-child(7) { left: 68%; animation-duration: 27s; animation-delay: -17s; }
+.auth-chip:nth-child(8) { left: 86%; animation-duration: 22s; animation-delay: -1s; }
+.auth-chip:nth-child(9) { left: 17%; animation-duration: 26s; animation-delay: -20s; }
+.auth-chip:nth-child(10) { left: 38%; animation-duration: 24s; animation-delay: -9s; }
+.auth-chip:nth-child(11) { left: 58%; animation-duration: 28s; animation-delay: -15s; }
+.auth-chip:nth-child(12) { left: 78%; animation-duration: 23s; animation-delay: -5s; }
+.auth-chip:nth-child(13) { left: 12%; animation-duration: 29s; animation-delay: -23s; }
+.auth-chip:nth-child(14) { left: 63%; animation-duration: 21s; animation-delay: -11s; }
+.auth-chip:nth-child(15) { left: 92%; animation-duration: 26s; animation-delay: -18s; }
+/* profundidade: alguns mais distantes (menores, desfocados) */
+.auth-chip:nth-child(3n) .auth-chip-glass { width: 1.8rem; height: 1.8rem; opacity: 0.48; filter: blur(0.6px); }
+.auth-chip:nth-child(4n) .auth-chip-glass { width: 2.8rem; height: 2.8rem; opacity: 0.85; }
+.auth-chip:nth-child(3n) .auth-chip-glass svg { width: 0.85rem; height: 0.85rem; }
+.auth-chip:nth-child(4n) .auth-chip-glass svg { width: 1.2rem; height: 1.2rem; }
+@keyframes vv-river {
+  0% { transform: translate3d(0, 0, 0) rotate(-3deg); opacity: 0; }
+  9% { opacity: 0.72; }
+  38% { transform: translate3d(0.9rem, -36vh, 0) rotate(2deg); }
+  70% { transform: translate3d(-0.7rem, -70vh, 0) rotate(-2deg); }
+  90% { opacity: 0.5; }
+  100% { transform: translate3d(0.5rem, -112vh, 0) rotate(3deg); opacity: 0; }
+}
+@keyframes vv-chip-glow {
+  from { filter: saturate(0.85) brightness(0.95); }
+  to { filter: saturate(1.2) brightness(1.1); }
+}
+.auth-spark {
+  position: absolute;
+  bottom: -2rem;
+  width: 2px;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary-glow) 85%, white);
+  box-shadow: 0 0 8px var(--primary-glow);
+  opacity: 0;
+  animation: vv-spark 13s linear infinite;
+}
+.auth-spark:nth-of-type(1) { left: 14%; animation-delay: -1s; }
+.auth-spark:nth-of-type(2) { left: 29%; animation-delay: -4s; animation-duration: 16s; }
+.auth-spark:nth-of-type(3) { left: 41%; animation-delay: -7s; }
+.auth-spark:nth-of-type(4) { left: 55%; animation-delay: -10s; animation-duration: 15s; }
+.auth-spark:nth-of-type(5) { left: 66%; animation-delay: -2s; }
+.auth-spark:nth-of-type(6) { left: 74%; animation-delay: -12s; animation-duration: 17s; }
+.auth-spark:nth-of-type(7) { left: 85%; animation-delay: -6s; }
+.auth-spark:nth-of-type(8) { left: 95%; animation-delay: -9s; animation-duration: 14s; }
+@keyframes vv-spark {
+  0% { transform: translateY(0); opacity: 0; }
+  12% { opacity: 0.9; }
+  85% { opacity: 0.35; }
+  100% { transform: translateY(-115vh); opacity: 0; }
+}
+/* PrÃªmio em destaque */
+.auth-prize {
+  display: inline-block;
+  background-image: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--primary-glow) 85%, white) 12%,
+    var(--foreground) 45%,
+    color-mix(in srgb, var(--primary) 80%, white) 78%
+  );
+  background-size: 180% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 46px color-mix(in srgb, var(--primary-glow) 22%, transparent);
+  animation: vv-prize-shine 9s linear infinite;
+}
+@keyframes vv-prize-shine {
+  from { background-position: 180% 0; }
+  to { background-position: -40% 0; }
+}
+.auth-pill {
+  border: 1px solid color-mix(in srgb, var(--foreground) 10%, var(--border));
+  background: color-mix(in srgb, var(--surface-2) 48%, transparent);
+  backdrop-filter: blur(12px) saturate(140%);
+}
+.auth-divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.75rem;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-chip, .auth-chip-glass, .auth-spark, .auth-trail, .auth-prize { animation: none !important; }
+  .auth-prize { color: var(--foreground); -webkit-text-fill-color: currentColor; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .auth-chip-glass, .auth-pill { backdrop-filter: none; background: var(--surface-2); }
+}
+.auth-stage > .auth-river { z-index: 0; }
+
+/* =========================================================
+   LANDING PREMIUM (lp-*) â€” glow, vidro, 3D sutil e motion
+   ========================================================= */
+.lp-glass {
+  position: relative;
+  background: color-mix(in srgb, var(--surface-2) 44%, transparent);
+  backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid color-mix(in srgb, var(--foreground) 9%, var(--border));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 12%, transparent),
+    0 24px 60px -40px var(--primary-glow);
+}
+.lp-hover {
+  transition:
+    transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 260ms ease,
+    border-color 260ms ease;
+}
+.lp-hover:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--primary) 34%, var(--border));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 16%, transparent),
+    0 26px 60px -34px var(--primary-glow);
+}
+/* borda com brilho girando (usar com moderaÃ§Ã£o) */
+.lp-ring::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--lp-angle, 0deg),
+    transparent 0deg,
+    color-mix(in srgb, var(--primary) 70%, transparent) 60deg,
+    color-mix(in srgb, var(--cyan, var(--primary)) 60%, transparent) 120deg,
+    transparent 200deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.6;
+  animation: lp-spin 8s linear infinite;
+  pointer-events: none;
+}
+@property --lp-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+@keyframes lp-spin { to { --lp-angle: 360deg; } }
+/* peÃ§as 3D flutuantes */
+.lp-float { animation: lp-float 9s ease-in-out infinite alternate; will-change: transform; }
+.lp-float-2 { animation-duration: 11s; animation-delay: -3s; }
+.lp-float-3 { animation-duration: 13s; animation-delay: -6s; }
+@keyframes lp-float {
+  from { transform: translate3d(0, 0, 0) rotate(-4deg); }
+  to { transform: translate3d(0.6rem, -1.1rem, 0) rotate(4deg); }
+}
+.lp-chip3d {
+  display: grid;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 1rem;
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, currentColor 26%, var(--border));
+  background:
+    linear-gradient(150deg, color-mix(in srgb, var(--foreground) 13%, transparent), transparent 62%),
+    color-mix(in srgb, var(--surface-2) 62%, transparent);
+  backdrop-filter: blur(12px) saturate(140%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 22%, transparent),
+    inset 0 -10px 18px -14px color-mix(in srgb, var(--background) 90%, transparent),
+    0 18px 34px -22px color-mix(in srgb, currentColor 60%, transparent),
+    0 0 26px color-mix(in srgb, currentColor 16%, transparent);
+  transform: perspective(600px) rotateX(9deg) rotateY(-10deg);
+}
+.lp-chip3d svg { width: 1.3rem; height: 1.3rem; }
+/* esfera / prisma translÃºcido */
+.lp-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(0.5px);
+  background:
+    radial-gradient(60% 55% at 32% 28%, color-mix(in srgb, var(--foreground) 55%, transparent), transparent 60%),
+    radial-gradient(90% 90% at 70% 78%, color-mix(in srgb, var(--primary) 70%, transparent), transparent 72%),
+    color-mix(in srgb, var(--surface-3) 70%, transparent);
+  box-shadow:
+    inset 0 -14px 26px -16px color-mix(in srgb, var(--background) 90%, transparent),
+    0 30px 60px -30px var(--primary-glow);
+  opacity: 0.85;
+}
+/* linha de energia entre passos */
+.lp-line {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--border) 90%, transparent), transparent);
+}
+.lp-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--primary-glow), transparent);
+  transform: translateX(-100%);
+  animation: lp-pulse 3.6s ease-in-out infinite;
+}
+@keyframes lp-pulse {
+  0% { transform: translateX(-100%); opacity: 0; }
+  30% { opacity: 0.9; }
+  100% { transform: translateX(100%); opacity: 0; }
+}
+/* reveal on scroll */
+.lp-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 620ms cubic-bezier(0.16, 1, 0.3, 1), transform 620ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lp-reveal.is-in { opacity: 1; transform: none; }
+/* nÃºmero com brilho */
+.lp-stat {
+  background-image: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--primary-glow) 90%, white) 10%,
+    var(--foreground) 52%,
+    color-mix(in srgb, var(--cyan, var(--primary)) 80%, white) 92%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 44px color-mix(in srgb, var(--primary-glow) 20%, transparent);
+}
+.lp-cta-glow { box-shadow: 0 14px 40px -16px var(--primary-glow), 0 0 0 1px color-mix(in srgb, var(--primary) 40%, transparent); }
+.lp-cta-glow:hover { box-shadow: 0 18px 50px -14px var(--primary-glow); }
+@media (prefers-reduced-motion: reduce) {
+  .lp-float, .lp-ring::before, .lp-line::after { animation: none !important; }
+  .lp-reveal { opacity: 1; transform: none; transition: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .lp-glass, .lp-chip3d { backdrop-filter: none; background: var(--surface-2); }
+}
+
+/* rotaÃ§Ã£o 3D suave em loop (mockup e peÃ§as do hero) */
+.lp-scene { perspective: 1400px; }
+.lp-rotate {
+  transform-style: preserve-3d;
+  animation: lp-rotate 16s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes lp-rotate {
+  from { transform: rotateY(-6deg) rotateX(3deg) translateZ(0); }
+  to { transform: rotateY(6deg) rotateX(-2deg) translateZ(0); }
+}
+.lp-spin3d { animation: lp-spin3d 12s ease-in-out infinite alternate; transform-style: preserve-3d; }
+@keyframes lp-spin3d {
+  from { transform: perspective(620px) rotateY(-26deg) rotateX(12deg); }
+  to { transform: perspective(620px) rotateY(26deg) rotateX(-6deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-rotate, .lp-spin3d { animation: none !important; }
 }

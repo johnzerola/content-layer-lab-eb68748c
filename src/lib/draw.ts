@@ -1,10 +1,29 @@
-import { fullscreenAt } from './template-timeline';
+import { fullscreenAt, videoBoxAt } from './template-timeline';
+/** O cliente de armazenamento só é carregado no navegador, nunca no worker. */
+const STORAGE_PREFIX = "storage:";
+const isStorageRef = (v: string) => v.startsWith(STORAGE_PREFIX);
+type MediaStore = typeof import("./media-store");
+let mediaStore: MediaStore | null = null;
+async function loadMediaStore(): Promise<MediaStore> {
+  mediaStore ??= await import("./media-store");
+  return mediaStore;
+}
+function peekMediaUrl(ref: string): string | null {
+  return mediaStore?.peekMediaUrl(ref) ?? null;
+}
+async function resolveMediaUrl(value: string): Promise<string> {
+  if (!isStorageRef(value)) return value;
+  const store = await loadMediaStore();
+  return store.resolveMediaUrl(value);
+}
 import {
   CANVAS_H,
   CANVAS_W,
   type CaptionStyle,
   type CleanupRegion,
   type ImageLayer,
+  type LayerAnim,
+
   type Template,
   type TextLayer,
 } from "./template";
@@ -104,10 +123,20 @@ export function setBackdropQuality(level: "alta" | "media" | "baixa") {
 }
 
 const imgCache = new Map<string, HTMLImageElement>();
+/** referências guardadas no armazenamento já pedidas (evita repetir a rede) */
+const pendingRefs = new Set<string>();
 
 /** Registra uma imagem já decodificada (usado pelos workers, que não têm `Image`). */
 export function setImageSource(src: string, img: CanvasImageSource) {
   imgCache.set(src, img as unknown as HTMLImageElement);
+}
+
+function startLoad(key: string, url: string): HTMLImageElement {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = url;
+  imgCache.set(key, img);
+  return img;
 }
 
 export function getImage(src: string): HTMLImageElement | null {
@@ -118,24 +147,39 @@ export function getImage(src: string): HTMLImageElement | null {
     return cached.complete && cached.naturalWidth ? cached : null;
   }
   if (typeof Image === "undefined") return null;
-  const img = new Image();
-  img.crossOrigin = "anonymous";
-  img.src = src;
-  imgCache.set(src, img);
+  if (isStorageRef(src)) {
+    const ready = peekMediaUrl(src);
+    if (ready) {
+      startLoad(src, ready);
+      return null;
+    }
+    if (!pendingRefs.has(src)) {
+      pendingRefs.add(src);
+      void resolveMediaUrl(src).then((url) => {
+        pendingRefs.delete(src);
+        if (url) startLoad(src, url);
+      });
+    }
+    return null;
+  }
+  startLoad(src, src);
   return null;
 }
 
 export function preloadImage(src: string) {
   return new Promise<void>((resolve) => {
     if (typeof Image === "undefined") return resolve();
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      imgCache.set(src, img);
-      resolve();
-    };
-    img.onerror = () => resolve();
-    img.src = src;
+    void resolveMediaUrl(src).then((url) => {
+      if (!url) return resolve();
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        imgCache.set(src, img);
+        resolve();
+      };
+      img.onerror = () => resolve();
+      img.src = url;
+    });
   });
 }
 
@@ -1083,12 +1127,14 @@ export function drawFrame(
   source?: FrameSource | null,
   opts?: DrawOpts,
 ) {
-  const fullscreen = fullscreenAt(t, Math.max(0, (opts?.time ?? 0) - (opts?.clip?.start ?? 0)));
+  const localTime = Math.max(0, (opts?.time ?? 0) - (opts?.clip?.start ?? 0));
+  if (t.videoKeyframes?.length) t = { ...t, video: videoBoxAt(t, localTime) };
+  const fullscreen = fullscreenAt(t, localTime);
   if (fullscreen.amount > 0) t = { ...t, video: fullscreen.video };
   const W = t.canvasW ?? CANVAS_W;
   const H = t.canvasH ?? CANVAS_H;
   ctx.save();
-  ctx.fillStyle = t.background;
+  ctx.fillStyle = backgroundPaint(ctx, t, W, H);
   ctx.fillRect(0, 0, W, H);
 
   // transição de abertura/saída: afeta o quadro montado inteiro
@@ -1106,33 +1152,54 @@ export function drawFrame(
     ctx.translate(-W / 2, -H / 2);
   }
 
-  // janela de tempo por camada (aparece/some com fade)
+  // janela de tempo por camada (aparece/some com efeito de entrada e saída)
   const layerTime = Math.max(0, (opts?.time ?? 0) - (opts?.clip?.start ?? 0));
-  const timeAlpha = (l: {
-    tStart?: number;
-    tEnd?: number | null;
-    fadeIn?: number;
-    fadeOut?: number;
-  }) => {
+  type TimedLayer = {
+    x?: number; y?: number; w?: number; h?: number;
+    tStart?: number; tEnd?: number | null; fadeIn?: number; fadeOut?: number;
+    animIn?: LayerAnim; animOut?: LayerAnim;
+  };
+  type Motion = { alpha: number; dx: number; dy: number; scale: number };
+  const easeOut = (p: number) => 1 - Math.pow(1 - p, 3);
+  const layerMotion = (l: TimedLayer): Motion => {
+    const m: Motion = { alpha: 1, dx: 0, dy: 0, scale: 1 };
     const start = l.tStart ?? 0;
     const end = l.tEnd != null && l.tEnd > start ? l.tEnd : null;
-    if (layerTime < start) return 0;
-    if (end != null && layerTime > end) return 0;
-    let a = 1;
+    if (layerTime < start || (end != null && layerTime > end)) return { ...m, alpha: 0 };
+    const bw = Math.max(80, l.w ?? 400);
+    const bh = Math.max(60, l.h ?? 200);
+    const apply = (kind: LayerAnim, raw: number, dir: 1 | -1) => {
+      const p = Math.max(0, Math.min(1, raw));
+      const e = easeOut(p);
+      const rest = 1 - e;
+      m.alpha = Math.min(m.alpha, p);
+      if (kind === "up") m.dy += dir * rest * bh * 0.85;
+      else if (kind === "down") m.dy -= dir * rest * bh * 0.85;
+      else if (kind === "left") m.dx -= dir * rest * bw * 0.9;
+      else if (kind === "right") m.dx += dir * rest * bw * 0.9;
+      else if (kind === "zoom") m.scale *= 1 - dir * rest * 0.35;
+      else if (kind === "pop") m.scale *= 1 - dir * (rest * 0.45 - Math.sin(p * Math.PI) * 0.12);
+    };
     const fi = l.fadeIn ?? 0;
-    if (fi > 0) a = Math.min(a, (layerTime - start) / fi);
+    if (fi > 0 && layerTime < start + fi) apply(l.animIn ?? "fade", (layerTime - start) / fi, 1);
     const fo = l.fadeOut ?? 0;
-    if (fo > 0 && end != null) a = Math.min(a, (end - layerTime) / fo);
-    return Math.max(0, Math.min(1, a));
+    if (fo > 0 && end != null && layerTime > end - fo) apply(l.animOut ?? "fade", (end - layerTime) / fo, -1);
+    return m;
   };
 
   // ordem de empilhamento configurável (z-index por camada)
-  const jobs: { z: number; i: number; alpha: number; run: () => void }[] = [];
-  const push = (
-    layer: { z?: number; tStart?: number; tEnd?: number | null; fadeIn?: number; fadeOut?: number },
-    fallback: number,
-    run: () => void,
-  ) => jobs.push({ z: layer.z ?? fallback, i: jobs.length, alpha: timeAlpha(layer) * (layer === t.video ? 1 : 1 - fullscreen.amount), run });
+  const jobs: { z: number; i: number; alpha: number; motion: Motion; box: TimedLayer; run: () => void }[] = [];
+  const push = (layer: TimedLayer & { z?: number }, fallback: number, run: () => void) => {
+    const motion = layerMotion(layer);
+    jobs.push({
+      z: layer.z ?? fallback,
+      i: jobs.length,
+      alpha: motion.alpha * (layer === (t.video as unknown as TimedLayer) ? 1 : 1 - fullscreen.amount),
+      motion,
+      box: layer,
+      run,
+    });
+  };
 
   push(t.video, 0, () => drawVideoLayer(ctx, t, source, opts));
   push(t.watermark, 10, () => drawImageLayer(ctx, t.watermark));
@@ -1159,6 +1226,14 @@ export function drawFrame(
       if (j.alpha <= 0) return;
       ctx.save();
       if (j.alpha < 1) ctx.globalAlpha *= j.alpha;
+      const { dx, dy, scale } = j.motion;
+      if (dx !== 0 || dy !== 0 || scale !== 1) {
+        const cx = (j.box.x ?? 0) + (j.box.w ?? W) / 2;
+        const cy = (j.box.y ?? 0) + (j.box.h ?? H) / 2;
+        ctx.translate(cx + dx, cy + dy);
+        ctx.scale(scale, scale);
+        ctx.translate(-cx, -cy);
+      }
       try {
         j.run();
       } finally {
@@ -1166,6 +1241,76 @@ export function drawFrame(
       }
     });
 
+
   if (animating) ctx.restore();
+  drawEdgeFx(ctx, t, W, H);
+  ctx.restore();
+}
+
+/** fundo sólido ou em gradiente */
+function backgroundPaint(ctx: CanvasRenderingContext2D, t: Template, W: number, H: number): string | CanvasGradient {
+  const g = t.bgGradient;
+  if (!g) return t.background || "#000";
+  if (g.kind === "radial") {
+    const rad = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.05, W / 2, H / 2, Math.max(W, H) * 0.72);
+    rad.addColorStop(0, g.from);
+    rad.addColorStop(1, g.to);
+    return rad;
+  }
+  const a = ((g.angle ?? 135) * Math.PI) / 180;
+  const cx = W / 2;
+  const cy = H / 2;
+  const len = (Math.abs(Math.cos(a)) * W + Math.abs(Math.sin(a)) * H) / 2;
+  const lin = ctx.createLinearGradient(cx - Math.cos(a) * len, cy - Math.sin(a) * len, cx + Math.cos(a) * len, cy + Math.sin(a) * len);
+  lin.addColorStop(0, g.from);
+  lin.addColorStop(1, g.to);
+  return lin;
+}
+
+/** gradiente/vinheta nas bordas, desenhado por cima de todas as camadas */
+function drawEdgeFx(ctx: CanvasRenderingContext2D, t: Template, W: number, H: number) {
+  const fx = t.edgeFx;
+  if (!fx || fx.strength <= 0) return;
+  const a = Math.max(0, Math.min(1, fx.strength));
+  const size = Math.max(0.05, Math.min(0.6, (fx.size ?? 28) / 100));
+  ctx.save();
+  if (fx.kind === "vignette") {
+    const r = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * (0.5 - size * 0.4), W / 2, H / 2, Math.max(W, H) * 0.75);
+    r.addColorStop(0, withAlpha(fx.color, 0));
+    r.addColorStop(1, withAlpha(fx.color, a));
+    ctx.fillStyle = r;
+    ctx.fillRect(0, 0, W, H);
+  } else if (fx.kind === "frame") {
+    const band = Math.round(Math.min(W, H) * size);
+    const strips: [number, number, number, number, [number, number, number, number]][] = [
+      [0, 0, W, band, [0, 0, 0, band]],
+      [0, H - band, W, band, [0, H, 0, H - band]],
+      [0, 0, band, H, [0, 0, band, 0]],
+      [W - band, 0, band, H, [W, 0, W - band, 0]],
+    ];
+    for (const [x, y, w, h, line] of strips) {
+      const g = ctx.createLinearGradient(line[0], line[1], line[2], line[3]);
+      g.addColorStop(0, withAlpha(fx.color, a));
+      g.addColorStop(1, withAlpha(fx.color, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(x, y, w, h);
+    }
+  } else {
+    const band = Math.round(H * size);
+    if (fx.kind === "top" || fx.kind === "both") {
+      const g = ctx.createLinearGradient(0, 0, 0, band);
+      g.addColorStop(0, withAlpha(fx.color, a));
+      g.addColorStop(1, withAlpha(fx.color, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, band);
+    }
+    if (fx.kind === "bottom" || fx.kind === "both") {
+      const g = ctx.createLinearGradient(0, H, 0, H - band);
+      g.addColorStop(0, withAlpha(fx.color, a));
+      g.addColorStop(1, withAlpha(fx.color, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, H - band, W, band);
+    }
+  }
   ctx.restore();
 }

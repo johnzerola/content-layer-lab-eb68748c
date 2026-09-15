@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { currentUser, onAuth, resetPassword, signIn, signUp, type CloudUser } from "@/lib/cloud";
 import { toast } from "sonner";
+import { AuthScreen } from "@/components/AuthScreen";
 
 
 /**
@@ -15,11 +16,14 @@ export function AuthGate({
   title = "Entre para usar o CleanerIA",
   description = "Os jobs de limpeza ficam salvos na sua conta com histórico e link de download.",
   fallbackExtra,
+  variant = "card",
 }: {
   children: ReactNode;
   title?: string;
   description?: string;
   fallbackExtra?: ReactNode;
+  /** "split" mostra a tela de acesso completa (vitrine + formulário). */
+  variant?: "card" | "split";
 }) {
   const [user, setUser] = useState<CloudUser | null>(null);
   const [ready, setReady] = useState(false);
@@ -81,6 +85,12 @@ export function AuthGate({
   }
 
   if (user) return <>{children}</>;
+
+  if (variant === "split") {
+    return (
+      <AuthScreen title={title} description={description} footer={fallbackExtra} />
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-md">

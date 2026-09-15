@@ -140,8 +140,10 @@ o fallback global, que existe apenas para registros legados `pending`.
 Uma conexão por conta pode selecionar `meta` ou `ayrshare`, mas credenciais por
 usuário só devem ser ativadas depois que o secret store estiver disponível.
 
-Facebook, Instagram e YouTube usam OAuth oficial e adapters próprios de
-publicação. TikTok continua em preparação.
+Facebook, Instagram, YouTube e TikTok usam OAuth oficial e adapters próprios
+de publicação. No TikTok, o envio direto exige que o aplicativo tenha acesso
+aprovado ao escopo `video.publish`; contas sem essa aprovação permanecem
+indisponíveis para publicação pública.
 
 ## OAuth Meta (Facebook e Instagram)
 

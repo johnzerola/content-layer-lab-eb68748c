@@ -2,6 +2,8 @@ import type { PostKind, PublishErrorCode, SocialProvider } from "@/lib/publishin
 import { facebookGraphBase, globalMetaCredentials, metaGraphBase } from "@/lib/meta.server";
 
 const YOUTUBE_UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos";
+const TIKTOK_API_BASE = "https://open.tiktokapis.com/v2";
+const TIKTOK_CHUNK_BYTES = 10 * 1024 * 1024;
 
 export type PublishInput = {
   kind: PostKind;
@@ -60,6 +62,24 @@ function nestedString(value: unknown, path: string[]): string | undefined {
   return typeof current === "string" ? current : undefined;
 }
 
+/**
+ * Erros HTTP 400 do Meta que são temporários (instabilidade, limite ou bloqueio
+ * temporário da conta) e por isso merecem nova tentativa em vez de falha final.
+ */
+const META_TRANSIENT_CODES = new Set([1, 2, 4, 17, 32, 341, 613]);
+/** Bloqueio temporário de segurança da conta — dura horas ou dias. */
+const META_TEMPORARY_BLOCK = 368;
+
+function metaError(payload: unknown): { code: number | null; message: string | null } {
+  const error = asObject(asObject(payload)?.["error"]);
+  const raw = error?.["code"];
+  const message = error?.["message"];
+  return {
+    code: typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) || null : null,
+    message: typeof message === "string" ? message : null,
+  };
+}
+
 function providerFailure(provider: string, status: number, payload: unknown): PublishResult {
   const detail = JSON.stringify(payload)?.slice(0, 300) ?? "resposta invalida";
   if (status === 401 || status === 403) {
@@ -71,8 +91,28 @@ function providerFailure(provider: string, status: number, payload: unknown): Pu
   if (status >= 500) {
     return { ok: false, code: "PROVIDER_TEMPORARY_ERROR", retryable: true, error: `${provider} [${status}]: ${detail}` };
   }
-  return { ok: false, code: "PROVIDER_PERMANENT_ERROR", retryable: false, error: `${provider} [${status}]: ${detail}` };
+  const meta = metaError(payload);
+  if (meta.code === META_TEMPORARY_BLOCK) {
+    return {
+      ok: false,
+      code: "ACCOUNT_NOT_CONNECTED",
+      retryable: false,
+      error:
+        `${provider}: a conta no Facebook/Instagram está temporariamente bloqueada pelo Meta por motivos de segurança. ` +
+        `Acesse a conta no Facebook, resolva o aviso de segurança e reagende a publicação.`,
+    };
+  }
+  if (meta.code !== null && META_TRANSIENT_CODES.has(meta.code)) {
+    return {
+      ok: false,
+      code: "PROVIDER_TEMPORARY_ERROR",
+      retryable: true,
+      error: `${provider} [${meta.code}]: ${meta.message ?? detail}`,
+    };
+  }
+  return { ok: false, code: "PROVIDER_PERMANENT_ERROR", retryable: false, error: `${provider} [${status}]: ${meta.message ?? detail}` };
 }
+
 
 function youtubePrivacyStatus(): "private" | "public" | "unlisted" {
   const configured = process.env["YOUTUBE_PRIVACY_STATUS"]?.trim();
@@ -159,7 +199,7 @@ export function activeProvider(requested?: SocialProvider): "ayrshare" | "meta" 
 }
 
 export async function publish(input: PublishInput): Promise<PublishResult> {
-  const allowedPlatforms = ["instagram", "youtube", "facebook"];
+  const allowedPlatforms = ["instagram", "youtube", "facebook", "tiktok"];
   if (input.platform && !allowedPlatforms.includes(input.platform)) {
     return {
       ok: false,
@@ -170,7 +210,7 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
   }
 
   const provider =
-    (input.provider === "meta" || input.provider === "youtube") && input.providerAccessToken
+    (input.provider === "meta" || input.provider === "youtube" || input.provider === "tiktok") && input.providerAccessToken
       ? input.provider
       : activeProvider(input.provider);
   if (!provider) {
@@ -210,9 +250,144 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
   }
 
   if (input.platform === "facebook") return publishFacebookPage(input);
+  if (provider === "tiktok") return publishTikTok(input);
   if (provider === "youtube") return publishYoutube(input);
   if (provider === "ayrshare") return publishAyrshare(input);
   return publishMeta(input);
+}
+
+function tiktokPublicPostId(payload: unknown): string | undefined {
+  const data = asObject(asObject(payload)?.["data"]);
+  const value = data?.["publicaly_available_post_id"] ?? data?.["publicly_available_post_id"];
+  if (Array.isArray(value)) return value.find((item): item is string => typeof item === "string");
+  return typeof value === "string" ? value : undefined;
+}
+
+function tiktokStatus(payload: unknown): string | undefined {
+  return nestedString(payload, ["data", "status"]);
+}
+
+async function tiktokRequest(
+  path: string,
+  token: string,
+  body: Record<string, unknown>,
+): Promise<{ response: Response; payload: unknown }> {
+  const response = await fetch(`${TIKTOK_API_BASE}${path}`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json; charset=UTF-8" },
+    body: JSON.stringify(body),
+  });
+  return { response, payload: await response.json().catch(() => null) };
+}
+
+/** Publicação oficial via Content Posting API. O upload é enviado em partes para não expor o Storage. */
+async function publishTikTok(input: PublishInput): Promise<PublishResult> {
+  const token = input.providerAccessToken;
+  if (!token || !input.providerAccountId) {
+    return { ok: false, code: "AUTH_INVALID", retryable: false, error: "A conta TikTok não possui credencial conectada." };
+  }
+  if (input.mediaType === "image") {
+    return { ok: false, code: "MEDIA_INVALID", retryable: false, error: "Esta publicação do TikTok aceita apenas vídeo." };
+  }
+
+  try {
+    let publishId = input.pendingContainerId ?? undefined;
+    if (!publishId) {
+      const media = await fetch(input.videoUrl);
+      if (!media.ok) {
+        return { ok: false, code: "MEDIA_NOT_FOUND", retryable: false, error: "O vídeo salvo não está disponível para envio ao TikTok." };
+      }
+      const bytes = await media.arrayBuffer();
+      if (bytes.byteLength === 0) {
+        return { ok: false, code: "MEDIA_INVALID", retryable: false, error: "O arquivo de vídeo está vazio." };
+      }
+      const totalChunks = Math.max(1, Math.ceil(bytes.byteLength / TIKTOK_CHUNK_BYTES));
+      const chunkSize = totalChunks === 1 ? bytes.byteLength : TIKTOK_CHUNK_BYTES;
+      const creator = await tiktokRequest("/post/publish/creator_info/query/", token, {});
+      if (!creator.response.ok) return providerFailure("TikTok consultar criador", creator.response.status, creator.payload);
+      const privacyOptions = asObject(asObject(creator.payload)?.["data"])?.["privacy_level_options"];
+      const privacy = Array.isArray(privacyOptions)
+        ? privacyOptions.find((value) => value === "PUBLIC_TO_EVERYONE") ?? privacyOptions.find((value): value is string => typeof value === "string")
+        : undefined;
+      if (!privacy) {
+        return { ok: false, code: "CAPABILITY_UNAVAILABLE", retryable: false, error: "O TikTok não liberou uma opção de visibilidade para esta conta." };
+      }
+
+      const initialized = await tiktokRequest("/post/publish/video/init/", token, {
+        post_info: {
+          title: input.caption.slice(0, 2200),
+          privacy_level: privacy,
+          disable_duet: false,
+          disable_comment: false,
+          disable_stitch: false,
+          video_cover_timestamp_ms: 1000,
+        },
+        source_info: {
+          source: "FILE_UPLOAD",
+          video_size: bytes.byteLength,
+          chunk_size: chunkSize,
+          total_chunk_count: totalChunks,
+        },
+      });
+      publishId = nestedString(initialized.payload, ["data", "publish_id"]);
+      const uploadUrl = nestedString(initialized.payload, ["data", "upload_url"]);
+      if (!initialized.response.ok || !publishId || !uploadUrl) {
+        return providerFailure("TikTok iniciar publicação", initialized.response.status, initialized.payload);
+      }
+
+      for (let start = 0; start < bytes.byteLength; start += chunkSize) {
+        const end = Math.min(bytes.byteLength, start + chunkSize);
+        const chunk = bytes.slice(start, end);
+        const uploaded = await fetch(uploadUrl, {
+          method: "PUT",
+          headers: {
+            "content-type": media.headers.get("content-type") ?? "video/mp4",
+            "content-length": String(chunk.byteLength),
+            "content-range": `bytes ${start}-${end - 1}/${bytes.byteLength}`,
+          },
+          body: chunk,
+        });
+        if (!uploaded.ok) {
+          const detail = await uploaded.text().catch(() => "");
+          return providerFailure("TikTok enviar vídeo", uploaded.status, { detail });
+        }
+      }
+    }
+
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const checked = await tiktokRequest("/post/publish/status/fetch/", token, { publish_id: publishId });
+      if (!checked.response.ok) return providerFailure("TikTok consultar publicação", checked.response.status, checked.payload);
+      const status = tiktokStatus(checked.payload);
+      if (status === "PUBLISH_COMPLETE" || status === "SEND_TO_USER_INBOX") {
+        const providerPostId = tiktokPublicPostId(checked.payload) ?? publishId;
+        const publicId = tiktokPublicPostId(checked.payload);
+        return {
+          ok: true,
+          providerPostId,
+          ...(publicId ? { permalink: `https://www.tiktok.com/@${input.username}/video/${publicId}` } : {}),
+        };
+      }
+      if (status === "FAILED") {
+        const reason = nestedString(checked.payload, ["data", "fail_reason"]) ?? "O TikTok recusou o vídeo.";
+        return { ok: false, code: "PROVIDER_PERMANENT_ERROR", retryable: false, error: reason };
+      }
+      if (attempt < 11) await new Promise((resolve) => setTimeout(resolve, 2500));
+    }
+    return {
+      ok: false,
+      code: "PROVIDER_TEMPORARY_ERROR",
+      retryable: true,
+      error: "O TikTok ainda está processando o vídeo.",
+      pendingContainerId: publishId,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      code: "PROVIDER_TEMPORARY_ERROR",
+      retryable: true,
+      error: error instanceof Error ? error.message : "TikTok indisponível.",
+    };
+  }
 }
 
 async function publishYoutube(input: PublishInput): Promise<PublishResult> {

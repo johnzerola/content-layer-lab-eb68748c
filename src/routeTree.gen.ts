@@ -14,12 +14,14 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as ArmazenamentoRouteImport } from './routes/armazenamento'
 import { Route as BibliotecaRouteImport } from './routes/biblioteca'
+import { Route as ChatsceneRouteImport } from './routes/chatscene'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as CompararRouteImport } from './routes/comparar'
 import { Route as ContaRouteImport } from './routes/conta'
 import { Route as ContasRouteImport } from './routes/contas'
 import { Route as CortesRouteImport } from './routes/cortes'
 import { Route as EditorRouteImport } from './routes/editor'
+import { Route as EditorDemoRouteImport } from './routes/editor-demo'
 import { Route as EditorV2RouteImport } from './routes/editor-v2'
 import { Route as EstilosRouteImport } from './routes/estilos'
 import { Route as EstudioRouteImport } from './routes/estudio'
@@ -31,6 +33,8 @@ import { Route as LiveRouteImport } from './routes/live'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as MetricasRouteImport } from './routes/metricas'
 import { Route as PerfisRouteImport } from './routes/perfis'
+import { Route as PlanosRouteImport } from './routes/planos'
+import { Route as PortfolioRouteImport } from './routes/portfolio'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as ProjetosRouteImport } from './routes/projetos'
 import { Route as RemoverRouteImport } from './routes/remover'
@@ -38,6 +42,8 @@ import { Route as TermosRouteImport } from './routes/termos'
 import { Route as VendasRouteImport } from './routes/vendas'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as ChatsceneCompararRouteImport } from './routes/chatscene_.comparar'
+import { Route as ChatsceneRenderRouteImport } from './routes/chatscene_.render'
 import { Route as TemplatesIndexRouteImport } from './routes/templates.index'
 import { Route as TemplatesNewRouteImport } from './routes/templates.new'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
@@ -87,6 +93,11 @@ const BibliotecaRoute = BibliotecaRouteImport.update({
   path: '/biblioteca',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChatsceneRoute = ChatsceneRouteImport.update({
+  id: '/chatscene',
+  path: '/chatscene',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CheckoutRoute = CheckoutRouteImport.update({
   id: '/checkout',
   path: '/checkout',
@@ -115,6 +126,11 @@ const CortesRoute = CortesRouteImport.update({
 const EditorRoute = EditorRouteImport.update({
   id: '/editor',
   path: '/editor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EditorDemoRoute = EditorDemoRouteImport.update({
+  id: '/editor-demo',
+  path: '/editor-demo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EditorV2Route = EditorV2RouteImport.update({
@@ -172,6 +188,16 @@ const PerfisRoute = PerfisRouteImport.update({
   path: '/perfis',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlanosRoute = PlanosRouteImport.update({
+  id: '/planos',
+  path: '/planos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortfolioRoute = PortfolioRouteImport.update({
+  id: '/portfolio',
+  path: '/portfolio',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PrivacidadeRoute = PrivacidadeRouteImport.update({
   id: '/privacidade',
   path: '/privacidade',
@@ -209,6 +235,16 @@ const Char91DotwellKnownChar93OauthProtectedResourceRoute =
     path: '/.well-known/oauth-protected-resource',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ChatsceneCompararRoute = ChatsceneCompararRouteImport.update({
+  id: '/chatscene_/comparar',
+  path: '/chatscene/comparar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChatsceneRenderRoute = ChatsceneRenderRouteImport.update({
+  id: '/chatscene_/render',
+  path: '/chatscene/render',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TemplatesIndexRoute = TemplatesIndexRouteImport.update({
   id: '/templates/',
   path: '/templates/',
@@ -344,12 +380,14 @@ export interface FileRoutesByFullPath {
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
   '/biblioteca': typeof BibliotecaRoute
+  '/chatscene': typeof ChatsceneRoute
   '/checkout': typeof CheckoutRoute
   '/comparar': typeof CompararRoute
   '/conta': typeof ContaRoute
   '/contas': typeof ContasRoute
   '/cortes': typeof CortesRoute
   '/editor': typeof EditorRoute
+  '/editor-demo': typeof EditorDemoRoute
   '/editor-v2': typeof EditorV2Route
   '/estilos': typeof EstilosRoute
   '/estudio': typeof EstudioRoute
@@ -361,6 +399,8 @@ export interface FileRoutesByFullPath {
   '/mcp': typeof McpRoute
   '/metricas': typeof MetricasRoute
   '/perfis': typeof PerfisRoute
+  '/planos': typeof PlanosRoute
+  '/portfolio': typeof PortfolioRoute
   '/privacidade': typeof PrivacidadeRoute
   '/projetos': typeof ProjetosRoute
   '/remover': typeof RemoverRoute
@@ -368,6 +408,8 @@ export interface FileRoutesByFullPath {
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/chatscene/comparar': typeof ChatsceneCompararRoute
+  '/chatscene/render': typeof ChatsceneRenderRoute
   '/templates/new': typeof TemplatesNewRoute
   '/templates/': typeof TemplatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -398,12 +440,14 @@ export interface FileRoutesByTo {
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
   '/biblioteca': typeof BibliotecaRoute
+  '/chatscene': typeof ChatsceneRoute
   '/checkout': typeof CheckoutRoute
   '/comparar': typeof CompararRoute
   '/conta': typeof ContaRoute
   '/contas': typeof ContasRoute
   '/cortes': typeof CortesRoute
   '/editor': typeof EditorRoute
+  '/editor-demo': typeof EditorDemoRoute
   '/editor-v2': typeof EditorV2Route
   '/estilos': typeof EstilosRoute
   '/estudio': typeof EstudioRoute
@@ -415,6 +459,8 @@ export interface FileRoutesByTo {
   '/mcp': typeof McpRoute
   '/metricas': typeof MetricasRoute
   '/perfis': typeof PerfisRoute
+  '/planos': typeof PlanosRoute
+  '/portfolio': typeof PortfolioRoute
   '/privacidade': typeof PrivacidadeRoute
   '/projetos': typeof ProjetosRoute
   '/remover': typeof RemoverRoute
@@ -422,6 +468,8 @@ export interface FileRoutesByTo {
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/chatscene/comparar': typeof ChatsceneCompararRoute
+  '/chatscene/render': typeof ChatsceneRenderRoute
   '/templates/new': typeof TemplatesNewRoute
   '/templates': typeof TemplatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -453,12 +501,14 @@ export interface FileRoutesById {
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
   '/biblioteca': typeof BibliotecaRoute
+  '/chatscene': typeof ChatsceneRoute
   '/checkout': typeof CheckoutRoute
   '/comparar': typeof CompararRoute
   '/conta': typeof ContaRoute
   '/contas': typeof ContasRoute
   '/cortes': typeof CortesRoute
   '/editor': typeof EditorRoute
+  '/editor-demo': typeof EditorDemoRoute
   '/editor-v2': typeof EditorV2Route
   '/estilos': typeof EstilosRoute
   '/estudio': typeof EstudioRoute
@@ -470,6 +520,8 @@ export interface FileRoutesById {
   '/mcp': typeof McpRoute
   '/metricas': typeof MetricasRoute
   '/perfis': typeof PerfisRoute
+  '/planos': typeof PlanosRoute
+  '/portfolio': typeof PortfolioRoute
   '/privacidade': typeof PrivacidadeRoute
   '/projetos': typeof ProjetosRoute
   '/remover': typeof RemoverRoute
@@ -477,6 +529,8 @@ export interface FileRoutesById {
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/chatscene_/comparar': typeof ChatsceneCompararRoute
+  '/chatscene_/render': typeof ChatsceneRenderRoute
   '/templates/new': typeof TemplatesNewRoute
   '/templates/': typeof TemplatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -509,12 +563,14 @@ export interface FileRouteTypes {
     | '/agenda'
     | '/armazenamento'
     | '/biblioteca'
+    | '/chatscene'
     | '/checkout'
     | '/comparar'
     | '/conta'
     | '/contas'
     | '/cortes'
     | '/editor'
+    | '/editor-demo'
     | '/editor-v2'
     | '/estilos'
     | '/estudio'
@@ -526,6 +582,8 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/metricas'
     | '/perfis'
+    | '/planos'
+    | '/portfolio'
     | '/privacidade'
     | '/projetos'
     | '/remover'
@@ -533,6 +591,8 @@ export interface FileRouteTypes {
     | '/vendas'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/chatscene/comparar'
+    | '/chatscene/render'
     | '/templates/new'
     | '/templates/'
     | '/.lovable/oauth/consent'
@@ -563,12 +623,14 @@ export interface FileRouteTypes {
     | '/agenda'
     | '/armazenamento'
     | '/biblioteca'
+    | '/chatscene'
     | '/checkout'
     | '/comparar'
     | '/conta'
     | '/contas'
     | '/cortes'
     | '/editor'
+    | '/editor-demo'
     | '/editor-v2'
     | '/estilos'
     | '/estudio'
@@ -580,6 +642,8 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/metricas'
     | '/perfis'
+    | '/planos'
+    | '/portfolio'
     | '/privacidade'
     | '/projetos'
     | '/remover'
@@ -587,6 +651,8 @@ export interface FileRouteTypes {
     | '/vendas'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/chatscene/comparar'
+    | '/chatscene/render'
     | '/templates/new'
     | '/templates'
     | '/.lovable/oauth/consent'
@@ -617,12 +683,14 @@ export interface FileRouteTypes {
     | '/agenda'
     | '/armazenamento'
     | '/biblioteca'
+    | '/chatscene'
     | '/checkout'
     | '/comparar'
     | '/conta'
     | '/contas'
     | '/cortes'
     | '/editor'
+    | '/editor-demo'
     | '/editor-v2'
     | '/estilos'
     | '/estudio'
@@ -634,6 +702,8 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/metricas'
     | '/perfis'
+    | '/planos'
+    | '/portfolio'
     | '/privacidade'
     | '/projetos'
     | '/remover'
@@ -641,6 +711,8 @@ export interface FileRouteTypes {
     | '/vendas'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/chatscene_/comparar'
+    | '/chatscene_/render'
     | '/templates/new'
     | '/templates/'
     | '/.lovable/oauth/consent'
@@ -672,12 +744,14 @@ export interface RootRouteChildren {
   AgendaRoute: typeof AgendaRoute
   ArmazenamentoRoute: typeof ArmazenamentoRoute
   BibliotecaRoute: typeof BibliotecaRoute
+  ChatsceneRoute: typeof ChatsceneRoute
   CheckoutRoute: typeof CheckoutRoute
   CompararRoute: typeof CompararRoute
   ContaRoute: typeof ContaRoute
   ContasRoute: typeof ContasRoute
   CortesRoute: typeof CortesRoute
   EditorRoute: typeof EditorRoute
+  EditorDemoRoute: typeof EditorDemoRoute
   EditorV2Route: typeof EditorV2Route
   EstilosRoute: typeof EstilosRoute
   EstudioRoute: typeof EstudioRoute
@@ -689,6 +763,8 @@ export interface RootRouteChildren {
   McpRoute: typeof McpRoute
   MetricasRoute: typeof MetricasRoute
   PerfisRoute: typeof PerfisRoute
+  PlanosRoute: typeof PlanosRoute
+  PortfolioRoute: typeof PortfolioRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   ProjetosRoute: typeof ProjetosRoute
   RemoverRoute: typeof RemoverRoute
@@ -696,6 +772,8 @@ export interface RootRouteChildren {
   VendasRoute: typeof VendasRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  ChatsceneCompararRoute: typeof ChatsceneCompararRoute
+  ChatsceneRenderRoute: typeof ChatsceneRenderRoute
   TemplatesNewRoute: typeof TemplatesNewRoute
   TemplatesIndexRoute: typeof TemplatesIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
@@ -758,6 +836,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BibliotecaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/chatscene': {
+      id: '/chatscene'
+      path: '/chatscene'
+      fullPath: '/chatscene'
+      preLoaderRoute: typeof ChatsceneRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/checkout': {
       id: '/checkout'
       path: '/checkout'
@@ -798,6 +883,13 @@ declare module '@tanstack/react-router' {
       path: '/editor'
       fullPath: '/editor'
       preLoaderRoute: typeof EditorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/editor-demo': {
+      id: '/editor-demo'
+      path: '/editor-demo'
+      fullPath: '/editor-demo'
+      preLoaderRoute: typeof EditorDemoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/editor-v2': {
@@ -877,6 +969,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PerfisRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/planos': {
+      id: '/planos'
+      path: '/planos'
+      fullPath: '/planos'
+      preLoaderRoute: typeof PlanosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portfolio': {
+      id: '/portfolio'
+      path: '/portfolio'
+      fullPath: '/portfolio'
+      preLoaderRoute: typeof PortfolioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/privacidade': {
       id: '/privacidade'
       path: '/privacidade'
@@ -924,6 +1030,20 @@ declare module '@tanstack/react-router' {
       path: '/.well-known/oauth-protected-resource'
       fullPath: '/.well-known/oauth-protected-resource'
       preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chatscene_/comparar': {
+      id: '/chatscene_/comparar'
+      path: '/chatscene/comparar'
+      fullPath: '/chatscene/comparar'
+      preLoaderRoute: typeof ChatsceneCompararRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chatscene_/render': {
+      id: '/chatscene_/render'
+      path: '/chatscene/render'
+      fullPath: '/chatscene/render'
+      preLoaderRoute: typeof ChatsceneRenderRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/templates/': {
@@ -1096,12 +1216,14 @@ const rootRouteChildren: RootRouteChildren = {
   AgendaRoute: AgendaRoute,
   ArmazenamentoRoute: ArmazenamentoRoute,
   BibliotecaRoute: BibliotecaRoute,
+  ChatsceneRoute: ChatsceneRoute,
   CheckoutRoute: CheckoutRoute,
   CompararRoute: CompararRoute,
   ContaRoute: ContaRoute,
   ContasRoute: ContasRoute,
   CortesRoute: CortesRoute,
   EditorRoute: EditorRoute,
+  EditorDemoRoute: EditorDemoRoute,
   EditorV2Route: EditorV2Route,
   EstilosRoute: EstilosRoute,
   EstudioRoute: EstudioRoute,
@@ -1113,6 +1235,8 @@ const rootRouteChildren: RootRouteChildren = {
   McpRoute: McpRoute,
   MetricasRoute: MetricasRoute,
   PerfisRoute: PerfisRoute,
+  PlanosRoute: PlanosRoute,
+  PortfolioRoute: PortfolioRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   ProjetosRoute: ProjetosRoute,
   RemoverRoute: RemoverRoute,
@@ -1121,6 +1245,8 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  ChatsceneCompararRoute: ChatsceneCompararRoute,
+  ChatsceneRenderRoute: ChatsceneRenderRoute,
   TemplatesNewRoute: TemplatesNewRoute,
   TemplatesIndexRoute: TemplatesIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,

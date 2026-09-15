@@ -67,6 +67,7 @@ export async function persistTikTokAccount(
       refresh_token_ciphertext: encryptSocialToken(input.tokens.refreshToken),
       expires_at: input.tokens.expiresAt.toISOString(),
       refresh_expires_at: input.tokens.refreshExpiresAt.toISOString(),
+      token_kind: "tiktok",
       updated_at: now,
     },
     { onConflict: "connection_id" },

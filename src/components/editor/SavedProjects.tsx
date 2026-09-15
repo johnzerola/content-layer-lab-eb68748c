@@ -8,7 +8,7 @@ import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { loadSourceFile, registerSourceFile } from "@/lib/editor/cuts";
-import { listEditorProjects, saveEditorProject, type EditorProjectRecord } from "@/lib/editor/project.service";
+import { listEditorProjects, renameEditorProject, type EditorProjectSummary } from "@/lib/editor/project.service";
 
 function seconds(v?: number | null) {
   if (!v || !Number.isFinite(v)) return "—";
@@ -18,7 +18,7 @@ function seconds(v?: number | null) {
 }
 
 export function SavedProjects() {
-  const [items, setItems] = useState<EditorProjectRecord[]>([]);
+  const [items, setItems] = useState<EditorProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [tick, setTick] = useState(0);
@@ -44,7 +44,7 @@ export function SavedProjects() {
     let alive = true;
     void (async () => {
       const ids = await Promise.all(
-        items.map(async (p) => ((await loadSourceFile(p.doc.videoId)) ? p.doc.videoId : null)),
+        items.map(async (p) => ((await loadSourceFile(p.videoId)) ? p.videoId : null)),
       );
       if (alive) setAvailable(new Set(ids.filter((id): id is string => Boolean(id))));
     })();
@@ -64,8 +64,8 @@ export function SavedProjects() {
     let matched = 0;
     for (const file of Array.from(files)) {
       for (const p of items) {
-        if (p.doc.title === file.name || p.name === file.name) {
-          registerSourceFile(p.doc.videoId, file);
+        if (p.name === file.name) {
+          registerSourceFile(p.videoId, file);
           matched++;
           break;
         }
@@ -118,22 +118,13 @@ export function SavedProjects() {
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {filtered.map((p) => {
-          const hasFile = available.has(p.doc.videoId);
-          const layers = p.doc.composition?.layers?.length ?? 0;
-          const keys = p.doc.preedit?.keys?.length ?? 0;
-          const cuts = p.doc.removedRanges?.length ?? 0;
-          const tracks = p.doc.audio?.tracks ?? [];
-          const audioBits = Array.from(new Set(tracks.map((t) => t.kind)));
+          const hasFile = available.has(p.videoId);
           return (
             <article key={p.id} className="glass space-y-2 rounded-2xl border border-border/60 p-3">
               <div className="flex items-baseline justify-between gap-2">
                 <h3 className="truncate text-sm font-medium">{p.name}</h3>
-                <span className="mono-label">{seconds(p.doc.media?.duration)}</span>
+                <span className="mono-label">{seconds(p.duration)}</span>
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                {layers} camadas · {cuts} corte(s) · {keys} keyframes ·{" "}
-                {audioBits.length ? audioBits.join(" + ") : "sem áudio extra"}
-              </p>
               <p className="text-[11px] text-muted-foreground">
                 Atualizado em {new Date(p.updated_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
               </p>
@@ -145,7 +136,7 @@ export function SavedProjects() {
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <Link
                   to="/projects/$projectId/editor/$videoId"
-                  params={{ projectId: p.id, videoId: p.doc.videoId }}
+                  params={{ projectId: p.id, videoId: p.videoId }}
                   className="rounded-lg bg-primary px-2.5 py-1.5 text-primary-foreground"
                 >
                   Reabrir no editor
@@ -156,7 +147,7 @@ export function SavedProjects() {
                   onClick={async () => {
                     const name = window.prompt("Nome do projeto", p.name);
                     if (!name) return;
-                    await saveEditorProject(p.id, { ...p.doc, title: name });
+                    await renameEditorProject(p.id, name);
                     void load();
                   }}
                 >
