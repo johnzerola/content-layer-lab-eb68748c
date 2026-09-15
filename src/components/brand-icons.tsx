@@ -43,8 +43,9 @@ export function TikTokIcon(props: IconProps) {
 
 // arcticons:kwai — stroke-based, 48x48 grid.
 export function KwaiIcon(props: IconProps) {
+  const { viewBox: _viewBox, ...rest } = props;
   return (
-    <Base viewBox="0 0 48 48" {...props}>
+    <Base viewBox="0 0 48 48" {...rest}>
       <g fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
         <path d="M20.85 42.5h13.478a5.39 5.39 0 0 0 5.39-5.391v-7.764a5.39 5.39 0 0 0-5.39-5.391H20.85a5.39 5.39 0 0 0-5.39 5.39v7.765a5.39 5.39 0 0 0 5.39 5.391" />
         <circle cx="18.328" cy="13.261" r="7.761" />
