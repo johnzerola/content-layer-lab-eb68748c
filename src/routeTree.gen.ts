@@ -31,6 +31,7 @@ import { Route as LiveRouteImport } from './routes/live'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as MetricasRouteImport } from './routes/metricas'
 import { Route as PerfisRouteImport } from './routes/perfis'
+import { Route as PlanosRouteImport } from './routes/planos'
 import { Route as PortfolioRouteImport } from './routes/portfolio'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as ProjetosRouteImport } from './routes/projetos'
@@ -173,6 +174,11 @@ const MetricasRoute = MetricasRouteImport.update({
 const PerfisRoute = PerfisRouteImport.update({
   id: '/perfis',
   path: '/perfis',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlanosRoute = PlanosRouteImport.update({
+  id: '/planos',
+  path: '/planos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PortfolioRoute = PortfolioRouteImport.update({
@@ -379,6 +385,7 @@ export interface FileRoutesByFullPath {
   '/mcp': typeof McpRoute
   '/metricas': typeof MetricasRoute
   '/perfis': typeof PerfisRoute
+  '/planos': typeof PlanosRoute
   '/portfolio': typeof PortfolioRoute
   '/privacidade': typeof PrivacidadeRoute
   '/projetos': typeof ProjetosRoute
@@ -436,6 +443,7 @@ export interface FileRoutesByTo {
   '/mcp': typeof McpRoute
   '/metricas': typeof MetricasRoute
   '/perfis': typeof PerfisRoute
+  '/planos': typeof PlanosRoute
   '/portfolio': typeof PortfolioRoute
   '/privacidade': typeof PrivacidadeRoute
   '/projetos': typeof ProjetosRoute
@@ -494,6 +502,7 @@ export interface FileRoutesById {
   '/mcp': typeof McpRoute
   '/metricas': typeof MetricasRoute
   '/perfis': typeof PerfisRoute
+  '/planos': typeof PlanosRoute
   '/portfolio': typeof PortfolioRoute
   '/privacidade': typeof PrivacidadeRoute
   '/projetos': typeof ProjetosRoute
@@ -553,6 +562,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/metricas'
     | '/perfis'
+    | '/planos'
     | '/portfolio'
     | '/privacidade'
     | '/projetos'
@@ -610,6 +620,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/metricas'
     | '/perfis'
+    | '/planos'
     | '/portfolio'
     | '/privacidade'
     | '/projetos'
@@ -667,6 +678,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/metricas'
     | '/perfis'
+    | '/planos'
     | '/portfolio'
     | '/privacidade'
     | '/projetos'
@@ -725,6 +737,7 @@ export interface RootRouteChildren {
   McpRoute: typeof McpRoute
   MetricasRoute: typeof MetricasRoute
   PerfisRoute: typeof PerfisRoute
+  PlanosRoute: typeof PlanosRoute
   PortfolioRoute: typeof PortfolioRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   ProjetosRoute: typeof ProjetosRoute
@@ -914,6 +927,13 @@ declare module '@tanstack/react-router' {
       path: '/perfis'
       fullPath: '/perfis'
       preLoaderRoute: typeof PerfisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/planos': {
+      id: '/planos'
+      path: '/planos'
+      fullPath: '/planos'
+      preLoaderRoute: typeof PlanosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/portfolio': {
@@ -1173,6 +1193,7 @@ const rootRouteChildren: RootRouteChildren = {
   McpRoute: McpRoute,
   MetricasRoute: MetricasRoute,
   PerfisRoute: PerfisRoute,
+  PlanosRoute: PlanosRoute,
   PortfolioRoute: PortfolioRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   ProjetosRoute: ProjetosRoute,
