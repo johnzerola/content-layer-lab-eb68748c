@@ -81,6 +81,8 @@ describe("authenticated Meta linking to scheduled publishing", () => {
     });
 
     const updateClaimedPost = vi.fn();
+    const removeStorageObject = vi.fn(async () => undefined);
+    const deletePublishedPost = vi.fn(async () => undefined);
     const summary = await runPublishQueue(
       {
         claim: async () => [
@@ -98,8 +100,10 @@ describe("authenticated Meta linking to scheduled publishing", () => {
         loadAccount: async () => storedAccount,
         loadConnection: async () => storedConnection,
         createSignedUrl: async () => "https://media.example.test/fresh-video.mp4",
+        removeStorageObject,
         publish,
         updateClaimedPost,
+        deletePublishedPost,
         now: () => new Date("2026-08-15T12:00:00.000Z"),
         log: () => undefined,
       },
@@ -112,6 +116,8 @@ describe("authenticated Meta linking to scheduled publishing", () => {
       "lock-1",
       expect.objectContaining({ status: "publicado", provider_post_id: "published-id" }),
     );
+    expect(removeStorageObject).toHaveBeenCalledWith("user-1/video.mp4");
+    expect(deletePublishedPost).toHaveBeenCalledWith("post-1", "lock-1");
     expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
       "https://graph.instagram.com/v26.0/me?fields=id,username",
       "https://graph.instagram.com/v26.0/ig-validated/media",

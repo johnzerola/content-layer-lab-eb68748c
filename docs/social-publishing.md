@@ -16,6 +16,12 @@ incrementa `attempts` e também recupera locks vencidos. Falhas temporárias
 retornam a `agendado` com `next_attempt_at`; falhas permanentes ou tentativas
 esgotadas passam para `falhou`.
 
+Quando a API oficial confirma a publicação, a fila primeiro marca o item como
+`publicado` para impedir um segundo envio. Em seguida remove o arquivo do bucket
+privado `posts` e apaga imediatamente o registro de `scheduled_posts`. Se a
+remoção do arquivo falhar, o registro publicado é mantido como trava de
+segurança, evitando publicação duplicada e permitindo uma nova limpeza.
+
 ## Configuração
 
 Use os nomes documentados em `.env.example`. Segredos nunca usam prefixo

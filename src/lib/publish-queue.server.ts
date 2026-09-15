@@ -62,6 +62,7 @@ export type QueueDependencies = {
   removeStorageObject?: (videoPath: string) => Promise<void>;
   publish: (input: PublishInput) => Promise<PublishResult>;
   updateClaimedPost: (postId: string, lockId: string, update: PostUpdate) => Promise<void>;
+  deletePublishedPost?: (postId: string, lockId: string) => Promise<void>;
   now: () => Date;
   log: (entry: Record<string, unknown>) => void;
 };
@@ -174,9 +175,24 @@ export async function runPublishQueue(
     }
 
     if (result.ok) {
+      await deps.updateClaimedPost(post.id, options.lockId, {
+        status: "publicado",
+        published_at: deps.now().toISOString(),
+        permalink: result.permalink ?? null,
+        provider_post_id: result.providerPostId ?? null,
+        error: null,
+        error_code: null,
+        lock_id: options.lockId,
+        locked_at: null,
+        next_attempt_at: null,
+        provider_container_id: null,
+      });
+
+      let mediaRemoved = !post.video_path;
       if (post.video_path && deps.removeStorageObject) {
         try {
           await deps.removeStorageObject(post.video_path);
+          mediaRemoved = true;
         } catch {
           deps.log({
             event: "publish_storage_cleanup_failed",
@@ -185,18 +201,13 @@ export async function runPublishQueue(
           });
         }
       }
-      await deps.updateClaimedPost(post.id, options.lockId, {
-        status: "publicado",
-        published_at: deps.now().toISOString(),
-        permalink: result.permalink ?? null,
-        provider_post_id: result.providerPostId ?? null,
-        error: null,
-        error_code: null,
-        lock_id: null,
-        locked_at: null,
-        next_attempt_at: null,
-        provider_container_id: null,
-      });
+      if (mediaRemoved && deps.deletePublishedPost) {
+        try {
+          await deps.deletePublishedPost(post.id, options.lockId);
+        } catch {
+          deps.log({ event: "publish_record_cleanup_failed", postId: post.id });
+        }
+      }
       summary.published++;
     } else {
       const shouldRetry = result.retryable && post.attempts < options.maxAttempts;

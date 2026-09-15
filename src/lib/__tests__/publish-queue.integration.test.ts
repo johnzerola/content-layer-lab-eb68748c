@@ -23,6 +23,8 @@ function dependencies(posts: ClaimedPost[], publishResult: PublishResult) {
   const claimed = new Set<string>();
   const createSignedUrl = vi.fn(async () => "https://storage.example/fresh-signed-url");
   const publish = vi.fn(async () => publishResult);
+  const removeStorageObject = vi.fn(async () => undefined);
+  const deletePublishedPost = vi.fn(async () => undefined);
   const deps: QueueDependencies = {
     claim: async (_lockId, limit) => {
       const available = posts.filter((post) => !claimed.has(post.id)).slice(0, limit);
@@ -39,14 +41,16 @@ function dependencies(posts: ClaimedPost[], publishResult: PublishResult) {
     }),
     loadConnection: async () => null,
     createSignedUrl,
+    removeStorageObject,
     publish,
     updateClaimedPost: async (postId, lockId, update) => {
       updates.push({ postId, lockId, update });
     },
+    deletePublishedPost,
     now: () => new Date(NOW),
     log: () => undefined,
   };
-  return { deps, updates, createSignedUrl, publish };
+  return { deps, updates, createSignedUrl, publish, removeStorageObject, deletePublishedPost };
 }
 
 const options = { lockId: "lock-1", limit: 10, lockTimeoutSeconds: 900, maxAttempts: 5 };
@@ -72,8 +76,21 @@ describe("publishing queue integration", () => {
     expect(fixture.updates[0]?.update).toMatchObject({
       status: "publicado",
       provider_post_id: "provider-post-1",
-      lock_id: null,
+      lock_id: "lock-1",
     });
+    expect(fixture.removeStorageObject).toHaveBeenCalledWith("user-1/video.mp4");
+    expect(fixture.deletePublishedPost).toHaveBeenCalledWith("post-1", "lock-1");
+  });
+
+  it("keeps the published row when media cleanup fails, preventing a duplicate publish", async () => {
+    const fixture = dependencies([duePost()], { ok: true, providerPostId: "provider-post-1" });
+    fixture.removeStorageObject.mockRejectedValueOnce(new Error("storage unavailable"));
+
+    const summary = await runPublishQueue(fixture.deps, options);
+
+    expect(summary.published).toBe(1);
+    expect(fixture.updates[0]?.update).toMatchObject({ status: "publicado", lock_id: "lock-1" });
+    expect(fixture.deletePublishedPost).not.toHaveBeenCalled();
   });
 
   it("schedules a temporary failure for a future retry", async () => {
