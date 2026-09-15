@@ -1621,3 +1621,23 @@
 @media (prefers-reduced-transparency: reduce) {
   .lp-glass, .lp-chip3d { backdrop-filter: none; background: var(--surface-2); }
 }
+
+/* rotação 3D suave em loop (mockup e peças do hero) */
+.lp-scene { perspective: 1400px; }
+.lp-rotate {
+  transform-style: preserve-3d;
+  animation: lp-rotate 16s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes lp-rotate {
+  from { transform: rotateY(-6deg) rotateX(3deg) translateZ(0); }
+  to { transform: rotateY(6deg) rotateX(-2deg) translateZ(0); }
+}
+.lp-spin3d { animation: lp-spin3d 12s ease-in-out infinite alternate; transform-style: preserve-3d; }
+@keyframes lp-spin3d {
+  from { transform: perspective(620px) rotateY(-26deg) rotateX(12deg); }
+  to { transform: perspective(620px) rotateY(26deg) rotateX(-6deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-rotate, .lp-spin3d { animation: none !important; }
+}

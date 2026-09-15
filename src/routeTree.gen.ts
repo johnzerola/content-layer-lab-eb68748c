@@ -21,6 +21,7 @@ import { Route as ContaRouteImport } from './routes/conta'
 import { Route as ContasRouteImport } from './routes/contas'
 import { Route as CortesRouteImport } from './routes/cortes'
 import { Route as EditorRouteImport } from './routes/editor'
+import { Route as EditorDemoRouteImport } from './routes/editor-demo'
 import { Route as EstilosRouteImport } from './routes/estilos'
 import { Route as EstudioRouteImport } from './routes/estudio'
 import { Route as ExclusaoDeDadosRouteImport } from './routes/exclusao-de-dados'
@@ -31,6 +32,7 @@ import { Route as LiveRouteImport } from './routes/live'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as MetricasRouteImport } from './routes/metricas'
 import { Route as PerfisRouteImport } from './routes/perfis'
+import { Route as PlanosRouteImport } from './routes/planos'
 import { Route as PortfolioRouteImport } from './routes/portfolio'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as ProjetosRouteImport } from './routes/projetos'
@@ -125,6 +127,11 @@ const EditorRoute = EditorRouteImport.update({
   path: '/editor',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EditorDemoRoute = EditorDemoRouteImport.update({
+  id: '/editor-demo',
+  path: '/editor-demo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EstilosRoute = EstilosRouteImport.update({
   id: '/estilos',
   path: '/estilos',
@@ -173,6 +180,11 @@ const MetricasRoute = MetricasRouteImport.update({
 const PerfisRoute = PerfisRouteImport.update({
   id: '/perfis',
   path: '/perfis',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlanosRoute = PlanosRouteImport.update({
+  id: '/planos',
+  path: '/planos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PortfolioRoute = PortfolioRouteImport.update({
@@ -369,6 +381,7 @@ export interface FileRoutesByFullPath {
   '/contas': typeof ContasRoute
   '/cortes': typeof CortesRoute
   '/editor': typeof EditorRoute
+  '/editor-demo': typeof EditorDemoRoute
   '/estilos': typeof EstilosRoute
   '/estudio': typeof EstudioRoute
   '/exclusao-de-dados': typeof ExclusaoDeDadosRoute
@@ -379,6 +392,7 @@ export interface FileRoutesByFullPath {
   '/mcp': typeof McpRoute
   '/metricas': typeof MetricasRoute
   '/perfis': typeof PerfisRoute
+  '/planos': typeof PlanosRoute
   '/portfolio': typeof PortfolioRoute
   '/privacidade': typeof PrivacidadeRoute
   '/projetos': typeof ProjetosRoute
@@ -426,6 +440,7 @@ export interface FileRoutesByTo {
   '/contas': typeof ContasRoute
   '/cortes': typeof CortesRoute
   '/editor': typeof EditorRoute
+  '/editor-demo': typeof EditorDemoRoute
   '/estilos': typeof EstilosRoute
   '/estudio': typeof EstudioRoute
   '/exclusao-de-dados': typeof ExclusaoDeDadosRoute
@@ -436,6 +451,7 @@ export interface FileRoutesByTo {
   '/mcp': typeof McpRoute
   '/metricas': typeof MetricasRoute
   '/perfis': typeof PerfisRoute
+  '/planos': typeof PlanosRoute
   '/portfolio': typeof PortfolioRoute
   '/privacidade': typeof PrivacidadeRoute
   '/projetos': typeof ProjetosRoute
@@ -484,6 +500,7 @@ export interface FileRoutesById {
   '/contas': typeof ContasRoute
   '/cortes': typeof CortesRoute
   '/editor': typeof EditorRoute
+  '/editor-demo': typeof EditorDemoRoute
   '/estilos': typeof EstilosRoute
   '/estudio': typeof EstudioRoute
   '/exclusao-de-dados': typeof ExclusaoDeDadosRoute
@@ -494,6 +511,7 @@ export interface FileRoutesById {
   '/mcp': typeof McpRoute
   '/metricas': typeof MetricasRoute
   '/perfis': typeof PerfisRoute
+  '/planos': typeof PlanosRoute
   '/portfolio': typeof PortfolioRoute
   '/privacidade': typeof PrivacidadeRoute
   '/projetos': typeof ProjetosRoute
@@ -543,6 +561,7 @@ export interface FileRouteTypes {
     | '/contas'
     | '/cortes'
     | '/editor'
+    | '/editor-demo'
     | '/estilos'
     | '/estudio'
     | '/exclusao-de-dados'
@@ -553,6 +572,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/metricas'
     | '/perfis'
+    | '/planos'
     | '/portfolio'
     | '/privacidade'
     | '/projetos'
@@ -600,6 +620,7 @@ export interface FileRouteTypes {
     | '/contas'
     | '/cortes'
     | '/editor'
+    | '/editor-demo'
     | '/estilos'
     | '/estudio'
     | '/exclusao-de-dados'
@@ -610,6 +631,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/metricas'
     | '/perfis'
+    | '/planos'
     | '/portfolio'
     | '/privacidade'
     | '/projetos'
@@ -657,6 +679,7 @@ export interface FileRouteTypes {
     | '/contas'
     | '/cortes'
     | '/editor'
+    | '/editor-demo'
     | '/estilos'
     | '/estudio'
     | '/exclusao-de-dados'
@@ -667,6 +690,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/metricas'
     | '/perfis'
+    | '/planos'
     | '/portfolio'
     | '/privacidade'
     | '/projetos'
@@ -715,6 +739,7 @@ export interface RootRouteChildren {
   ContasRoute: typeof ContasRoute
   CortesRoute: typeof CortesRoute
   EditorRoute: typeof EditorRoute
+  EditorDemoRoute: typeof EditorDemoRoute
   EstilosRoute: typeof EstilosRoute
   EstudioRoute: typeof EstudioRoute
   ExclusaoDeDadosRoute: typeof ExclusaoDeDadosRoute
@@ -725,6 +750,7 @@ export interface RootRouteChildren {
   McpRoute: typeof McpRoute
   MetricasRoute: typeof MetricasRoute
   PerfisRoute: typeof PerfisRoute
+  PlanosRoute: typeof PlanosRoute
   PortfolioRoute: typeof PortfolioRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   ProjetosRoute: typeof ProjetosRoute
@@ -846,6 +872,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EditorRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/editor-demo': {
+      id: '/editor-demo'
+      path: '/editor-demo'
+      fullPath: '/editor-demo'
+      preLoaderRoute: typeof EditorDemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/estilos': {
       id: '/estilos'
       path: '/estilos'
@@ -914,6 +947,13 @@ declare module '@tanstack/react-router' {
       path: '/perfis'
       fullPath: '/perfis'
       preLoaderRoute: typeof PerfisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/planos': {
+      id: '/planos'
+      path: '/planos'
+      fullPath: '/planos'
+      preLoaderRoute: typeof PlanosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/portfolio': {
@@ -1163,6 +1203,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContasRoute: ContasRoute,
   CortesRoute: CortesRoute,
   EditorRoute: EditorRoute,
+  EditorDemoRoute: EditorDemoRoute,
   EstilosRoute: EstilosRoute,
   EstudioRoute: EstudioRoute,
   ExclusaoDeDadosRoute: ExclusaoDeDadosRoute,
@@ -1173,6 +1214,7 @@ const rootRouteChildren: RootRouteChildren = {
   McpRoute: McpRoute,
   MetricasRoute: MetricasRoute,
   PerfisRoute: PerfisRoute,
+  PlanosRoute: PlanosRoute,
   PortfolioRoute: PortfolioRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   ProjetosRoute: ProjetosRoute,

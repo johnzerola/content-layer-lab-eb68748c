@@ -8,37 +8,37 @@ export function FloatingChips() {
       <span className="lp-orb size-24 opacity-60" style={{ bottom: "12%", left: "-2rem" }} />
 
       <span className="lp-float absolute left-[-2.5rem] top-[22%]">
-        <span className="lp-chip3d">
+        <span className="lp-chip3d lp-spin3d">
           <Scissors />
         </span>
       </span>
       <span className="lp-float lp-float-2 absolute right-[-1.5rem] top-[12%]">
-        <span className="lp-chip3d" style={{ color: "var(--cyan, var(--primary))" }}>
+        <span className="lp-chip3d lp-spin3d" style={{ color: "var(--cyan, var(--primary))" }}>
           <Captions />
         </span>
       </span>
       <span className="lp-float lp-float-3 absolute bottom-[6%] left-[-3.5rem]">
-        <span className="lp-chip3d" style={{ color: "var(--accent)" }}>
+        <span className="lp-chip3d lp-spin3d" style={{ color: "var(--accent)" }}>
           <Music4 />
         </span>
       </span>
       <span className="lp-float lp-float-2 absolute bottom-[26%] right-[4%]">
-        <span className="lp-chip3d">
+        <span className="lp-chip3d lp-spin3d">
           <BarChart3 />
         </span>
       </span>
       <span className="lp-float absolute right-[26%] top-[-1.5rem]">
-        <span className="lp-chip3d" style={{ color: "var(--warning)" }}>
+        <span className="lp-chip3d lp-spin3d" style={{ color: "var(--warning)" }}>
           <Sparkles />
         </span>
       </span>
       <span className="lp-float lp-float-3 absolute left-[6%] top-[4%]">
-        <span className="lp-chip3d">
+        <span className="lp-chip3d lp-spin3d">
           <Play />
         </span>
       </span>
       <span className="lp-float lp-float-2 absolute bottom-[-2rem] right-[-2.5rem]">
-        <span className="lp-chip3d" style={{ color: "var(--cyan, var(--primary))" }}>
+        <span className="lp-chip3d lp-spin3d" style={{ color: "var(--cyan, var(--primary))" }}>
           <Wand2 />
         </span>
       </span>
