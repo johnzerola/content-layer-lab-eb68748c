@@ -291,7 +291,7 @@ function Hero() {
     <section className="relative z-10 mx-auto max-w-6xl px-5 pb-16 pt-14 md:pb-24 md:pt-20">
       <FloatingChips />
       <div className="relative grid items-center gap-12 lg:grid-cols-[1.02fr_.98fr]">
-        <Reveal>
+        <Reveal className="min-w-0">
           <span className="lp-glass mono-label inline-flex items-center gap-2 rounded-full px-3 py-1.5">
             <span className="auth-live size-1.5 rounded-full bg-primary" />
             edição de vídeo com IA
@@ -341,7 +341,7 @@ function Hero() {
           <p className="mono-label mt-5">sem instalar nada · exporta mp4 1080×1920 · reels, tiktok e shorts</p>
         </Reveal>
 
-        <Reveal delay={120}>
+        <Reveal delay={120} className="min-w-0">
           <EditorMockup />
         </Reveal>
       </div>
