@@ -56,6 +56,7 @@ import {
   isLocalEditorAsset,
   persistEditorMedia,
   persistEditorProject,
+  prepareAudioForSeparation,
   prepareLocalMedia,
   readEditorMedia,
   readEditorProject,
@@ -786,7 +787,16 @@ export function EditorV2Foundation() {
         recipe: ticket.recipe ?? { id: "service-default", revision: "capabilities-not-reported" },
       });
       jobRepository.save(jobRecord);
-      const result = await runStemJob(ticket, sourceWav, { signal: controller.signal, onStage: setMessage, onStatus: recordJobStatus });
+      setMessage("Convertendo o áudio para 44.100 Hz…");
+      const separationWav = await prepareAudioForSeparation(sourceWav, {
+        signal: controller.signal,
+        maxDuration: ticket.maxDuration,
+      });
+      const result = await runStemJob(ticket, separationWav, {
+        signal: controller.signal,
+        onStage: setMessage,
+        onStatus: recordJobStatus,
+      });
       controller.signal.throwIfAborted();
 
       const state = busRef.current.getState();

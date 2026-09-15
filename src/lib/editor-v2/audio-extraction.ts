@@ -26,6 +26,73 @@ export interface ExtractAudioOptions {
   waveformBuckets?: number;
 }
 
+export const AUDIO_SEPARATION_SAMPLE_RATE = 44_100;
+
+/**
+ * Produces the strict PCM WAV accepted by the separation service without
+ * replacing the editor's original extracted asset. Camera and phone audio is
+ * commonly 48 kHz, while the current Demucs worker contract is 44.1 kHz.
+ */
+export async function prepareAudioForSeparation(
+  file: Blob,
+  options: Pick<ExtractAudioOptions, "signal" | "maxDuration"> = {},
+): Promise<Blob> {
+  options.signal?.throwIfAborted();
+  const AudioCtx =
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioCtx) throw new Error("Este navegador não oferece decodificação de áudio local.");
+  const context = new AudioCtx();
+  let decoded: AudioBuffer;
+  try {
+    decoded = await context.decodeAudioData(await file.arrayBuffer());
+  } catch {
+    throw new Error("Não foi possível preparar o áudio para separar diálogo e música.");
+  } finally {
+    await context.close();
+  }
+  options.signal?.throwIfAborted();
+  const maxDuration = options.maxDuration ?? LOCAL_AUDIO_EXTRACTION_LIMITS.maxDuration;
+  if (!Number.isFinite(decoded.duration) || decoded.duration <= 0)
+    throw new Error("A mídia não contém uma faixa de áudio utilizável.");
+  if (decoded.duration > maxDuration)
+    throw new Error(`Separe um trecho de até ${maxDuration} segundos por vez.`);
+  const channelCount = Math.min(
+    LOCAL_AUDIO_EXTRACTION_LIMITS.maxChannels,
+    decoded.numberOfChannels,
+  );
+  if (channelCount < 1) throw new Error("A mídia não contém canais de áudio.");
+
+  if (decoded.sampleRate === AUDIO_SEPARATION_SAMPLE_RATE) {
+    return encodeStereoWav(
+      Array.from({ length: channelCount }, (_, index) => decoded.getChannelData(index).slice()),
+      AUDIO_SEPARATION_SAMPLE_RATE,
+    );
+  }
+
+  const OfflineCtx =
+    window.OfflineAudioContext ??
+    (window as unknown as { webkitOfflineAudioContext?: typeof OfflineAudioContext })
+      .webkitOfflineAudioContext;
+  if (!OfflineCtx)
+    throw new Error("Este navegador não oferece conversão de áudio para 44.100 Hz.");
+  const resampleContext = new OfflineCtx(
+    channelCount,
+    Math.ceil(decoded.duration * AUDIO_SEPARATION_SAMPLE_RATE),
+    AUDIO_SEPARATION_SAMPLE_RATE,
+  );
+  const source = resampleContext.createBufferSource();
+  source.buffer = decoded;
+  source.connect(resampleContext.destination);
+  source.start();
+  const resampled = await resampleContext.startRendering();
+  options.signal?.throwIfAborted();
+  return encodeStereoWav(
+    Array.from({ length: channelCount }, (_, index) => resampled.getChannelData(index)),
+    AUDIO_SEPARATION_SAMPLE_RATE,
+  );
+}
+
 export async function extractAudioFromMediaFile(file: File, options: ExtractAudioOptions = {}): Promise<ExtractedAudioResult> {
   const maxBytes = options.maxBytes ?? LOCAL_AUDIO_EXTRACTION_LIMITS.maxBytes;
   const maxDuration = options.maxDuration ?? LOCAL_AUDIO_EXTRACTION_LIMITS.maxDuration;
