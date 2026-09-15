@@ -88,6 +88,9 @@
   --destructive: #f06b78;
   --destructive-foreground: #17070a;
   --warn: #f6b94a;
+  /* aliases usados por vitrine/landing */
+  --warning: var(--warn);
+  --cyan: #21d4d8;
   --success: #2dd4a3;
   --info: #59a8ff;
   --social-meta: #f06b78;

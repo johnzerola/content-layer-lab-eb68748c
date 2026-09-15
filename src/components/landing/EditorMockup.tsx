@@ -29,7 +29,7 @@ export function EditorMockup() {
     <div className="lp-glass lp-ring relative overflow-hidden rounded-3xl p-3 sm:p-4">
       <div className="flex items-center gap-2 px-1 pb-3">
         <span className="size-2.5 rounded-full bg-destructive/70" />
-        <span className="size-2.5 rounded-full bg-warning/70" />
+        <span className="size-2.5 rounded-full bg-warn/70" />
         <span className="size-2.5 rounded-full bg-primary/70" />
         <span className="mono-label ml-2 truncate">editor ia · podcast_ep42.mp4</span>
         <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-[10px] text-primary">
