@@ -131,33 +131,31 @@ export function AuthScreen({
   return (
     <div className="auth-screen auth-enter grid max-h-[94vh] w-full overflow-y-auto rounded-3xl border border-border bg-surface md:max-h-[90vh] md:grid-cols-[0.94fr_1fr] md:overflow-hidden lg:grid-cols-[1.05fr_1fr]">
       {/* ---------- vitrine ---------- */}
-      <aside className="auth-stage relative hidden flex-col justify-between overflow-hidden p-6 md:flex lg:p-8">
+      <aside className="auth-stage relative hidden flex-col justify-between overflow-hidden p-6 md:flex lg:p-9">
         <span aria-hidden className="auth-beam auth-beam-a" />
         <span aria-hidden className="auth-beam auth-beam-b" />
         <span aria-hidden className="auth-grid" />
-        <div aria-hidden className="auth-social-field">
-          {[...SOCIAL_ICONS, ...SOCIAL_ICONS].map(({ label, Icon, className }, index) => (
-            <span className={`auth-social-float ${className}`} key={`${label}-${index}`}>
-              <span className="auth-social-icon">
-                <Icon aria-label={label} />
-              </span>
-            </span>
-          ))}
-          <span className="auth-glass-sheen" />
-        </div>
+        <PrizeStream />
+        <span aria-hidden className="auth-glass-sheen" />
 
         <div className="relative">
-          <span className="auth-glass inline-flex items-center gap-2 rounded-full border border-border-hover px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+          <span className="auth-pill inline-flex items-center gap-2 rounded-full px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
             <span className="auth-live size-1.5 rounded-full bg-primary" />
-            estúdio em produção
+            ao vivo
           </span>
 
-          <h1 className="mt-6 font-display text-[clamp(2rem,3.2vw,2.9rem)] font-extrabold leading-[0.95] tracking-tight">
-            <span className="auth-shine block">Seus cortes</span>
-            <span className="text-gradient block">viram audiência.</span>
+          <p className="mt-7 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+            prêmio acumulado da semana
+          </p>
+          <p className="mt-2 font-display text-[clamp(2.6rem,4.6vw,4.2rem)] font-extrabold leading-none tracking-[-0.04em]">
+            <PrizeCounter values={PRIZES} />
+          </p>
+
+          <h1 className="mt-6 max-w-sm font-display text-[clamp(1.35rem,2vw,1.8rem)] font-extrabold leading-[1.05] tracking-tight">
+            <span className="auth-shine">Seus cortes valem dinheiro de verdade.</span>
           </h1>
-          <p className="mt-4 max-w-sm text-[13px] leading-relaxed text-muted-foreground">
-            Importe centenas de vídeos, aplique seu template e publique em escala — sem sair do VaiViral.
+          <p className="mt-3 max-w-sm text-[13px] leading-relaxed text-muted-foreground">
+            Publique nos campeonatos e receba por cada visualização. Pagamento direto no PIX.
           </p>
         </div>
 
@@ -169,7 +167,7 @@ export function AuthScreen({
               style={{ animationDelay: `${120 + i * 90}ms` }}
             >
               <p
-                className={`font-display text-3xl font-extrabold tracking-tight ${
+                className={`font-display text-2xl font-extrabold tracking-tight ${
                   h.tone === "primary" ? "text-gradient" : "text-foreground"
                 }`}
               >
@@ -180,7 +178,7 @@ export function AuthScreen({
           ))}
         </div>
 
-        <ul className="relative mt-6 space-y-2">
+        <ul className="relative mt-5 space-y-2">
           {FEATURES.map((f, i) => (
             <li
               key={f}
@@ -194,7 +192,32 @@ export function AuthScreen({
             </li>
           ))}
         </ul>
+
+        <div className="relative mt-6 flex items-center gap-2 text-muted-foreground">
+          {SOCIAL_ICONS.map(({ label, Icon, className }) => (
+            <span
+              key={label}
+              className={`auth-pill grid size-8 place-items-center rounded-lg ${className}`}
+              title={label}
+            >
+              <Icon aria-label={label} />
+            </span>
+          ))}
+        </div>
       </aside>
+
+      {/* ---------- topo compacto (mobile) ---------- */}
+      <div className="auth-stage relative flex items-center gap-3 overflow-hidden px-5 py-4 md:hidden">
+        <PrizeStream />
+        <span aria-hidden className="auth-beam auth-beam-a" />
+        <span className="auth-pill relative inline-flex items-center gap-2 rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+          <span className="auth-live size-1.5 rounded-full bg-primary" />
+          ao vivo
+        </span>
+        <p className="relative font-display text-xl font-extrabold tracking-tight">
+          <PrizeCounter values={PRIZES} />
+        </p>
+      </div>
 
       {/* ---------- formulário ---------- */}
       <section className="auth-panel-glass relative flex flex-col justify-center p-6 sm:p-9">
