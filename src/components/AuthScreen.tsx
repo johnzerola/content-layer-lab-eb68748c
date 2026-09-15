@@ -2,17 +2,19 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowRight,
   Check,
-  Clapperboard,
   Eye,
   EyeOff,
-  Facebook,
-  Instagram,
   Loader2,
-  Music2,
   Sparkles,
-  Youtube,
   Zap,
 } from "lucide-react";
+import {
+  FacebookIcon,
+  InstagramIcon,
+  KwaiIcon,
+  TikTokIcon,
+  YouTubeIcon,
+} from "@/components/brand-icons";
 import { Button } from "@/components/ui/button";
 import { resetPassword, signIn, signUp } from "@/lib/cloud";
 import { toast } from "sonner";
@@ -29,11 +31,11 @@ const FEATURES = [
 ];
 
 const SOCIAL_ICONS = [
-  { label: "Instagram", Icon: Instagram, className: "auth-social-instagram" },
-  { label: "TikTok", Icon: Music2, className: "auth-social-tiktok" },
-  { label: "Kwai", Icon: Clapperboard, className: "auth-social-kwai" },
-  { label: "YouTube", Icon: Youtube, className: "auth-social-youtube" },
-  { label: "Facebook", Icon: Facebook, className: "auth-social-facebook" },
+  { label: "Instagram", Icon: InstagramIcon, className: "auth-social-instagram" },
+  { label: "TikTok", Icon: TikTokIcon, className: "auth-social-tiktok" },
+  { label: "Kwai", Icon: KwaiIcon, className: "auth-social-kwai" },
+  { label: "YouTube", Icon: YouTubeIcon, className: "auth-social-youtube" },
+  { label: "Facebook", Icon: FacebookIcon, className: "auth-social-facebook" },
 ] as const;
 
 function AnimatedNumber({ value, suffix, delay = 0 }: { value: number; suffix: string; delay?: number }) {
