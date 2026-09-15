@@ -55,7 +55,7 @@ const NAV = [
   { label: "Como funciona", href: "#fluxo" },
   { label: "Recursos", href: "#recursos" },
   { label: "Números", href: "#numeros" },
-  { label: "Planos", href: "#planos" },
+  { label: "Planos", href: "/planos" },
   { label: "FAQ", href: "#faq" },
 ];
 
@@ -331,12 +331,12 @@ function Hero() {
               Começar agora
               <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
-            <a
-              href="#demo"
+            <Link
+              to="/editor-demo"
               className="lp-glass lp-hover inline-flex h-12 items-center rounded-xl px-6 text-sm font-medium text-foreground/90"
             >
-              Ver o produto por dentro
-            </a>
+              Abrir o editor de demonstração
+            </Link>
           </div>
           <p className="mono-label mt-5">sem instalar nada · exporta mp4 1080×1920 · reels, tiktok e shorts</p>
         </Reveal>
