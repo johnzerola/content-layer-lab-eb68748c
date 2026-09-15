@@ -355,6 +355,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
         {routeLink("/perfis", "Perfis", Users, expanded, close)}
         {routeLink("/live", "Monitora Live", Radio, expanded, close)}
         {routeLink("/metricas", "Métricas", BarChart3, expanded, close)}
+        {routeLink("/portfolio", "Portfólio", Images, expanded, close)}
       </div>
 
       <div className="mt-4 flex flex-col gap-0.5 px-3">
