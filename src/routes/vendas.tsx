@@ -26,6 +26,7 @@ import {
 
 import { EditorMockup } from "@/components/landing/EditorMockup";
 import { FloatingChips } from "@/components/landing/FloatingChips";
+import { AccountCta } from "@/components/landing/AccountCta";
 import { Reveal } from "@/components/landing/Reveal";
 import { Stat } from "@/components/landing/Stat";
 
@@ -290,12 +291,11 @@ function Header() {
             ),
           )}
         </nav>
-        <Link
-          to="/"
+        <AccountCta
+          guestLabel="Entrar"
+          memberLabel="Abrir meu estúdio"
           className="lp-cta-glow ml-auto inline-flex h-9 shrink-0 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-px md:ml-0"
-        >
-          Abrir estúdio <ArrowRight className="size-4" />
-        </Link>
+        />
       </div>
     </header>
   );
@@ -338,14 +338,11 @@ function Hero() {
           </div>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Link
-              to="/checkout"
-              search={{ plano: "creator" }}
+            <AccountCta
+              guestLabel="Criar minha conta"
+              memberLabel="Abrir meu estúdio"
               className="lp-cta-glow group inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5"
-            >
-              Começar agora
-              <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
+            />
             <Link
               to="/editor-demo"
               className="lp-glass lp-hover inline-flex h-12 items-center rounded-xl px-6 text-sm font-medium text-foreground/90"
@@ -738,13 +735,11 @@ function FinalCta() {
               Envie o primeiro vídeo e veja os cortes prontos com legenda, enquadramento e seu branding em
               poucos minutos.
             </p>
-            <Link
-              to="/checkout"
-              search={{ plano: "creator" }}
+            <AccountCta
+              guestLabel="Criar minha conta"
+              memberLabel="Abrir meu estúdio"
               className="lp-cta-glow mt-9 inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-7 text-sm font-semibold text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5"
-            >
-              Começar agora <ArrowRight className="size-4" />
-            </Link>
+            />
           </div>
         </div>
       </Reveal>
