@@ -3,7 +3,7 @@ import type { SVGProps } from "react";
 
 type IconProps = SVGProps<SVGSVGElement>;
 
-function Base({ children, viewBox = "0 0 24 24", ...props }: IconProps & { viewBox?: string }) {
+function Base({ children, viewBox = "0 0 24 24", ...props }: IconProps & { viewBox?: string | undefined }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
