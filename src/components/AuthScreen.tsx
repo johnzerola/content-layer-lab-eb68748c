@@ -34,8 +34,8 @@ function GoogleMark({ className }: { className?: string }) {
 }
 import { toast } from "sonner";
 
-/** Prêmios em destaque que se alternam na vitrine. */
-const PRIZES = [298000, 246200, 187500, 321800];
+/** Prêmio em destaque: carrega uma vez e permanece no valor final. */
+const PRIZES = [246000];
 
 
 const HIGHLIGHTS = [

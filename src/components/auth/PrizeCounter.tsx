@@ -8,8 +8,7 @@ function formatBRL(v: number) {
 }
 
 /**
- * Prêmio em destaque: conta suavemente de zero até o primeiro valor e depois
- * transita entre os valores da lista, num ciclo contínuo e elegante.
+ * Prêmio em destaque: carrega rapidamente do zero até o valor final.
  */
 export function PrizeCounter({ values, interval = 5200 }: { values: number[]; interval?: number }) {
   const [display, setDisplay] = useState(0);
@@ -24,15 +23,18 @@ export function PrizeCounter({ values, interval = 5200 }: { values: number[]; in
       return;
     }
     const from = fromRef.current;
-    const duration = 1800;
+    const duration = 950;
     const startedAt = performance.now();
     let frame = 0;
     const tick = (now: number) => {
       const p = Math.min(1, (now - startedAt) / duration);
-      const eased = 1 - Math.pow(1 - p, 4);
+      const eased = 1 - Math.pow(1 - p, 3);
       setDisplay(from + (target - from) * eased);
       if (p < 1) frame = requestAnimationFrame(tick);
-      else fromRef.current = target;
+      else {
+        setDisplay(target);
+        fromRef.current = target;
+      }
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
