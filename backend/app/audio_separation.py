@@ -62,7 +62,7 @@ def capabilities():
             "notice": NOTICE}
 
 
-def audio_info(path: Path):
+def audio_probe(path: Path, *, allow_resample: bool = False):
     result = subprocess.run([
         "ffprobe", "-v", "error", "-show_entries",
         "format=duration:stream=codec_type,channels,sample_rate", "-of", "json", str(path),
@@ -76,9 +76,37 @@ def audio_info(path: Path):
         raise ValueError(f"O áudio precisa ter até {MAX_SECONDS} segundos.")
     if int(streams[0].get("channels", 0)) not in (1, 2):
         raise ValueError("Use áudio mono ou estéreo.")
-    if int(streams[0].get("sample_rate", 0)) != 44100:
+    sample_rate = int(streams[0].get("sample_rate", 0))
+    if allow_resample and not 8000 <= sample_rate <= 192000:
+        raise ValueError("Taxa de amostragem inválida.")
+    if not allow_resample and sample_rate != 44100:
         raise ValueError("Use áudio em 44.100 Hz.")
-    return duration
+    return duration, sample_rate
+
+
+def audio_info(path: Path):
+    return audio_probe(path)[0]
+
+
+def normalize_uploaded_wav(path: Path):
+    """Accept common WAV rates at the boundary and store one engine-safe format."""
+    duration, sample_rate = audio_probe(path, allow_resample=True)
+    if sample_rate == 44100:
+        return duration
+
+    normalized = path.with_name("input.normalized.wav")
+    try:
+        subprocess.run([
+            "ffmpeg", "-y", "-v", "error", "-i", str(path), "-vn",
+            "-ar", "44100", "-c:a", "pcm_s16le", str(normalized),
+        ], capture_output=True, check=True, timeout=60)
+        normalized_duration = audio_info(normalized)
+        if abs(normalized_duration - duration) > 0.15:
+            raise ValueError("A conversão alterou a duração do áudio.")
+        normalized.replace(path)
+        return normalized_duration
+    finally:
+        normalized.unlink(missing_ok=True)
 
 
 def command(source: Path, output: Path):
@@ -264,9 +292,9 @@ class AudioSeparation:
                         header = source.read(12)
                     if header[:4] != b"RIFF" or header[8:12] != b"WAVE":
                         raise ValueError("Formato inválido: envie WAV.")
-                    duration = audio_info(directory / "input.wav")
+                    duration = normalize_uploaded_wav(directory / "input.wav")
                 except (ValueError, subprocess.SubprocessError, KeyError):
-                    raise HTTPException(422, "WAV inválido: use mono/estéreo, 44.100 Hz e até 3 minutos.") from None
+                    raise HTTPException(422, "WAV inválido: use mono/estéreo e até 3 minutos.") from None
                 write_state(directory, {"status": "uploaded", "duration": duration})
                 return {"status": "uploaded", "duration": duration}
             except BaseException:

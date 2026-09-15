@@ -13,6 +13,7 @@ const ticket: StemTicket = {
 };
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
+const validWav = () => encodeStereoWav([new Float32Array([0, 0])], 44100);
 afterEach(() => vi.unstubAllGlobals());
 
 describe("real audio separation", () => {
@@ -39,7 +40,7 @@ describe("real audio separation", () => {
       return json({ status: "completed", duration: 5 });
     });
     vi.stubGlobal("fetch", fetcher);
-    const result = await runStemJob(ticket, new Blob(["wav"]));
+    const result = await runStemJob(ticket, validWav());
     expect(result.duration).toBe(5);
     expect(result.voice.size).toBe(256);
     expect(fetcher.mock.calls.filter(([url]) => url.endsWith("/start"))).toHaveLength(1);
@@ -50,7 +51,7 @@ describe("real audio separation", () => {
       url === ticket.base ? json({ status: "failed", error: "Model failed" }) : json({}),
     );
     vi.stubGlobal("fetch", fetcher);
-    await expect(runStemJob(ticket, new Blob())).rejects.toThrow("Model failed");
+    await expect(runStemJob(ticket, validWav())).rejects.toThrow("Model failed");
     expect(fetcher.mock.calls.some(([url]) => url.endsWith("/cancel"))).toBe(true);
     expect(fetcher.mock.calls.some(([url]) => url.includes("/stems/"))).toBe(false);
   });
@@ -69,7 +70,7 @@ describe("real audio separation", () => {
       return json(states.shift());
     }));
 
-    const result = await runStemJob(ticket, new Blob(["wav"]), { pollIntervalMs: 0, onStage: stage => { stages.push(stage); }, onStatus: status => { statuses.push(status); } });
+    const result = await runStemJob(ticket, validWav(), { pollIntervalMs: 0, onStage: stage => { stages.push(stage); }, onStatus: status => { statuses.push(status); } });
 
     expect(result.duration).toBe(5);
     expect(stages).toContain("Na fila para separar diálogo e música…");
@@ -83,7 +84,7 @@ describe("real audio separation", () => {
       return json({});
     });
     vi.stubGlobal("fetch", fetcher);
-    await expect(runStemJob(ticket, new Blob())).rejects.toThrow("network");
+    await expect(runStemJob(ticket, validWav())).rejects.toThrow("network");
     expect(fetcher.mock.calls.at(-1)?.[0]).toBe(`${ticket.base}/cancel`);
   });
 
@@ -96,6 +97,14 @@ describe("real audio separation", () => {
         return json({ status: "completed", duration: 5 });
       }),
     );
-    await expect(runStemJob(ticket, new Blob())).rejects.toThrow("trilha de áudio");
+    await expect(runStemJob(ticket, validWav())).rejects.toThrow("trilha de áudio");
+  });
+
+  it("rejects malformed audio before contacting the worker", async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(runStemJob(ticket, new Blob(["not-a-wav"]))).rejects.toThrow("WAV válido");
+    expect(fetcher).not.toHaveBeenCalled();
   });
 });

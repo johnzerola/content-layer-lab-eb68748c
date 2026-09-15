@@ -11,12 +11,32 @@ export interface StemTicket {
 
 export type StemJobNetworkStatus = "uploaded" | "queued" | "processing" | "downloading";
 
+async function assertSeparationWav(wav: Blob): Promise<void> {
+  if (wav.size < 44) throw new Error("O áudio preparado está vazio ou não é um WAV válido.");
+
+  const header = new DataView(await wav.slice(0, 44).arrayBuffer());
+  const ascii = (offset: number, length: number) =>
+    String.fromCharCode(...Array.from({ length }, (_, index) => header.getUint8(offset + index)));
+  const valid =
+    ascii(0, 4) === "RIFF" &&
+    ascii(8, 4) === "WAVE" &&
+    ascii(12, 4) === "fmt " &&
+    header.getUint16(20, true) === 1 &&
+    [1, 2].includes(header.getUint16(22, true)) &&
+    header.getUint32(24, true) === 44_100 &&
+    header.getUint16(34, true) === 16;
+
+  if (!valid)
+    throw new Error("O áudio não pôde ser preparado em WAV PCM, 44.100 Hz, mono ou estéreo.");
+}
+
 export async function runStemJob(
   ticket: StemTicket,
   wav: Blob,
   options: { signal?: AbortSignal; onStage?: (stage: string) => void; onStatus?: (status: StemJobNetworkStatus) => void | Promise<void>; pollIntervalMs?: number } = {},
 ): Promise<{ voice: Blob; music: Blob; duration: number; engine?: string; model?: string; quality?: string }> {
   const { signal, onStage, onStatus, pollIntervalMs = 2500 } = options;
+  await assertSeparationWav(wav);
   let started = false;
   const deadline = AbortSignal.timeout(17 * 60_000);
   const combined = signal ? AbortSignal.any([signal, deadline]) : deadline;

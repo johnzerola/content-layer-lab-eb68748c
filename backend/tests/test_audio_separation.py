@@ -111,6 +111,24 @@ def test_real_wav_upload_duplicate_and_invalid_media(service):
         assert not (manager.root / other / "input.wav").exists()
 
 
+def test_upload_normalizes_48khz_before_engine(service):
+    manager, client = service
+    job_id = str(uuid.uuid4())
+    with patch("app.audio_separation.capabilities", return_value={"ready": True}):
+        result = client.post(
+            f"/v1/audio/jobs/{job_id}/upload",
+            content=wav(rate=48000),
+            headers=header(manager, job_id, "upload"),
+        )
+
+    assert result.status_code == 200
+    source = manager.root / job_id / "input.wav"
+    assert audio_info(source) == pytest.approx(0.1, abs=0.01)
+    with wave.open(str(source), "rb") as normalized:
+        assert normalized.getframerate() == 44100
+        assert normalized.getsampwidth() == 2
+
+
 def test_run_error_releases_slot_and_never_completes(service):
     manager, client = service
     job_id = str(uuid.uuid4())
