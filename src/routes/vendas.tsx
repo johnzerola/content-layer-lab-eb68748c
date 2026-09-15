@@ -54,6 +54,7 @@ export const Route = createFileRoute("/vendas")({
 const NAV = [
   { label: "Como funciona", href: "#fluxo" },
   { label: "Recursos", href: "#recursos" },
+  { label: "Editor", href: "/editor-demo" },
   { label: "Números", href: "#numeros" },
   { label: "Planos", href: "/planos" },
   { label: "FAQ", href: "#faq" },
@@ -269,11 +270,25 @@ function Header() {
           <span className="font-display text-[15px] font-semibold tracking-tight">VaiViral</span>
         </Link>
         <nav className="ml-auto hidden items-center gap-7 md:flex">
-          {NAV.map((n) => (
-            <a key={n.href} href={n.href} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-              {n.label}
-            </a>
-          ))}
+          {NAV.map((n) =>
+            n.href.startsWith("/") ? (
+              <Link
+                key={n.href}
+                to={n.href}
+                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {n.label}
+              </Link>
+            ) : (
+              <a
+                key={n.href}
+                href={n.href}
+                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {n.label}
+              </a>
+            ),
+          )}
         </nav>
         <Link
           to="/"
