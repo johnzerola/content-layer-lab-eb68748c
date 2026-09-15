@@ -1212,6 +1212,47 @@
   animation: vv-rise var(--dur-panel, 240ms) var(--ease-out-expo, cubic-bezier(0.2, 0.8, 0.2, 1)) both;
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent);
 }
+/* Liquid glass: material translúcido para cards, badge, abas e painel */
+.auth-glass {
+  position: relative;
+  background: color-mix(in srgb, var(--surface-2) 46%, transparent);
+  backdrop-filter: blur(14px) saturate(150%);
+  border-color: color-mix(in srgb, var(--foreground) 10%, var(--border));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 12%, transparent),
+    0 10px 30px -22px color-mix(in srgb, var(--background) 80%, transparent);
+  transition:
+    transform 220ms var(--ease-out-expo, cubic-bezier(0.2, 0.8, 0.2, 1)),
+    box-shadow 220ms ease,
+    border-color 220ms ease;
+}
+.auth-glass-lift:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--primary) 32%, var(--border));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 16%, transparent),
+    0 16px 36px -24px var(--primary-glow);
+}
+.auth-panel-glass {
+  background: color-mix(in srgb, var(--surface-2) 34%, transparent);
+  backdrop-filter: blur(18px) saturate(140%);
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .auth-glass { background: color-mix(in srgb, var(--surface-2) 92%, transparent); }
+  .auth-panel-glass { background: color-mix(in srgb, var(--surface-2) 88%, transparent); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .auth-glass,
+  .auth-panel-glass,
+  .auth-social-icon {
+    backdrop-filter: none;
+    background: var(--surface-2);
+  }
+}
+@media (max-width: 768px) {
+  .auth-glass { backdrop-filter: blur(9px) saturate(135%); }
+  .auth-panel-glass { backdrop-filter: blur(10px) saturate(130%); }
+}
 .auth-logo {
   background-image: var(--gradient-primary);
   box-shadow: 0 8px 24px -10px var(--primary-glow), 0 0 0 1px color-mix(in srgb, var(--primary) 25%, transparent);
