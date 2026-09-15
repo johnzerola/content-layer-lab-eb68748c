@@ -32,7 +32,7 @@ export function Reveal({
   return (
     <div
       ref={ref}
-      className={`lp-reveal ${inView ? "is-in" : ""} ${className}`}
+      className={`lp-reveal min-w-0 ${inView ? "is-in" : ""} ${className}`}
       style={{ transitionDelay: `${delay}ms` }}
     >
       {children}
