@@ -1,0 +1,12 @@
+# Add after ALL existing production compose overlays. Requires a preflighted image.
+services:
+  worker:
+    image: ${BANDIT_IMAGE:?Set the tested Bandit candidate image}
+    environment:
+      AUDIO_SEPARATION_ENGINE: bandit
+      AUDIO_SEPARATION_ENABLED: "1"
+      BANDIT_PYTHON: /usr/local/bin/python
+      BANDIT_DEVICE: cpu
+      BANDIT_CHECKOUT: /opt/bandit-infer
+      BANDIT_CHECKPOINT: /opt/bandit-model/checkpoint-multi.ckpt
+      AUDIO_SEPARATION_TIMEOUT_SECONDS: "900"

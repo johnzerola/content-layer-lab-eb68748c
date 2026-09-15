@@ -1,7 +1,7 @@
 """Offline, research-only CASS pilot. Does not change the production engine.
 
 Run with the existing isolated CUDA Python and a pinned bandit-infer checkout.
-Input must be a mono/stereo 48 kHz WAV, at most 30 seconds.
+Input must be a mono/stereo 48 kHz WAV; default limit 30 seconds.
 """
 from __future__ import annotations
 
@@ -24,6 +24,7 @@ def main():
     parser.add_argument("--checkout", type=Path, required=True)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--device", choices=("cpu", "cuda"), required=True)
+    parser.add_argument("--max-seconds", type=int, choices=range(1, 181), default=30)
     args = parser.parse_args()
     revision = subprocess.check_output(
         ["git", "-C", str(args.checkout), "rev-parse", "HEAD"], text=True
@@ -43,8 +44,8 @@ def main():
     from bandit_infer import BanditSession
 
     audio, rate = sf.read(args.input, dtype="float32", always_2d=True)
-    if rate != 48000 or audio.shape[1] not in (1, 2) or not 0 < len(audio) <= 30 * rate:
-        raise ValueError("Expected 48 kHz mono/stereo, at most 30 seconds")
+    if rate != 48000 or audio.shape[1] not in (1, 2) or not 0 < len(audio) <= args.max_seconds * rate:
+        raise ValueError(f"Expected 48 kHz mono/stereo, at most {args.max_seconds} seconds")
     if not np.isfinite(audio).all():
         raise ValueError("Non-finite input")
     torch.set_num_threads(2)

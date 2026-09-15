@@ -1,0 +1,16 @@
+# Build on the CURRENT running image, supplied explicitly. Do not reuse old backups.
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+RUN git clone https://github.com/openmirlab/bandit-infer.git /opt/bandit-infer \
+    && git -C /opt/bandit-infer checkout --detach 7ec03cb568811958db65a96a10fdb8879922b2ac
+# The base image must already provide torch, numpy and soundfile. No GPU dependency replacement.
+RUN python -c "import torch,numpy,soundfile"
+COPY bandit-model/checkpoint-multi.ckpt /opt/bandit-model/checkpoint-multi.ckpt
+RUN echo 'abcfccf65446752a057f4a302c941479a54b7560ebf8d7bca039d2ea98e64cfc  /opt/bandit-model/checkpoint-multi.ckpt' | sha256sum -c -
+COPY app/audio_separation.py app/bandit_worker.py /app/app/
+ENV BANDIT_CHECKOUT=/opt/bandit-infer BANDIT_CHECKPOINT=/opt/bandit-model/checkpoint-multi.ckpt BANDIT_DEVICE=cpu
+# Engine selection stays in the activation overlay, after a real CPU smoke.
+USER cleaner

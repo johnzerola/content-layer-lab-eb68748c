@@ -16,6 +16,8 @@ Classificação: **verde** = referência/código geralmente compatível após re
 | ffmpeg.wasm | MIT + obrigações do build FFmpeg | amarelo | codecs, patentes e distribuição do binário exigem revisão |
 | Mediabunny | MPL-2.0 | amarelo | arquivo modificado pode ter obrigações de disponibilização |
 | Remotion | licença especial/comercial | vermelho para core | usar apenas após revisão jurídica/licença apropriada |
+| bandit-infer | Apache-2.0; Karn Watcharasupat e colaboradores; commit `7ec03cb568811958db65a96a10fdb8879922b2ac` | verde | código permitido; preservar LICENSE/NOTICE e atribuição; fonte: https://github.com/openmirlab/bandit-infer |
+| Bandit V2 `checkpoint-multi.ckpt` | CC-BY-SA-4.0; Karn Watcharasupat, Chih-Wei Wu e Iroro Orife; v1 | amarelo | uso comercial permitido com atribuição e ShareAlike; peso intacto fica fora do Git; SHA-256 `abcfccf65446752a057f4a302c941479a54b7560ebf8d7bca039d2ea98e64cfc`; fonte: https://zenodo.org/records/12701995 |
 
 ## Regra de incorporação
 

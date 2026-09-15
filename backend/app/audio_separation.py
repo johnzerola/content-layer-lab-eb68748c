@@ -27,6 +27,19 @@ from .storage import job_dir, read_state, write_state, cleanup_expired, director
 MAX_SECONDS = 180
 MAX_BYTES = 64 * 1024 * 1024
 MODEL = "htdemucs"
+
+def engine_name():
+    return os.getenv("AUDIO_SEPARATION_ENGINE", "demucs")
+
+
+def bandit_configuration():
+    return {
+        "python": os.getenv("BANDIT_PYTHON", sys.executable),
+        "checkout": os.getenv("BANDIT_CHECKOUT", ""),
+        "checkpoint": os.getenv("BANDIT_CHECKPOINT", ""),
+        "device": os.getenv("BANDIT_DEVICE", "cpu"),
+    }
+
 def separation_settings() -> tuple[str, int, float]:
     quality = os.getenv("AUDIO_SEPARATION_QUALITY", "fast").lower()
     if quality not in {"fast", "quality"}:
@@ -42,6 +55,19 @@ NOTICE = "Pode haver resíduos de música; canto pode permanecer junto da fala."
 
 def capabilities():
     enabled = os.getenv("AUDIO_SEPARATION_ENABLED", "0") == "1"
+    if engine_name() == "bandit":
+        config = bandit_configuration()
+        installed = (Path(config["python"]).is_file()
+                     and (Path(config["checkout"]) / "src/bandit_infer").is_dir()
+                     and Path(config["checkpoint"]).is_file()
+                     and config["device"] in {"cpu", "cuda"})
+        return {"ready": enabled and installed and bool(shutil.which("ffmpeg")) and bool(shutil.which("ffprobe")),
+                "engine": "bandit", "model": "v2-multi", "device": config["device"],
+                "revision": "7ec03cb568811958db65a96a10fdb8879922b2ac:abcfccf65446752a057f4a302c941479a54b7560ebf8d7bca039d2ea98e64cfc",
+                "max_duration": MAX_SECONDS, "max_bytes": MAX_BYTES, "losslessIntermediate": True,
+                "notice": "Bandit V2 — Karn Watcharasupat e colaboradores. Pesos CC-BY-SA-4.0: https://zenodo.org/records/12701995. Pode haver resíduos em outros vídeos."}
+    if engine_name() != "demucs":
+        return {"ready": False, "engine": engine_name(), "notice": "Motor de áudio desconhecido."}
     installed = importlib.util.find_spec("demucs") is not None
     model, shifts, overlap = separation_settings()
     quality = os.getenv("AUDIO_SEPARATION_QUALITY", "fast").lower()
@@ -91,16 +117,19 @@ def audio_info(path: Path):
 def normalize_uploaded_wav(path: Path):
     """Accept common WAV rates at the boundary and store one engine-safe format."""
     duration, sample_rate = audio_probe(path, allow_resample=True)
-    if sample_rate == 44100:
+    target_rate = 48000 if engine_name() == "bandit" else 44100
+    if sample_rate == target_rate:
         return duration
 
     normalized = path.with_name("input.normalized.wav")
     try:
         subprocess.run([
             "ffmpeg", "-y", "-v", "error", "-i", str(path), "-vn",
-            "-ar", "44100", "-c:a", "pcm_s16le", str(normalized),
+            "-ar", str(target_rate), "-c:a", "pcm_f32le" if engine_name() == "bandit" else "pcm_s16le", str(normalized),
         ], capture_output=True, check=True, timeout=60)
-        normalized_duration = audio_info(normalized)
+        normalized_duration, actual_rate = audio_probe(normalized, allow_resample=True)
+        if actual_rate != target_rate:
+            raise ValueError("Taxa de amostragem inesperada após conversão.")
         if abs(normalized_duration - duration) > 0.15:
             raise ValueError("A conversão alterou a duração do áudio.")
         normalized.replace(path)
@@ -138,7 +167,55 @@ def stop_process(process):
     process.wait(timeout=15)
 
 
+def separate_bandit(directory: Path, cancel: threading.Event):
+    config = bandit_configuration()
+    source = directory / "input.wav"
+    duration, _ = audio_probe(source, allow_resample=True)
+    prepared = directory / "bandit-input.wav"
+    # Native inference stays at the approved 48 kHz; external contract stays 44.1 kHz.
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(source), "-ar", "48000",
+                    "-c:a", "pcm_f32le", str(prepared)], check=True, capture_output=True, timeout=60)
+    native = directory / "bandit-native"
+    args = [config["python"], str(Path(__file__).with_name("bandit_worker.py")),
+            "--input", str(prepared), "--output", str(native), "--checkout", config["checkout"],
+            "--checkpoint", config["checkpoint"], "--device", config["device"]]
+    timeout = max(60, min(3600, int(os.getenv("AUDIO_SEPARATION_TIMEOUT_SECONDS", "900"))))
+    deadline = time.monotonic() + timeout
+    if cancel.is_set():
+        raise RuntimeError("Separação cancelada.")
+    with (directory / "engine.log").open("wb") as log:
+        process = subprocess.Popen(args, stdout=log, stderr=log, start_new_session=os.name != "nt")
+        try:
+            while process.poll() is None:
+                if cancel.wait(0.25):
+                    raise RuntimeError("Separação cancelada.")
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("Separação excedeu o tempo configurado. Tente um trecho menor.")
+            if process.returncode != 0:
+                raise RuntimeError("Bandit falhou; consulte engine.log. O original foi preservado.")
+        finally:
+            stop_process(process)
+    target = directory / "separated" / "v2-multi" / "input"
+    target.mkdir(parents=True)
+    for stem in ("vocals", "no_vocals"):
+        if cancel.is_set():
+            raise RuntimeError("Separação cancelada.")
+        output = target / f"{stem}.wav"
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(native / f"{stem}.wav"),
+                        "-ar", "44100", "-c:a", "pcm_f32le", str(output)],
+                       check=True, capture_output=True, timeout=60)
+        if abs(audio_info(output) - duration) > 0.15:
+            raise RuntimeError("Duração das trilhas divergente; saída não aprovada.")
+    if cancel.is_set():
+        raise RuntimeError("Separação cancelada.")
+    return duration
+
+
 def separate(directory: Path, cancel: threading.Event):
+    if engine_name() == "bandit":
+        return separate_bandit(directory, cancel)
+    if engine_name() != "demucs":
+        raise RuntimeError("Motor de áudio desconhecido.")
     source = directory / "input.wav"
     duration = audio_info(source)
     output = directory / "separated"
@@ -239,6 +316,12 @@ class AudioSeparation:
             duration = separate(directory, event)
             model, shifts, overlap = separation_settings()
             quality = os.getenv("AUDIO_SEPARATION_QUALITY", "fast").lower()
+            if engine_name() == "bandit":
+                write_state(directory, {"status": "completed", "duration": duration,
+                                       "engine": "bandit", "model": "v2-multi", "ensemble": False,
+                                       "processing_seconds": round(time.monotonic() - started, 3),
+                                       "format": "wav", "notice": capabilities()["notice"]})
+                return
             write_state(directory, {"status": "completed", "duration": duration,
                                     "engine": "demucs", "model": model, "shifts": shifts,
                                     "overlap": overlap, "quality": quality if quality in {"fast", "quality"} else "fast",
@@ -272,9 +355,10 @@ class AudioSeparation:
             try:
                 if directory.exists():
                     raise HTTPException(409, "Este upload já existe; crie outro trabalho.")
-                if shutil.disk_usage(self.settings.storage_dir).free < self.settings.min_free_bytes + MAX_BYTES * 4:
+                reserve = MAX_BYTES * (8 if engine_name() == "bandit" else 4)
+                if shutil.disk_usage(self.settings.storage_dir).free < self.settings.min_free_bytes + reserve:
                     raise HTTPException(507, "Espaço insuficiente para separar áudio.")
-                if directory_size(self.settings.storage_dir) + MAX_BYTES * 4 > self.settings.storage_quota_bytes:
+                if directory_size(self.settings.storage_dir) + reserve > self.settings.storage_quota_bytes:
                     raise HTTPException(507, "Cota de armazenamento atingida.")
                 directory.mkdir(parents=True)
                 created = True

@@ -47,12 +47,13 @@ export const prepareAudioSeparation = createServerFn({ method: "POST" })
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok)
-      throw new Error("Publique o serviço Demucs na Hostear antes de separar as trilhas.");
+      throw new Error("O serviço de separação de áudio está indisponível.");
     const caps = (await response.json()) as {
       ready?: boolean;
       max_duration?: number;
       engine?: string;
       model?: string;
+      revision?: string;
       quality?: string;
       shifts?: number;
       overlap?: number;
@@ -60,12 +61,12 @@ export const prepareAudioSeparation = createServerFn({ method: "POST" })
     };
     if (caps.ready !== true)
       throw new Error(
-        "Demucs não está instalado/habilitado na Hostear. O áudio original não foi alterado.",
+        "O motor de separação não está habilitado no servidor. O áudio original não foi alterado.",
       );
     const jobId = crypto.randomUUID();
     const recipe = {
       id: `${caps.engine ?? "unknown"}:${caps.model ?? "unknown"}`,
-      revision: [
+      revision: caps.revision ?? [
         caps.quality ?? "unknown",
         `shifts=${caps.shifts ?? "unknown"}`,
         `overlap=${caps.overlap ?? "unknown"}`,
