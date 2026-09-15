@@ -17,7 +17,7 @@ export function FloatingChips() {
           <Captions />
         </span>
       </span>
-      <span className="lp-float lp-float-3 absolute bottom-[8%] left-[18%]">
+      <span className="lp-float lp-float-3 absolute bottom-[6%] left-[-3.5rem]">
         <span className="lp-chip3d" style={{ color: "var(--accent)" }}>
           <Music4 />
         </span>
@@ -37,7 +37,7 @@ export function FloatingChips() {
           <Play />
         </span>
       </span>
-      <span className="lp-float lp-float-2 absolute bottom-[-1rem] right-[30%]">
+      <span className="lp-float lp-float-2 absolute bottom-[-2rem] right-[-2.5rem]">
         <span className="lp-chip3d" style={{ color: "var(--cyan, var(--primary))" }}>
           <Wand2 />
         </span>
