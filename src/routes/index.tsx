@@ -336,6 +336,13 @@ function stripBranding(t: Template): Template {
   };
 }
 
+function orientationLabel(w: number, h: number): string {
+  const orientation = orientationOf(w, h);
+  if (orientation === "horizontal") return "horizontal";
+  if (orientation === "square") return "quadrado";
+  return "vertical";
+}
+
 /** Lembra qual template estava ativo entre sessões. */
 const ACTIVE_KEY = "vv.active-template";
 
@@ -1860,18 +1867,30 @@ function Home() {
 
 
   const baseTpl: Template = mode === "clip" ? stripBranding(active) : active;
+  // A exportação do ViralBatch redimensiona o template para cada plataforma.
+  // A prévia deve usar o mesmo primeiro formato selecionado, em vez de exibir
+  // as dimensões do arquivo de origem como se fossem as dimensões da saída.
+  const previewPlatform = flow.export.platforms
+    ? PLATFORM_PRESETS.find((preset) => platforms.includes(preset.id))
+    : undefined;
+  const previewCanvasW = previewPlatform?.w ?? baseTpl.canvasW ?? CANVAS_W;
+  const previewCanvasH = previewPlatform?.h ?? baseTpl.canvasH ?? CANVAS_H;
+  const previewBaseTpl = applyRatio(baseTpl, previewCanvasW, previewCanvasH);
   const previewTemplate: Template = selected
     ? {
-        ...baseTpl,
-        headline: { ...baseTpl.headline, text: selected.headline || baseTpl.headline.text },
-        cleanup: baseTpl.cleanup ?? [],
+        ...previewBaseTpl,
+        headline: {
+          ...previewBaseTpl.headline,
+          text: selected.headline || previewBaseTpl.headline.text,
+        },
+        cleanup: previewBaseTpl.cleanup ?? [],
         video: {
-          ...baseTpl.video,
+          ...previewBaseTpl.video,
           offsetX: selected.offsetX,
           offsetY: selected.offsetY,
         },
       }
-    : baseTpl;
+    : previewBaseTpl;
 
   return (
     <AppShell
@@ -2216,7 +2235,14 @@ function Home() {
               {selected ? (
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <p className="mono-label">Original</p>
+                    <p className="mono-label">
+                      Original
+                      {selected.w ? (
+                        <span className="ml-2 text-[11px] text-muted-foreground">
+                          {orientationLabel(selected.w, selected.h)} · {selected.w}×{selected.h}
+                        </span>
+                      ) : null}
+                    </p>
                     {selected.poster ? (
                       <img
                         src={selected.poster}
@@ -2295,15 +2321,11 @@ function Home() {
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="mono-label">
-                        Preview final
-                        {selected?.w ? (
-                          <span className="ml-2 text-[11px] text-muted-foreground">
-                            {orientationOf(selected.w, selected.h) === "horizontal"
-                              ? "horizontal"
-                              : orientationOf(selected.w, selected.h) === "square"
-                                ? "quadrado"
-                                : "vertical"}{" "}
-                            · {selected.w}×{selected.h}
+                        Preview final · {orientationLabel(previewCanvasW, previewCanvasH)} ·{" "}
+                        {previewCanvasW}×{previewCanvasH}
+                        {previewPlatform ? (
+                          <span className="ml-2 text-[11px] text-primary">
+                            {previewPlatform.label}
                           </span>
                         ) : null}
                       </p>
@@ -2445,6 +2467,12 @@ function Home() {
                         )}
                       </div>
                     )}
+                    {orientationOf(previewCanvasW, previewCanvasH) === "vertical" ? (
+                      <p className="text-center text-[11px] text-muted-foreground">
+                        O arquivo é 9:16. Em players de computador, as laterais da tela ficam
+                        pretas; elas não fazem parte do vídeo exportado.
+                      </p>
+                    ) : null}
                     {/* estilo rápido de legenda direto na prévia */}
                     <div className="flex flex-wrap items-center gap-1">
                       <button
