@@ -183,6 +183,17 @@ export function preloadImage(src: string) {
   });
 }
 
+/** Garante que logo, avatar e imagens livres existam antes do primeiro frame. */
+export async function preloadTemplateImages(t: Template) {
+  const sources = new Set<string>();
+  if (t.watermark.src) sources.add(t.watermark.src);
+  if (t.avatar.src) sources.add(t.avatar.src);
+  for (const extra of t.extras ?? []) {
+    if ("src" in extra && extra.src) sources.add(extra.src);
+  }
+  await Promise.all([...sources].map((src) => preloadImage(src)));
+}
+
 /** aplica opacidade a uma cor hex (#rgb/#rrggbb); outras notações passam direto */
 export function withAlpha(color: string, alpha: number) {
   const a = Math.min(1, Math.max(0, alpha));
@@ -645,6 +656,8 @@ export interface DrawOpts {
   borderColor?: string;
   /** tempo atual do vídeo fonte (segundos) — usado pelas legendas e janelas de limpeza */
   time?: number;
+  /** relógio da montagem, depois de cortes/velocidade — usado por camadas e keyframes */
+  timelineTime?: number;
   captions?: CaptionCue[];
   /** placa de fundo (mediana temporal) para reconstruir áreas com pixels reais */
   plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null;
@@ -1127,7 +1140,7 @@ export function drawFrame(
   source?: FrameSource | null,
   opts?: DrawOpts,
 ) {
-  const localTime = Math.max(0, (opts?.time ?? 0) - (opts?.clip?.start ?? 0));
+  const localTime = Math.max(0, opts?.timelineTime ?? ((opts?.time ?? 0) - (opts?.clip?.start ?? 0)));
   if (t.videoKeyframes?.length) t = { ...t, video: videoBoxAt(t, localTime) };
   const fullscreen = fullscreenAt(t, localTime);
   if (fullscreen.amount > 0) t = { ...t, video: fullscreen.video };
@@ -1153,7 +1166,7 @@ export function drawFrame(
   }
 
   // janela de tempo por camada (aparece/some com efeito de entrada e saída)
-  const layerTime = Math.max(0, (opts?.time ?? 0) - (opts?.clip?.start ?? 0));
+  const layerTime = localTime;
   type TimedLayer = {
     x?: number; y?: number; w?: number; h?: number;
     tStart?: number; tEnd?: number | null; fadeIn?: number; fadeOut?: number;

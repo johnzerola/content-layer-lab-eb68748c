@@ -136,7 +136,8 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
     rotate: v.rotate,
     border: v.border,
     borderColor: v.borderColor,
-    ...(opts.pre ? { pre: opts.pre, clip: { start: trimStart, end: trimStart + effDur } } : {}),
+    ...(opts.pre ? { pre: opts.pre } : {}),
+    clip: { start: trimStart, end: trimStart + effDur },
     ...(opts.captions?.length ? { captions: opts.captions } : {}),
     ...(opts.plate
       ? { plate: opts.plate as unknown as { canvas: HTMLCanvasElement; ok: Set<string> } }
@@ -213,6 +214,7 @@ export async function coreEncodeMp4(opts: CoreEncodeOptions): Promise<ArrayBuffe
           }
         : {}),
       time: srcTime,
+      timelineTime: outTime,
       quality: "hq" as const,
     });
 

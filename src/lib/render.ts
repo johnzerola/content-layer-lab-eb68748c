@@ -1,5 +1,5 @@
 import { CANVAS_H, CANVAS_W, type Template } from "./template";
-import { drawFrame } from "./draw";
+import { drawFrame, preloadTemplateImages } from "./draw";
 import { encodeMp4, webCodecsSupported } from "./encode";
 import { poolSupported, renderInPool } from "./render-pool";
 import { motionAt, type Variation } from "./variation";
@@ -116,6 +116,7 @@ async function recordVideo(
   const tpl: Template = opts.headline
     ? { ...template, headline: { ...template.headline, text: opts.headline } }
     : template;
+  await preloadTemplateImages(tpl);
 
   const done = new Promise<Blob>((resolve) => {
     recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
@@ -142,8 +143,10 @@ async function recordVideo(
       border: v.border,
       borderColor: v.borderColor,
       time: video.currentTime,
+      timelineTime: outTime,
       quality: "hq" as const,
-      ...(opts.pre ? { pre: opts.pre, clip: { start: clipStart, end: endAt } } : {}),
+      ...(opts.pre ? { pre: opts.pre } : {}),
+      clip: { start: clipStart, end: endAt },
       ...(opts.captions?.length ? { captions: opts.captions } : {}),
       ...(opts.plate ? { plate: opts.plate } : {}),
     });

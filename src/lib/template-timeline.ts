@@ -1,4 +1,60 @@
-import type { Template } from './template';
+import type { Template, VideoLayer } from './template';
+
+export type VideoKeyframeBox = Pick<VideoLayer, 'x' | 'y' | 'w' | 'h' | 'radius'>;
+
+const KEY_EPSILON = 0.05;
+
+const keyBox = (video: VideoLayer): VideoKeyframeBox => ({
+  x: video.x,
+  y: video.y,
+  w: video.w,
+  h: video.h,
+  radius: video.radius,
+});
+
+/** Cria ou atualiza o keyframe exatamente sob a agulha. */
+export function upsertVideoKeyframe(t: Template, time: number, patch: Partial<VideoKeyframeBox> = {}): Template {
+  const at = Number(Math.max(0, time).toFixed(2));
+  const current = keyBox(videoBoxAt(t, at));
+  const existing = (t.videoKeyframes ?? []).find((key) => Math.abs(key.t - at) <= KEY_EPSILON);
+  const next = {
+    id: existing?.id ?? crypto.randomUUID(),
+    t: at,
+    ...current,
+    ...patch,
+  };
+  return {
+    ...t,
+    videoKeyframes: [
+      ...(t.videoKeyframes ?? []).filter((key) => Math.abs(key.t - at) > KEY_EPSILON),
+      next,
+    ].sort((a, b) => a.t - b.t),
+  };
+}
+
+/**
+ * Ajusta a caixa base ou, quando a agulha está sobre um keyframe, o próprio
+ * keyframe. Assim a sequência "marcar keyframe -> mover/redimensionar" funciona.
+ */
+export function patchVideoAtTime(t: Template, time: number, patch: Partial<VideoKeyframeBox>): Template {
+  const hasKey = (t.videoKeyframes ?? []).some((key) => Math.abs(key.t - time) <= KEY_EPSILON);
+  if (hasKey) return upsertVideoKeyframe(t, time, patch);
+  return { ...t, video: { ...t.video, ...patch } };
+}
+
+/** Cria uma animação real da caixa atual até o quadro 9:16 inteiro. */
+export function expandVideoFrom(t: Template, time: number, duration: number, transition = 0.8): Template {
+  const start = Math.max(0, Math.min(time, Math.max(0, duration - 0.1)));
+  const end = Math.min(duration, start + Math.max(0.1, transition));
+  const anchored = upsertVideoKeyframe(t, start, keyBox(videoBoxAt(t, start)));
+  return upsertVideoKeyframe(anchored, end, {
+    x: 0,
+    y: 0,
+    w: t.canvasW ?? 1080,
+    h: t.canvasH ?? 1920,
+    radius: 0,
+  });
+}
 
 export function fullscreenAt(t: Template, time: number) {
   let amount = 0;

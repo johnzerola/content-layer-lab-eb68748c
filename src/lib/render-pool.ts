@@ -14,6 +14,7 @@ import type { WorkerResponse, RenderRequest } from "@/workers/render.worker";
 import { analysisCache, fileKey } from "./analysis-cache";
 import { audioEnvelope, renderAudioTrack, toPcm, type Envelope } from "./audio-track";
 import { keptSegments } from "./preedit";
+import { resolveMediaUrl } from "./media-store";
 
 interface Pending {
   resolve: (buf: ArrayBuffer) => void;
@@ -178,7 +179,10 @@ async function loadBitmaps(srcs: string[]) {
   for (const src of srcs) {
     try {
       const bmp = await analysisCache(`bitmap:${src}`, async () => {
-        const res = await fetch(src);
+        const url = await resolveMediaUrl(src);
+        if (!url) throw new Error("Imagem do template indisponível");
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Imagem do template respondeu ${res.status}`);
         const blob = await res.blob();
         return createImageBitmap(blob);
       });

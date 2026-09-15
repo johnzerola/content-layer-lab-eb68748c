@@ -1,5 +1,5 @@
 import { ArrayBufferTarget, Muxer } from "mp4-muxer";
-import { setBackdropQuality, drawFrame } from "./draw";
+import { setBackdropQuality, drawFrame, preloadTemplateImages } from "./draw";
 import { CANVAS_H, CANVAS_W, type Template } from "./template";
 import { motionAt, type Variation } from "./variation";
 import type { CaptionCue } from "./captions";
@@ -191,6 +191,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     const tpl: Template = opts.headline
       ? { ...t, headline: { ...t.headline, text: opts.headline } }
       : t;
+    await preloadTemplateImages(tpl);
 
     const drawOpts = {
       mirror: v.mirror,
@@ -203,7 +204,8 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       rotate: v.rotate,
       border: v.border,
       borderColor: v.borderColor,
-      ...(opts.pre ? { pre: opts.pre, clip: { start: trimStart, end: trimStart + effDur } } : {}),
+      ...(opts.pre ? { pre: opts.pre } : {}),
+      clip: { start: trimStart, end: trimStart + effDur },
       ...(opts.captions?.length ? { captions: opts.captions } : {}),
       ...(opts.plate ? { plate: opts.plate } : {}),
     };
@@ -246,6 +248,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
               }
             : {}),
           time: srcTime,
+          timelineTime: outTime,
           quality: "hq" as const,
         },
       );

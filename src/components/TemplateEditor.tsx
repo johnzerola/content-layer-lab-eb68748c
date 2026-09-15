@@ -50,6 +50,7 @@ const AUTO_FULL_ID = "auto-fullscreen";
 import { TemplateTimeline } from "./TemplateTimeline";
 import { uploadFileOrInline } from "@/lib/media-store";
 import { useMediaUrl } from "@/hooks/useMediaUrl";
+import { patchVideoAtTime, upsertVideoKeyframe, videoBoxAt } from "@/lib/template-timeline";
 
 const KEY_OF: Record<LayerId, keyof Template> = {
   video: "video",
@@ -387,27 +388,12 @@ export function TemplateEditor({
   const [snap, setSnap] = useState(true);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [dropping, setDropping] = useState(false);
-  const [zoom, setZoom] = useState(0.75);
+  const [zoom, setZoom] = useState(1);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [timelineOpen, setTimelineOpen] = useState(true);
 
   /** Marca a posição/tamanho atual do vídeo como keyframe no tempo da linha do tempo. */
-  const addVideoKey = () =>
-    setT({
-      ...t,
-      videoKeyframes: [
-        ...(t.videoKeyframes ?? []).filter((k) => Math.abs(k.t - time) > 0.05),
-        {
-          id: crypto.randomUUID(),
-          t: Number(time.toFixed(2)),
-          x: t.video.x,
-          y: t.video.y,
-          w: t.video.w,
-          h: t.video.h,
-          radius: t.video.radius,
-        },
-      ].sort((a, b) => a.t - b.t),
-    });
+  const addVideoKey = () => setT(upsertVideoKeyframe(t, time));
 
   /** Trecho final em que tudo some e o vídeo ocupa o 9:16 inteiro. */
   const autoFull = (t.fullscreenClips ?? []).find((c) => c.id === AUTO_FULL_ID) ?? null;
@@ -502,9 +488,37 @@ export function TemplateEditor({
   const fonts = useMemo(() => [...BUILTIN_FONTS, ...(t.fonts ?? []).map((f) => f.name)], [t.fonts]);
 
   const patch = (id: LayerId, data: Record<string, unknown>) => {
+    if (id === "video") {
+      const geometryKeys = new Set(["x", "y", "w", "h", "radius"]);
+      const geometry = Object.fromEntries(Object.entries(data).filter(([key]) => geometryKeys.has(key)));
+      const staticData = Object.fromEntries(Object.entries(data).filter(([key]) => !geometryKeys.has(key)));
+      let next = Object.keys(staticData).length ? { ...t, video: { ...t.video, ...staticData } } as Template : t;
+      if (Object.keys(geometry).length) next = patchVideoAtTime(next, time, geometry);
+      setT(next);
+      return;
+    }
     const key = KEY_OF[id];
     const cur = (t[key] ?? (id === "captions" ? defaultCaptions() : {})) as object;
     setT({ ...t, [key]: { ...cur, ...data } } as Template);
+  };
+
+  const videoAtTime = videoBoxAt(t, time);
+
+  /** Mantém o arraste do canvas sincronizado com o keyframe sob a agulha. */
+  const changeFromCanvas = (next: Template) => {
+    const currentKey = (t.videoKeyframes ?? []).some((key) => Math.abs(key.t - time) <= 0.05);
+    if (!currentKey || next.video === t.video) {
+      setT(next);
+      return;
+    }
+    const geometry = {
+      x: next.video.x,
+      y: next.video.y,
+      w: next.video.w,
+      h: next.video.h,
+      radius: next.video.radius,
+    };
+    setT(patchVideoAtTime({ ...next, video: t.video, videoKeyframes: t.videoKeyframes }, time, geometry));
   };
 
   const patchExtra = (extraId: string, data: Record<string, unknown>) =>
@@ -727,13 +741,13 @@ export function TemplateEditor({
       <div className="space-y-3">
         {id === "video" && (
           <>
-            <Slider label="X" value={t.video.x} min={-200} max={1080} onChange={(v) => patch(id, { x: v })} />
-            <Slider label="Y" value={t.video.y} min={-200} max={1920} onChange={(v) => patch(id, { y: v })} />
-            <Slider label="Largura" value={t.video.w} min={200} max={1080} onChange={(v) => patch(id, { w: v })} />
-            <Slider label="Altura" value={t.video.h} min={200} max={1920} onChange={(v) => patch(id, { h: v })} />
+            <Slider label="X" value={videoAtTime.x} min={-200} max={1080} onChange={(v) => patch(id, { x: v })} />
+            <Slider label="Y" value={videoAtTime.y} min={-200} max={1920} onChange={(v) => patch(id, { y: v })} />
+            <Slider label="Largura" value={videoAtTime.w} min={200} max={1080} onChange={(v) => patch(id, { w: v })} />
+            <Slider label="Altura" value={videoAtTime.h} min={200} max={1920} onChange={(v) => patch(id, { h: v })} />
             <Slider
               label="Cantos arredondados"
-              value={t.video.radius}
+              value={videoAtTime.radius}
               min={0}
               max={240}
               onChange={(v) => patch(id, { radius: v })}
@@ -746,7 +760,7 @@ export function TemplateEditor({
               ].map(([label, ratio]) => (
                 <button
                   key={label as string}
-                  onClick={() => patch(id, { h: Math.round(t.video.w / (ratio as number)) })}
+                  onClick={() => patch(id, { h: Math.round(videoAtTime.w / (ratio as number)) })}
                   className="rounded-full border border-border px-3 py-1 text-xs hover:border-primary"
                 >
                   {label}
@@ -757,8 +771,8 @@ export function TemplateEditor({
             <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
               <p className="studio-label">Movimento por keyframes</p>
               <p className="text-[11px] text-muted-foreground">
-                Posicione a linha do tempo, ajuste o vídeo e marque um keyframe. Entre dois keyframes o vídeo cresce ou
-                se move sozinho, de forma suave.
+                Marque um keyframe e ajuste o vídeo nesse ponto, ou ajuste primeiro e marque depois. Entre dois
+                keyframes o vídeo cresce ou se move de forma suave.
               </p>
               <div className="flex flex-wrap gap-2">
                 <button className="rounded-full border border-primary px-3 py-1 text-xs text-primary" onClick={addVideoKey}>
@@ -1816,7 +1830,7 @@ export function TemplateEditor({
                   {Math.round(zoom * 100)}%
                 </output>
                 <button
-                  onClick={() => setZoom(0.75)}
+                  onClick={() => setZoom(1)}
                   className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-surface-3 hover:text-foreground"
                   aria-label="Ajustar zoom"
                   title="Ajustar à tela"
@@ -1861,7 +1875,7 @@ export function TemplateEditor({
                 onDuration={setMediaDuration}
                 selected={selected}
                 onSelect={setSelected}
-                onChange={setT}
+                onChange={changeFromCanvas}
                 snap={snap}
                 debug={debug}
                 debugGrid={debugGrid}

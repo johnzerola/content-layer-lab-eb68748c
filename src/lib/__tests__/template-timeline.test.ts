@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createTemplate } from '../template';
-import { fullscreenAt } from '../template-timeline';
+import { expandVideoFrom, fullscreenAt, patchVideoAtTime, upsertVideoKeyframe, videoBoxAt } from '../template-timeline';
 import { subtractRanges } from '../editor/transcript';
 import { outputTimeAtSrc, segmentsDuration, srcTimeAt } from '../preedit';
 
@@ -26,6 +26,35 @@ describe('template fullscreen timeline', () => {
     const custom = { ...t, canvasW: 1920, canvasH: 1080, fullscreenClips: [...t.fullscreenClips, { id: 'two', start: 19, end: 25, fade: 0 }] };
     expect(fullscreenAt(custom, 19.5).video).toMatchObject({ w: 1920, h: 1080 });
     expect(fullscreenAt(custom, 19.5).amount).toBe(1);
+  });
+});
+
+describe('keyframes de vídeo do template', () => {
+  it('atualiza o keyframe sob a agulha sem alterar a caixa base', () => {
+    const base = createTemplate();
+    const keyed = upsertVideoKeyframe(base, 4);
+    const changed = patchVideoAtTime(keyed, 4.02, { x: 0, y: 0, w: 1080, h: 1920, radius: 0 });
+    expect(changed.video).toEqual(base.video);
+    expect(changed.videoKeyframes).toHaveLength(1);
+    expect(videoBoxAt(changed, 4)).toMatchObject({ x: 0, y: 0, w: 1080, h: 1920, radius: 0 });
+  });
+
+  it('mantém ajustes normais na caixa base quando não existe keyframe no instante', () => {
+    const base = createTemplate();
+    const changed = patchVideoAtTime(base, 3, { w: 900 });
+    expect(changed.video.w).toBe(900);
+    expect(changed.videoKeyframes ?? []).toHaveLength(0);
+  });
+
+  it('Expandir cria um movimento suave a partir do segundo escolhido', () => {
+    const base = createTemplate();
+    const expanded = expandVideoFrom(base, 10, 30, 0.8);
+    expect(expanded.videoKeyframes?.map((key) => key.t)).toEqual([10, 10.8]);
+    expect(videoBoxAt(expanded, 10)).toMatchObject({
+      x: base.video.x, y: base.video.y, w: base.video.w, h: base.video.h,
+    });
+    expect(videoBoxAt(expanded, 10.4).w).toBeGreaterThan(base.video.w);
+    expect(videoBoxAt(expanded, 10.8)).toMatchObject({ x: 0, y: 0, w: 1080, h: 1920, radius: 0 });
   });
 });
 

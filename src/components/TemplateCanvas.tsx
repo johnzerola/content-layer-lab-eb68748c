@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useInView } from '@/hooks/use-in-view';
 import { previewSize } from '@/lib/editor/preview-paint';
 import {
@@ -12,6 +12,7 @@ import {
 import { drawFrame, preloadImage, type DrawOpts } from "@/lib/draw";
 import { PlatformUIOverlay, type PlatformUI } from "@/components/PlatformUIOverlay";
 import { motionAt, type Variation } from "@/lib/variation";
+import { videoBoxAt } from "@/lib/template-timeline";
 
 
 type Rect = { x: number; y: number; w: number; h: number };
@@ -387,13 +388,17 @@ export function TemplateCanvas({
 
 
   const [live, setLive] = useState<{ id: SelId; r: Rect } | null>(null);
+  const rectAtPlayhead = useCallback((id: SelId) => {
+    if (id !== "video" || timelineTime === undefined) return rectOf(template, id);
+    return rectOf({ ...template, video: videoBoxAt(template, timelineTime) }, id);
+  }, [template, timelineTime]);
 
   const drag = (id: SelId, mode: DragMode) => (e: React.PointerEvent) => {
     if (!interactive || !onChange) return;
     e.preventDefault();
     e.stopPropagation();
     onSelect?.(id);
-    const startRect = rectOf(template, id);
+    const startRect = rectAtPlayhead(id);
     if (!startRect) return;
     const box = wrapRef.current!.getBoundingClientRect();
     const scale = W / box.width;
@@ -404,7 +409,7 @@ export function TemplateCanvas({
     // alvos de alinhamento: bordas/centro do canvas + bordas das outras camadas
     const others = selectableIds(template)
       .filter((oid) => oid !== id)
-      .map((oid) => rectOf(template, oid))
+      .map((oid) => rectAtPlayhead(oid))
       .filter(Boolean) as Rect[];
     const xTargets = [0, W / 2, W, 60, W - 60, ...others.flatMap((r) => [r.x, r.x + r.w / 2, r.x + r.w])];
     const yTargets = [0, H / 2, H, 60, H - 60, ...others.flatMap((r) => [r.y, r.y + r.h / 2, r.y + r.h])];
@@ -513,14 +518,14 @@ export function TemplateCanvas({
       };
       const mv = d[ev.key];
       if (!mv) return;
-      const r = rectOf(template, selected);
+      const r = rectAtPlayhead(selected);
       if (!r) return;
       ev.preventDefault();
       onChange(applyRect(template, selected, { x: Math.round(r.x + mv[0]), y: Math.round(r.y + mv[1]) }));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [interactive, onChange, selected, template]);
+  }, [interactive, onChange, selected, template, rectAtPlayhead]);
 
   const ids = selectableIds(template);
 
@@ -563,7 +568,7 @@ export function TemplateCanvas({
               const l = layerOf(template, id) as
                 | (Rect & { visible: boolean; rotation?: number; opacity?: number; z?: number })
                 | null;
-              const r = rectOf(template, id);
+              const r = rectAtPlayhead(id);
               if (!l || !r) return null;
               const on = l.visible;
               return (
@@ -596,7 +601,7 @@ export function TemplateCanvas({
       {interactive &&
         ids.map((id) => {
           const l = layerOf(template, id);
-          const r = rectOf(template, id);
+          const r = rectAtPlayhead(id);
           if (!l || !r || !l.visible) return null;
           const sel = selected === id;
           return (
