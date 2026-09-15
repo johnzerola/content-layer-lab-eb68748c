@@ -232,8 +232,8 @@ export function AuthScreen({
             <span className="auth-logo grid size-12 place-items-center rounded-2xl text-primary-foreground">
               <Zap className="size-5" />
             </span>
-            <h2 className="mt-4 font-display text-xl font-semibold tracking-tight">{title}</h2>
-            <p className="mt-1.5 text-[13px] text-muted-foreground">{description}</p>
+            <h2 className="mt-4 font-display text-2xl font-bold tracking-[-0.02em]">{title}</h2>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{description}</p>
           </div>
 
           <div
@@ -343,16 +343,20 @@ export function AuthScreen({
             </Button>
           </form>
 
-          <p className="mt-6 text-center text-[12px] text-muted-foreground">
-            {mode === "in" ? "Não tem uma conta?" : "Já tem uma conta?"}{" "}
-            <button
-              type="button"
-              onClick={() => setMode(mode === "in" ? "up" : "in")}
-              className="font-medium text-primary underline-offset-4 hover:underline"
-            >
-              {mode === "in" ? "Criar conta" : "Entrar"}
-            </button>
-          </p>
+          <div className="auth-divider mt-6">
+            <span className="text-center font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              {mode === "in" ? "ainda não tem conta" : "já tem conta"}
+            </span>
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setMode(mode === "in" ? "up" : "in")}
+            className="auth-glass auth-glass-lift mt-4 min-h-11 w-full rounded-xl text-[13px] font-medium"
+          >
+            {mode === "in" ? "Criar minha conta grátis" : "Entrar na minha conta"}
+          </Button>
 
           {footer ? <div className="mt-5 flex flex-col items-center gap-2">{footer}</div> : null}
         </div>
