@@ -46,5 +46,6 @@
 - [x] Tela inicial: estúdios carregam sob demanda
 - [x] Transformar /editor na área principal do estúdio com projetos, envio de vídeo e acesso à timeline, cortes e exportação reais
 - [x] Direcionar CTAs de usuários autenticados ao estúdio real e validar o acesso com Google
+- [x] Apagar imediatamente o arquivo e o registro após confirmação da publicação, sem remover falhas
 - [ ] Pagamento real (Paddle ou Stripe) — adiado por decisão do usuário
 - [ ] Retenção de arquivos por plano com aviso antes de apagar
