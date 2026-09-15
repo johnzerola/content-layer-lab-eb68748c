@@ -59,12 +59,10 @@ function PortfolioPage() {
 
   const stats = useMemo(() => {
     const totalVideos = items.length;
-    const totalMin = items.reduce((acc, e) => acc + (e.bytes ? 0 : 0), 0);
     const gb = items.reduce((acc, e) => acc + (e.bytes ?? 0), 0) / 1024 ** 3;
     const platforms = new Set(items.map((e) => e.platform).filter(Boolean) as string[]);
     return {
       totalVideos,
-      totalMin,
       gb,
       platforms: platforms.size,
       projects: (projectsQ.data?.length ?? 0) + (instancesQ.data?.length ?? 0),
