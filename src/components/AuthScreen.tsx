@@ -118,6 +118,24 @@ export function AuthScreen({
     }
   };
 
+  const google = async () => {
+    setBusy(true);
+    try {
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+      });
+      if (result.error) {
+        toast.error("Não foi possível entrar com o Google. Tente de novo.");
+        return;
+      }
+      if (result.redirected) return;
+    } catch {
+      toast.error("Não foi possível entrar com o Google. Tente de novo.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const recover = async () => {
     if (!/.+@.+\..+/.test(email)) {
       toast.error("Digite seu e-mail para receber o link de recuperação.");
