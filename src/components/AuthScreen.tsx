@@ -345,6 +345,23 @@ export function AuthScreen({
 
           <div className="auth-divider mt-6">
             <span className="text-center font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              ou continue com
+            </span>
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy}
+            onClick={() => void google()}
+            className="auth-glass auth-glass-lift mt-4 min-h-12 w-full rounded-xl text-[13px] font-medium"
+          >
+            <GoogleMark className="mr-2 size-4" />
+            Continuar com Google
+          </Button>
+
+          <div className="auth-divider mt-6">
+            <span className="text-center font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
               {mode === "in" ? "ainda não tem conta" : "já tem conta"}
             </span>
           </div>
