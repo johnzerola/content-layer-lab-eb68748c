@@ -433,7 +433,7 @@ function Demo() {
                 <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-lg bg-[var(--primary-subtle)] text-primary">
                   <Check className="size-3.5" />
                 </span>
-                <span>
+                <span className="min-w-0">
                   <span className="block text-[14px] font-semibold">{t}</span>
                   <span className="mt-1 block text-[13px] leading-relaxed text-muted-foreground">{d}</span>
                 </span>
