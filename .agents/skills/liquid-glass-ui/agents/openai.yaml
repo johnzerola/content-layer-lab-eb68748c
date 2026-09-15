@@ -1,0 +1,4 @@
+interface:
+  display_name: "Liquid Glass UI"
+  short_description: "Build natural, accessible glass interfaces"
+  default_prompt: "Use $liquid-glass-ui to add a natural, accessible Liquid Glass interface to this project."
