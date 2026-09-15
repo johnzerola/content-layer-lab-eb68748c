@@ -1478,3 +1478,4 @@
 @media (prefers-reduced-transparency: reduce) {
   .auth-chip-glass, .auth-pill { backdrop-filter: none; background: var(--surface-2); }
 }
+.auth-stage > .auth-river { z-index: 0; }
