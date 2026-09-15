@@ -650,17 +650,16 @@ function Plans() {
                     </li>
                   ))}
                 </ul>
-                <Link
-                  to="/checkout"
-                  search={{ plano: p.name.toLowerCase() }}
+                <AccountCta
+                  plano={p.name.toLowerCase()}
+                  guestLabel={p.cta}
                   className={`mt-8 inline-flex min-h-11 items-center justify-center rounded-xl text-sm font-semibold transition-transform duration-200 hover:-translate-y-px ${
                     p.featured
                       ? "lp-cta-glow bg-primary text-primary-foreground"
                       : "border border-border text-foreground hover:bg-surface"
                   }`}
-                >
-                  {p.cta}
-                </Link>
+                  showArrow={false}
+                />
               </article>
             </Reveal>
           );

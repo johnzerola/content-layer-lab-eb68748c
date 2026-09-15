@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { LandingShell } from "@/components/landing/LandingShell";
+import { AccountCta } from "@/components/landing/AccountCta";
 import { Reveal } from "@/components/landing/Reveal";
 
 export const Route = createFileRoute("/editor-demo")({
@@ -372,13 +373,10 @@ function EditorDemoPage() {
                 Entre na sua conta, envie o arquivo ou o link e receba os cortes prontos com legenda e enquadramento.
               </p>
               <div className="mt-9 flex flex-wrap justify-center gap-3">
-                <Link
-                  to="/checkout"
-                  search={{ plano: "creator" }}
+                <AccountCta
+                  guestLabel="Entrar e começar"
                   className="lp-cta-glow inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-7 text-sm font-semibold text-primary-foreground transition-transform hover:-translate-y-0.5"
-                >
-                  Entrar e começar <ArrowRight className="size-4" />
-                </Link>
+                />
                 <Link
                   to="/planos"
                   className="lp-glass lp-hover inline-flex h-12 items-center rounded-xl px-6 text-sm font-medium"

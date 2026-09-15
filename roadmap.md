@@ -44,7 +44,7 @@
 - [x] Biblioteca: botão Baixar para os vídeos guardados na conta (link temporário)
 - [x] TikTok real na Biblioteca e Agenda via API oficial, com OAuth, renovação e link da publicação
 - [x] Tela inicial: estúdios carregam sob demanda
-- [ ] Transformar /editor na área principal do estúdio com projetos, envio de vídeo e acesso à timeline, cortes e exportação reais
-- [ ] Direcionar CTAs de usuários autenticados ao estúdio real e validar o acesso com Google
+- [x] Transformar /editor na área principal do estúdio com projetos, envio de vídeo e acesso à timeline, cortes e exportação reais
+- [x] Direcionar CTAs de usuários autenticados ao estúdio real e validar o acesso com Google
 - [ ] Pagamento real (Paddle ou Stripe) — adiado por decisão do usuário
 - [ ] Retenção de arquivos por plano com aviso antes de apagar
