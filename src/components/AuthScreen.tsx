@@ -147,7 +147,7 @@ export function AuthScreen({
         </div>
 
         <div className="relative">
-          <span className="inline-flex items-center gap-2 rounded-full border border-border-hover bg-surface-2/70 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+          <span className="auth-glass inline-flex items-center gap-2 rounded-full border border-border-hover px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
             <span className="auth-live size-1.5 rounded-full bg-primary" />
             estúdio em produção
           </span>
