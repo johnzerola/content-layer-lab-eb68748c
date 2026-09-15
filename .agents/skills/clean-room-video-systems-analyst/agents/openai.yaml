@@ -1,0 +1,4 @@
+interface:
+  display_name: "Clean Room Video Systems Analyst"
+  short_description: "Análise limpa de sistemas externos de restauração"
+  default_prompt: "Use $clean-room-video-systems-analyst para estudar este sistema externo por comportamento observável."

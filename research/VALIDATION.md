@@ -1,5 +1,9 @@
 # Verificação e limites da primeira versão
 
+> Registro histórico da primeira versão do laboratório. O catálogo cresceu
+> depois desta validação; use `research/MCP_TOOLS.md`, `skills/INDEX.json` e
+> `docs/cleaner-engineering/MCP-INVENTORY.md` para o inventário atual.
+
 ## Evidências realizadas
 
 - Oito skills criadas e reconhecidas no catálogo do ambiente; validador oficial

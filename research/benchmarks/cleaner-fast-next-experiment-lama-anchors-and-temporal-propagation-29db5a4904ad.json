@@ -1,0 +1,15 @@
+{
+  "id": "cleaner-fast-next-experiment-lama-anchors-and-temporal-propagation-29db5a4904ad",
+  "title": "Cleaner Fast next experiment: LaMa anchors and temporal propagation",
+  "body": "2026-09-12. Next experiment identified; stop before further benchmarks. Hypothesis: LaMa adaptive anchors plus confidence-gated bidirectional propagation can reduce cost/time while preserving Golden V4 perceived quality. No new inference or paid GPU, installs, production edits or promotion. Historical worker wall times 381.265 s/5 s and 602.622 s/4.9 s are not isolated CUDA inference. Per-stage timings/geometry overwrite earlier scenes. Parent VRAM=0 does not measure child GPU allocation. Current difficulty analyzer hardcodes mask_ratio=1 and donor_confidence=0, forcing HARD; it cannot justify engine selection. Read-only ffprobe confirms Pedro B-junctions has 46 frames and complete C-master has150. Masters of150/147 frames differ from source PTS by up to0.000326 s, so exact timing parity is unproven. Actual per-scene worker masks were not located in inspected artifacts; reconstructed masks require explicit provenance. Next: pin5s input/mask contract, profile per job/scene/process including model load and CPU flow, test LaMa anchors locally without silent paid escalation. Keep ComfyUI optional lab adapter. Detailed evidence and limitations reside in linked artifacts; do not reuse earlier inferred GPU timings or HARD classifications.",
+  "sources": [
+    "G:/dowloand/teste/golden-performance-research-20260912/CLEANER-FAST-RD.md",
+    "G:/dowloand/teste/golden-performance-research-20260912/evidence.json",
+    "https://github.com/advimman/lama",
+    "https://github.com/lixiaowen-xw/DiffuEraser",
+    "https://github.com/hitachinsk/FGT"
+  ],
+  "evidence": "HYPOTHESIS",
+  "recorded_at": "2026-09-12T07:14:47.083979+00:00",
+  "category": "benchmarks"
+}

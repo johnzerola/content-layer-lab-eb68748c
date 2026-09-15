@@ -1,0 +1,13 @@
+{
+  "id": "cleaner-e5-wogan-checkpoint-only-pilot-rejected-2026-09-13-b74923ee9b23",
+  "title": "Cleaner E5 WOGAN checkpoint-only pilot rejected 2026-09-13",
+  "body": "CONFIRMED: official WOGAN checkpoint prefix0e2ff207, same test5 runtime/context x4-area-native; official WOGAN recommended threshold1.5 explicitly not used. Three frames24-26, PSNR delta -6.178dB vsdegraded, +0.113dB vsGAN rejected prior; PSNR SSIM edge temporal fail. One cleaning pass residual3.549652/255 already damages structure. No expansion, input/source/Golden preserved, master exact, harness three arms compared. Author static24/26 only, no new independent review or perceptual playback. Next: audit cleaning adapter equivalence before new engine. ExternalGPU USD0.",
+  "sources": [
+    "G:\\dowloand\\teste\\cleaner-e5-wogan-pilot-20260913\\REPORT.md",
+    "G:\\dowloand\\teste\\cleaner-e5-wogan-pilot-20260913\\contract.json",
+    "G:\\dowloand\\teste\\cleaner-e5-wogan-pilot-20260913\\result.json"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-13T14:40:42.481307+00:00",
+  "category": "experiments"
+}

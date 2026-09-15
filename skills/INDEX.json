@@ -1,7 +1,19 @@
 {
-  "updated_at": "2026-09-11",
-  "policy": "Use existing domain skills; do not duplicate them with token-efficiency skills before benchmarks prove a missing responsibility.",
-  "existing_roots": [".agents/skills", "C:/Users/DINO/.codex/skills"],
+  "updated_at": "2026-09-12",
+  "policy": "Use project specialists by routing ownership and retain older domain skills as narrow helpers. Do not activate every skill.",
+  "discovery_note": "Codex discovers project skills from .agents/skills; this file is an internal catalog, not the discovery mechanism.",
+  "existing_roots": [
+    ".agents/skills",
+    "C:/Users/DINO/.codex/skills"
+  ],
+  "cleaner_core_specialists": [
+    {"name": "cleaner-video-reconstruction-engineer", "primary_for": ["E1", "E3", "cross-stage reconstruction"]},
+    {"name": "temporal-correspondence-engineer", "primary_for": ["E2", "donor recovery"]},
+    {"name": "reconstruction-quality-scientist", "primary_for": ["independent quality verdict"], "default_mode": "read-only"},
+    {"name": "cleaner-gpu-performance-engineer", "primary_for": ["GPU memory", "latency", "cost after quality"]},
+    {"name": "clean-room-video-systems-analyst", "primary_for": ["lawful external-system behavior"], "default_mode": "read-only"}
+  ],
+  "routing": "docs/cleaner-engineering/SPECIALIST_ROUTING.md",
   "proposed": [
     {"name": "token-efficiency-director", "status": "DEFERRED", "reason": "Needs measured baseline and explicit non-overlap review."}
   ]

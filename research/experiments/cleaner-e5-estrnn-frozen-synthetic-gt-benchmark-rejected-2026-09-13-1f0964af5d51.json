@@ -1,0 +1,15 @@
+{
+  "id": "cleaner-e5-estrnn-frozen-synthetic-gt-benchmark-rejected-2026-09-13-1f0964af5d51",
+  "title": "Cleaner E5 ESTRNN frozen synthetic GT benchmark rejected 2026-09-13",
+  "body": "CONFIRMED: one official ESTRNN BSD 2ms16ms checkpoint FP32 evaluated on all three frozen 24frame600x420 E5 GT cases. PSNR deltas -1.777/-1.446/-3.287dB; all fail PSNR/SSIM/edge and suit/face lose highpass amplitude. 72outputs, 3FFV1 exact, unchanged inputs/SOURCE/Golden. 6.484s neural total,36.116s runner, GPU externalUSD0. Independent static review Level2 limitations; complete temporal quality UNDETERMINED. No product/global improvement approved. No E3 rerun.",
+  "sources": [
+    "G:\\dowloand\\teste\\cleaner-e5-estrnn-20260913\\REPORT.md",
+    "G:\\dowloand\\teste\\cleaner-e5-estrnn-20260913\\contract.json",
+    "G:\\dowloand\\teste\\cleaner-e5-estrnn-20260913\\result.json",
+    "G:\\dowloand\\teste\\cleaner-e5-estrnn-20260913\\INDEPENDENT-REVIEW.md",
+    "https://github.com/zzh-tech/ESTRNN/tree/c7e7a49b0d9f53df320fe58e1f1861206666aa54"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-13T13:57:57.871583+00:00",
+  "category": "experiments"
+}

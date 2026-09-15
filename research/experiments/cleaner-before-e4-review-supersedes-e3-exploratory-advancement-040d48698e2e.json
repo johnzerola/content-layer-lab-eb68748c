@@ -1,0 +1,13 @@
+{
+  "id": "cleaner-before-e4-review-supersedes-e3-exploratory-advancement-040d48698e2e",
+  "title": "Cleaner before E4 review supersedes E3 exploratory advancement",
+  "body": "CONFIRMED: Audit of archived E2 window 74 frames found 11136 green proxy pixels-frame at feathered contaminated SOURCE boundaries and 4605 at rejected donors. Hard donor ablation leaves 4605 and seams; not an approved fix. E2 sequence uses LK partial affine, unlike local SIFT controls; control results cannot validate the different delivered path. E3 effective source/donor/model blend weights 2.954/73.424/23.622 percent, not binary 82.23/17.77 provenance or compute savings. ProPainter processed full 46-frame inference masks. New one-clock comparison videos contain 74 and 46 frames at30fps plus exact-frame PNGs. Manifest128 artifacts and code hashes verified. Status RETEST_BEFORE_E4 supersedes prior exploratory advancement in cleaner-e3-pedro-propainter-temporal-plus-observed-references-9d0e2a91dad1. HYPOTHESIS: donor/model weight switches at138/139/149 contribute temporal texture instability; no continuous/blind temporal approval, no compensated temporal gate. Browser webview attachment timed out. No new inference, paid GPU or production changes.",
+  "sources": [
+    "G:\\dowloand\\teste\\cleaner-review-before-e4-20260912\\REVIEW.md",
+    "G:\\dowloand\\teste\\cleaner-review-before-e4-20260912\\metrics.json",
+    "G:\\dowloand\\teste\\cleaner-review-before-e4-20260912\\evidence-manifest.json"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-12T22:05:41.580270+00:00",
+  "category": "experiments"
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Temporal Correspondence Engineer"
+  short_description: "Recuperação temporal e seleção de doadores do Cleaner"
+  default_prompt: "Use $temporal-correspondence-engineer para investigar esta tarefa de correspondência temporal do Cleaner."

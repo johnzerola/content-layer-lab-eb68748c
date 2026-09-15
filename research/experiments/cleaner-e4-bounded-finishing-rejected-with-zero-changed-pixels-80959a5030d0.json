@@ -1,0 +1,14 @@
+{
+  "id": "cleaner-e4-bounded-finishing-rejected-with-zero-changed-pixels-80959a5030d0",
+  "title": "Cleaner E4 bounded finishing rejected with zero changed pixels",
+  "body": "CONFIRMED on Pedro 150-frame frozen baseline: two bounded E4 variants changed zero pixels. A full-sequence review found 468 strong-green proxy pixels in scene1 frames 81-97, 99, 100 and 103; every detected pixel was inside the composition mask and overlapped the SOURCE proxy. Frame90 visual evidence is compatible with residual SOURCE contribution over the buckle. E4 cannot correct this earlier composition failure or the unresolved cloth structure at frame129. Master validation: 150 frames exact against PNGs, source audio elementary-stream SHA256 identical, maximum frame PTS delta 0.333ms, zero outside-selection change.",
+  "sources": [
+    "G:/dowloand/teste/cleaner-e4-local-finish-20260912/E4-REPORT.md",
+    "G:/dowloand/teste/cleaner-e4-local-finish-20260912/quality-review.json",
+    "G:/dowloand/teste/cleaner-e4-local-finish-20260912/contract.json",
+    "G:/dowloand/teste/cleaner-e4-local-finish-20260912/texture-02/contract.json"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-13T00:34:31.873796+00:00",
+  "category": "experiments"
+}

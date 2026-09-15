@@ -23,8 +23,9 @@ checkout em `.codex/config.toml` sem substituir outros servidores. Se mover o
 checkout, ajuste esse bloco. A nova conexão pode exigir reabrir a sessão do Codex.
 O teste stdio independente comprova o servidor, não uma reconexão automática do host.
 
-As oito skills ficam em `.agents/skills`. Foram reconhecidas pelo catálogo do
-ambiente durante a instalação. [Documentação oficial de skills](https://learn.chatgpt.com/docs/build-skills)
+As skills de pesquisa e engenharia ficam em `.agents/skills`; o catálogo atual
+está em `skills/INDEX.json`. Foram reconhecidas pelo catálogo do ambiente durante
+a instalação. [Documentação oficial de skills](https://learn.chatgpt.com/docs/build-skills)
 e [configuração MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
 O servidor usa o [SDK Python v1, linha mantida](https://github.com/modelcontextprotocol/python-sdk/tree/v1.x),
 fixado em 1.30.0. A migração para v2 é deliberadamente independente deste trabalho.

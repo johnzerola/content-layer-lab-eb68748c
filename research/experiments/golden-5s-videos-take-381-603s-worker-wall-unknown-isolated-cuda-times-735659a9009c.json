@@ -1,0 +1,13 @@
+{
+  "id": "golden-5s-videos-take-381-603s-worker-wall-unknown-isolated-cuda-times-735659a9009c",
+  "title": "Golden 5s videos take 381-603s worker wall; unknown isolated CUDA times and masks parity.",
+  "body": "{\"problem\": \"Golden 5s videos take 381-603s worker wall; unknown isolated CUDA times and masks parity.\", \"hypothesis\": \"LaMa on <=30 adaptive anchors per150f with masked trustworthy temporal propagation can reach noninferior perceived quality and >=3x lower local operational wall time.\", \"baseline\": \"Archived Pedro C-master-lossless.mp4 sha256 cf9d023d71cadf6f341a8663d1885218788de12d3128a7522e0b0fc0fe5fff44; historical worker381.265s; Golden immutable.\", \"change\": \"Local isolated LaMaFP32+original donors+confidence-based reanchoring; FinisherOFF. Unique scene/process telemetry and router unknowns fixed only in experimental worktree.\", \"dataset\": \"Pedro150f5s1080x192030fps source ac3220aa3b4bcf92332a06cb42412477df1f438fbcb22127db17137deb1fe9b9. Cuts0,74,104,150 recomputed. Reconstructed masks => HISTORICAL_VISUAL_COMPARISON.\", \"metrics\": [\"wall_time\", \"model_load\", \"neural_time\", \"flow\", \"propagation\", \"confidence\", \"composition\", \"encode\", \"vram_peak_current_process\", \"sampled_rss\", \"external_pixels_changed\", \"residue\", \"seam\", \"texture\", \"flicker\", \"ghosting\", \"anchor_count\", \"known_unknown_propagated_escalation_ratios\"], \"status\": \"EXECUTED_REJECTED\", \"result\": {\"verdict\": \"REJECT\", \"processing_wall_seconds\": 108.84649699996226, \"anchors\": 20, \"external_pixels_changed\": 0, \"temporal_noninferiority\": null, \"quality_noninferior\": false, \"report\": \"G:\\\\dowloand\\\\teste\\\\cleaner-fast-b-20260912\\\\run-01\\\\EXPERIMENT-B-REPORT.md\", \"manifest_sha256\": \"41d3b2dd4950fcd078dafc22f5d18f1356d602651adb3baa6246503d6379aec6\", \"next\": \"FGT local same contract; recommended only, not executed\"}, \"production_changes\": false}",
+  "sources": [
+    "Archived Pedro C-master-lossless.mp4 sha256 cf9d023d71cadf6f341a8663d1885218788de12d3128a7522e0b0fc0fe5fff44; historical worker381.265s; Golden immutable.",
+    "Pedro150f5s1080x192030fps source ac3220aa3b4bcf92332a06cb42412477df1f438fbcb22127db17137deb1fe9b9. Cuts0,74,104,150 recomputed. Reconstructed masks => HISTORICAL_VISUAL_COMPARISON."
+  ],
+  "evidence": "MEASURED_LOCAL_EXPERIMENT",
+  "recorded_at": "2026-09-12T13:31:16.232206+00:00",
+  "category": "experiments",
+  "updated_at": "2026-09-12T15:26:06.250782+00:00"
+}

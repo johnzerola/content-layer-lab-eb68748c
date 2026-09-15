@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cleaner GPU Performance Engineer"
+  short_description: "Custo, memória e desempenho GPU do Cleaner"
+  default_prompt: "Use $cleaner-gpu-performance-engineer para medir esta tarefa de desempenho do Cleaner."

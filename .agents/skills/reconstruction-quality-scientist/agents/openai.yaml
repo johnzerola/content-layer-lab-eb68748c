@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reconstruction Quality Scientist"
+  short_description: "Autoridade independente de qualidade da reconstrução"
+  default_prompt: "Use $reconstruction-quality-scientist para julgar este resultado do Cleaner com evidência independente."

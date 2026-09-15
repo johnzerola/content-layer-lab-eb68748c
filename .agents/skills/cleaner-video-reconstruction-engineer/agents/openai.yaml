@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cleaner Video Reconstruction Engineer"
+  short_description: "Arquitetura e experimentos de reconstrução do Cleaner"
+  default_prompt: "Use $cleaner-video-reconstruction-engineer para investigar esta tarefa de reconstrução do Cleaner."

@@ -1,13 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "updated_at": "2026-09-11",
+  "updated_at": "2026-09-12",
+  "discovery_note": "Project MCP discovery uses .codex/config.toml; this file is an audited internal registry.",
   "servers": [
-    {"name": "serena", "classification": "ALWAYS_AVAILABLE", "version": "serena-agent==1.7.0", "purpose": "symbol-aware internal-code navigation", "status": "SMOKE_PASSED", "credential_required": false},
-    {"name": "playwright", "classification": "ON_DEMAND", "purpose": "browser validation", "status": "EXISTING", "credential_required": false},
-    {"name": "chrome-devtools", "classification": "ON_DEMAND", "purpose": "browser diagnostics", "status": "EXISTING", "credential_required": false},
-    {"name": "cleaner-research", "classification": "ON_DEMAND", "purpose": "isolated Cleaner research", "status": "EXISTING", "credential_required": false},
-    {"name": "editor-development", "classification": "ON_DEMAND", "purpose": "editor research", "status": "EXISTING", "credential_required": false},
-    {"name": "context7", "classification": "ON_DEMAND", "purpose": "current external-library documentation", "status": "BLOCKED_NO_CREDENTIAL", "credential_required": true},
-    {"name": "github", "classification": "ON_DEMAND", "purpose": "issues, pull requests and repository metadata", "status": "BLOCKED_NO_CREDENTIAL", "credential_required": true}
+    {"name": "serena", "category": ["CODE_NAVIGATION"], "classification": "ALWAYS_AVAILABLE", "version": "serena-agent==1.7.0", "purpose": "symbol-aware internal-code navigation", "status": "SMOKE_PASSED", "credential_required": false},
+    {"name": "playwright", "category": ["UI_TESTING"], "classification": "ON_DEMAND", "version": "@playwright/mcp@0.0.80", "purpose": "isolated browser validation", "status": "CONFIGURED", "credential_required": false},
+    {"name": "chrome-devtools", "category": ["UI_TESTING", "EXECUTION_PROFILING"], "classification": "ON_DEMAND", "version": "chrome-devtools-mcp@1.9.0", "purpose": "isolated browser diagnostics", "status": "CONFIGURED", "credential_required": false},
+    {"name": "cleaner-research", "category": ["CODE_NAVIGATION", "UPSTREAM_RESEARCH", "EXECUTION_PROFILING"], "classification": "ON_DEMAND", "purpose": "isolated Cleaner research and bounded CPU controls", "status": "CONFIGURED", "credential_required": false},
+    {"name": "editor-development", "category": ["OTHER"], "classification": "ON_DEMAND", "purpose": "editor research", "status": "CONFIGURED", "credential_required": false},
+    {"name": "context7", "category": ["DOCUMENTATION"], "classification": "ON_DEMAND", "purpose": "current external-library documentation", "status": "NOT_CONFIGURED", "credential_required": true},
+    {"name": "github", "category": ["UPSTREAM_RESEARCH"], "classification": "ON_DEMAND", "purpose": "exact public files, commits, issues and pull requests", "status": "NOT_CONFIGURED", "credential_required": true}
   ]
 }

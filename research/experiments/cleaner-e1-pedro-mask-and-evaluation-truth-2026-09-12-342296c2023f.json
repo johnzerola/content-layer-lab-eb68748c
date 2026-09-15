@@ -1,0 +1,13 @@
+{
+  "id": "cleaner-e1-pedro-mask-and-evaluation-truth-2026-09-12-342296c2023f",
+  "title": "Cleaner E1 Pedro mask and evaluation truth 2026-09-12",
+  "body": "Measured on 150 lossless Pedro frames. A single reviewer annotated 18 word events, 139 central-caption-visible frames, 11 central-clean frames and six reviewed clean donors. Frozen V2 detector: presence recall 96.40%, precision 100%, transition recall 85.71%, false negatives 22/39/50/101/111, no false positives in the 11 real clean central frames. A reviewed experiment-only policy recovers these five fades with relaxed color constrained to the confirmed event support; it has 0/11 clean central masks, 0/139 visible frames without a mask and zero selection leakage. Synthetic 24-frame same-generator holdout: presence recall 88.89%, precision 72.73%, effect pixel recall 88.95%, and all six green non-text distractors were false positives. Automatic V2 is rejected. The reviewed contract may isolate reconstruction in E2, but product E1 remains open because no independent real holdout and no exact real pixel GT for occluded black outline/shadow exist. Fourteen tests passed. No neural inference, RunPod job or paid GPU was used.",
+  "sources": [
+    "G:/dowloand/teste/cleaner-e1-mask-ground-truth-20260912/E1-MASK-AND-GROUND-TRUTH-REPORT.md",
+    "G:/dowloand/teste/cleaner-e1-mask-ground-truth-20260912/E1-REPORT.json",
+    "G:/dowloand/teste/cleaner-e1-mask-ground-truth-20260912/evidence-manifest.json"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-12T19:18:14.124833+00:00",
+  "category": "experiments"
+}

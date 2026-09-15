@@ -1,0 +1,13 @@
+{
+  "id": "pedro-phase-6-regression-smoke-combined-candidate-f57b63645aae",
+  "title": "Pedro phase 6 regression smoke combined candidate",
+  "body": "CONFIRMED: The single paid RTX 4090 job 5b95c01e-38ea-4df4-a75f-f655ed53b7ce-u1 completed the combined scene-roi-v4 legacy_refined path. The final 150-frame delivery showed zero neon-green pixels inside the frozen composition masks versus 159607 across 26 frames in v4_old, and the lossless master changed zero decoded pixels outside the frozen broad regions. LIMIT: pure DiffuEraser and complete per-scene reports were persisted on the network volume but not transferred, so the result confirms the combined candidate and cannot isolate the causal contribution of subtitle-junctions. No retry was submitted; endpoint restored to workers 0/0. Approximate balance delta US$0.100392324.",
+  "sources": [
+    "G:/dowloand/teste/regression-fix-smoke-20260912/pedro-01/REGRESSION-FIX-SMOKE-REPORT.md",
+    "G:/dowloand/teste/regression-fix-smoke-20260912/pedro-01/run-report.json",
+    "G:/dowloand/teste/regression-fix-smoke-20260912/pedro-01/metrics.json"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-12T03:17:50.533574+00:00",
+  "category": "experiments"
+}

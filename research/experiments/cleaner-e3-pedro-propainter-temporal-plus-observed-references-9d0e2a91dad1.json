@@ -1,0 +1,15 @@
+{
+  "id": "cleaner-e3-pedro-propainter-temporal-plus-observed-references-9d0e2a91dad1",
+  "title": "Cleaner E3 Pedro ProPainter temporal plus observed references",
+  "body": "CONFIRMED on the Pedro development clip, scene 2 only: official ProPainter ran locally on RTX 2060 for 46 frames at native 833x625 ROI padded to 840x632, FP16, without resize or fallback. The final conditioned composition used 82.23% E2 accepted observed pixels and 17.77% generated pixels within support. It preserved clean frames 144-147, changed zero pixels outside the authorized selection, and the FFV1 master matched composed PNGs with max channel delta 0. A mask omission, not a model hallucination, caused the frame-139 green residual; completing the already-overlapping chroma component added 420 pixels and removed connected green proxy components >=10 px. Weighted gradient on support was Golden 22.390, raw ProPainter 13.696, hybrid 20.288; this is descriptive, not a quality score. Visual critical-frame review passed structure provisionally, while temporal blind review, holdout, scene-0 window/fades, and commercial licensing remain open. ProPainter S-Lab License 1.0 blocks commercial promotion without permission.",
+  "sources": [
+    "G:/dowloand/teste/cleaner-e3-propainter-20260912/hybrid-05/E3-REPORT.md",
+    "G:/dowloand/teste/cleaner-e3-propainter-20260912/hybrid-05/E3-result.json",
+    "G:/dowloand/teste/cleaner-e3-propainter-20260912/run-03/preflight.json",
+    "https://arxiv.org/abs/2309.03897",
+    "https://github.com/sczhou/ProPainter"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-12T21:02:54.989858+00:00",
+  "category": "experiments"
+}

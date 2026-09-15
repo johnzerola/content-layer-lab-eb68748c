@@ -1,0 +1,13 @@
+{
+  "id": "cleaner-e2-pedro-observed-reference-recovery-2026-09-12-a447f3453ae4",
+  "title": "Cleaner E2 Pedro observed reference recovery 2026-09-12",
+  "body": "Measured on the frozen Pedro E1 contract. Six known-background controls passed coverage >= 0.75, MAE <= 12 and gradient correlation >= 0.35; cross-scene, fully occluded and captioned donors were rejected. Local surface matching materially improved the moving-fabric controls, reducing MAE from 3.092/4.458 to 1.426/1.577 and increasing gradient correlation from 0.361/0.212 to 0.736/0.688. Complete scene results were mixed: buckle scene component pass (98.40% mean, 97.67% minimum coverage), window/bed retest (99.74% mean but small fade residuals and foreground-change risk), and moving fabric reject/escalate E3 (85.50% mean, 0% minimum, visible residuals, zero-coverage frames 138/149). All 11 clean frames stayed unchanged and zero pixels changed outside accepted support. Decision: accept only conditionally gated real-reference recovery, never force coverage, and route unresolved pixels/frames to E3 temporal reconstruction. Twenty tests passed including E1 controls; six masters/review videos decoded with expected frame counts and 30 FPS. No neural inference, RunPod job, paid external GPU, deploy or product change.",
+  "sources": [
+    "G:/dowloand/teste/cleaner-e2-real-reference-20260912/E2-REAL-REFERENCE-REPORT.md",
+    "G:/dowloand/teste/cleaner-e2-real-reference-20260912/E2-summary.json",
+    "G:/dowloand/teste/cleaner-e2-real-reference-20260912/evidence-manifest.json"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-12T19:49:24.554797+00:00",
+  "category": "experiments"
+}

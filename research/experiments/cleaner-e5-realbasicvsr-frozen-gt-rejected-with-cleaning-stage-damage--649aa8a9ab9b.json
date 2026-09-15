@@ -1,0 +1,14 @@
+{
+  "id": "cleaner-e5-realbasicvsr-frozen-gt-rejected-with-cleaning-stage-damage--649aa8a9ab9b",
+  "title": "Cleaner E5 RealBasicVSR frozen GT rejected with cleaning stage damage 2026-09-13",
+  "body": "CONFIRMED: RealBasicVSR x4-area-native FP32 test5 on frozen E5 3x24 frames600x420. PSNR deltas [-6.046881825017362, -10.140323273075005, -6.616140159488296]. REJECT metric+Level3 independent review window24/36/47. Archived cleaning already damaged; individual cleaning passes not isolated. No E2/E3/E4 or product changes. Inference 131.380s, external GPU USD0. 72PNG/3FFV1 exact; hashes/geometry/PTS preserved; harness imported/compared. Temporal perceptual UNDETERMINED. Next bounded diagnosis: individual cleaning passes, no sharpening or threshold relaxation.",
+  "sources": [
+    "G:\\dowloand\\teste\\cleaner-e5-realbasicvsr-20260913\\REPORT.md",
+    "G:\\dowloand\\teste\\cleaner-e5-realbasicvsr-20260913\\contract.json",
+    "G:\\dowloand\\teste\\cleaner-e5-realbasicvsr-20260913\\result.json",
+    "G:\\dowloand\\teste\\cleaner-e5-realbasicvsr-20260913\\INDEPENDENT-REVIEW.md"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-13T14:22:31.213870+00:00",
+  "category": "experiments"
+}

@@ -1,0 +1,15 @@
+{
+  "id": "cleaner-local-controls-presence-rejected-observed-donors-global-appear-bda0de98d2f5",
+  "title": "Cleaner local controls: presence rejected, observed donors, global appearance and FGT memory preflight",
+  "body": "Executed local composition-only V1/V2 over archived LaMa B predictions; no new inference, paid jobs, production change or Golden mutation. V2 source PNG hashes verified,150 frames,1080x1920,30fps. Master has zero changed pixels outside alpha/selection,zero source PTS delta,and source/master/delivery audio bitstream hashes equal. Proposed support reduced68.95995%;16,324 unsupported pixels were excluded from applied alpha. REJECT for visible inherited patch and missed faded text,not a valid replacement for Golden. Donor diagnostics:4-nearby vs up-to12 candidates; additional manually inspected clean references0/1,77/78,145/146. Current affine consensus accepts25,766 candidate pixels for frame90 only; this is not pixel-level truth or restored-quality approval. Window and cloth alignment fail despite clean source observations. No donors were applied. Four global tone/sharpness controls completed over Golden; subtle appearance change,overshoot/clipping recorded,not neural upscale or VMake parity; no promotion. Static official FGT FP32 native-grid calculation estimates17.246GiB for peak attention score tensor before softmax/other buffers on target6GB GPU; no FGT inference or measured OOM. All statements apply to this clip and exact archived contracts. Six synthetic mask controls pass; browser runtime and blinded temporal review remain untested. Use linked reports and checkpoint rather than reread full history.",
+  "sources": [
+    "G:/dowloand/teste/cleaner-presence-control-20260912-v2/REPORT.md",
+    "G:/dowloand/teste/cleaner-presence-control-20260912-v2/validation.json",
+    "G:/dowloand/teste/cleaner-presence-control-20260912-v2/MILESTONE_CONTEXT.md",
+    "G:/dowloand/teste/global-appearance-ablation-20260912/REPORT.md",
+    "G:/dowloand/teste/cleaner-fast-c-preflight-20260912/FGT-PREFLIGHT.md"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-12T18:26:15.757839+00:00",
+  "category": "experiments"
+}

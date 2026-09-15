@@ -1,0 +1,13 @@
+{
+  "id": "cleaner-e5-first-cleaning-pass-damage-single-window-2026-09-13-3e5800dbd551",
+  "title": "Cleaner E5 first cleaning pass damage single window 2026-09-13",
+  "body": "CONFIRMED in existing runtime: one unchanged RealBasicVSR forward with non-mutating hook, input SOURCE24/24/24/25/26/27/28. Only one cleaning pass, mean abs residue3.659595/255 below5/255. Raw and clean core24-26 exactly match six archived floats, max delta0. First pass already loses5.55-5.72dB PSNR and visibly damages structure. Iterative amplification excluded for this window. Parent REJECT maintained. New independent reviewer unavailable usage limit; author static review only, temporal UNDETERMINED. No production/Golden/E2/E3/E4 changes, GPU externalUSD0. Next: select fidelity-oriented compression candidate under new contract; no repeated threshold tuning. Legacy runtime equivalence not certified.",
+  "sources": [
+    "G:\\dowloand\\teste\\cleaner-e5-cleaning-passes-20260913\\REPORT.md",
+    "G:\\dowloand\\teste\\cleaner-e5-cleaning-passes-20260913\\result.json",
+    "G:\\dowloand\\teste\\cleaner-e5-cleaning-passes-20260913\\contract.json"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-13T14:29:56.739746+00:00",
+  "category": "experiments"
+}

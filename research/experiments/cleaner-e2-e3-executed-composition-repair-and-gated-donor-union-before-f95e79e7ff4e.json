@@ -1,0 +1,13 @@
+{
+  "id": "cleaner-e2-e3-executed-composition-repair-and-gated-donor-union-before-f95e79e7ff4e",
+  "title": "Cleaner E2 E3 executed composition repair and gated donor union before E4",
+  "body": "CONFIRMED: Implemented zero contaminated SOURCE weight in core, raw donor/validity/alpha persistence, local SIFT sequence path and two-estimator union rejecting channel disagreement>14. Same-scene two-donor gates kept. One native FP16 ProPainter window run74 frames took390.424s, external GPU0; fabric46 frames reused archived run03 model. Window strong-green proxy15741->0, fabric0->0; zero changes outside selection or on clean frames. FFmpeg BGR24 lossless masters exact against74+46 composed PNGs. Eight tests passed. Fabric local-only26.73%, LK84.63%, union90.40% binary core coverage, not blend/compute savings. Visual inspection46/60 and124/129/138/139/149: green window residue removed; fabric remend/texture remains,129 especially and139 contour requires review. Unwarped weight-switch mean0.1310->0.0877 describes composition only, not motion/flicker approval. No continuous/blind review or holdout. Status IMPLEMENTED_AND_TESTED_RETEST_BEFORE_E4. ProPainter not commercially promoted; no production/deploy; local390s remains incompatible with product latency. Corrected clips silent relative30fps, not full5s audio delivery. Next bounded work shadow-contour139 and nonrigid motion GT controls; no E4 advancement.",
+  "sources": [
+    "G:/dowloand/teste/cleaner-e2-e3-repair-20260912/REVIEW.md",
+    "G:/dowloand/teste/cleaner-e2-e3-repair-20260912/delivery.json",
+    "G:/dowloand/teste/cleaner-e2-e3-repair-20260912/evidence-manifest.json"
+  ],
+  "evidence": "CONFIRMED",
+  "recorded_at": "2026-09-12T22:34:51.206526+00:00",
+  "category": "experiments"
+}

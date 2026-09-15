@@ -1,5 +1,9 @@
 # Token Efficiency — Existing-State Audit
 
+> Historical snapshot: this audit predates the project Serena configuration and
+> the Cleaner engineering layer. Use `mcp/MCP_REGISTRY.json` and
+> `docs/cleaner-engineering/MCP-INVENTORY.md` for the current MCP inventory.
+
 Date: 2026-09-11
 Checkpoint: `51870c8d3408e7a5bf7eb289df0afa825d832368`
 Scope: development infrastructure only. No Cleaner engine, production pipeline,
