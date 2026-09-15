@@ -18,7 +18,20 @@ import {
 import { PrizeCounter } from "@/components/auth/PrizeCounter";
 import { PrizeStream } from "@/components/auth/PrizeStream";
 import { Button } from "@/components/ui/button";
+import { lovable } from "@/integrations/lovable/index";
 import { resetPassword, signIn, signUp } from "@/lib/cloud";
+
+/** Marca oficial do Google (multicolor) para o botão de acesso. */
+function GoogleMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" aria-hidden className={className}>
+      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8a12 12 0 1 1 7.9-21l5.7-5.7A20 20 0 1 0 24 44c11 0 20-9 20-20 0-1.2-.1-2.3-.4-3.5z" />
+      <path fill="#FF3D00" d="m6.3 14.7 6.6 4.8A12 12 0 0 1 24 12c3.1 0 5.9 1.2 7.9 3.1l5.7-5.7A20 20 0 0 0 6.3 14.7z" />
+      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2A11.9 11.9 0 0 1 12.7 28l-6.6 5.1A20 20 0 0 0 24 44z" />
+      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3a12 12 0 0 1-4.1 5.6l6.2 5.2C37 40.2 44 35 44 24c0-1.2-.1-2.3-.4-3.5z" />
+    </svg>
+  );
+}
 import { toast } from "sonner";
 
 /** Prêmios em destaque que se alternam na vitrine. */
@@ -113,6 +126,24 @@ export function AuthScreen({
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Não foi possível entrar.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const google = async () => {
+    setBusy(true);
+    try {
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+      });
+      if (result.error) {
+        toast.error("Não foi possível entrar com o Google. Tente de novo.");
+        return;
+      }
+      if (result.redirected) return;
+    } catch {
+      toast.error("Não foi possível entrar com o Google. Tente de novo.");
     } finally {
       setBusy(false);
     }
@@ -342,6 +373,23 @@ export function AuthScreen({
               )}
             </Button>
           </form>
+
+          <div className="auth-divider mt-6">
+            <span className="text-center font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              ou continue com
+            </span>
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy}
+            onClick={() => void google()}
+            className="auth-glass auth-glass-lift mt-4 min-h-12 w-full rounded-xl text-[13px] font-medium"
+          >
+            <GoogleMark className="mr-2 size-4" />
+            Continuar com Google
+          </Button>
 
           <div className="auth-divider mt-6">
             <span className="text-center font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">

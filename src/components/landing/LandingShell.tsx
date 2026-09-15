@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight } from "lucide-react";
 import type { ReactNode } from "react";
+
+import { AccountCta } from "@/components/landing/AccountCta";
 
 /** Cabeçalho, luz ambiente e rodapé compartilhados pelas páginas públicas. */
 export function LandingShell({ children }: { children: ReactNode }) {
@@ -44,13 +45,11 @@ export function LandingShell({ children }: { children: ReactNode }) {
               Planos
             </Link>
           </nav>
-          <Link
-            to="/checkout"
-            search={{ plano: "creator" }}
+          <AccountCta
+            guestLabel="Entrar"
+            memberLabel="Abrir meu estúdio"
             className="lp-cta-glow ml-auto inline-flex h-9 shrink-0 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-px md:ml-0"
-          >
-            Entrar <ArrowRight className="size-4" />
-          </Link>
+          />
         </div>
       </header>
 
