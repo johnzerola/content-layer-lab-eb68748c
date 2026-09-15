@@ -196,6 +196,17 @@ export async function createPublishDependencies(): Promise<QueueDependencies> {
         .maybeSingle();
       if (error || !data) throw new Error("result update failed");
     },
+    deletePublishedPost: async (postId, lockId) => {
+      const { data, error } = await supabaseAdmin
+        .from("scheduled_posts")
+        .delete()
+        .eq("id", postId)
+        .eq("lock_id", lockId)
+        .eq("status", "publicado")
+        .select("id")
+        .maybeSingle();
+      if (error || !data) throw new Error("published post cleanup failed");
+    },
     now: () => new Date(),
     log: (entry) => console.info(JSON.stringify(entry)),
   };

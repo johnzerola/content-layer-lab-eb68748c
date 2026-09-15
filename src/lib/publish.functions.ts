@@ -80,14 +80,7 @@ export const publishPostNow = createServerFn({ method: "POST" })
     }
 
     if (result.ok) {
-      if (post.video_path && deps.removeStorageObject) {
-        try {
-          await deps.removeStorageObject(post.video_path);
-        } catch {
-          /* limpeza de storage é best-effort */
-        }
-      }
-      await supabaseAdmin
+      const { data: finalized, error: finalizeError } = await supabaseAdmin
         .from("scheduled_posts")
         .update({
           status: "publicado",
@@ -96,13 +89,39 @@ export const publishPostNow = createServerFn({ method: "POST" })
           provider_post_id: result.providerPostId ?? null,
           error: null,
           error_code: null,
-          lock_id: null,
           locked_at: null,
           next_attempt_at: null,
           provider_container_id: null,
         })
         .eq("id", post.id)
-        .eq("lock_id", lockId);
+        .eq("lock_id", lockId)
+        .select("id")
+        .maybeSingle();
+      if (finalizeError || !finalized) {
+        return {
+          ok: false,
+          error: "O vídeo foi publicado, mas a limpeza local não pôde ser concluída.",
+          code: "DATABASE_ERROR",
+        };
+      }
+
+      let mediaRemoved = !post.video_path;
+      if (post.video_path && deps.removeStorageObject) {
+        try {
+          await deps.removeStorageObject(post.video_path);
+          mediaRemoved = true;
+        } catch {
+          /* limpeza de storage é best-effort */
+        }
+      }
+      if (mediaRemoved) {
+        await supabaseAdmin
+          .from("scheduled_posts")
+          .delete()
+          .eq("id", post.id)
+          .eq("lock_id", lockId)
+          .eq("status", "publicado");
+      }
       return { ok: true, permalink: result.permalink ?? null, providerPostId: result.providerPostId ?? null };
     }
 
