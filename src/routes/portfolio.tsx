@@ -74,10 +74,11 @@ function PortfolioPage() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6">
       {/* ── Vitrine ─────────────────────────────────────────── */}
-      <section className="auth-stage relative overflow-hidden rounded-2xl border border-border p-6 sm:p-10">
+      <section className="lp-glass lp-ring relative overflow-hidden rounded-3xl p-6 sm:p-10">
         <span aria-hidden className="auth-grid" />
         <span aria-hidden className="auth-beam auth-beam-a" />
         <span aria-hidden className="auth-beam auth-beam-b" />
+        <span aria-hidden className="lp-orb absolute -right-16 -top-20 size-56 opacity-60" />
 
         <p className="mono-label relative text-primary">Portfólio</p>
         <h1 className="relative mt-3 max-w-2xl text-[clamp(2rem,1rem+4vw,3.6rem)] font-extrabold leading-[0.95] tracking-[-0.03em]">
@@ -94,9 +95,9 @@ function PortfolioPage() {
             { icon: Clapperboard, value: stats.platforms, suffix: "", decimals: 0, label: "plataformas usadas" },
             { icon: Timer, value: stats.gb, suffix: " GB", decimals: 1, label: "de vídeo gerado" },
           ].map((s, i) => (
-            <div key={s.label} className="auth-glass auth-glass-lift rounded-xl p-4">
+            <div key={s.label} className="lp-glass lp-hover rounded-2xl p-4">
               <s.icon className="size-4 text-primary" />
-              <p className="mt-2 text-2xl font-extrabold tracking-tight">
+              <p className="lp-stat mt-2 font-display text-2xl font-extrabold tracking-tight">
                 <CountUp value={s.value} suffix={s.suffix} decimals={s.decimals} delay={400 + i * 180} />
               </p>
               <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{s.label}</p>
@@ -137,7 +138,7 @@ function PortfolioPage() {
             {items.map((e, i) => (
               <li
                 key={e.id}
-                className="rise-in group relative overflow-hidden rounded-xl border border-border bg-surface-2"
+                className="rise-in lp-hover group relative overflow-hidden rounded-2xl border border-border bg-surface-2"
                 style={{ animationDelay: `${Math.min(i, 12) * 45}ms` }}
               >
                 <div className="relative aspect-[9/16] overflow-hidden">
@@ -175,7 +176,7 @@ function PortfolioPage() {
         <h2 className="text-lg font-bold tracking-tight">Projetos salvos</h2>
         <ul className="mt-4 grid gap-3 sm:grid-cols-2">
           {(projectsQ.data ?? []).slice(0, 8).map((p) => (
-            <li key={p.id} className="auth-glass auth-glass-lift flex items-center justify-between gap-3 rounded-xl p-4">
+            <li key={p.id} className="lp-glass lp-hover flex items-center justify-between gap-3 rounded-2xl p-4">
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">{p.name}</p>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
