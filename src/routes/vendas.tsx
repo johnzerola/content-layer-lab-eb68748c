@@ -341,8 +341,10 @@ function Hero() {
           <p className="mono-label mt-5">sem instalar nada · exporta mp4 1080×1920 · reels, tiktok e shorts</p>
         </Reveal>
 
-        <Reveal delay={120} className="min-w-0">
-          <EditorMockup />
+        <Reveal delay={120} className="lp-scene min-w-0">
+          <div className="lp-rotate">
+            <EditorMockup />
+          </div>
         </Reveal>
       </div>
     </section>
@@ -495,7 +497,7 @@ function Advanced() {
             </div>
             <div className="lp-glass lp-ring relative grid min-h-[16rem] place-items-center overflow-hidden rounded-3xl p-8">
               <span aria-hidden className="lp-orb absolute -right-10 -top-10 size-40 opacity-70" />
-              <span className="lp-float lp-chip3d !size-24 !rounded-3xl">
+              <span className="lp-float lp-chip3d lp-spin3d !size-24 !rounded-3xl">
                 <a.icon />
               </span>
             </div>
@@ -711,7 +713,7 @@ function FinalCta() {
           <span aria-hidden className="lp-orb absolute -left-16 -top-16 size-56 opacity-60" />
           <span aria-hidden className="lp-orb absolute -bottom-20 -right-10 size-48 opacity-50" />
           <div className="relative">
-            <span className="lp-float lp-chip3d mx-auto !size-16 !rounded-2xl">
+            <span className="lp-float lp-chip3d lp-spin3d mx-auto !size-16 !rounded-2xl">
               <Sparkles />
             </span>
             <h2 className="mx-auto mt-6 max-w-2xl font-display text-3xl font-extrabold tracking-[-0.03em] md:text-[2.8rem] md:leading-[1.06]">
