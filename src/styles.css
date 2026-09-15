@@ -1633,10 +1633,10 @@
   from { transform: rotateY(-6deg) rotateX(3deg) translateZ(0); }
   to { transform: rotateY(6deg) rotateX(-2deg) translateZ(0); }
 }
-.lp-spin3d { animation: lp-spin3d 14s linear infinite; transform-style: preserve-3d; }
+.lp-spin3d { animation: lp-spin3d 12s ease-in-out infinite alternate; transform-style: preserve-3d; }
 @keyframes lp-spin3d {
-  from { transform: perspective(600px) rotateY(0deg) rotateX(9deg); }
-  to { transform: perspective(600px) rotateY(360deg) rotateX(9deg); }
+  from { transform: perspective(620px) rotateY(-26deg) rotateX(12deg); }
+  to { transform: perspective(620px) rotateY(26deg) rotateX(-6deg); }
 }
 @media (prefers-reduced-motion: reduce) {
   .lp-rotate, .lp-spin3d { animation: none !important; }
