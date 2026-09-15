@@ -1,6 +1,6 @@
 ---
 name: threejs-xr
-description: Sets up WebXR in Three.js — VRButton, ARButton, XRSession, controllers, hand tracking, hit testing, and immersive experiences. Use when the user asks about VR, AR, WebXR, immersive experiences, XR controllers, hand tracking, or augmented reality. Trigger keywords: WebXR, VR, AR, VRButton, ARButton, XRSession, controller, hand tracking, immersive, augmented reality, virtual reality.
+description: "Sets up WebXR in Three.js — VRButton, ARButton, XRSession, controllers, hand tracking, hit testing, and immersive experiences. Use when the user asks about VR, AR, WebXR, immersive experiences, XR controllers, hand tracking, or augmented reality. Trigger keywords: WebXR, VR, AR, VRButton, ARButton, XRSession, controller, hand tracking, immersive, augmented reality, virtual reality."
 ---
 
 # Three.js WebXR

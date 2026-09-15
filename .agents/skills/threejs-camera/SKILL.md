@@ -1,6 +1,6 @@
 ---
 name: threejs-camera
-description: Configures Three.js cameras and controls — PerspectiveCamera, OrthographicCamera, OrbitControls, FlyControls, PointerLockControls, and first-person setup. Use when the user asks about cameras, controls, orbit, fly, first-person, camera movement, or viewport setup. Trigger keywords: camera, OrbitControls, FlyControls, PointerLockControls, perspective, orthographic, first person, viewport, FOV.
+description: "Configures Three.js cameras and controls — PerspectiveCamera, OrthographicCamera, OrbitControls, FlyControls, PointerLockControls, and first-person setup. Use when the user asks about cameras, controls, orbit, fly, first-person, camera movement, or viewport setup. Trigger keywords: camera, OrbitControls, FlyControls, PointerLockControls, perspective, orthographic, first person, viewport, FOV."
 ---
 
 # Three.js Camera & Controls
