@@ -165,7 +165,7 @@ export function AuthScreen({
           {HIGHLIGHTS.map((h, i) => (
             <div
               key={h.label}
-              className="auth-card rounded-xl border border-border bg-surface-2/60 p-3.5 lg:p-4"
+              className="auth-card auth-glass auth-glass-lift rounded-xl border border-border p-3.5 lg:p-4"
               style={{ animationDelay: `${120 + i * 90}ms` }}
             >
               <p
@@ -197,7 +197,7 @@ export function AuthScreen({
       </aside>
 
       {/* ---------- formulário ---------- */}
-      <section className="relative flex flex-col justify-center bg-surface-2/40 p-6 sm:p-9">
+      <section className="auth-panel-glass relative flex flex-col justify-center p-6 sm:p-9">
         <div className={`mx-auto w-full max-w-sm ${mounted ? "rise-in" : "opacity-0"}`}>
           <div className="flex flex-col items-center text-center">
             <span className="auth-logo grid size-12 place-items-center rounded-2xl text-primary-foreground">
@@ -210,7 +210,7 @@ export function AuthScreen({
           <div
             role="tablist"
             aria-label="Entrar ou criar conta"
-            className="relative mt-6 grid grid-cols-2 rounded-xl border border-border bg-surface p-1"
+            className="auth-glass relative mt-6 grid grid-cols-2 rounded-xl border border-border p-1"
           >
             <span
               aria-hidden
