@@ -32,14 +32,14 @@ export function EditorMockup() {
         <span className="size-2.5 rounded-full bg-warn/70" />
         <span className="size-2.5 rounded-full bg-primary/70" />
         <span className="mono-label ml-2 truncate">editor ia · podcast_ep42.mp4</span>
-        <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-[10px] text-primary">
+        <span className="ml-auto inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-[10px] text-primary">
           <Sparkles className="size-3" /> IA ativa
         </span>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)]">
         {/* preview 9:16 */}
-        <div className="relative aspect-[9/16] overflow-hidden rounded-2xl border border-border bg-surface-2">
+        <div className="relative mx-auto aspect-[9/16] w-36 overflow-hidden rounded-2xl border border-border bg-surface-2 sm:w-auto">
           <div
             className="absolute inset-0"
             style={{
