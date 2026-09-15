@@ -55,7 +55,7 @@ export function AccountCta({
 
   if (user) {
     return (
-      <Link to="/" className={className}>
+      <Link to="/editor" className={className}>
         {memberLabel}
         {showArrow ? <ArrowRight className="size-4" /> : null}
       </Link>

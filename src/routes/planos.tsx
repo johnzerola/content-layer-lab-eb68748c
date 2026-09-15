@@ -1,8 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowRight, BadgeCheck, Check, CreditCard, Info, QrCode, ShieldCheck, Sparkles } from "lucide-react";
 
 import { LandingShell } from "@/components/landing/LandingShell";
+import { AccountCta } from "@/components/landing/AccountCta";
 import { Reveal } from "@/components/landing/Reveal";
 import { PAID_PLANS, PLANS } from "@/lib/plan";
 
@@ -143,17 +144,15 @@ function PlansPage() {
                     </li>
                   </ul>
 
-                  <Link
-                    to="/checkout"
-                    search={{ plano: p.id }}
+                  <AccountCta
+                    plano={p.id}
+                    guestLabel="Entrar e assinar"
                     className={`mt-8 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-transform duration-200 hover:-translate-y-px ${
                       featured
                         ? "lp-cta-glow bg-primary text-primary-foreground"
                         : "border border-border text-foreground hover:bg-surface"
                     }`}
-                  >
-                    Entrar e assinar <ArrowRight className="size-4" />
-                  </Link>
+                  />
                 </article>
               </Reveal>
             );
@@ -174,13 +173,11 @@ function PlansPage() {
                 {PLANS.trial.items.join(" · ")}. Sem cartão para começar.
               </p>
             </div>
-            <Link
-              to="/checkout"
-              search={{ plano: "trial" }}
+            <AccountCta
+              plano="trial"
+              guestLabel="Testar grátis"
               className="lp-glass lp-hover ml-auto inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-5 text-sm font-semibold"
-            >
-              Testar grátis <ArrowRight className="size-4" />
-            </Link>
+            />
           </div>
         </Reveal>
       </section>
