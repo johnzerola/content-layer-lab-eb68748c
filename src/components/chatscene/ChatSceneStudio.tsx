@@ -37,8 +37,15 @@ import { BrandPanel } from "@/components/chatscene/BrandPanel";
 import { ThemePanel } from "@/components/chatscene/ThemePanel";
 import { MusicPanel } from "@/components/chatscene/MusicPanel";
 import { StoryPanel } from "@/components/chatscene/StoryPanel";
+import { CreatorFormatPicker } from "./CreatorFormatPicker";
+import {
+  applyCreatorFormat,
+  createCreatorExample,
+  type CreatorFormat,
+} from "@/lib/chatscene/creator-presets";
+import { appendRedditStory, type RedditStoryDraft } from "@/lib/chatscene/reddit-story";
 import { generateStory } from "@/lib/chatscene/story.functions";
-import { storyToProject, timingForDuration, type StoryBrief } from "@/lib/chatscene/story";
+import { storyToProject, type StoryBrief } from "@/lib/chatscene/story";
 
 import { buildPlan } from "@/lib/chatscene/clock";
 import { encodeFrameSequence, frameEncoderSupported } from "@/lib/chatscene/encode-frames";
@@ -103,27 +110,19 @@ import {
 const PALETTE = ["#7c5cff", "#ff5c8a", "#22c08a", "#f2b705", "#4ec3ff", "#ff8a4c"];
 
 type StudioTab =
-  | "historia"
-  | "participantes"
-  | "mensagens"
-  | "tempo"
-  | "fundo"
-  | "vozes"
-  | "estilo"
-  | "exportar";
+  "historia" | "participantes" | "mensagens" | "tempo" | "fundo" | "vozes" | "estilo" | "exportar";
 
 /** Abas do editor: cada assunto em uma tela, com a prévia sempre ao lado. */
 const STUDIO_TABS: { id: StudioTab; label: string; icon: typeof Palette }[] = [
-  { id: "historia", label: "História", icon: Wand2 },
-  { id: "participantes", label: "Participantes", icon: Users },
-  { id: "mensagens", label: "Mensagens", icon: MessageSquare },
+  { id: "historia", label: "Criar roteiro", icon: Wand2 },
+  { id: "participantes", label: "Personagens", icon: Users },
+  { id: "mensagens", label: "Revisar falas", icon: MessageSquare },
   { id: "tempo", label: "Linha do tempo", icon: Clock },
   { id: "fundo", label: "Fundo", icon: ImageIcon },
-  { id: "vozes", label: "Voice Cast", icon: Mic },
+  { id: "vozes", label: "Vozes e atuação", icon: Mic },
   { id: "estilo", label: "Estilo", icon: Palette },
   { id: "exportar", label: "Exportar", icon: Download },
 ];
-
 
 function slugify(text: string): string {
   return (
@@ -137,10 +136,12 @@ function slugify(text: string): string {
 }
 
 export function ChatSceneStudio() {
-  const [project, setProject] = useState<ChatSceneProject>(() => createChatSceneProject());
+  const [project, setProject] = useState<ChatSceneProject>(() =>
+    applyCreatorFormat(createChatSceneProject(), "whatsapp"),
+  );
   const [recordId, setRecordId] = useState<string | null>(null);
   const [script, setScript] = useState("");
-  const [tab, setTab] = useState<StudioTab>("mensagens");
+  const [tab, setTab] = useState<StudioTab>("historia");
   const [frame, setFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -166,7 +167,6 @@ export function ChatSceneStudio() {
   const abortRef = useRef<AbortController | null>(null);
   const [exportUrl, setExportUrl] = useState<string | null>(null);
   const [exportName, setExportName] = useState("chatscene.mp4");
-
 
   const plan = useMemo(() => buildPlan(project), [project]);
   const isGroup = (project.chatKind ?? "direct") === "group";
@@ -213,10 +213,13 @@ export function ChatSceneStudio() {
         const { asset, library: next, reused } = await addFileToLibrary(file, "message");
         setLibrary(next);
         updateMessage(messageId, { mediaUrl: asset.url, mediaAspect: asset.aspect });
-        if (reused) toast.success("Arquivo reaproveitado da biblioteca — nada foi enviado de novo.");
+        if (reused)
+          toast.success("Arquivo reaproveitado da biblioteca — nada foi enviado de novo.");
         const temporary = asset.temporary;
         if (temporary) {
-          toast.warning("O arquivo ficou só nesta sessão; salve a conversa depois de enviá-lo de novo.");
+          toast.warning(
+            "O arquivo ficou só nesta sessão; salve a conversa depois de enviá-lo de novo.",
+          );
         }
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Não foi possível usar este arquivo.");
@@ -248,7 +251,10 @@ export function ChatSceneStudio() {
   const handleHeaderImage = useCallback(async (file: File, slot: "logo" | "background") => {
     setUploading(slot === "logo" ? "header-logo" : "header-bg");
     try {
-      const { asset, library: next } = await addFileToLibrary(file, slot === "logo" ? "logo" : "background");
+      const { asset, library: next } = await addFileToLibrary(
+        file,
+        slot === "logo" ? "logo" : "background",
+      );
       setLibrary(next);
       setProject((prev) => ({
         ...prev,
@@ -305,8 +311,6 @@ export function ChatSceneStudio() {
     }
   }, []);
 
-
-
   /** Música de fundo do vídeo. */
   const handleMusic = useCallback(async (file: File) => {
     setUploading("music");
@@ -352,8 +356,7 @@ export function ChatSceneStudio() {
     setProject((prev) => {
       const last = prev.messages.at(-1);
       const lastAuthor = last ? participantOf(prev, last.participantId) : null;
-      const next =
-        prev.participants.find((p) => p.id !== lastAuthor?.id) ?? prev.participants[0]!;
+      const next = prev.participants.find((p) => p.id !== lastAuthor?.id) ?? prev.participants[0]!;
       const message = createMessage(next.id, { text: "" });
       setSelected(message.id);
       return { ...prev, messages: [...prev.messages, message] };
@@ -407,7 +410,6 @@ export function ChatSceneStudio() {
     });
   }, []);
 
-
   const removeMessage = useCallback((id: string) => {
     setProject((prev) => ({ ...prev, messages: prev.messages.filter((m) => m.id !== id) }));
   }, []);
@@ -427,7 +429,13 @@ export function ChatSceneStudio() {
   /** Arrastar e soltar: leva a mensagem para a posição solta. */
   const reorderMessage = useCallback((from: number, to: number) => {
     setProject((prev) => {
-      if (from === to || from < 0 || to < 0 || from >= prev.messages.length || to >= prev.messages.length) {
+      if (
+        from === to ||
+        from < 0 ||
+        to < 0 ||
+        from >= prev.messages.length ||
+        to >= prev.messages.length
+      ) {
         return prev;
       }
       const messages = [...prev.messages];
@@ -436,8 +444,6 @@ export function ChatSceneStudio() {
       return { ...prev, messages };
     });
   }, []);
-
-
 
   const duplicateMessage = useCallback((id: string) => {
     setProject((prev) => {
@@ -496,6 +502,43 @@ export function ChatSceneStudio() {
 
   const speakFn = useServerFn(synthesizeVoice);
   const storyFn = useServerFn(generateStory);
+  const creatorFormat = project.storyFormat ?? "whatsapp";
+  const handleFormat = (format: CreatorFormat) => {
+    setPlaying(false);
+    setProject((prev) => applyCreatorFormat(prev, format));
+    setTab("historia");
+    toast.success(
+      format === "whatsapp"
+        ? "Formato Fake WhatsApp aplicado. Seu roteiro foi preservado."
+        : "Formato narrado aplicado. Seu roteiro foi preservado.",
+    );
+  };
+  const handleCreatorExample = () => {
+    const next = createCreatorExample(creatorFormat, project);
+    setPlaying(false);
+    setSelected(null);
+    setClips(new Map());
+    setFrame(0);
+    setProject(next);
+    toast.success("Exemplo original carregado, ainda sem vozes geradas. Você pode desfazer.");
+  };
+  const handleImportReddit = (draft: RedditStoryDraft) => {
+    try {
+      const next = applyCreatorFormat(appendRedditStory(project, draft), "reddit");
+      const firstAdded = next.messages[project.messages.length]!;
+      const nextPlan = buildPlan(next);
+      setPlaying(false);
+      setSelected(firstAdded.id);
+      setFrame(nextPlan.byId[firstAdded.id]?.appearFrame ?? 0);
+      setProject(next);
+      setTab("mensagens");
+      toast.success("História adicionada. Revise os blocos e gere a narração em Vozes.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível adicionar a história.",
+      );
+    }
+  };
   const voiceProvider = useMemo(
     () => createGatewayVoiceProvider((input) => speakFn({ data: input })),
     [speakFn],
@@ -503,20 +546,24 @@ export function ChatSceneStudio() {
 
   /** Modo simples: cria roteiro, elenco e falas reais, já sincronizadas no documento. */
   const handleGenerateStory = useCallback(
-    async (brief: StoryBrief) => {
+    async (brief: StoryBrief, withVoices: boolean) => {
       setStoryBusy(true);
       setCastFailures([]);
       try {
         const script = await storyFn({ data: brief });
-        const nextProject = storyToProject(
-          { ...project, timing: timingForDuration(brief.durationSec) },
-          script,
-        );
+        const nextProject = storyToProject(applyCreatorFormat(project, "whatsapp"), script);
         setProject(nextProject);
         setSelected(null);
         setFrame(0);
         setPlaying(false);
-        setTab("vozes");
+        setClips(new Map());
+        setTab(withVoices ? "vozes" : "mensagens");
+        if (!withVoices) {
+          toast.success(
+            "Roteiro criado. Revise as falas e escolha as vozes antes de gerar o áudio.",
+          );
+          return;
+        }
 
         const spoken = speakingMessages(nextProject).length;
         setCastState("running");
@@ -529,9 +576,13 @@ export function ChatSceneStudio() {
         setProject(applyVoiceDurations(nextProject, cast.durations));
         setCastFailures(cast.failures);
         if (cast.failures.length) {
-          toast.warning(`História pronta, mas ${cast.failures.length} falas precisam ser tentadas novamente.`);
+          toast.warning(
+            `História pronta, mas ${cast.failures.length} falas precisam ser tentadas novamente.`,
+          );
         } else {
-          toast.success(`História completa com ${nextProject.participants.length} personagens e ${cast.clips.size} falas reais.`);
+          toast.success(
+            `História completa com ${nextProject.participants.length} personagens e ${cast.clips.size} falas reais.`,
+          );
         }
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Não foi possível criar a história.");
@@ -553,7 +604,8 @@ export function ChatSceneStudio() {
       }
       const voice = effectiveVoice(project, message);
       const text = speakableText(message.kind, message.text);
-      if (voice && clip.key === voiceKey(text, voice.profile, voice.direction)) next.set(message.id, clip);
+      if (voice && clip.key === voiceKey(text, voice.profile, voice.direction))
+        next.set(message.id, clip);
     }
     return next;
   }, [clips, project]);
@@ -580,12 +632,10 @@ export function ChatSceneStudio() {
 
   /** Gera (ou reaproveita) a fala de todas as mensagens com voz escolhida. */
   const handleGenerateVoices = useCallback(async () => {
-    const withVoice = speakingMessages(project).filter(
-      (m) => {
-        const participant = project.participants.find((p) => p.id === m.message.participantId);
-        return participant ? voiceProfileOf(project, participant) : null;
-      },
-    );
+    const withVoice = speakingMessages(project).filter((m) => {
+      const participant = project.participants.find((p) => p.id === m.message.participantId);
+      return participant ? voiceProfileOf(project, participant) : null;
+    });
     if (!withVoice.length) {
       toast.error("Escolha uma voz para pelo menos uma pessoa da conversa.");
       return;
@@ -625,41 +675,41 @@ export function ChatSceneStudio() {
   }, [project, voiceProvider]);
 
   /** Áudio próprio: entra no lugar da voz gerada e manda no tempo da mensagem. */
-  const handleVoiceFile = useCallback(
-    async (messageId: string, file: File) => {
-      setUploading(`voice-${messageId}`);
-      try {
-        const clip = await decodeClip(`upload:${messageId}:${file.name}:${file.size}`, file);
-        setClips((prev) => {
-          const next = new Map(prev);
-          next.set(messageId, clip);
-          return next;
+  const handleVoiceFile = useCallback(async (messageId: string, file: File) => {
+    setUploading(`voice-${messageId}`);
+    try {
+      const clip = await decodeClip(`upload:${messageId}:${file.name}:${file.size}`, file);
+      setClips((prev) => {
+        const next = new Map(prev);
+        next.set(messageId, clip);
+        return next;
+      });
+      setProject((prev) => {
+        const message = prev.messages.find((m) => m.id === messageId);
+        const voice = message ? effectiveVoice(prev, message) : null;
+        return applyVoiceDurations(prev, {
+          [messageId]: clipDurationMs(clip, voice?.profile ?? null),
         });
-        setProject((prev) => {
-          const message = prev.messages.find((m) => m.id === messageId);
-          const voice = message ? effectiveVoice(prev, message) : null;
-          return applyVoiceDurations(prev, {
-            [messageId]: clipDurationMs(clip, voice?.profile ?? null),
-          });
-        });
-        toast.success("Áudio aplicado — o tempo da mensagem já acompanha a fala.");
-      } catch {
-        toast.error("Não foi possível ler este áudio. Use MP3, M4A, WAV ou OGG.");
-      } finally {
-        setUploading(null);
-      }
-    },
-    [],
-  );
+      });
+      toast.success("Áudio aplicado — o tempo da mensagem já acompanha a fala.");
+    } catch {
+      toast.error("Não foi possível ler este áudio. Use MP3, M4A, WAV ou OGG.");
+    } finally {
+      setUploading(null);
+    }
+  }, []);
 
-  const handleRemoveVoiceClip = useCallback((messageId: string) => {
-    setClips((prev) => {
-      const next = new Map(prev);
-      next.delete(messageId);
-      return next;
-    });
-    updateMessage(messageId, { voiceMs: null });
-  }, [updateMessage]);
+  const handleRemoveVoiceClip = useCallback(
+    (messageId: string) => {
+      setClips((prev) => {
+        const next = new Map(prev);
+        next.delete(messageId);
+        return next;
+      });
+      updateMessage(messageId, { voiceMs: null });
+    },
+    [updateMessage],
+  );
 
   const handlePlayClip = useCallback(
     (messageId: string) => {
@@ -683,7 +733,6 @@ export function ChatSceneStudio() {
     stopPreviewRef.current = null;
     setPlayingClip(null);
   }, []);
-
 
   const handleExport = useCallback(async () => {
     if (!frameEncoderSupported()) {
@@ -710,7 +759,13 @@ export function ChatSceneStudio() {
       if (effectiveClips.size || mix.musicUrl || project.sound?.enabled) {
         try {
           const music = mix.musicUrl ? await loadMusic(mix.musicUrl) : null;
-          audio = await mixConversationAudio({ project, plan, clips: effectiveClips, settings: mix, music });
+          audio = await mixConversationAudio({
+            project,
+            plan,
+            clips: effectiveClips,
+            settings: mix,
+            music,
+          });
         } catch {
           toast.warning("O vídeo sai sem som: não foi possível montar a trilha.");
         }
@@ -738,7 +793,6 @@ export function ChatSceneStudio() {
       a.download = name;
       a.click();
       toast.success("Vídeo pronto. Baixou e já dá para assistir aqui.");
-
     } catch (err) {
       if ((err as DOMException)?.name === "AbortError") toast("Exportação cancelada.");
       else toast.error(err instanceof Error ? err.message : "A exportação falhou.");
@@ -753,10 +807,12 @@ export function ChatSceneStudio() {
   const { width, height } = renderSize(project.render);
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-4 py-6">
+    <div className="mx-auto w-full max-w-[1560px] px-4 py-6 lg:px-6">
       <header className="mb-5 flex flex-wrap items-center gap-3">
         <div className="min-w-[220px] flex-1">
-          <p className="mono-label text-muted-foreground">Analogue ChatScene</p>
+          <p className="mb-1 text-xs font-semibold tracking-[.14em] text-muted-foreground">
+            CHATSCENE / ESTÚDIO DE HISTÓRIAS
+          </p>
           <Input
             value={project.title}
             onChange={(e) => patch({ title: e.target.value })}
@@ -766,7 +822,13 @@ export function ChatSceneStudio() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={undo} disabled={!canUndo} aria-label="Desfazer">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={undo}
+            disabled={!canUndo}
+            aria-label="Desfazer"
+          >
             <Undo2 className="mr-1.5 size-4" />
             Desfazer
           </Button>
@@ -774,18 +836,36 @@ export function ChatSceneStudio() {
             <Redo2 className="mr-1.5 size-4" />
             Refazer
           </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <a href="/chatscene/comparar">Comparar com referência</a>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <a href="/chatscene/render">Render em tempo real</a>
-          </Button>
+          <details className="relative">
+            <summary className="cursor-pointer rounded-lg px-2 py-2 text-xs text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring">
+              Ferramentas
+            </summary>
+            <div className="absolute right-0 z-20 mt-2 w-48 rounded-xl border border-border bg-card p-2 shadow-lg">
+              <a
+                className="block rounded p-2 text-xs hover:bg-secondary"
+                href="/chatscene/comparar"
+              >
+                Comparar referência
+              </a>
+              <a className="block rounded p-2 text-xs hover:bg-secondary" href="/chatscene/render">
+                Render em tempo real
+              </a>
+            </div>
+          </details>
           <Button variant="secondary" size="sm" onClick={() => void handleSave()} disabled={saving}>
-            {saving ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : <Save className="mr-1.5 size-4" />}
+            {saving ? (
+              <Loader2 className="mr-1.5 size-4 animate-spin" />
+            ) : (
+              <Save className="mr-1.5 size-4" />
+            )}
             Salvar
           </Button>
           <Button size="sm" onClick={() => void handleExport()} disabled={exporting}>
-            {exporting ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : <Download className="mr-1.5 size-4" />}
+            {exporting ? (
+              <Loader2 className="mr-1.5 size-4 animate-spin" />
+            ) : (
+              <Download className="mr-1.5 size-4" />
+            )}
             {exporting ? `${Math.round(progress * 100)}%` : "Exportar MP4"}
           </Button>
           {exporting && (
@@ -796,10 +876,18 @@ export function ChatSceneStudio() {
         </div>
       </header>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
+      <CreatorFormatPicker
+        value={creatorFormat}
+        onChange={handleFormat}
+        disabled={storyBusy || castState === "running" || exporting}
+      />
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_430px]">
         {/* --------------------------------------------------- editor em abas */}
-        <section className="glass rounded-2xl border border-border p-4">
-          <nav className="mb-4 flex flex-wrap gap-1.5" aria-label="Abas do editor">
+        <section className="min-w-0 rounded-2xl border border-border bg-card p-4 lg:p-5">
+          <nav
+            className="mb-6 flex flex-wrap gap-1.5 border-b border-border pb-4"
+            aria-label="Abas do editor"
+          >
             {STUDIO_TABS.map((t) => {
               const Icon = t.icon;
               return (
@@ -810,7 +898,7 @@ export function ChatSceneStudio() {
                   aria-pressed={tab === t.id}
                   className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition ${
                     tab === t.id
-                      ? "border-primary bg-primary/10 text-primary"
+                      ? "border-primary bg-primary/10 text-foreground"
                       : "border-border text-muted-foreground hover:border-primary/50"
                   }`}
                 >
@@ -821,9 +909,16 @@ export function ChatSceneStudio() {
             })}
           </nav>
 
-          {tab === "historia" && (
-            <StoryPanel busy={storyBusy} onGenerate={(brief) => void handleGenerateStory(brief)} />
-          )}
+          <div hidden={tab !== "historia"}>
+            <StoryPanel
+              format={creatorFormat}
+              busy={storyBusy || castState === "running" || exporting}
+              onGenerate={(brief, withVoices) => void handleGenerateStory(brief, withVoices)}
+              onImportReddit={handleImportReddit}
+              onExample={handleCreatorExample}
+              onReferenceStyle={() => handleFormat("whatsapp")}
+            />
+          </div>
 
           {tab === "participantes" && (
             <ParticipantsPanel
@@ -892,7 +987,9 @@ export function ChatSceneStudio() {
                     max={2}
                     step={0.1}
                     value={project.timing.speed}
-                    onChange={(e) => patch({ timing: { ...project.timing, speed: Number(e.target.value) } })}
+                    onChange={(e) =>
+                      patch({ timing: { ...project.timing, speed: Number(e.target.value) } })
+                    }
                     className="h-1.5 w-full accent-primary"
                     aria-label="Velocidade da conversa"
                   />
@@ -946,7 +1043,9 @@ export function ChatSceneStudio() {
                   <input
                     type="checkbox"
                     checked={project.timing.typing}
-                    onChange={(e) => patch({ timing: { ...project.timing, typing: e.target.checked } })}
+                    onChange={(e) =>
+                      patch({ timing: { ...project.timing, typing: e.target.checked } })
+                    }
                   />
                   mostrar “digitando…”
                 </label>
@@ -1001,11 +1100,19 @@ export function ChatSceneStudio() {
                         <input
                           type="checkbox"
                           checked={Boolean(selectedMessage.voiceDirection)}
-                          onChange={(e) => updateMessage(selectedMessage.id, {
-                            voiceDirection: e.target.checked
-                              ? { emotion: "neutral", speedMultiplier: 1, energyMultiplier: 1, pauseBeforeMs: 0, pauseAfterMs: 0 }
-                              : null,
-                          })}
+                          onChange={(e) =>
+                            updateMessage(selectedMessage.id, {
+                              voiceDirection: e.target.checked
+                                ? {
+                                    emotion: "neutral",
+                                    speedMultiplier: 1,
+                                    energyMultiplier: 1,
+                                    pauseBeforeMs: 0,
+                                    pauseAfterMs: 0,
+                                  }
+                                : null,
+                            })
+                          }
                         />
                         Direção de voz desta mensagem
                       </label>
@@ -1013,16 +1120,94 @@ export function ChatSceneStudio() {
                         <div className="mt-2 space-y-2">
                           <select
                             value={selectedMessage.voiceDirection.emotion ?? "neutral"}
-                            onChange={(e) => updateMessage(selectedMessage.id, { voiceDirection: { ...selectedMessage.voiceDirection, emotion: e.target.value as import("@/lib/chatscene/voice").VoiceEmotion } })}
+                            onChange={(e) =>
+                              updateMessage(selectedMessage.id, {
+                                voiceDirection: {
+                                  ...selectedMessage.voiceDirection,
+                                  emotion: e.target
+                                    .value as import("@/lib/chatscene/voice").VoiceEmotion,
+                                },
+                              })
+                            }
                             className="w-full rounded-md border border-border bg-background px-2 py-1.5"
                             aria-label="Emoção desta mensagem"
                           >
-                            <option value="neutral">Neutra</option><option value="happy">Feliz</option><option value="excited">Empolgada</option><option value="serious">Séria</option><option value="nervous">Nervosa</option><option value="annoyed">Incomodada</option><option value="angry-theatrical">Brava teatral</option><option value="sad">Triste</option><option value="sarcastic">Sarcástica</option><option value="surprised">Surpresa</option><option value="whisper-like">Como segredo</option>
+                            <option value="neutral">Neutra</option>
+                            <option value="happy">Feliz</option>
+                            <option value="excited">Empolgada</option>
+                            <option value="serious">Séria</option>
+                            <option value="nervous">Nervosa</option>
+                            <option value="annoyed">Incomodada</option>
+                            <option value="angry-theatrical">Brava teatral</option>
+                            <option value="sad">Triste</option>
+                            <option value="sarcastic">Sarcástica</option>
+                            <option value="surprised">Surpresa</option>
+                            <option value="whisper-like">Como segredo</option>
                           </select>
-                          <Range label="Velocidade da fala" value={selectedMessage.voiceDirection.speedMultiplier ?? 1} min={0.7} max={1.3} step={0.05} suffix="×" onChange={(v) => updateMessage(selectedMessage.id, { voiceDirection: { ...selectedMessage.voiceDirection, speedMultiplier: v } })} />
-                          <Range label="Energia da fala" value={selectedMessage.voiceDirection.energyMultiplier ?? 1} min={0.6} max={1.4} step={0.05} suffix="×" onChange={(v) => updateMessage(selectedMessage.id, { voiceDirection: { ...selectedMessage.voiceDirection, energyMultiplier: v } })} />
-                          <Range label="Pausa da voz antes" value={selectedMessage.voiceDirection.pauseBeforeMs ?? 0} min={0} max={3000} step={100} suffix="ms" onChange={(v) => updateMessage(selectedMessage.id, { voiceDirection: { ...selectedMessage.voiceDirection, pauseBeforeMs: v } })} />
-                          <Range label="Pausa da voz depois" value={selectedMessage.voiceDirection.pauseAfterMs ?? 0} min={0} max={3000} step={100} suffix="ms" onChange={(v) => updateMessage(selectedMessage.id, { voiceDirection: { ...selectedMessage.voiceDirection, pauseAfterMs: v } })} />
+                          <Range
+                            label="Velocidade da fala"
+                            value={selectedMessage.voiceDirection.speedMultiplier ?? 1}
+                            min={0.7}
+                            max={1.3}
+                            step={0.05}
+                            suffix="×"
+                            onChange={(v) =>
+                              updateMessage(selectedMessage.id, {
+                                voiceDirection: {
+                                  ...selectedMessage.voiceDirection,
+                                  speedMultiplier: v,
+                                },
+                              })
+                            }
+                          />
+                          <Range
+                            label="Energia da fala"
+                            value={selectedMessage.voiceDirection.energyMultiplier ?? 1}
+                            min={0.6}
+                            max={1.4}
+                            step={0.05}
+                            suffix="×"
+                            onChange={(v) =>
+                              updateMessage(selectedMessage.id, {
+                                voiceDirection: {
+                                  ...selectedMessage.voiceDirection,
+                                  energyMultiplier: v,
+                                },
+                              })
+                            }
+                          />
+                          <Range
+                            label="Pausa da voz antes"
+                            value={selectedMessage.voiceDirection.pauseBeforeMs ?? 0}
+                            min={0}
+                            max={3000}
+                            step={100}
+                            suffix="ms"
+                            onChange={(v) =>
+                              updateMessage(selectedMessage.id, {
+                                voiceDirection: {
+                                  ...selectedMessage.voiceDirection,
+                                  pauseBeforeMs: v,
+                                },
+                              })
+                            }
+                          />
+                          <Range
+                            label="Pausa da voz depois"
+                            value={selectedMessage.voiceDirection.pauseAfterMs ?? 0}
+                            min={0}
+                            max={3000}
+                            step={100}
+                            suffix="ms"
+                            onChange={(v) =>
+                              updateMessage(selectedMessage.id, {
+                                voiceDirection: {
+                                  ...selectedMessage.voiceDirection,
+                                  pauseAfterMs: v,
+                                },
+                              })
+                            }
+                          />
                         </div>
                       ) : null}
                     </div>
@@ -1081,7 +1266,9 @@ export function ChatSceneStudio() {
                       <input
                         type="checkbox"
                         checked={selectedMessage.emphasis ?? false}
-                        onChange={(e) => updateMessage(selectedMessage.id, { emphasis: e.target.checked })}
+                        onChange={(e) =>
+                          updateMessage(selectedMessage.id, { emphasis: e.target.checked })
+                        }
                       />
                       momento de peso (segura mais na tela)
                     </label>
@@ -1092,7 +1279,9 @@ export function ChatSceneStudio() {
                           <button
                             key={emoji || "none"}
                             type="button"
-                            onClick={() => updateMessage(selectedMessage.id, { reaction: emoji || null })}
+                            onClick={() =>
+                              updateMessage(selectedMessage.id, { reaction: emoji || null })
+                            }
                             className={`rounded-md border px-2 py-1 ${
                               (selectedMessage.reaction ?? "") === emoji
                                 ? "border-primary bg-primary/10"
@@ -1108,7 +1297,9 @@ export function ChatSceneStudio() {
                       <p className="mb-1 text-muted-foreground">Hora desta mensagem</p>
                       <input
                         value={selectedMessage.time ?? ""}
-                        onChange={(e) => updateMessage(selectedMessage.id, { time: e.target.value || null })}
+                        onChange={(e) =>
+                          updateMessage(selectedMessage.id, { time: e.target.value || null })
+                        }
                         placeholder="automática"
                         className="w-full rounded-md border border-border bg-background px-2 py-1.5"
                         aria-label="Hora desta mensagem"
@@ -1117,7 +1308,9 @@ export function ChatSceneStudio() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => updateMessage(selectedMessage.id, { delayMs: null, typingMs: null })}
+                      onClick={() =>
+                        updateMessage(selectedMessage.id, { delayMs: null, typingMs: null })
+                      }
                     >
                       Voltar ao ritmo automático
                     </Button>
@@ -1145,12 +1338,19 @@ export function ChatSceneStudio() {
             <div>
               <p className="mono-label mb-1.5 text-muted-foreground">Galeria de fundos</p>
               <p className="mb-2 text-[11px] text-muted-foreground">
-                Vídeos de gameplay gerados por IA — livres de direitos autorais, pode usar nos seus Shorts.
+                Vídeos de gameplay gerados por IA — livres de direitos autorais, pode usar nos seus
+                Shorts.
               </p>
               {(["gameplay", "satisfatorio", "cenario", "cor"] as const).map((cat) => (
                 <div key={cat} className="mb-3">
-                  <p className="mono-label mb-1.5 text-muted-foreground/80">{BACKGROUND_CATEGORY_LABELS[cat]}</p>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="list" aria-label={BACKGROUND_CATEGORY_LABELS[cat]}>
+                  <p className="mono-label mb-1.5 text-muted-foreground/80">
+                    {BACKGROUND_CATEGORY_LABELS[cat]}
+                  </p>
+                  <div
+                    className="grid grid-cols-2 gap-2 sm:grid-cols-3"
+                    role="list"
+                    aria-label={BACKGROUND_CATEGORY_LABELS[cat]}
+                  >
                     {BACKGROUND_PRESETS.filter((b) => b.category === cat).map((b) => {
                       const active =
                         (project.background?.kind ?? "theme") === b.value.kind &&
@@ -1166,24 +1366,61 @@ export function ChatSceneStudio() {
                           aria-label={`Usar fundo ${b.label}`}
                           role="listitem"
                           className={`group overflow-hidden rounded-lg border text-left text-xs transition ${
-                            active ? "border-primary bg-primary/10 ring-1 ring-primary/40" : "border-border hover:border-primary/50"
+                            active
+                              ? "border-primary bg-primary/10 ring-1 ring-primary/40"
+                              : "border-border hover:border-primary/50"
                           }`}
                         >
                           <span className="relative block aspect-[9/16] overflow-hidden bg-muted">
                             {b.value.kind === "video" && b.value.videoUrl ? (
-                              <video src={b.value.videoUrl} muted loop autoPlay playsInline preload="auto" className="size-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                              <video
+                                src={b.value.videoUrl}
+                                muted
+                                loop
+                                autoPlay
+                                playsInline
+                                preload="auto"
+                                className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+                              />
                             ) : b.value.kind === "image" && b.value.imageUrl ? (
-                              <img src={b.value.imageUrl} alt="" loading="lazy" className="size-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                              <img
+                                src={b.value.imageUrl}
+                                alt=""
+                                loading="lazy"
+                                className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+                              />
                             ) : b.value.kind === "gradient" ? (
-                              <span className="block size-full" style={{ background: `linear-gradient(145deg, ${b.value.color}, ${b.value.colorB})` }} />
+                              <span
+                                className="block size-full"
+                                style={{
+                                  background: `linear-gradient(145deg, ${b.value.color}, ${b.value.colorB})`,
+                                }}
+                              />
                             ) : b.value.kind === "solid" ? (
-                              <span className="block size-full" style={{ backgroundColor: b.value.color ?? undefined }} />
+                              <span
+                                className="block size-full"
+                                style={{ backgroundColor: b.value.color ?? undefined }}
+                              />
                             ) : (
-                              <span className="grid size-full place-items-center bg-secondary text-muted-foreground">Tema</span>
+                              <span className="grid size-full place-items-center bg-secondary text-muted-foreground">
+                                Tema
+                              </span>
                             )}
-                            {b.value.kind === "video" ? <span className="absolute bottom-1.5 left-1.5 rounded bg-background/80 px-1.5 py-0.5 text-[9px] font-medium text-foreground">LOOP</span> : null}
-                            {b.value.kind === "image" ? <span className="absolute bottom-1.5 left-1.5 rounded bg-background/80 px-1.5 py-0.5 text-[9px] font-medium text-foreground">PARADO</span> : null}
-                            {active ? <span className="absolute right-1.5 top-1.5 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold text-primary-foreground">ATIVO</span> : null}
+                            {b.value.kind === "video" ? (
+                              <span className="absolute bottom-1.5 left-1.5 rounded bg-background/80 px-1.5 py-0.5 text-[9px] font-medium text-foreground">
+                                LOOP
+                              </span>
+                            ) : null}
+                            {b.value.kind === "image" ? (
+                              <span className="absolute bottom-1.5 left-1.5 rounded bg-background/80 px-1.5 py-0.5 text-[9px] font-medium text-foreground">
+                                PARADO
+                              </span>
+                            ) : null}
+                            {active ? (
+                              <span className="absolute right-1.5 top-1.5 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold text-primary-foreground">
+                                ATIVO
+                              </span>
+                            ) : null}
                           </span>
                           <span className="block px-2 py-1.5 font-medium">{b.label}</span>
                         </button>
@@ -1196,7 +1433,8 @@ export function ChatSceneStudio() {
               <div className="mt-3 rounded-lg border border-dashed border-border bg-background/35 p-3">
                 <p className="text-xs font-medium">Usar meu próprio vídeo ou imagem</p>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  Envie um arquivo vertical (9:16) do seu computador para usar como fundo da conversa.
+                  Envie um arquivo vertical (9:16) do seu computador para usar como fundo da
+                  conversa.
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background/60 px-2.5 py-1.5 text-xs hover:border-primary">
@@ -1249,7 +1487,9 @@ export function ChatSceneStudio() {
                     />
                   </label>
                   {project.background?.kind === "video" &&
-                  !BACKGROUND_PRESETS.some((b) => b.value.videoUrl === project.background?.videoUrl) ? (
+                  !BACKGROUND_PRESETS.some(
+                    (b) => b.value.videoUrl === project.background?.videoUrl,
+                  ) ? (
                     <button
                       type="button"
                       className="text-[11px] text-muted-foreground underline hover:text-primary"
@@ -1266,16 +1506,29 @@ export function ChatSceneStudio() {
                   Repetir vídeo
                   <input
                     type="checkbox"
-                    checked={project.background?.kind === "video" ? project.background.loop !== false : false}
+                    checked={
+                      project.background?.kind === "video"
+                        ? project.background.loop !== false
+                        : false
+                    }
                     disabled={project.background?.kind !== "video"}
-                    onChange={(e) => project.background?.kind === "video" && patch({ background: { ...project.background, loop: e.target.checked } })}
+                    onChange={(e) =>
+                      project.background?.kind === "video" &&
+                      patch({ background: { ...project.background, loop: e.target.checked } })
+                    }
                   />
                 </label>
               </div>
 
               <div className="mt-3 rounded-lg border border-border bg-background/35 p-3">
-                <p className="mono-label mb-2 text-muted-foreground">Altura da janela de conversa</p>
-                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Altura da janela de conversa">
+                <p className="mono-label mb-2 text-muted-foreground">
+                  Altura da janela de conversa
+                </p>
+                <div
+                  className="flex flex-wrap gap-1.5"
+                  role="group"
+                  aria-label="Altura da janela de conversa"
+                >
                   {[0.4, 0.5, 0.6].map((ratio) => {
                     const active = Math.abs((project.layout?.height ?? 1) - ratio) < 0.02;
                     return (
@@ -1285,7 +1538,11 @@ export function ChatSceneStudio() {
                         aria-pressed={active}
                         onClick={() =>
                           patch({
-                            layout: { ...(project.layout ?? DEFAULT_LAYOUT), height: ratio, autoHeight: false },
+                            layout: {
+                              ...(project.layout ?? DEFAULT_LAYOUT),
+                              height: ratio,
+                              autoHeight: false,
+                            },
                           })
                         }
                         className={`rounded-md border px-2.5 py-1 text-xs ${
@@ -1371,7 +1628,8 @@ export function ChatSceneStudio() {
                   frame={frame}
                   onSelect={(preset) => {
                     const option = CREATOR_LAYOUTS.find((l) => l.id === preset);
-                    if (option) patch({ ...(option.apply ?? {}), layout: { ...option.value, preset } });
+                    if (option)
+                      patch({ ...(option.apply ?? {}), layout: { ...option.value, preset } });
                   }}
                 />
               </div>
@@ -1433,7 +1691,9 @@ export function ChatSceneStudio() {
                     }`}
                   >
                     <span className="font-medium">{t.label}</span>
-                    <span className="block truncate text-[10px] text-muted-foreground">{t.description}</span>
+                    <span className="block truncate text-[10px] text-muted-foreground">
+                      {t.description}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -1450,7 +1710,9 @@ export function ChatSceneStudio() {
                   <input
                     type="checkbox"
                     checked={project.render.safeZones}
-                    onChange={(e) => patch({ render: { ...project.render, safeZones: e.target.checked } })}
+                    onChange={(e) =>
+                      patch({ render: { ...project.render, safeZones: e.target.checked } })
+                    }
                   />
                   margens seguras
                 </label>
@@ -1507,7 +1769,9 @@ export function ChatSceneStudio() {
                       key={c.id}
                       type="button"
                       title={c.hint}
-                      onClick={() => patch({ camera: { ...DEFAULT_CAMERA, ...project.camera, mode: c.id } })}
+                      onClick={() =>
+                        patch({ camera: { ...DEFAULT_CAMERA, ...project.camera, mode: c.id } })
+                      }
                       className={`rounded-lg border px-2 py-1.5 text-xs transition ${
                         (project.camera?.mode ?? "off") === c.id
                           ? "border-primary bg-primary/10"
@@ -1520,7 +1784,9 @@ export function ChatSceneStudio() {
                 </div>
                 {(project.camera?.mode ?? "off") !== "off" && (
                   <div className="mt-1.5 flex items-center gap-1.5">
-                    <span className="mono-label shrink-0 text-[10px] text-muted-foreground">força</span>
+                    <span className="mono-label shrink-0 text-[10px] text-muted-foreground">
+                      força
+                    </span>
                     <input
                       type="range"
                       min={0.2}
@@ -1592,7 +1858,9 @@ export function ChatSceneStudio() {
                       max={1}
                       step={0.05}
                       value={project.sound?.volume ?? 0.5}
-                      onChange={(e) => patch({ sound: { enabled: true, volume: Number(e.target.value) } })}
+                      onChange={(e) =>
+                        patch({ sound: { enabled: true, volume: Number(e.target.value) } })
+                      }
                       className="mt-1 w-full"
                       aria-label="Volume dos sons"
                     />
@@ -1635,11 +1903,15 @@ export function ChatSceneStudio() {
                 </select>
               </div>
               <p className="text-muted-foreground">
-                Duração final: {(plan.durationMs / 1000).toFixed(1)}s · {width}×{height} · {plan.fps} quadros
-                por segundo.
+                Duração final: {(plan.durationMs / 1000).toFixed(1)}s · {width}×{height} ·{" "}
+                {plan.fps} quadros por segundo.
               </p>
               <Button onClick={() => void handleExport()} disabled={exporting}>
-                {exporting ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : <Download className="mr-1.5 size-4" />}
+                {exporting ? (
+                  <Loader2 className="mr-1.5 size-4 animate-spin" />
+                ) : (
+                  <Download className="mr-1.5 size-4" />
+                )}
                 {exporting ? `Exportando ${Math.round(progress * 100)}%` : "Exportar MP4"}
               </Button>
 
@@ -1679,7 +1951,19 @@ export function ChatSceneStudio() {
         </section>
 
         {/* ----------------------------------------------------------- prévia */}
-        <section className="glass h-fit rounded-2xl border border-border p-4 lg:sticky lg:top-4">
+        <section className="min-w-0 rounded-2xl border border-border bg-card p-4 lg:sticky lg:top-4">
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold">Prévia do seu vídeo</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {creatorFormat === "whatsapp" ? "Fake WhatsApp" : "História narrada"} ·{" "}
+                {project.render.aspect}
+              </p>
+            </div>
+            <span className="rounded-md border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground">
+              {project.render.fps} FPS
+            </span>
+          </div>
           <ChatScenePreview
             project={project}
             plan={plan}
@@ -1689,11 +1973,41 @@ export function ChatSceneStudio() {
             onPlaying={setPlaying}
             clips={effectiveClips}
           />
+          <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-4 text-center">
+            <div>
+              <p className="text-lg font-semibold">{project.messages.length}</p>
+              <p className="text-[10px] text-muted-foreground">trechos</p>
+            </div>
+            <div>
+              <p className="text-lg font-semibold">{project.participants.length}</p>
+              <p className="text-[10px] text-muted-foreground">personagens</p>
+            </div>
+            <div>
+              <p className="text-lg font-semibold">
+                {effectiveClips.size}/{speakingMessages(project).length}
+              </p>
+              <p className="text-[10px] text-muted-foreground">falas com áudio</p>
+            </div>
+          </div>
+          {!effectiveClips.size && (
+            <p className="mt-3 rounded-lg bg-secondary/50 p-3 text-xs leading-relaxed text-muted-foreground">
+              Prévia visual. Gere as vozes para ouvir a atuação e conferir o ritmo real.
+            </p>
+          )}
+          <div className="mt-3 flex gap-2">
+            <Button className="flex-1" size="sm" variant="outline" onClick={() => setTab("vozes")}>
+              <Mic className="size-3.5" />
+              Escolher vozes
+            </Button>
+            <Button className="flex-1" size="sm" variant="outline" onClick={() => setTab("fundo")}>
+              <ImageIcon className="size-3.5" />
+              Vídeo de fundo
+            </Button>
+          </div>
         </section>
       </div>
     </div>
   );
-
 }
 
 function Range({

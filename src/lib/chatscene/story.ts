@@ -7,6 +7,7 @@
  */
 import { PERSONALITY_PRESETS, splitByPersonality, type TextingPersonality } from "./personality";
 import { profileFromPreset, type VoiceAge, type VoiceEmotion, type VoiceGender, type VoiceProfile } from "./voice";
+import { normalizeStoryScript, storyNameKey } from "./story-generation";
 import {
   createMessage,
   createParticipant,
@@ -66,33 +67,50 @@ export const DEFAULT_BRIEF: StoryBrief = { topic: "", tone: "comedia", durationS
 
 const PALETTE = ["#7c5cff", "#25d366", "#ff5c8a", "#28c6ff", "#ffb347", "#8bd450", "#ff8a5c", "#9d7bff"];
 
-const key = (text: string) =>
-  text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+const key = storyNameKey;
+
+function characterAge(character: StoryCharacter): VoiceAge {
+  if (character.age) return character.age;
+  const role = key(character.role);
+  if (/adolesc|teen/.test(role)) return "teen";
+  if (/crian|menin|moleque/.test(role)) return "juvenil";
+  if (/\bavo\b|\bvo\b|idos/.test(role)) return "madura";
+  return "adulta";
+}
+
+function characterGender(character: StoryCharacter): VoiceGender {
+  if (character.gender) return character.gender;
+  return /\bmae\b|\bmamae\b|professora|amiga|filha|menina|sobrinha|estagiaria/.test(key(character.role))
+    ? "feminina" : "masculina";
+}
 
 /** Escolhe uma identidade vocal sintética coerente com o papel do personagem. */
 export function suggestVoicePresetId(character: StoryCharacter): string {
-  const role = key(`${character.role} ${character.name}`);
-  const female = character.gender === "feminina";
+  const role = key(character.role);
+  const gender = characterGender(character);
+  const female = gender === "feminina";
+  const age = characterAge(character);
+  // Family relationships do not imply age: a daughter or son can be an adult.
+  if (age === "juvenil") return gender === "neutra" ? "acting-child-happy" : female ? "child-girl-animated" : "child-boy-animated";
+  if (age === "teen") return female ? "teen-girl-casual" : "teen-boy-casual";
+  if (age === "madura") return female ? "grandmother-warm" : "grandfather-calm";
   if (/chefe|patr|diretor|gerente/.test(role)) return female ? "adult-female-boss" : "principal-boss";
-  if (/mãe|mae|mamae/.test(role)) return "mother-warm";
-  if (/pai|papai/.test(role)) return "father-warm";
-  if (/vó|vo |avo|avó/.test(role)) return female ? "grandmother-warm" : "grandfather-calm";
-  if (/professor|escola/.test(role)) return "teacher-calm";
-  if (/crian|filh|menin|sobrinh|moleque/.test(role)) return female ? "child-girl-animated" : "child-boy-animated";
-  if (/adolesc|teen/.test(role)) return female ? "teen-girl-casual" : "teen-boy-casual";
+  if (/\bmae\b|\bmamae\b|\bpai\b|\bpapai\b/.test(role)) return female ? "mother-warm" : "father-warm";
+  if (/professor/.test(role)) return female ? "adult-female-serious" : "teacher-calm";
   if (/amig|colega/.test(role)) return female ? "adult-female-friendly" : "friend-energetic";
-  if (/nervos|novato|estagi/.test(role)) return "employee-nervous";
-  if (/narrad/.test(role)) return "narrator-dramatic";
+  if (/nervos|novat|estagi/.test(role)) return female ? "adult-female-casual" : "employee-nervous";
+  if (/narrad/.test(role)) return female ? "adult-female-warm" : "narrator-dramatic";
   return female ? "adult-female-casual" : "adult-male-casual";
 }
 
 /** Escolhe o jeito de escrever a partir do papel do personagem. */
 export function suggestPersonalityPresetId(character: StoryCharacter): string {
-  const role = key(`${character.role} ${character.name}`);
+  const role = key(character.role);
+  const age = characterAge(character);
+  if (age === "juvenil" || age === "teen") return "filho";
+  if (age === "madura") return "avo";
   if (/chefe|patr|diretor|gerente|professor/.test(role)) return "chefe";
-  if (/mãe|mae|pai|papai|mamae/.test(role)) return "mae";
-  if (/crian|filh|menin|adolesc|teen|sobrinh|moleque/.test(role)) return "filho";
-  if (/vó|avo|avó|idos/.test(role)) return "avo";
+  if (/\bmae\b|\bpai\b|\bpapai\b|\bmamae\b/.test(role)) return "mae";
   return "neutro";
 }
 
@@ -112,25 +130,26 @@ export function timingForDuration(durationSec: number) {
  * várias bolhas conforme o jeito de escrever de cada um).
  */
 export function storyToProject(base: ChatSceneProject, script: StoryScript): ChatSceneProject {
+  const validated = normalizeStoryScript(script);
   const participants: ChatParticipant[] = [];
   const voiceProfiles: VoiceProfile[] = [];
   const byName = new Map<string, ChatParticipant>();
 
-  script.characters.forEach((character, index) => {
+  validated.characters.forEach((character, index) => {
     const participant = createParticipant({
-      name: character.name.trim() || `Pessoa ${index + 1}`,
-      isSelf: character.isSelf ?? index === 0,
+      name: character.name,
+      isSelf: character.isSelf === true,
       color: PALETTE[index % PALETTE.length]!,
       personalityPresetId: suggestPersonalityPresetId(character),
       personality: personalityValue(suggestPersonalityPresetId(character)),
     });
-    const profile = profileFromPreset(suggestVoicePresetId(character), {
+    const profile: VoiceProfile = { ...profileFromPreset(suggestVoicePresetId(character), {
       id: `voice_${participant.id}`,
       name: `${participant.name} — ${character.role.trim() || "personagem"}`,
       provider: "lovable-ai",
       language: "pt",
       locale: "pt-BR",
-    });
+    }), ageStyle: characterAge(character), genderStyle: characterGender(character) };
     participant.voiceProfileId = profile.id!;
     participant.voice = profile;
     participants.push(participant);
@@ -141,18 +160,19 @@ export function storyToProject(base: ChatSceneProject, script: StoryScript): Cha
   const fallback = participants[0]!;
   const threads: ChatSceneThread[] = [];
   const threadByName = new Map<string, ChatSceneThread>();
+  let activeThreadId = MAIN_THREAD_ID;
   const ensureThread = (name: string | undefined): string => {
     const clean = (name ?? "").trim();
     if (!clean) {
       if (!threads.length) {
-        const main = { id: MAIN_THREAD_ID, name: script.title || "Conversa", kind: "direct" as const };
+        const main = { id: MAIN_THREAD_ID, name: validated.title, kind: participants.length > 2 ? "group" as const : "direct" as const };
         threads.push(main);
         threadByName.set(key(main.name), main);
       }
-      return threads[0]!.id;
+      return activeThreadId;
     }
     const found = threadByName.get(key(clean));
-    if (found) return found.id;
+    if (found) { activeThreadId = found.id; return found.id; }
     const thread: ChatSceneThread = {
       id: threads.length === 0 ? MAIN_THREAD_ID : `t_${threads.length + 1}`,
       name: clean,
@@ -161,11 +181,12 @@ export function storyToProject(base: ChatSceneProject, script: StoryScript): Cha
     };
     threads.push(thread);
     threadByName.set(key(clean), thread);
+    activeThreadId = thread.id;
     return thread.id;
   };
 
   const messages: ChatMessage[] = [];
-  script.lines.forEach((line, index) => {
+  validated.lines.forEach((line, index) => {
     const text = line.text.trim();
     if (!text) return;
     const threadId = ensureThread(line.thread);
@@ -175,7 +196,7 @@ export function storyToProject(base: ChatSceneProject, script: StoryScript): Cha
       return;
     }
 
-    const author = byName.get(key(line.speaker)) ?? fallback;
+    const author = byName.get(key(line.speaker))!;
     const parts = splitByPersonality(text, personalityValue(author.personalityPresetId ?? "neutro"), `${index}`);
     parts.forEach((part) => {
       messages.push(
@@ -193,7 +214,7 @@ export function storyToProject(base: ChatSceneProject, script: StoryScript): Cha
 
   return {
     ...base,
-    title: script.title.trim() || base.title,
+    title: validated.title,
     participants,
     voiceProfiles,
     threads,

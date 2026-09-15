@@ -11,6 +11,8 @@ import { typingAt } from "./clock";
 import { deliveryStateAt } from "./events";
 import { mediaFrameAt, type LoadedMedia } from "./media";
 import { durationLabel, voiceSeconds, voiceWave } from "./message-kinds";
+import { buildConversationPages, type ConversationPage } from "./page-manager";
+import { paintRedditCard } from "./reddit-draw";
 import { planScroll } from "./scroll-planner";
 import type { ChatTheme } from "./theme";
 import {
@@ -47,10 +49,12 @@ interface Metrics {
   metaSize: number;
 }
 
-function metricsFor(width: number, height: number): Metrics {
+function metricsFor(width: number, height: number, paginated = false): Metrics {
   // referência: 1080x1920. Tudo escala pela menor dimensão relativa para que
   // 1:1 e 16:9 não fiquem com texto gigante.
-  const scale = Math.min(width / 1080, height / 1920) * (width >= height ? 1.35 : 1);
+  // Pages use readable width-based type; scrolling documents keep legacy metrics.
+  const scale = paginated ? width / 1080 * 1.35
+    : Math.min(width / 1080, height / 1920) * (width >= height ? 1.35 : 1);
   const pad = Math.round(34 * scale);
   return {
     scale,
@@ -206,7 +210,7 @@ export function layoutMessages(
   /** altura usada só para calcular tamanhos (painel de altura variável) */
   metricsH?: number,
 ): Layout {
-  const m = metricsFor(width, metricsH ?? height);
+  const m = metricsFor(width, metricsH ?? height, project.layout?.pagination === "pages");
   const isGroup = (project.chatKind ?? "direct") === "group" || project.participants.length > 2;
   const items: LaidOutMessage[] = [];
   let y = 0;
@@ -738,6 +742,20 @@ export function entranceTransform(
   return { alpha: raw.alpha, dy: raw.dy * k, scale: 1 + (raw.scale - 1) * k };
 }
 
+/** Entrada usada por mensagens. Painéis que crescem revelam o novo conteúdo
+ * pelo recorte inferior e mantêm todas as bolhas na mesma posição e escala. */
+export function messageEntranceTransform(
+  project: {
+    animation?: ChatSceneProject["animation"] | undefined;
+    motion?: { intensity?: number | undefined } | undefined;
+    layout?: { autoHeight?: boolean | undefined } | undefined;
+  },
+  t: number,
+): { alpha: number; dy: number; scale: number } {
+  if (project.layout?.autoHeight) return { alpha: 1, dy: 0, scale: 1 };
+  return entranceTransform(project.animation, t, project.motion?.intensity ?? 1);
+}
+
 function baseEntrance(
   animation: ChatSceneProject["animation"],
   t: number,
@@ -839,6 +857,93 @@ export function threadFrame(project: ChatSceneProject, plan: ConversationPlan, f
   };
 }
 
+interface PagedLayouts {
+  plan: ConversationPlan;
+  key: string;
+  pages: ConversationPage[];
+  pageByMessage: Map<string, ConversationPage>;
+  layouts: Map<string, Layout>;
+}
+
+const pageCache = new WeakMap<ChatSceneProject, PagedLayouts[]>();
+const messageListKey = (messages: ChatMessage[]) => JSON.stringify(messages.map((message) => message.id));
+
+/** Page measurements belong to one immutable project/plan and media geometry. */
+function pagedLayoutsFor(
+  ctx: Ctx2D, project: ChatSceneProject, theme: ChatTheme, plan: ConversationPlan,
+  width: number, height: number, showHeader: boolean, media?: Map<string, LoadedMedia>, metricsH?: number,
+): PagedLayouts {
+  const m = metricsFor(width, metricsH ?? height, project.layout?.pagination === "pages");
+  const headerH = showHeader && (project.header?.style ?? "messenger") !== "none" ? m.headerH : 0;
+  ctx.save();
+  // Actual font metrics invalidate a pre-font-load layout, including participant fonts.
+  const fontMetrics = project.participants.map((author) => {
+    const style = bubbleStyleOf(author, theme);
+    ctx.font = fontOf(style, style.weight, m.fontSize * style.scale);
+    return ctx.measureText("Hamburgefontsiv 0123456789").width;
+  });
+  ctx.restore();
+  const mediaGeometry = [...(media ?? [])].map(([url, item]) => [url, item.width, item.height, item.aspect]);
+  const key = JSON.stringify([width, height, metricsH, headerH, theme, fontMetrics, mediaGeometry]);
+  let cache = pageCache.get(project);
+  const hit = cache?.find((entry) => entry.plan === plan && entry.key === key);
+  if (hit) return hit;
+  const layouts = new Map<string, Layout>();
+  const measure = (messages: ChatMessage[]) => {
+    const listKey = messageListKey(messages);
+    let layout = layouts.get(listKey);
+    if (!layout) {
+      layout = layoutMessages(ctx, project, theme, messages, width, height, media, metricsH);
+      layouts.set(listKey, layout);
+    }
+    return layout.contentH;
+  };
+  const bottom = metricsH != null ? height - m.pad : height - Math.max(m.pad, Math.round(height * 0.1));
+  const typingReserve = plan.entries.some((entry) => entry.typingFrame < entry.appearFrame)
+    ? Math.round(72 * m.scale) + m.gap : 0;
+  const budget = Math.max(1, bottom - headerH - m.pad - typingReserve);
+  const entries = project.messages.flatMap((message) => {
+    const entry = plan.byId[message.id];
+    return entry ? [{ message, sessionId: threadIdOf(project, message), startMs: entry.appearFrame / plan.fps * 1000 }] : [];
+  });
+  const pages = buildConversationPages(entries, measure, budget, Math.max(1, entries.length));
+  const result: PagedLayouts = { plan, key, pages, layouts,
+    pageByMessage: new Map(pages.flatMap((page) => page.messageIds.map((id) => [id, page] as const))) };
+  if (!cache) { cache = []; pageCache.set(project, cache); }
+  if (cache.length >= 8) cache.shift();
+  cache.push(result);
+  return result;
+}
+
+/** Uses the production bubble measurements and existing ConversationPlan, never V3 timing. */
+export function conversationPagesFor(
+  ctx: Ctx2D, project: ChatSceneProject, theme: ChatTheme, plan: ConversationPlan,
+  width: number, height: number, showHeader = true, media?: Map<string, LoadedMedia>, metricsH?: number,
+): readonly ConversationPage[] {
+  return pagedLayoutsFor(ctx, project, theme, plan, width, height, showHeader, media, metricsH).pages;
+}
+
+function pageMessages(appeared: ChatMessage[], cache: PagedLayouts): ChatMessage[] {
+  const last = appeared.at(-1);
+  const page = last ? cache.pageByMessage.get(last.id) : undefined;
+  if (!page) return [];
+  const ids = new Set(page.messageIds);
+  return appeared.filter((message) => ids.has(message.id));
+}
+
+function cachedPageLayout(
+  ctx: Ctx2D, cache: PagedLayouts, project: ChatSceneProject, theme: ChatTheme,
+  messages: ChatMessage[], width: number, height: number, media?: Map<string, LoadedMedia>, metricsH?: number,
+): Layout {
+  const key = messageListKey(messages);
+  let layout = cache.layouts.get(key);
+  if (!layout) {
+    layout = layoutMessages(ctx, project, theme, messages, width, height, media, metricsH);
+    cache.layouts.set(key, layout);
+  }
+  return layout;
+}
+
 /**
  * Altura do painel quando ele acompanha a conversa: começa com o topo e a
  * primeira mensagem e cresce, com transição suave, até o limite do
@@ -854,15 +959,21 @@ export function autoPanelHeight(
   maxHeight: number,
   media?: Map<string, LoadedMedia>,
 ): number {
-  const m = metricsFor(width, maxHeight);
-  const headerVisible = (project.header?.style ?? "messenger") !== "none";
+  const m = metricsFor(width, maxHeight, project.layout?.pagination === "pages");
+  const headerVisible = (project.header?.style ?? "messenger") !== "none" &&
+    (project.layout?.pagination !== "pages" || project.layout?.header !== false);
   const headerH = headerVisible ? m.headerH : 0;
-  const appeared = threadFrame(project, plan, frame).messages;
+  const pages = project.layout?.pagination === "pages"
+    ? pagedLayoutsFor(ctx, project, theme, plan, width, maxHeight, headerVisible, media, maxHeight) : null;
+  const allAppeared = threadFrame(project, plan, frame).messages;
+  const appeared = pages ? pageMessages(allAppeared, pages) : allAppeared;
   const typing = typingAt(project, plan, frame);
   const typingH = typing ? Math.round(72 * m.scale) + m.gap : 0;
 
   const heightFor = (list: ChatMessage[]) => {
-    const content = list.length ? layoutMessages(ctx, project, theme, list, width, maxHeight, media, maxHeight).contentH : 0;
+    const content = list.length ? (pages
+      ? cachedPageLayout(ctx, pages, project, theme, list, width, maxHeight, media, maxHeight)
+      : layoutMessages(ctx, project, theme, list, width, maxHeight, media, maxHeight)).contentH : 0;
     const total = headerH + content + typingH + m.pad * 2;
     return Math.max(headerH + m.pad * 2, Math.min(maxHeight, Math.round(total)));
   };
@@ -893,6 +1004,23 @@ export function paintFrame(
   options: PaintOptions = {},
 ) {
   const media = options.media;
+  if (project.storyFormat === "reddit") {
+    const layout = project.layout ?? DEFAULT_LAYOUT;
+    ctx.save();
+    if (layout.backgroundBlur > 0 && "filter" in ctx) {
+      ctx.filter = `blur(${Math.round((layout.backgroundBlur * width) / 1080)}px)`;
+    }
+    const scale = clampUnit(layout.backgroundScale, 1, 2);
+    const bw = width * scale;
+    const bh = height * scale;
+    ctx.translate((width - bw) / 2, (height - bh) / 2 + height * clampUnit(layout.backgroundOffsetY, -0.3, 0.3));
+    drawWallpaper(ctx, theme, bw, bh, metricsFor(bw, bh), project.background, media, frame / plan.fps);
+    ctx.restore();
+    paintRedditCard(ctx, project, theme, plan, frame, width, height);
+    drawBranding(ctx, project, width, height, media);
+    if (options.safeZones) drawSafeZones(ctx, width, height);
+    return;
+  }
   const base = chatRect(project.layout, width, height);
   const auto = project.layout?.autoHeight
     ? autoPanelHeight(ctx, project, theme, plan, frame, base.w, base.h, media)
@@ -1071,7 +1199,7 @@ function paintConversation(
   /** em layouts sobre vídeo, o painel mantém seu próprio papel de parede */
   conversationBackground: ChatSceneBackground | undefined = project.background,
 ) {
-  const m = metricsFor(width, fit?.metricsH ?? height);
+  const m = metricsFor(width, fit?.metricsH ?? height, project.layout?.pagination === "pages");
   const media = options.media;
   const headerVisible = showHeader && (project.header?.style ?? "messenger") !== "none";
   const headerH = headerVisible ? m.headerH : 0;
@@ -1081,14 +1209,19 @@ function paintConversation(
   const view = threadFrame(project, plan, frame);
   const typingMsg = typingAt(project, plan, frame);
   const typingActive = typingMsg && threadIdOf(project, typingMsg) === view.threadId ? typingMsg : null;
+  const pages = project.layout?.pagination === "pages"
+    ? pagedLayoutsFor(ctx, project, theme, plan, width, fit?.metricsH ?? height, showHeader, media, fit?.metricsH) : null;
 
   // desenha uma conversa inteira deslocada e com opacidade própria: é isso que
   // permite o corte de um chat para o outro sem duplicar o código de desenho
   const drawList = (appeared: ChatMessage[], dx: number, alphaMul: number, allowTyping: boolean) => {
+  if (pages) appeared = pageMessages(appeared, pages);
   ctx.save();
   if (dx) ctx.translate(dx, 0);
   const typing = allowTyping ? typingActive : null;
-  const layout = layoutMessages(ctx, project, theme, appeared, width, height, media, fit?.metricsH);
+  const layout = pages
+    ? cachedPageLayout(ctx, pages, project, theme, appeared, width, fit?.metricsH ?? height, media, fit?.metricsH)
+    : layoutMessages(ctx, project, theme, appeared, width, height, media, fit?.metricsH);
   const typingH = typing ? Math.round(72 * m.scale) + m.gap : 0;
 
   // deixa a margem inferior livre para a interface das plataformas
@@ -1097,10 +1230,10 @@ function paintConversation(
   // mensagem e a seguinte é suavizada — e continua determinística, porque só
   // depende do quadro atual.
   const targetNow = areaBottom - (layout.contentH + typingH);
-  let offsetY = targetNow;
+  let offsetY = pages ? headerH + m.pad : targetNow;
   const last = appeared[appeared.length - 1];
   const lastEntry = last ? plan.byId[last.id] : undefined;
-  if (lastEntry && !fit) {
+  if (lastEntry && !fit && !pages) {
     const scrollFrames = Math.max(1, Math.round(plan.fps * 0.28));
     const p = Math.max(0, Math.min(1, (frame - lastEntry.appearFrame) / scrollFrames));
     if (p < 1) {
@@ -1122,15 +1255,29 @@ function paintConversation(
   ctx.rect(0, headerH, width, height - headerH);
   ctx.clip();
 
+  // An individual oversized bubble gets its own page and remains fully visible.
+  if (pages) {
+    // Em painel auto-height, o recorte cresce. A escala deve ser calculada
+    // contra a altura final, senão todas as mensagens pulam a cada chegada.
+    const available = Math.max(1, (fit?.metricsH ?? height) - headerH - m.pad * 2);
+    const contentScale = Math.min(1, available / Math.max(1, layout.contentH + typingH));
+    if (contentScale < 1) {
+      ctx.translate(width / 2, headerH + m.pad);
+      ctx.scale(contentScale, contentScale);
+      ctx.translate(-width / 2, -(headerH + m.pad));
+    }
+  }
+
   // destaque: quando a mensagem recém-chegada é um momento de peso, ela cresce
   // um pouco e as anteriores escurecem, como nos vídeos virais
-  const spotlight = last?.emphasis === true ? last : null;
+  const revealFromBottomOnly = Boolean(fit && project.layout?.autoHeight);
+  const spotlight = revealFromBottomOnly ? null : last?.emphasis === true ? last : null;
 
   for (const item of layout.items) {
     const entry = plan.byId[item.message.id];
     const age = entry ? frame - entry.appearFrame : 0;
     const t = entry ? age / Math.max(1, entry.entranceFrames) : 1;
-    const anim = entranceTransform(project.animation, t, project.motion?.intensity ?? 1);
+    const anim = messageEntranceTransform(project, t);
     const rise = anim.dy * Math.round(34 * m.scale);
     const y = offsetY + item.y + rise;
     const seconds = Math.max(0, age) / plan.fps;

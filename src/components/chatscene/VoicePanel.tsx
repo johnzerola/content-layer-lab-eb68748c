@@ -10,6 +10,7 @@ import {
   PITCH_MIN,
   VOICE_PRESETS,
   profileFromPreset,
+  voiceDisplayLabel,
   voicePreset,
   type VoiceProfile,
 } from "@/lib/chatscene/voice";
@@ -91,7 +92,7 @@ export function VoicePanel(props: VoicePanelProps) {
                         onClick={() => setProject(attachPreset(project, participant.id, actingPreset.id))}
                       >
                         {active ? <Check className="size-3 shrink-0 text-primary" aria-hidden /> : <span className="size-3 shrink-0" />}
-                        <span>{actingPreset.label}</span>
+                        <span>{voiceDisplayLabel(actingPreset)}</span>
                       </Button>
                     );
                   })}
@@ -109,7 +110,7 @@ export function VoicePanel(props: VoicePanelProps) {
                   <option value="">Sem voz</option>
                   {Array.from(new Set(VOICE_PRESETS.map((p) => p.group))).map((group) => (
                     <optgroup key={group} label={group}>
-                      {VOICE_PRESETS.filter((p) => p.group === group).map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}
+                      {VOICE_PRESETS.filter((p) => p.group === group).map((preset) => <option key={preset.id} value={preset.id}>{voiceDisplayLabel(preset)}</option>)}
                     </optgroup>
                   ))}
                 </select>
@@ -136,7 +137,7 @@ export function VoicePanel(props: VoicePanelProps) {
                       </div>
                     </details>
                   </div>
-                  <p className="mt-2 text-[10px] text-muted-foreground">Voz real · velocidade na geração · pitch na reprodução e no vídeo</p>
+                  <p className="mt-2 text-[10px] text-muted-foreground">Prévia sintetizada · velocidade na geração · tom na reprodução e no vídeo</p>
                 </>
               ) : null}
             </article>

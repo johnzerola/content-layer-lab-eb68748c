@@ -18,9 +18,25 @@ export function effectiveVoice(project: ChatSceneProject, message: ChatMessage):
 export function attachPreset(project: ChatSceneProject, participantId: string, presetId: string): ChatSceneProject {
   const participant = project.participants.find((p) => p.id === participantId);
   if (!participant) return project;
-  const id = participant.voiceProfileId ?? `voice_${participant.id}`;
-  const previous = project.voiceProfiles?.find((p) => p.id === id);
-  const profile = profileFromPreset(presetId, { ...previous, id });
+  const previous = voiceProfileOf(project, participant);
+  const shared = participant.voiceProfileId && project.participants.some((p) => p.id !== participantId && p.voiceProfileId === participant.voiceProfileId);
+  let id = participant.voiceProfileId ?? `voice_${participant.id}`;
+  if (shared || !participant.voiceProfileId) {
+    const occupied = new Set([
+      ...(project.voiceProfiles ?? []).map((p) => p.id),
+      ...project.participants.filter((p) => p.id !== participantId).map((p) => p.voiceProfileId),
+    ]);
+    const baseId = `voice_${participant.id}`;
+    id = baseId;
+    let suffix = 2;
+    while (occupied.has(id)) id = `${baseId}_${suffix++}`;
+  }
+  // A preset replaces the sound; retain only the participant's saved metadata.
+  const metadata: Partial<VoiceProfile> = { id };
+  for (const key of ["name", "gain", "provider", "language", "locale", "seed", "providerSettings"] as const) {
+    if (previous?.[key] !== undefined) Object.assign(metadata, { [key]: previous[key] });
+  }
+  const profile = profileFromPreset(presetId, metadata);
   return {
     ...project,
     voiceProfiles: [...(project.voiceProfiles ?? []).filter((p) => p.id !== id), profile],

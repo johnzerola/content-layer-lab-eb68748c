@@ -2,12 +2,48 @@
 import { createMiddleware } from '@tanstack/react-start'
 import { supabase } from './client'
 
+function readJwtPayload(token: string): { exp?: number; iss?: string } | null {
+  try {
+    const part = token.split('.')[1]
+    if (!part) return null
+    const normalized = part.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
+    return JSON.parse(atob(padded)) as { exp?: number; iss?: string }
+  } catch {
+    return null
+  }
+}
+
+export function sessionNeedsRefresh(
+  token: string,
+  expiresAt: number | undefined,
+  projectUrl: string | undefined,
+  nowSeconds = Math.floor(Date.now() / 1000),
+): boolean {
+  const payload = readJwtPayload(token)
+  if (!payload) return true
+  const expiration = expiresAt ?? payload.exp
+  if (!expiration || expiration <= nowSeconds + 60) return true
+  if (projectUrl && payload.iss !== `${projectUrl.replace(/\/$/, '')}/auth/v1`) return true
+  return false
+}
+
 // Must be registered as a global `functionMiddleware` in `src/start.ts`; otherwise
 // the browser never attaches the bearer token to serverFn RPCs.
 export const attachSupabaseAuth = createMiddleware({ type: 'function' }).client(
   async ({ next }) => {
-    const { data } = await supabase.auth.getSession()
-    const token = data.session?.access_token
+    const { data, error } = await supabase.auth.getSession()
+    if (error) throw new Error('Sua sessão não pôde ser carregada. Entre novamente.')
+    let session = data.session
+    const projectUrl = import.meta.env['VITE_SUPABASE_URL'] as string | undefined
+    if (session && sessionNeedsRefresh(session.access_token, session.expires_at, projectUrl)) {
+      const refreshed = await supabase.auth.refreshSession()
+      if (refreshed.error || !refreshed.data.session) {
+        throw new Error('Sua sessão expirou ou pertence a outro projeto. Entre novamente.')
+      }
+      session = refreshed.data.session
+    }
+    const token = session?.access_token
     return next({
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })

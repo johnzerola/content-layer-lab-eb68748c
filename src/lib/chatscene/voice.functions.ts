@@ -6,35 +6,40 @@
  * voz de pessoas reais, porque o produto não faz clonagem.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { voiceSynthesisInput } from "./voice-request";
 
-const MAX_CHARS = 600;
+export function resolveVoiceProviderConfig(env: Record<string, string | undefined>) {
+  if (env["LOVABLE_API_KEY"]) {
+    return {
+      key: env["LOVABLE_API_KEY"],
+      endpoint: "https://ai.gateway.lovable.dev/v1/audio/speech",
+      model: "openai/gpt-4o-mini-tts",
+    };
+  }
+  if (env["OPENAI_API_KEY"]) {
+    return {
+      key: env["OPENAI_API_KEY"],
+      endpoint: "https://api.openai.com/v1/audio/speech",
+      model: "gpt-4o-mini-tts",
+    };
+  }
+  return null;
+}
 
 export const synthesizeVoice = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .validator((input: unknown) =>
-    z
-      .object({
-        // bolhas muito longas são cortadas em vez de derrubar a geração
-        text: z.string().min(1).transform((t) => t.slice(0, MAX_CHARS)),
-        voice: z.string().min(1).max(40),
-        // direção muito longa é cortada em vez de derrubar a geração
-        direction: z.string().transform((d) => d.slice(0, 480)).optional(),
-        speed: z.number().min(0.7).max(1.3).optional(),
-      })
-      .parse(input),
-  )
+  .validator((input: unknown) => voiceSynthesisInput.parse(input))
   .handler(async ({ data }) => {
-    const key = process.env["LOVABLE_API_KEY"];
-    if (!key) throw new Error("A geração de voz não está configurada neste projeto.");
+    const provider = resolveVoiceProviderConfig(process.env);
+    if (!provider) throw new Error("A geração de voz ainda não tem uma chave configurada no servidor.");
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/audio/speech", {
+    const res = await fetch(provider.endpoint, {
       method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${provider.key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "openai/gpt-4o-mini-tts",
+        model: provider.model,
         input: data.text,
         voice: data.voice,
         response_format: "mp3",
@@ -47,7 +52,7 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
     });
 
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
+      await res.body?.cancel().catch(() => undefined);
       if (res.status === 402) {
         throw new Error("Seus créditos de IA acabaram. Adicione créditos para gerar as vozes.");
       }
@@ -60,7 +65,7 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
       if (res.status === 429) {
         throw new Error("Muitas vozes ao mesmo tempo. Espere alguns segundos e tente de novo.");
       }
-      console.error(`TTS falhou [${res.status}]: ${body}`);
+      console.error(`TTS falhou [${res.status}] no provedor configurado.`);
       throw new Error("Não foi possível gerar esta fala agora.");
     }
 

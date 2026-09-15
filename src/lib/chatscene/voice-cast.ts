@@ -177,8 +177,8 @@ export function createGatewayVoiceProvider(
           profile.style,
           direction?.emotion,
           Math.max(0, Math.min(1, (profile.energy ?? 0.5) * (direction?.energyMultiplier ?? 1))),
-          preset.age,
-          preset.gender,
+          profile.ageStyle ?? preset.age,
+          profile.genderStyle ?? preset.gender,
           {
             ...(profile.expressiveness === undefined ? {} : { expressiveness: profile.expressiveness }),
             ...(profile.roughness === undefined ? {} : { roughness: profile.roughness }),

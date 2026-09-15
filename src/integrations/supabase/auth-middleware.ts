@@ -89,20 +89,31 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       }
     );
 
-    const { data, error } = await supabase.auth.getClaims(token);
-    if (error || !data?.claims) {
-      throw new Error('Unauthorized: Invalid token');
+    const verifiedClaims = await supabase.auth.getClaims(token);
+    let claims = verifiedClaims.data?.claims;
+    let verifiedUserId: string | undefined;
+
+    // getClaims may need the project's JWKS endpoint. A fresh getUser call is
+    // an authoritative fallback for valid legacy tokens and temporary JWKS
+    // lookup failures; it never trusts an unverified decoded payload.
+    if (verifiedClaims.error || !claims?.sub) {
+      const verifiedUser = await supabase.auth.getUser(token);
+      if (verifiedUser.error || !verifiedUser.data.user) {
+        throw new Error('Sua sessão expirou ou pertence a outro projeto. Entre novamente.');
+      }
+      verifiedUserId = verifiedUser.data.user.id;
     }
 
-    if (!data.claims.sub) {
+    const userId = claims?.sub ?? verifiedUserId;
+    if (!userId) {
       throw new Error('Unauthorized: No user ID found in token');
     }
 
     return next({
       context: {
         supabase,
-        userId: data.claims.sub,
-        claims: data.claims,
+        userId,
+        claims: claims ?? { sub: userId },
       },
     });
   },

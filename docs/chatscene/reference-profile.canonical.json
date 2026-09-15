@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "status": "RECONCILED_WITH_UNRESOLVED_MEASUREMENTS",
+  "reviewedAt": "2026-09-15",
+  "sources": {
+    "R1": "97efad90-3842-4c28-a96c-87fcad6ae2e3/pasted-text.txt: first report",
+    "R2": "97efad90-3842-4c28-a96c-87fcad6ae2e3/pasted-text.txt: second report, Parts 1-30",
+    "TABLE": "reference-table-audit.json (derived claims; not video measurement)",
+    "PRINTS": "G:/dowloand/aachat (six 1920x1080 screenshots, visually inspected)",
+    "P5": "G:/dowloand/aachat/a03e3ae0-599c-4589-bd70-6a53ce0eaac8.png"
+  },
+  "parameters": {
+    "aspect": { "value": "9:16", "range": null, "confidence": "HIGH", "status": "CONFIRMED", "sources": ["PRINTS"] },
+    "durationSeconds": { "value": 136, "range": [135.2, 136], "confidence": "MEDIUM", "status": "LIKELY", "sources": ["R1", "R2"] },
+    "messageCount": { "value": null, "range": [53, 55], "confidence": "LOW", "status": "DISPUTED", "sources": ["R1", "R2", "PRINTS"] },
+    "messagesPerMinute": { "value": null, "range": [23.382, 24.265], "confidence": "LOW", "status": "DISPUTED", "sources": ["R1", "R2"] },
+    "speechWpm": { "value": null, "range": [190, 260], "confidence": "LOW", "status": "DISPUTED", "sources": ["R1", "R2", "TABLE"] },
+    "speechCps": { "value": null, "range": [18, 22], "confidence": "LOW", "status": "DISPUTED", "sources": ["R1", "R2", "TABLE"] },
+    "bubbleLeadMs": { "value": null, "range": [0, 50], "confidence": "LOW", "status": "DISPUTED", "sources": ["R1", "R2"] },
+    "postSpeechGapMs": { "value": null, "range": [50, 200], "confidence": "LOW", "status": "DISPUTED", "sources": ["R1", "R2", "TABLE"] },
+    "typingEnabled": { "value": false, "range": null, "confidence": "MEDIUM", "status": "LIKELY", "sources": ["R1", "R2", "PRINTS"] },
+    "chatX": { "value": null, "range": [0.05, 0.075], "confidence": "MEDIUM", "status": "DISPUTED", "sources": ["R1", "R2", "PRINTS"] },
+    "chatY": { "value": null, "range": [0.07, 0.12], "confidence": "MEDIUM", "status": "DISPUTED", "sources": ["R1", "R2", "PRINTS"] },
+    "chatWidth": { "value": null, "range": [0.86, 0.90], "confidence": "MEDIUM", "status": "DISPUTED", "sources": ["R1", "R2", "PRINTS"] },
+    "maxChatHeight": { "value": null, "range": [0.50, 0.62], "confidence": "LOW", "status": "DISPUTED", "sources": ["R1", "R2", "P5"] },
+    "bubbleMaxWidth": { "value": null, "range": [0.70, 0.82], "confidence": "LOW", "status": "DISPUTED", "sources": ["R1", "R2", "PRINTS"] },
+    "visibleMessagesObserved": { "value": 5, "range": null, "confidence": "HIGH", "status": "CONFIRMED", "sources": ["P5"], "note": "Observed count, not maximum across entire video." },
+    "maxVisibleMessages": { "value": null, "range": null, "confidence": "LOW", "status": "UNKNOWN", "sources": ["P5"] },
+    "meanPageDurationSeconds": { "value": null, "range": [9, 11.3], "confidence": "LOW", "status": "DISPUTED", "sources": ["R1", "R2"] },
+    "overflowBehavior": { "value": null, "range": ["RESET_ONLY", "MICRO_SCROLL_THEN_RESET"], "confidence": "LOW", "status": "DISPUTED", "sources": ["R1", "R2", "PRINTS"] },
+    "imageMediaPresent": { "value": true, "range": null, "confidence": "HIGH", "status": "CONFIRMED", "sources": ["PRINTS"] },
+    "backgroundAudioMuted": { "value": null, "range": null, "confidence": "LOW", "status": "UNKNOWN", "sources": ["R1", "R2"] }
+  },
+  "experimentalPolicy": {
+    "sourceOfTruth": "src/lib/chatscene/style-profile.ts",
+    "promoted": false,
+    "note": "Defaults are engineering choices for tests, not inferred measurements. Geometry remains in project.layout."
+  }
+}

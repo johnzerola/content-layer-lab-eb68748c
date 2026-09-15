@@ -55,6 +55,8 @@ export interface VoiceProviderCapabilities {
 export const PITCH_MIN = -6;
 export const PITCH_MAX = 6;
 export const VOICE_SAMPLE_TEXT = "Oi! Tudo bem? Tenho uma coisa para te contar.";
+/** Includes the full acting direction, identity and timbre of every preset. */
+export const VOICE_DIRECTION_MAX_CHARS = 1600;
 
 export function pitchRate(pitch: number | undefined): number {
   const semitones = Math.max(PITCH_MIN, Math.min(PITCH_MAX, pitch ?? 0));
@@ -87,8 +89,8 @@ export const VOICE_PRESETS: VoicePreset[] = [
   preset("acting-cinematic-dramatic", "Dramático cinematográfico", "Presets de atuação", "Intenso • narrativo • controlado", "masculina", "adulta", "onyx", { style:"dramatic",speed:.92,energy:.68,expressiveness:.88,roughness:.2,warmth:.56,brightness:.38,pitch:-1 }),
   preset("acting-natural-nervous", "Nervoso natural", "Presets de atuação", "Tenso • hesitante • realista", "neutra", "adulta", "ash", { style:"nervosa",speed:1.06,energy:.54,expressiveness:.7,roughness:.12,warmth:.38,brightness:.52,pitch:.5 }),
   preset("acting-light-sarcastic", "Sarcástico leve", "Presets de atuação", "Irônico • sutil • conversado", "feminina", "adulta", "nova", { style:"sarcastica",speed:.98,energy:.5,expressiveness:.68,roughness:.06,warmth:.38,brightness:.58,pitch:0 }),
-  preset("child-boy-animated", "Child Boy — Animated", "Juvenil sintética", "Juvenil masculino • animado", "masculina", "juvenil", "echo", { style:"animada",speed:1.16,energy:.9,expressiveness:.9,roughness:.1,warmth:.45,brightness:.85,pitch:2 }),
-  preset("child-boy-calm", "Child Boy — Calm", "Juvenil sintética", "Juvenil masculino • suave", "masculina", "juvenil", "echo", { style:"calma",speed:.94,energy:.4,expressiveness:.45,roughness:.05,warmth:.65,brightness:.72,pitch:1.5 }),
+  preset("child-boy-animated", "Criança masculina 1 — animada", "Juvenil sintética", "Juvenil masculino • animado", "masculina", "juvenil", "echo", { style:"animada",speed:1.16,energy:.9,expressiveness:.9,roughness:.1,warmth:.45,brightness:.85,pitch:2 }),
+  preset("child-boy-calm", "Criança masculina 2 — suave", "Juvenil sintética", "Juvenil masculino • suave", "masculina", "juvenil", "echo", { style:"calma",speed:.94,energy:.4,expressiveness:.45,roughness:.05,warmth:.65,brightness:.72,pitch:1.5 }),
   preset("child-boy-grumpy", "Child Boy — Grumpy", "Juvenil sintética", "Juvenil masculino • impaciente", "masculina", "juvenil", "echo", { style:"brava",speed:1.08,energy:.82,expressiveness:.85,roughness:.38,warmth:.2,brightness:.65,pitch:1 }),
   preset("child-boy-raspy", "Child Boy — Raspy Cartoon", "Juvenil sintética", "Juvenil estilizado • cômico", "masculina", "juvenil", "echo", { style:"comedy",speed:1.05,energy:.75,expressiveness:.92,roughness:.66,warmth:.35,brightness:.65,pitch:.5 }),
   preset("child-girl-animated", "Child Girl — Animated", "Juvenil sintética", "Juvenil feminino • animada", "feminina", "juvenil", "shimmer", { style:"animada",speed:1.15,energy:.9,expressiveness:.92,roughness:.05,warmth:.5,brightness:.9,pitch:2 }),
@@ -141,22 +143,37 @@ export const VOICE_STYLES: { id: VoiceStyle; label: string; direction: string }[
 
 /** Atalhos mostrados primeiro no Voice Cast; todos são identidades sintéticas genéricas. */
 export const FEATURED_ACTING_PRESET_IDS = [
-  "acting-narrator-melancholic",
-  "acting-adult-sad",
-  "acting-child-sad",
-  "acting-child-happy",
-  "acting-secret-whisper",
-  "acting-cinematic-dramatic",
-  "acting-natural-nervous",
-  "acting-light-sarcastic",
+  "adult-male-boss",
+  "adult-male-casual",
+  "adult-male-friendly",
+  "child-boy-animated",
+  "child-boy-calm",
+  "teen-boy-casual",
+  "teen-boy-excited",
+  "teen-boy-serious",
 ] as const;
+
+const FEATURED_VOICE_LABELS: Record<string, string> = {
+  "adult-male-boss": "Adulto chefe",
+  "adult-male-casual": "Adulto 1 — natural",
+  "adult-male-friendly": "Adulto 2 — amigável",
+  "child-boy-animated": "Criança masculina 1 — animada",
+  "child-boy-calm": "Criança masculina 2 — suave",
+  "teen-boy-casual": "Adolescente 1 — natural",
+  "teen-boy-excited": "Adolescente 2 — animado",
+  "teen-boy-serious": "Adolescente 3 — sério",
+};
+
+export function voiceDisplayLabel(preset: VoicePreset): string {
+  return FEATURED_VOICE_LABELS[preset.id] ?? preset.label;
+}
 
 export const DEFAULT_VOICE: VoiceProfile = { presetId:"adult-female-casual",provider:"lovable-ai",providerVoiceId:"nova",language:"pt",locale:"pt-BR",ageStyle:"adulta",genderStyle:"feminina",style:"natural",speed:1,gain:1,pitch:0,energy:.55,expressiveness:.5,roughness:.08,warmth:.55,brightness:.62 };
 export const DEFAULT_MESSAGE_VOICE_DIRECTION: MessageVoiceDirection = { emotion:"neutral",speedMultiplier:1,energyMultiplier:1,pauseBeforeMs:0,pauseAfterMs:0 };
 
 export function voicePreset(id: string | undefined): VoicePreset { return VOICE_PRESETS.find(v=>v.id===id) ?? VOICE_PRESETS.find(v=>v.id==="adult-female-casual") ?? VOICE_PRESETS[0]!; }
 export function profileFromPreset(id: string, base: Partial<VoiceProfile> = {}): VoiceProfile {
-  const p=voicePreset(id); return { ...DEFAULT_VOICE,...p.profile,...base,presetId:p.id,providerVoiceId:base.providerVoiceId??p.providerVoice,ageStyle:p.age,genderStyle:p.gender,name:base.name??p.label };
+  const p=voicePreset(id); return { ...DEFAULT_VOICE,...p.profile,...base,presetId:p.id,providerVoiceId:base.providerVoiceId??p.providerVoice,ageStyle:p.age,genderStyle:p.gender,name:base.name??voiceDisplayLabel(p) };
 }
 export interface VoiceTimbre { expressiveness?: number; roughness?: number; warmth?: number; brightness?: number; }
 
@@ -186,7 +203,9 @@ export interface VoiceMixSettings { enabled:boolean; ducking:boolean; normalize:
 export const DEFAULT_VOICE_MIX: VoiceMixSettings = { enabled:false,ducking:true,normalize:true,musicUrl:null,musicGain:.25,duckingAmount:.78,duckingAttackMs:180,duckingReleaseMs:240 };
 
 export function voiceKey(text:string, profile:VoiceProfile, direction?:Partial<MessageVoiceDirection>):string {
-  const raw=JSON.stringify({v:"ator-br-2",text:text.trim(),provider:profile.provider??"lovable-ai",voice:profile.providerVoiceId??voicePreset(profile.presetId).providerVoice,preset:profile.presetId,locale:profile.locale??"pt-BR",style:profile.style,speed:Number(profile.speed.toFixed(3)),pitch:profile.pitch??0,energy:profile.energy??.5,expression:profile.expressiveness??.5,roughness:profile.roughness??0,warmth:profile.warmth??.5,brightness:profile.brightness??.5,emotion:direction?.emotion??"neutral",speedMultiplier:direction?.speedMultiplier??1,energyMultiplier:direction?.energyMultiplier??1,settings:profile.providerSettings??{}});
+  const preset = voicePreset(profile.presetId);
+  // v3 excludes cached audio generated before full acting directions reached the server.
+  const raw=JSON.stringify({v:"ator-br-3",text:text.trim(),provider:profile.provider??"lovable-ai",voice:profile.providerVoiceId??preset.providerVoice,preset:profile.presetId,locale:profile.locale??"pt-BR",age:profile.ageStyle??preset.age,gender:profile.genderStyle??preset.gender,style:profile.style,speed:Number(profile.speed.toFixed(3)),pitch:profile.pitch??0,energy:profile.energy??.5,expression:profile.expressiveness??.5,roughness:profile.roughness??0,warmth:profile.warmth??.5,brightness:profile.brightness??.5,emotion:direction?.emotion??"neutral",speedMultiplier:direction?.speedMultiplier??1,energyMultiplier:direction?.energyMultiplier??1,settings:profile.providerSettings??{}});
   let h1=2166136261,h2=5381; for(let i=0;i<raw.length;i++){h1=Math.imul(h1^raw.charCodeAt(i),16777619)>>>0;h2=((h2<<5)+h2+raw.charCodeAt(i))>>>0;} return `${h1.toString(36)}${h2.toString(36)}`;
 }
 export function speakableText(kind:string,text:string):string { if(kind==="system"||kind==="sticker"||kind==="card")return ""; return text.replace(/\s+/g," ").trim(); }

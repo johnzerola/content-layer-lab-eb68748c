@@ -4,6 +4,7 @@ import {
   DEFAULT_VOICE_MIX,
   FEATURED_ACTING_PRESET_IDS,
   speakableText,
+  voiceDisplayLabel,
   voiceDirection,
   voiceKey,
   voicePreset,
@@ -30,9 +31,11 @@ describe("elenco de vozes", () => {
   it("oferece presets reutilizáveis de atuação sem pessoas reais", () => {
     expect(FEATURED_ACTING_PRESET_IDS).toHaveLength(8);
     const featured = FEATURED_ACTING_PRESET_IDS.map((id) => voicePreset(id));
-    expect(featured.every((item) => item.group === "Presets de atuação")).toBe(true);
-    expect(featured.map((item) => item.label)).toContain("Narrador grave e melancólico");
-    expect(featured.map((item) => item.label)).toContain("Criança sintética triste");
+    const labels = featured.map(voiceDisplayLabel);
+    expect(labels).toContain("Adulto chefe");
+    expect(labels).toContain("Adulto 1 — natural");
+    expect(labels).toContain("Criança masculina 2 — suave");
+    expect(labels).toContain("Adolescente 3 — sério");
     expect(featured.every((item) => Math.abs(item.profile.pitch ?? 0) <= 2)).toBe(true);
   });
 

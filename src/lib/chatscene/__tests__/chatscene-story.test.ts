@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { storyToProject, suggestPersonalityPresetId, suggestVoicePresetId, timingForDuration } from "../story";
 import { buildPlan } from "../clock";
 import { createChatSceneProject, MAIN_THREAD_ID } from "../types";
+import { voicePreset } from "../voice";
 
 const script = {
   title: "Primeiro dia",
@@ -53,5 +54,55 @@ describe("story engine", () => {
     expect(suggestVoicePresetId({ name: "Mãe", role: "mãe", gender: "feminina" })).toBe("mother-warm");
     expect(suggestPersonalityPresetId({ name: "Chefe", role: "chefe" })).toBe("chefe");
     expect(timingForDuration(40).speed).toBeGreaterThan(timingForDuration(120).speed);
+  });
+
+  it("mantém apenas o dono explícito mesmo quando ele não é o primeiro", () => {
+    const input = { ...script, characters: script.characters.map((character, index) => ({ ...character, isSelf: index === 1 ? true : undefined })) };
+    const project = storyToProject(createChatSceneProject(), input);
+    expect(project.participants.map((person) => person.isSelf)).toEqual([false, true, false]);
+  });
+
+  it("recusa referência inválida antes de montar o documento", () => {
+    const base = createChatSceneProject();
+    const snapshot = JSON.stringify(base);
+    const input = { ...script, lines: script.lines.map((line, index) => index === 0 ? { ...line, speaker: "Pessoa inexistente" } : line) };
+    expect(() => storyToProject(base, input)).toThrow(/não está no elenco/);
+    expect(JSON.stringify(base)).toBe(snapshot);
+  });
+
+  it("respeita idade e gênero explícitos em vez de inferir pela relação familiar", () => {
+    const cases = [
+      { name: "Rafa", role: "filho adulto", gender: "masculina" as const, age: "adulta" as const },
+      { name: "Bia", role: "amiga", gender: "feminina" as const, age: "teen" as const },
+      { name: "Carla", role: "professora", gender: "feminina" as const, age: "adulta" as const },
+      { name: "Lia", role: "estagiária", gender: "feminina" as const, age: "adulta" as const },
+      { name: "Alex", role: "criança", gender: "neutra" as const, age: "juvenil" as const },
+    ];
+    for (const character of cases) {
+      const preset = voicePreset(suggestVoicePresetId(character));
+      expect(preset.age).toBe(character.age);
+      expect(preset.gender).toBe(character.gender);
+    }
+    expect(suggestPersonalityPresetId(cases[0]!)).toBe("neutro");
+  });
+
+  it("preserva identidade declarada e emoção na conversão", () => {
+    const input = { ...script, characters: script.characters.map((character, index) => index === 0
+      ? { ...character, gender: "neutra" as const, age: "teen" as const }
+      : character) };
+    const project = storyToProject(createChatSceneProject(), input);
+    const person = project.participants[0]!;
+    const profile = project.voiceProfiles!.find((voice) => voice.id === person.voiceProfileId)!;
+    expect(profile).toMatchObject({ ageStyle: "teen", genderStyle: "neutra", locale: "pt-BR" });
+    expect(project.messages.find((message) => message.text === "desculpa, chefe")).toMatchObject({
+      participantId: person.id, voiceDirection: { emotion: "nervous" },
+    });
+  });
+
+  it("mensagem sem thread continua na conversa anterior", () => {
+    const input = { ...script, lines: [...script.lines, { speaker: "Gabriel", text: "já almocei, mãe" }] };
+    const project = storyToProject(createChatSceneProject(), input);
+    const family = project.threads!.find((thread) => thread.name === "Grupo da família")!;
+    expect(project.messages.at(-1)!.threadId).toBe(family.id);
   });
 });

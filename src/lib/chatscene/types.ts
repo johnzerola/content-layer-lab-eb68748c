@@ -18,6 +18,7 @@ export const CHATSCENE_PROJECT_MODE = "chatscene";
 export const CHATSCENE_PROJECT_VERSION = 2;
 
 export type ChatSceneAspect = "9:16" | "1:1" | "16:9";
+export type ChatSceneStoryFormat = "whatsapp" | "reddit";
 
 export type MessageKind = "text" | "image" | "emoji" | "system" | "sticker" | "video" | "voice" | "card";
 
@@ -34,6 +35,8 @@ export type ChatKind = "direct" | "group";
  */
 export interface ChatSceneThread {
   id: string;
+  /** Source attribution for an imported narrative, preserved in saved projects. */
+  storySource?: import("./reddit-story").RedditStorySource;
   /** nome mostrado no topo */
   name: string;
   avatarUrl?: string | null;
@@ -299,6 +302,8 @@ export type ChatLayoutPreset =
 
 export interface ChatSceneLayout {
   preset: ChatLayoutPreset;
+  /** Continuous legacy chat, or height-based pages in the Canvas renderer. */
+  pagination?: "scroll" | "pages";
   /** posição e tamanho da conversa, em fração da tela (0–1) */
   x: number;
   y: number;
@@ -327,6 +332,7 @@ import { PERSONALITY_PRESETS } from "./personality";
 
 export const DEFAULT_LAYOUT: ChatSceneLayout = {
   preset: "full-chat",
+  pagination: "scroll",
   x: 0,
   y: 0,
   width: 1,
@@ -505,6 +511,8 @@ export interface ChatSceneProject {
   id: string;
   version: number;
   title: string;
+  /** Visual storytelling format; absent in legacy documents means WhatsApp. */
+  storyFormat?: ChatSceneStoryFormat;
   themeId: string;
   /** ajustes de cor, fonte e forma por cima do tema escolhido */
   themeOverrides?: import("./theme").ThemeOverrides;
@@ -647,6 +655,7 @@ export function createChatSceneProject(init: Partial<ChatSceneProject> = {}): Ch
     id: init.id ?? chatSceneId("cs"),
     version: CHATSCENE_PROJECT_VERSION,
     title: init.title ?? "Nova conversa",
+    storyFormat: init.storyFormat === "reddit" ? "reddit" : "whatsapp",
     themeId: init.themeId ?? "zap",
     themeOverrides: init.themeOverrides ?? {},
     dark: init.dark ?? false,
@@ -727,6 +736,7 @@ export function createThread(init: Partial<ChatSceneThread> = {}): ChatSceneThre
     avatarUrl: init.avatarUrl ?? null,
     kind: init.kind ?? "direct",
     subtitle: init.subtitle ?? null,
+    ...(init.storySource ? { storySource: { ...init.storySource } } : {}),
   };
 }
 
@@ -755,6 +765,7 @@ export function normalizeChatSceneProject(raw: Partial<ChatSceneProject> | null 
     id: raw.id ?? base.id,
     version: CHATSCENE_PROJECT_VERSION,
     participants,
+    storyFormat: raw.storyFormat === "reddit" ? "reddit" : "whatsapp",
     voiceProfiles,
     messages,
     timing: { ...DEFAULT_TIMING, ...(raw.timing ?? {}) },
