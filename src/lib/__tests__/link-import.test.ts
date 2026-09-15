@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractVideoLinks, MAX_LINK_BATCH } from "@/lib/link-import";
+import { extractVideoLinks, MAX_LINK_BATCH, proxyDownloadError } from "@/lib/link-import";
 
 describe("extractVideoLinks", () => {
   it("aceita lista numerada e preserva a ordem", () => {
@@ -22,7 +22,24 @@ describe("extractVideoLinks", () => {
   });
 
   it("limita lotes excessivos", () => {
-    const text = Array.from({ length: MAX_LINK_BATCH + 5 }, (_, i) => `https://example.com/${i}`).join("\n");
+    const text = Array.from(
+      { length: MAX_LINK_BATCH + 5 },
+      (_, i) => `https://example.com/${i}`,
+    ).join("\n");
     expect(extractVideoLinks(text)).toHaveLength(MAX_LINK_BATCH);
+  });
+});
+
+describe("proxyDownloadError", () => {
+  it("explica respostas conhecidas do proxy", () => {
+    expect(proxyDownloadError(400, "url not allowed")).toContain("validação de segurança");
+    expect(proxyDownloadError(415, "not a video")).toContain("página");
+    expect(proxyDownloadError(502, "upstream error")).toContain("não entregou");
+  });
+
+  it("não repassa corpos inesperados da origem", () => {
+    expect(proxyDownloadError(500, "<html>segredo interno</html>")).toBe(
+      "O servidor não conseguiu baixar o arquivo da plataforma.",
+    );
   });
 });

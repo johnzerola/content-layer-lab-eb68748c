@@ -15,15 +15,28 @@ const TTL_MS = 60_000;
 
 export function isBlockedIp(ip: string): boolean {
   if (ip.includes(":")) {
-    const v6 = ip.toLowerCase();
+    const v6 =
+      ip
+        .toLowerCase()
+        .replace(/^\[|\]$/g, "")
+        .split("%", 1)[0] ?? "";
+    if (!v6 || !/^[0-9a-f:.]+$/.test(v6)) return true;
     if (v6 === "::" || v6 === "::1") return true;
-    if (v6.startsWith("fe80") || v6.startsWith("fc") || v6.startsWith("fd")) return true;
-    // IPv4 mapeado (::ffff:127.0.0.1)
-    const mapped = v6.split(":").pop();
-    return mapped ? isBlockedIp(mapped) : true;
+    const mapped = v6.match(/(?:^|:)(\d{1,3}(?:\.\d{1,3}){3})$/)?.[1];
+    if (mapped) return isBlockedIp(mapped);
+
+    const firstText = v6.split(":").find(Boolean);
+    const first = firstText ? Number.parseInt(firstText, 16) : 0;
+    if (!Number.isFinite(first)) return true;
+    // fc00::/7 (local), fe80::/10 (link-local) e ff00::/8 (multicast).
+    if ((first & 0xfe00) === 0xfc00) return true;
+    if ((first & 0xffc0) === 0xfe80) return true;
+    if ((first & 0xff00) === 0xff00) return true;
+    return false;
   }
   const parts = ip.split(".").map(Number);
-  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return true;
+  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255))
+    return true;
   const [a, b] = parts as [number, number, number, number];
   return (
     a === 0 ||
@@ -41,7 +54,9 @@ async function resolve(host: string, type: "A" | "AAAA"): Promise<string[]> {
   const url = `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(host)}&type=${type}`;
   const res = await fetch(url, { headers: { accept: "application/dns-json" } }).catch(() => null);
   if (!res?.ok) return [];
-  const body = (await res.json().catch(() => null)) as { Answer?: { type: number; data: string }[] } | null;
+  const body = (await res.json().catch(() => null)) as {
+    Answer?: { type: number; data: string }[];
+  } | null;
   return (body?.Answer ?? [])
     .filter((a) => a.type === 1 || a.type === 28)
     .map((a) => a.data.trim())
