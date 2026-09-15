@@ -135,7 +135,7 @@ export function AuthScreen({
     setBusy(true);
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+        redirect_uri: `${window.location.origin}/editor`,
       });
       if (result.error) {
         toast.error("Não foi possível entrar com o Google. Tente de novo.");
