@@ -15,9 +15,15 @@ import {
   TikTokIcon,
   YouTubeIcon,
 } from "@/components/brand-icons";
+import { PrizeCounter } from "@/components/auth/PrizeCounter";
+import { PrizeStream } from "@/components/auth/PrizeStream";
 import { Button } from "@/components/ui/button";
 import { resetPassword, signIn, signUp } from "@/lib/cloud";
 import { toast } from "sonner";
+
+/** Prêmios em destaque que se alternam na vitrine. */
+const PRIZES = [298000, 246200, 187500, 321800];
+
 
 const HIGHLIGHTS = [
   { label: "Cortes virais gerados", value: 128, suffix: "K", tone: "primary" as const },
