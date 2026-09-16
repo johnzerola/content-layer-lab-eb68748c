@@ -787,10 +787,12 @@ export function EditorV2Foundation() {
         recipe: ticket.recipe ?? { id: "service-default", revision: "capabilities-not-reported" },
       });
       jobRepository.save(jobRecord);
-      setMessage("Convertendo o áudio para 44.100 Hz…");
+      const separationSampleRate: 44_100 | 48_000 = ticket.sampleRate === 48_000 ? 48_000 : 44_100;
+      setMessage(`Preparando o áudio em ${separationSampleRate.toLocaleString("pt-BR")} Hz…`);
       const separationWav = await prepareAudioForSeparation(sourceWav, {
         signal: controller.signal,
         maxDuration: ticket.maxDuration,
+        targetSampleRate: separationSampleRate,
       });
       const result = await runStemJob(ticket, separationWav, {
         signal: controller.signal,

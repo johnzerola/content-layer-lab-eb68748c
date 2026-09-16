@@ -53,6 +53,7 @@ export const prepareAudioSeparation = createServerFn({ method: "POST" })
       max_duration?: number;
       engine?: string;
       model?: string;
+      sample_rate?: number;
       revision?: string;
       quality?: string;
       shifts?: number;
@@ -62,6 +63,10 @@ export const prepareAudioSeparation = createServerFn({ method: "POST" })
     if (caps.ready !== true)
       throw new Error(
         "O motor de separação não está habilitado no servidor. O áudio original não foi alterado.",
+      );
+    if (caps.engine !== "bandit")
+      throw new Error(
+        "O Editor V2 exige o Bandit V2 na RTX para esta separação. O motor antigo não foi usado.",
       );
     const jobId = crypto.randomUUID();
     const recipe = {
@@ -103,6 +108,7 @@ export const prepareAudioSeparation = createServerFn({ method: "POST" })
       controlToken: jobToken(jobId, "control", 1800),
       resultToken: jobToken(jobId, "result", 1800),
       maxDuration: Math.min(180, caps.max_duration ?? 180),
+      sampleRate: caps.sample_rate === 48_000 ? 48_000 : 44_100,
       recipe,
       persistenceReady,
     };

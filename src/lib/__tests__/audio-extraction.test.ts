@@ -7,6 +7,29 @@ import {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("audio prepared for separation", () => {
+  it("preserves the native 48 kHz rate requested by Bandit", async () => {
+    const close = vi.fn();
+    vi.stubGlobal("window", {
+      AudioContext: class {
+        decodeAudioData = vi.fn().mockResolvedValue({
+          duration: 2 / 48_000,
+          sampleRate: 48_000,
+          numberOfChannels: 1,
+          getChannelData: () => new Float32Array([0.25, -0.25]),
+        });
+        close = close;
+      },
+    });
+
+    const wav = await prepareAudioForSeparation(new Blob(["source"]), { targetSampleRate: 48_000 });
+    const header = new DataView(await wav.arrayBuffer());
+
+    expect(header.getUint16(22, true)).toBe(1);
+    expect(header.getUint32(24, true)).toBe(48_000);
+    expect(header.getUint32(40, true)).toBe(4);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
   it("resamples 48 kHz camera audio to the worker's 44.1 kHz WAV contract", async () => {
     const decoded = {
       duration: 1,

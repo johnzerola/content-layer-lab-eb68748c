@@ -63,6 +63,7 @@ def capabilities():
                      and config["device"] in {"cpu", "cuda"})
         return {"ready": enabled and installed and bool(shutil.which("ffmpeg")) and bool(shutil.which("ffprobe")),
                 "engine": "bandit", "model": "v2-multi", "device": config["device"],
+                "sample_rate": 48000,
                 "revision": "7ec03cb568811958db65a96a10fdb8879922b2ac:abcfccf65446752a057f4a302c941479a54b7560ebf8d7bca039d2ea98e64cfc",
                 "max_duration": MAX_SECONDS, "max_bytes": MAX_BYTES, "losslessIntermediate": True,
                 "notice": "Bandit V2 — Karn Watcharasupat e colaboradores. Pesos CC-BY-SA-4.0: https://zenodo.org/records/12701995. Pode haver resíduos em outros vídeos."}
@@ -76,7 +77,7 @@ def capabilities():
     ensemble = os.getenv("AUDIO_SEPARATION_ENSEMBLE", "0") == "1"
     return {"ready": enabled and installed and bool(shutil.which("ffmpeg"))
             and bool(shutil.which("ffprobe")), "engine": "demucs", "model": model,
-            "device": "cpu", "quality": quality,
+            "device": "cpu", "quality": quality, "sample_rate": 44100,
             "profiles": {"fast": {"model": "htdemucs", "interactive": True},
                          "quality": {"model": "htdemucs_ft", "interactive": False}},
             "ensemble": {"enabled": ensemble, "model": os.getenv("AUDIO_SEPARATION_ENSEMBLE_MODEL", "mdx_extra"),

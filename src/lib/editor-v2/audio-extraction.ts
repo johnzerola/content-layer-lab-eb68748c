@@ -35,7 +35,7 @@ export const AUDIO_SEPARATION_SAMPLE_RATE = 44_100;
  */
 export async function prepareAudioForSeparation(
   file: Blob,
-  options: Pick<ExtractAudioOptions, "signal" | "maxDuration"> = {},
+  options: Pick<ExtractAudioOptions, "signal" | "maxDuration"> & { targetSampleRate?: 44_100 | 48_000 } = {},
 ): Promise<Blob> {
   options.signal?.throwIfAborted();
   const AudioCtx =
@@ -53,6 +53,7 @@ export async function prepareAudioForSeparation(
   }
   options.signal?.throwIfAborted();
   const maxDuration = options.maxDuration ?? LOCAL_AUDIO_EXTRACTION_LIMITS.maxDuration;
+  const targetSampleRate = options.targetSampleRate ?? AUDIO_SEPARATION_SAMPLE_RATE;
   if (!Number.isFinite(decoded.duration) || decoded.duration <= 0)
     throw new Error("A mídia não contém uma faixa de áudio utilizável.");
   if (decoded.duration > maxDuration)
@@ -63,10 +64,10 @@ export async function prepareAudioForSeparation(
   );
   if (channelCount < 1) throw new Error("A mídia não contém canais de áudio.");
 
-  if (decoded.sampleRate === AUDIO_SEPARATION_SAMPLE_RATE) {
+  if (decoded.sampleRate === targetSampleRate) {
     return encodeStereoWav(
       Array.from({ length: channelCount }, (_, index) => decoded.getChannelData(index).slice()),
-      AUDIO_SEPARATION_SAMPLE_RATE,
+      targetSampleRate,
     );
   }
 
@@ -78,8 +79,8 @@ export async function prepareAudioForSeparation(
     throw new Error("Este navegador não oferece conversão de áudio para 44.100 Hz.");
   const resampleContext = new OfflineCtx(
     channelCount,
-    Math.ceil(decoded.duration * AUDIO_SEPARATION_SAMPLE_RATE),
-    AUDIO_SEPARATION_SAMPLE_RATE,
+    Math.ceil(decoded.duration * targetSampleRate),
+    targetSampleRate,
   );
   const source = resampleContext.createBufferSource();
   source.buffer = decoded;
@@ -89,7 +90,7 @@ export async function prepareAudioForSeparation(
   options.signal?.throwIfAborted();
   return encodeStereoWav(
     Array.from({ length: channelCount }, (_, index) => resampled.getChannelData(index)),
-    AUDIO_SEPARATION_SAMPLE_RATE,
+    targetSampleRate,
   );
 }
 

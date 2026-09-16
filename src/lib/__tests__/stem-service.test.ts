@@ -10,6 +10,7 @@ const ticket: StemTicket = {
   controlToken: "control",
   resultToken: "result",
   maxDuration: 180,
+  sampleRate: 44_100,
 };
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
@@ -110,8 +111,8 @@ describe("real audio separation", () => {
     }));
 
     await runStemJob(
-      { ...ticket, recipe: { id: "bandit:v2-multi", revision: "test" } },
-      validWav(),
+      { ...ticket, sampleRate: 48_000, recipe: { id: "bandit:v2-multi", revision: "test" } },
+      encodeStereoWav([new Float32Array([0, 0])], 48_000),
       { onStage: stage => { stages.push(stage); } },
     );
 
