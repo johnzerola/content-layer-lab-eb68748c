@@ -253,3 +253,18 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## Checklist obrigatório antes do lançamento
+
+Estes itens bloqueiam o lançamento público. Não considerar o produto pronto enquanto permanecerem pendentes.
+
+- [ ] **Worker de áudio permanente:** substituir o túnel temporário `trycloudflare.com` por um Cloudflare Tunnel nomeado, com hostname fixo.
+- [ ] **Inicialização automática da RTX:** instalar o Bandit V2 como tarefa oculta do Windows, com reinício automático, logs e smoke de `capabilities` confirmando `bandit`, `cuda` e `48000` Hz. Consulte [o guia do worker RTX](docs/editor-v2/audio-separation/RTX-WORKER-SETUP-20260915.md).
+- [ ] **Plano para indisponibilidade:** definir o comportamento quando o computador com a RTX estiver desligado e decidir entre fila, mensagem de indisponibilidade ou GPU em nuvem.
+- [ ] **Pagamentos reais:** substituir o checkout simulado por um provedor de pagamentos, sem ativar plano apenas pelo estado do navegador.
+- [ ] **Webhooks e segurança financeira:** validar assinatura, idempotência, reenvios, valores, moeda, plano comprado e vínculo com o usuário antes de liberar créditos ou assinatura.
+- [ ] **Ciclo da assinatura:** implementar aprovação, falha, cancelamento, renovação, reembolso, chargeback e expiração dos benefícios.
+- [ ] **Créditos e limites:** registrar um ledger auditável para consumo, estorno e concessão de créditos, evitando saldo duplicado em requisições repetidas.
+- [ ] **Ambiente de teste:** validar compra completa no sandbox, webhook, liberação do plano, cancelamento e tentativa duplicada antes de habilitar produção.
+- [ ] **Operação e suporte:** configurar alertas, logs sem dados sensíveis, política de reembolso, termos, privacidade e um procedimento de recuperação.
+- [ ] **Smoke final publicado:** testar cadastro, login, pagamento, importação, Editor V2, separação de áudio, exportação e download no domínio público.
