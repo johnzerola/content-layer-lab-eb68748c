@@ -100,6 +100,24 @@ describe("real audio separation", () => {
     await expect(runStemJob(ticket, validWav())).rejects.toThrow("trilha de áudio");
   });
 
+  it("reports Bandit RTX while the automatic job is running", async () => {
+    const stages: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.endsWith("/upload") || url.endsWith("/start")) return json({});
+      if (url.includes("/stems/"))
+        return new Response(new Uint8Array(256), { headers: { "content-type": "audio/wav" } });
+      return json({ status: "completed", duration: 5, engine: "bandit", model: "v2-multi" });
+    }));
+
+    await runStemJob(
+      { ...ticket, recipe: { id: "bandit:v2-multi", revision: "test" } },
+      validWav(),
+      { onStage: stage => { stages.push(stage); } },
+    );
+
+    expect(stages).toContain("Bandit V2 separando diálogo e música na RTX…");
+  });
+
   it("rejects malformed audio before contacting the worker", async () => {
     const fetcher = vi.fn();
     vi.stubGlobal("fetch", fetcher);

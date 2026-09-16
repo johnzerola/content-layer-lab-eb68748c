@@ -64,7 +64,10 @@ export async function runStemJob(
     });
     await onStatus?.("uploaded");
     await request("/start", ticket.controlToken, { method: "POST" });
-    onStage?.("Demucs separando voz e acompanhamento na Hostear…");
+    const usingBandit = ticket.recipe?.id.toLowerCase().startsWith("bandit:") ?? false;
+    onStage?.(usingBandit
+      ? "Bandit V2 separando diálogo e música na RTX…"
+      : "Separando diálogo e música…");
     while (true) {
       const state = (await (await request("", ticket.controlToken)).json()) as {
         status: string;

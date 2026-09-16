@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, AlignCenter, AlignLeft, AlignRight, Clock3, Diamond, KeyRound, Play, Scissors, SlidersHorizontal, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, AlignCenter, AlignLeft, AlignRight, Clock3, Diamond, KeyRound, LoaderCircle, Play, Scissors, SlidersHorizontal, Sparkles, Trash2, X } from "lucide-react";
 import { ANIMATABLE_PROPERTIES, clampTransitionDuration, clipLocalTime, resolveAnimatedTransform, type AnimatableProperty, type AudioRepresentation, type AudioSourceGroup, type Clip, type ClipStyle, type ClipTransform, type MediaAsset, type ProjectSettings, type Track, type Transition } from "@/lib/editor-v2";
 import type { Easing } from "@/lib/video-template/types";
 import { TRANSITION_DEFINITIONS, type LibraryItem, type TransitionDefinition } from "@/lib/editor-v2/library";
@@ -91,7 +91,20 @@ export function InspectorV2(props: InspectorProps) {
           {clip.kind === "video" && clip.audio && <div className="mt-3 rounded-xl border border-white/8 bg-white/[0.025] p-3"><div className="flex items-center justify-between"><span className="text-[10px] font-medium">Som do vídeo</span><button type="button" aria-pressed={clip.audio.muted} onClick={() => onPatchClip(clip.id, { audio: { ...clip.audio!, muted: !clip.audio!.muted } })} className={`h-8 rounded-lg px-2.5 text-[10px] font-semibold ${clip.audio.muted ? "bg-destructive/15 text-destructive" : "bg-white/6 text-foreground"}`}>{clip.audio.muted ? "Mudo" : "Ativo"}</button></div><AudioRange label="Volume" value={clip.audio.gain} max={1.5} suffix={`${Math.round(clip.audio.gain * 100)}%`} onChange={(gain) => onPatchClip(clip.id, { audio: { ...clip.audio!, gain } })} /></div>}
           {audioGroup.sourceVideoClipId && <div className="mt-3 space-y-2" aria-busy={extractingAudio || separatingAudio}>
             <button type="button" disabled={separatingAudio} onClick={extractingAudio ? onCancelAudioExtraction : onExtractAudio} className={`min-h-9 w-full rounded-lg border px-3 text-[10px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-45 ${extractingAudio ? "border-amber-400/30 bg-amber-400/10 text-amber-200" : "border-white/10 bg-white/[0.035] text-foreground hover:border-white/20"}`}>{extractingAudio ? "Cancelar extração" : audioGroup.extractedClipId ? "Extrair novamente" : "Extrair áudio completo"}</button>
-            <button type="button" disabled={extractingAudio} onClick={separatingAudio ? onCancelAudioSeparation : onSeparateAudio} className={`min-h-10 w-full rounded-lg border px-3 text-[10px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-45 ${separatingAudio ? "border-amber-400/35 bg-amber-400/10 text-amber-100" : "border-primary/45 bg-primary/18 text-primary shadow-[0_0_18px_hsl(var(--primary)/.1)] hover:bg-primary/24"}`}>{separatingAudio ? "Cancelar separação" : audioGroup.dialogueClipId || audioGroup.musicClipId ? "Separar novamente" : "Separar diálogo e música"}</button>
+            <button
+              type="button"
+              disabled={extractingAudio || separatingAudio}
+              onClick={onSeparateAudio}
+              className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-primary/45 bg-primary/18 px-3 text-[10px] font-semibold text-primary shadow-[0_0_18px_hsl(var(--primary)/.1)] transition hover:bg-primary/24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-70"
+            >
+              {separatingAudio && <LoaderCircle aria-hidden="true" className="size-3.5 motion-safe:animate-spin" />}
+              {separatingAudio
+                ? "Separando automaticamente com a RTX…"
+                : audioGroup.dialogueClipId || audioGroup.musicClipId
+                  ? "Separar novamente com a RTX"
+                  : "Separar diálogo e música"}
+            </button>
+            {separatingAudio && <button type="button" onClick={onCancelAudioSeparation} className="flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg px-3 text-[10px] font-medium text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"><X aria-hidden="true" className="size-3.5" />Cancelar processamento</button>}
             {audioGroup.dialogueClipId || audioGroup.musicClipId ? <button type="button" disabled={extractingAudio || separatingAudio} onClick={onRestoreOriginalAudio} className="min-h-9 w-full rounded-lg px-3 text-[10px] font-medium text-muted-foreground transition hover:bg-white/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-45">Restaurar áudio original</button> : null}
             <p className="text-[9px] leading-relaxed text-muted-foreground">O original fica preservado. Depois, use Solo ou Mudo nas faixas Diálogo e Música e ambiente.</p>
           </div>}
