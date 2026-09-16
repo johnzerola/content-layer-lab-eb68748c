@@ -26,6 +26,7 @@ $env:BANDIT_DEVICE = 'cuda'
 $env:CLEANER_ENV = 'development'
 $env:CLEANER_BIND_PORT = [string]$Port
 $env:CLEANER_ALLOWED_HOSTS = if ($env:CLEANER_ALLOWED_HOSTS) { $env:CLEANER_ALLOWED_HOSTS } else { 'localhost,127.0.0.1' }
+$env:CORS_ORIGINS = if ($env:CORS_ORIGINS) { $env:CORS_ORIGINS } else { 'https://content-layer-lab.lovable.app,http://localhost:5173,http://127.0.0.1:5173' }
 $env:CLEANER_STORAGE = (Join-Path $PSScriptRoot '..\storage\bandit-gpu')
 $env:OMP_NUM_THREADS = '2'
 $env:MKL_NUM_THREADS = '2'
