@@ -24,6 +24,30 @@ Faça primeiro um smoke autenticado: `/v1/audio/capabilities` deve retornar `rea
 
 O PC precisa permanecer ligado e conectado enquanto um job estiver processando. Se o PC desligar ou o túnel cair, o job falha e o original permanece preservado; o Demucs da Hostear não é alternado automaticamente. Para voltar ao servidor CPU, remova as duas URLs do ambiente web e publique novamente.
 
+### Iniciar sem deixar o PowerShell aberto
+
+Use um Cloudflare Tunnel **nomeado**, com hostname fixo, em vez do endereço temporário `trycloudflare.com`. No painel Cloudflare, crie o túnel, publique um hostname HTTPS apontando para `http://127.0.0.1:8095` e instale o conector como serviço do Windows com o comando fornecido pelo próprio painel. Depois atualize `CLEANER_WORKER_URL` e `CLEANER_WORKER_PUBLIC_URL` no Lovable uma única vez com esse hostname fixo.
+
+Com o hostname definido, registre o Bandit para iniciar oculto no logon e reiniciar automaticamente se falhar:
+
+```powershell
+Set-Location C:\Users\DINO\content-layer-lab
+.\backend\scripts\install_bandit_gpu_autostart.ps1 `
+  -PublicHostname 'audio.seudominio.com' `
+  -StartNow
+```
+
+O segredo não é salvo nos argumentos da tarefa: o iniciador o carrega de `.env.local`. Os logs ficam em `backend/storage/bandit-gpu/logs`. Para consultar ou remover:
+
+```powershell
+Get-ScheduledTask -TaskName 'VaiViral Bandit GPU Worker'
+.\backend\scripts\install_bandit_gpu_autostart.ps1 `
+  -PublicHostname 'audio.seudominio.com' `
+  -Remove
+```
+
+O modo automático elimina as duas janelas abertas, mas o PC ainda precisa estar ligado, conectado e com o usuário do Windows autenticado para a RTX processar. Para disponibilidade mesmo com o PC desligado, use uma GPU em nuvem no lugar deste worker local.
+
 O teste de referência processou 80 segundos em 125,6 s na RTX 2060. Isso é uma referência local, não uma garantia de latência: carregamento do modelo, temperatura, outros aplicativos e múltiplos jobs alteram o tempo. O backend limita a um job por vez.
 
 ## Licença
