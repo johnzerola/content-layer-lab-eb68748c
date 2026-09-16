@@ -38,5 +38,5 @@ if ($LASTEXITCODE -ne 0) { throw 'Runtime incompleto: instale uvicorn, numpy e s
 Write-Host "Bandit GPU em http://127.0.0.1:$Port (não é público por padrão)"
 Write-Host 'Para uso remoto, abra um túnel de saída autenticado e configure CLEANER_WORKER_URL no backend web.'
 Push-Location (Join-Path $PSScriptRoot '..')
-try { & $Python -m uvicorn app.main:app --host 127.0.0.1 --port $Port }
+try { & $Python -m uvicorn app.audio_worker_main:app --host 127.0.0.1 --port $Port }
 finally { Pop-Location }

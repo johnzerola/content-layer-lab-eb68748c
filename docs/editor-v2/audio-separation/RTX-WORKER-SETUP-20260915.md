@@ -12,7 +12,7 @@ $env:BANDIT_PYTHON = 'C:\caminho\para\python.exe'
 .\backend\scripts\run_bandit_gpu_worker.ps1
 ```
 
-O script valida CUDA, FFmpeg, numpy, soundfile, uvicorn, o checkout e a existência do checkpoint. O serviço escuta somente `127.0.0.1:8095`; o áudio original e as saídas ficam em `backend/storage/bandit-gpu`.
+O script valida CUDA, FFmpeg, numpy, soundfile, uvicorn, o checkout e a existência do checkpoint. Ele inicia uma aplicação isolada só de áudio, portanto não exige OpenCV, OCR ou os modelos de vídeo. O serviço escuta somente `127.0.0.1:8095`; o áudio original e as saídas ficam em `backend/storage/bandit-gpu`.
 
 ## Ligar ao Editor V2
 
