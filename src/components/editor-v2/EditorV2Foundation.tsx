@@ -717,6 +717,15 @@ export function EditorV2Foundation() {
     const sourceAsset = videoClip?.assetId ? initial.assets.find((asset) => asset.id === videoClip.assetId) : undefined;
     if (!initialGroup || !videoClip || !sourceAsset) { setMessage("Selecione um vídeo ou uma de suas trilhas de áudio."); return; }
 
+    // Bandit accepts at most 180 seconds. Reject known-long sources before
+    // Web Audio decodes them, otherwise the UI appears stuck while the worker
+    // will reject the upload later.
+    const knownDuration = Number(sourceAsset.duration ?? (videoClip.sourceOut - videoClip.sourceIn));
+    if (Number.isFinite(knownDuration) && knownDuration > 180.15) {
+      setMessage(`Este vídeo tem ${Math.round(knownDuration)} segundos. Separe um trecho de até 180 segundos por vez.`);
+      return;
+    }
+
     const controller = new AbortController();
     audioSeparationRef.current = controller;
     setSeparatingAudio(true);
