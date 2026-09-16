@@ -720,7 +720,8 @@ export function EditorV2Foundation() {
     // Bandit accepts at most 180 seconds. Reject known-long sources before
     // Web Audio decodes them, otherwise the UI appears stuck while the worker
     // will reject the upload later.
-    const knownDuration = Number(sourceAsset.duration ?? (videoClip.sourceOut - videoClip.sourceIn));
+    const clipDuration = Number(videoClip.sourceOut - videoClip.sourceIn);
+    const knownDuration = Number.isFinite(clipDuration) && clipDuration > 0 ? clipDuration : Number(sourceAsset.duration);
     if (Number.isFinite(knownDuration) && knownDuration > 180.15) {
       setMessage(`Este vídeo tem ${Math.round(knownDuration)} segundos. Separe um trecho de até 180 segundos por vez.`);
       return;
@@ -746,6 +747,8 @@ export function EditorV2Foundation() {
         setMessage("Preparando o áudio completo para separar…");
         const extracted = await extractAudioFromMediaFile(sourceFile, {
           signal: controller.signal,
+          sourceIn: videoClip.sourceIn,
+          sourceOut: videoClip.sourceOut,
           onStage: (stage) => setMessage(stage === "reading" ? "Lendo o vídeo…" : stage === "decoding" ? "Decodificando o áudio…" : "Criando a fonte de áudio…"),
         });
         const state = busRef.current.getState();
@@ -770,8 +773,8 @@ export function EditorV2Foundation() {
       controller.signal.throwIfAborted();
       const separationSourceRevision = workingGroup.sourceRevision;
       const separationSourceFingerprint = sourceAsset.hash ?? `asset:${sourceAsset.id}`;
-      const sourceAudioAsset = busRef.current.getState().assets.find((asset) => asset.id === workingGroup.originalAudioAssetId);
-      const sourceDuration = sourceAudioAsset?.duration ?? sourceAsset.duration;
+      const clipDuration = videoClip.sourceOut - videoClip.sourceIn;
+      const sourceDuration = Number.isFinite(clipDuration) && clipDuration > 0 ? clipDuration : sourceAsset.duration;
       if (!Number.isFinite(sourceDuration) || sourceDuration! <= 0) throw new Error("Não foi possível congelar a duração do áudio fonte.");
       setMessage("Conectando ao separador de diálogo e música…");
       const ticket = await prepareAudioSeparation({ data: {

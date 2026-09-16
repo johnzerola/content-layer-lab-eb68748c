@@ -24,6 +24,8 @@ export interface ExtractAudioOptions {
   maxBytes?: number;
   maxDuration?: number;
   waveformBuckets?: number;
+  sourceIn?: number;
+  sourceOut?: number;
 }
 
 export const AUDIO_SEPARATION_SAMPLE_RATE = 44_100;
@@ -116,15 +118,22 @@ export async function extractAudioFromMediaFile(file: File, options: ExtractAudi
   }
   options.signal?.throwIfAborted();
   if (!Number.isFinite(decoded.duration) || decoded.duration <= 0) throw new Error("A mídia não contém uma faixa de áudio utilizável.");
-  if (decoded.duration > maxDuration) throw new Error(`Extraia um trecho de até ${maxDuration} segundos nesta fase.`);
+  const sourceIn = Math.max(0, options.sourceIn ?? 0);
+  const sourceOut = Math.min(decoded.duration, options.sourceOut ?? decoded.duration);
+  if (!Number.isFinite(sourceIn) || !Number.isFinite(sourceOut) || sourceOut <= sourceIn)
+    throw new Error("O intervalo de áudio selecionado é inválido.");
+  const selectedDuration = sourceOut - sourceIn;
+  if (selectedDuration > maxDuration) throw new Error(`Extraia um trecho de até ${maxDuration} segundos nesta fase.`);
   const channelCount = Math.min(LOCAL_AUDIO_EXTRACTION_LIMITS.maxChannels, decoded.numberOfChannels);
   if (channelCount < 1) throw new Error("A mídia não contém canais de áudio.");
   options.onStage?.("encoding");
-  const channels = Array.from({ length: channelCount }, (_, index) => decoded.getChannelData(index).slice());
+  const startFrame = Math.floor(sourceIn * decoded.sampleRate);
+  const endFrame = Math.min(decoded.length, Math.ceil(sourceOut * decoded.sampleRate));
+  const channels = Array.from({ length: channelCount }, (_, index) => decoded.getChannelData(index).slice(startFrame, endFrame));
   const summary = summarizeWaveform(channels, options.waveformBuckets ?? 180);
   const wav = encodeStereoWav(channels, decoded.sampleRate);
   options.signal?.throwIfAborted();
-  return { wav, duration: decoded.duration, sampleRate: decoded.sampleRate, channels: channelCount, ...summary };
+  return { wav, duration: selectedDuration, sampleRate: decoded.sampleRate, channels: channelCount, ...summary };
 }
 
 export function buildExtractedAudioMedia(input: {
