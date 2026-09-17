@@ -760,7 +760,10 @@ export function EditorV2Foundation() {
     const controller = new AbortController();
     audioSeparationRef.current = controller;
     setSeparatingAudio(true);
-    let workingGroup = initialGroup;
+    // Keep the project untouched while the worker runs. The extracted WAV is
+    // only a transport file for Bandit; it is not a completed editor result.
+    // Both separated stems are committed together after they are available.
+    const workingGroup = initialGroup;
     const jobRepository = new AudioSeparationJobRepository(window.localStorage);
     let jobRecord: AudioSeparationJobRecord | undefined;
     const recordJobStatus = async (status: "uploaded" | "queued" | "processing" | "downloading") => {
@@ -777,30 +780,18 @@ export function EditorV2Foundation() {
       if (!sourceWav) {
         const sourceFile = sourceFilesRef.current.get(sourceAsset.id);
         if (!sourceFile) throw new Error("O arquivo original precisa ser religado antes de separar o áudio.");
-        setMessage("Preparando o áudio completo para separar…");
+        setMessage("Preparando temporariamente o trecho para a RTX…");
         const extracted = await extractAudioFromMediaFile(sourceFile, {
           signal: controller.signal,
           sourceIn: videoClip.sourceIn,
           sourceOut: videoClip.sourceOut,
           onStage: (stage) => setMessage(stage === "reading" ? "Lendo o vídeo…" : stage === "decoding" ? "Decodificando o áudio…" : "Criando a fonte de áudio…"),
         });
-        const state = busRef.current.getState();
-        const prepared = buildExtractedAudioMedia({ sourceAsset, sourceClip: videoClip, group: workingGroup, result: extracted, revision: state.revisions.document + 1 });
-        sourceWav = new File([extracted.wav], `${prepared.asset.id}.wav`, { type: "audio/wav", lastModified: Date.now() });
-        const persisted = await persistEditorMedia(state.id, prepared.asset.id, sourceWav);
-        if (persisted) prepared.asset.storagePath = editorMediaStoragePath(state.id, prepared.asset.id);
-        const sourceUrl = URL.createObjectURL(sourceWav);
-        try {
-          setProject(busRef.current.execute(new RegisterExtractedAudioCommand(prepared.group, prepared.asset, prepared.clip)));
-          runtimeUrlsRef.current.add(sourceUrl);
-          sourceFilesRef.current.set(prepared.asset.id, sourceWav);
-          setAssetSources((current) => ({ ...current, [prepared.asset.id]: sourceUrl }));
-          setAssetWaveforms((current) => ({ ...current, [prepared.asset.id]: extracted.peaks }));
-          workingGroup = prepared.group;
-        } catch (error) {
-          URL.revokeObjectURL(sourceUrl);
-          throw error;
-        }
+        sourceWav = new File(
+          [extracted.wav],
+          `${sourceAsset.id}-separation-source.wav`,
+          { type: "audio/wav", lastModified: Date.now() },
+        );
       }
 
       controller.signal.throwIfAborted();
