@@ -30,6 +30,11 @@ export interface ExtractAudioOptions {
 
 export const AUDIO_SEPARATION_SAMPLE_RATE = 44_100;
 
+function groupOwnsVideoClip(group: AudioSourceGroup, clip: Clip, sourceAssetId: string) {
+  return clip.assetId === sourceAssetId
+    && (group.sourceVideoClipId === clip.id || clip.audioGroupId === group.id);
+}
+
 /**
  * Produces the strict PCM WAV accepted by the separation service without
  * replacing the editor's original extracted asset. Camera and phone audio is
@@ -145,7 +150,7 @@ export function buildExtractedAudioMedia(input: {
 }): { asset: MediaAsset; clip: Clip; group: AudioSourceGroup } {
   const { sourceAsset, sourceClip, result } = input;
   if (sourceAsset.kind !== "video" || sourceClip.kind !== "video" || sourceClip.assetId !== sourceAsset.id) throw new Error("Selecione um clipe de vídeo válido.");
-  if (input.group.sourceAssetId !== sourceAsset.id || input.group.sourceVideoClipId !== sourceClip.id) throw new Error("O grupo de áudio não pertence ao vídeo selecionado.");
+  if (input.group.sourceAssetId !== sourceAsset.id || !groupOwnsVideoClip(input.group, sourceClip, sourceAsset.id)) throw new Error("O grupo de áudio não pertence ao vídeo selecionado.");
   const revision = Math.max(1, Math.floor(input.revision));
   const id = `${sourceAsset.id}-audio-s${input.group.sourceStreamIndex}-r${revision}`;
   const asset: MediaAsset = {
@@ -156,7 +161,12 @@ export function buildExtractedAudioMedia(input: {
     storagePath: `local-session://${id}`,
     duration: result.duration,
     hash: `${id}.wav:${result.wav.size}:0`,
-    sourceAudio: { sourceAssetId: sourceAsset.id, streamIndex: input.group.sourceStreamIndex },
+    sourceAudio: {
+      sourceAssetId: sourceAsset.id,
+      streamIndex: input.group.sourceStreamIndex,
+      sourceIn: sourceClip.sourceIn,
+      sourceOut: sourceClip.sourceOut,
+    },
     audioAnalysis: { cacheKey: `${id}:${result.sampleRate}:${result.channels}:180`, status: "ready", sampleRate: result.sampleRate, channels: result.channels, peaks: result.peaks },
     license: structuredClone(sourceAsset.license),
   };
@@ -169,14 +179,22 @@ export function buildExtractedAudioMedia(input: {
     name: "Áudio original",
     projectStart: asProjectTime(Number(sourceClip.projectStart)),
     projectEnd: asProjectTime(Number(sourceClip.projectEnd)),
-    sourceIn: sourceClip.sourceIn,
-    sourceOut: sourceClip.sourceOut,
+    // The WAV contains only the selected source interval, so its own clock
+    // starts at zero even when the video was trimmed from the middle.
+    sourceIn: 0,
+    sourceOut: result.duration,
     playbackRate: sourceClip.playbackRate,
     enabled: true,
     effects: [],
     animations: [],
     audio: { gain: 1, muted: false, fadeIn: 0, fadeOut: 0, loop: false, stemRole: "original", envelope: [] },
-    metadata: { derivedFromClipId: sourceClip.id, extractionRevision: revision },
+    metadata: {
+      derivedFromClipId: sourceClip.id,
+      extractionRevision: revision,
+      rebasedSource: true,
+      sourceRangeIn: sourceClip.sourceIn,
+      sourceRangeOut: sourceClip.sourceOut,
+    },
   };
   return {
     asset,
@@ -199,7 +217,7 @@ export function buildSeparatedAudioMedia(input: {
 }): { dialogueAsset: MediaAsset; musicAsset: MediaAsset; dialogueClip: Clip; musicClip: Clip } {
   const { sourceAsset, sourceClip, group } = input;
   if (sourceAsset.kind !== "video" || sourceClip.kind !== "video" || sourceClip.assetId !== sourceAsset.id) throw new Error("Selecione um clipe de vídeo válido.");
-  if (group.sourceAssetId !== sourceAsset.id || group.sourceVideoClipId !== sourceClip.id) throw new Error("O grupo de áudio não pertence ao vídeo selecionado.");
+  if (group.sourceAssetId !== sourceAsset.id || !groupOwnsVideoClip(group, sourceClip, sourceAsset.id)) throw new Error("O grupo de áudio não pertence ao vídeo selecionado.");
   if (!Number.isFinite(input.duration) || input.duration <= 0) throw new Error("As trilhas separadas têm duração inválida.");
   const revision = Math.max(1, Math.floor(input.revision));
   const createAsset = (role: "voice" | "music", data: typeof input.dialogue) => {
@@ -236,8 +254,10 @@ export function buildSeparatedAudioMedia(input: {
     name: role === "voice" ? "Diálogo" : "Música e ambiente",
     projectStart: asProjectTime(Number(sourceClip.projectStart)),
     projectEnd: asProjectTime(Number(sourceClip.projectEnd)),
-    sourceIn: sourceClip.sourceIn,
-    sourceOut: sourceClip.sourceOut,
+    // Worker stems are returned for the cropped upload and therefore also
+    // start at zero. Keeping the video's old source offset here skips audio.
+    sourceIn: 0,
+    sourceOut: input.duration,
     playbackRate: sourceClip.playbackRate,
     enabled: true,
     effects: [],
@@ -251,7 +271,13 @@ export function buildSeparatedAudioMedia(input: {
       stemRole: role,
       envelope: [],
     },
-    metadata: { derivedFromClipId: sourceClip.id, separationRevision: revision },
+    metadata: {
+      derivedFromClipId: sourceClip.id,
+      separationRevision: revision,
+      rebasedSource: true,
+      sourceRangeIn: sourceClip.sourceIn,
+      sourceRangeOut: sourceClip.sourceOut,
+    },
   });
   return {
     dialogueAsset,

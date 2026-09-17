@@ -37,7 +37,14 @@ export interface MediaAsset {
   height?: number;
   hash?: string;
   audioAnalysis?: { cacheKey: string; status: "pending" | "ready" | "error"; sampleRate?: number; channels?: number; durationMs?: number; peaks?: number[]; error?: string };
-  sourceAudio?: { sourceAssetId: string; streamIndex: number; extractedAt?: string };
+  sourceAudio?: {
+    sourceAssetId: string;
+    streamIndex: number;
+    extractedAt?: string;
+    /** Source interval copied into this rebased audio asset. */
+    sourceIn?: number;
+    sourceOut?: number;
+  };
   stem?: {
     role: "voice" | "music";
     sourceAssetId: string;

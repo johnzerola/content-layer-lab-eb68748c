@@ -93,10 +93,20 @@ describe("Editor V2 audio separation jobs", () => {
   it("persists terminal metadata separately from the project", () => {
     const storage = memoryStorage();
     const repository = new AudioSeparationJobRepository(storage);
-    repository.save(createJob());
+    expect(repository.save(createJob())).toBe(true);
     expect(repository.get("project-1", "job-1")?.status).toBe("pending_upload");
     expect(repository.list("project-1")).toHaveLength(1);
     repository.remove("project-1", "job-1");
     expect(repository.get("project-1", "job-1")).toBeNull();
+  });
+
+  it("keeps processing possible when browser storage is full", () => {
+    const storage = {
+      ...memoryStorage(),
+      setItem: () => { throw new DOMException("Espaço insuficiente", "QuotaExceededError"); },
+    };
+    const repository = new AudioSeparationJobRepository(storage);
+
+    expect(repository.save(createJob())).toBe(false);
   });
 });

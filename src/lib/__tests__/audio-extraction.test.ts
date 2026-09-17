@@ -1,12 +1,38 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   AUDIO_SEPARATION_SAMPLE_RATE,
+  extractAudioFromMediaFile,
   prepareAudioForSeparation,
 } from "@/lib/editor-v2/audio-extraction";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("audio prepared for separation", () => {
+  it("encodes only the selected source interval", async () => {
+    const samples = new Float32Array(16).map((_, index) => index / 16);
+    vi.stubGlobal("window", {
+      AudioContext: class {
+        decodeAudioData = vi.fn().mockResolvedValue({
+          duration: 4,
+          length: 16,
+          sampleRate: 4,
+          numberOfChannels: 1,
+          getChannelData: () => samples,
+        });
+        close = vi.fn();
+      },
+    });
+
+    const result = await extractAudioFromMediaFile(
+      new File(["source"], "source.wav", { type: "audio/wav" }),
+      { sourceIn: 1, sourceOut: 3 },
+    );
+    const header = new DataView(await result.wav.arrayBuffer());
+
+    expect(result.duration).toBe(2);
+    expect(header.getUint32(40, true)).toBe(8 * 2);
+  });
+
   it("preserves the native 48 kHz rate requested by Bandit", async () => {
     const close = vi.fn();
     vi.stubGlobal("window", {

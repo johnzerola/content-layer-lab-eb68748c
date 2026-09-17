@@ -141,8 +141,18 @@ export function parseAudioSeparationJob(serialized: string): AudioSeparationJobR
 export class AudioSeparationJobRepository {
   constructor(private readonly storage: Pick<Storage, "getItem" | "setItem" | "removeItem" | "key" | "length">) {}
 
-  save(record: AudioSeparationJobRecord): void {
-    this.storage.setItem(`${STORAGE_PREFIX}${record.projectId}.${record.id}`, serializeAudioSeparationJob(record));
+  /**
+   * Job history is a convenience cache. A full or unavailable browser store
+   * must never prevent the audio upload from reaching the worker.
+   */
+  save(record: AudioSeparationJobRecord): boolean {
+    const serialized = serializeAudioSeparationJob(record);
+    try {
+      this.storage.setItem(`${STORAGE_PREFIX}${record.projectId}.${record.id}`, serialized);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   get(projectId: string, jobId: string): AudioSeparationJobRecord | null {

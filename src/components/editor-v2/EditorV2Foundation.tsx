@@ -106,6 +106,34 @@ function audioFileExtension(type: string) {
   return "wav";
 }
 
+function sourceVideoClipForAudioSelection(
+  project: EditorProjectV2,
+  selected: Clip | null | undefined,
+  group: EditorProjectV2["audioGroups"][number],
+) {
+  const isGroupVideo = (clip: Clip | null | undefined) => Boolean(
+    clip
+    && clip.kind === "video"
+    && clip.assetId === group.sourceAssetId
+    && (clip.id === group.sourceVideoClipId || clip.audioGroupId === group.id),
+  );
+  if (isGroupVideo(selected)) return selected;
+
+  const derivedFromClipId = selected?.metadata?.["derivedFromClipId"];
+  if (typeof derivedFromClipId === "string") {
+    const derived = findClip(project, derivedFromClipId);
+    if (isGroupVideo(derived)) return derived;
+  }
+
+  const anchor = group.sourceVideoClipId ? findClip(project, group.sourceVideoClipId) : undefined;
+  return isGroupVideo(anchor) ? anchor : undefined;
+}
+
+function assetMatchesSourceRange(asset: MediaAsset | undefined, clip: Clip) {
+  return Number(asset?.sourceAudio?.sourceIn) === Number(clip.sourceIn)
+    && Number(asset?.sourceAudio?.sourceOut) === Number(clip.sourceOut);
+}
+
 export function EditorV2Foundation() {
   const registry = useMemo(() => new LibraryRegistry(BUILT_IN_LIBRARY_ITEMS), []);
   const busRef = useRef(new EditorCommandBus(createEditorProjectV2({ name: "Projeto sem título", duration: 15 })));
@@ -659,7 +687,7 @@ export function EditorV2Foundation() {
     const state = busRef.current.getState();
     const selected = findClip(state, state.selection.primaryId);
     const group = selected ? state.audioGroups.find((item) => item.id === selected.audioGroupId || item.sourceVideoClipId === selected.id || item.extractedClipId === selected.id || item.dialogueClipId === selected.id || item.musicClipId === selected.id) : undefined;
-    const videoClip = group?.sourceVideoClipId ? findClip(state, group.sourceVideoClipId) : undefined;
+    const videoClip = group ? sourceVideoClipForAudioSelection(state, selected, group) : undefined;
     const sourceAsset = videoClip?.assetId ? state.assets.find((asset) => asset.id === videoClip.assetId) : undefined;
     const sourceFile = sourceAsset ? sourceFilesRef.current.get(sourceAsset.id) : undefined;
     if (!group || !videoClip || !sourceAsset || !sourceFile) { setMessage("O arquivo original deste vídeo não está disponível nesta sessão."); return; }
@@ -671,6 +699,8 @@ export function EditorV2Foundation() {
     try {
       const result = await extractAudioFromMediaFile(sourceFile, {
         signal: controller.signal,
+        sourceIn: videoClip.sourceIn,
+        sourceOut: videoClip.sourceOut,
         onStage: (stage) => setMessage(stage === "reading" ? "Lendo o arquivo…" : stage === "decoding" ? "Decodificando o áudio…" : "Criando áudio editável…"),
       });
       const prepared = buildExtractedAudioMedia({ sourceAsset, sourceClip: videoClip, group, result, revision: state.revisions.document + 1 });
@@ -713,7 +743,7 @@ export function EditorV2Foundation() {
     const initial = busRef.current.getState();
     const selected = findClip(initial, initial.selection.primaryId);
     const initialGroup = selected ? initial.audioGroups.find((item) => item.id === selected.audioGroupId || item.sourceVideoClipId === selected.id || item.extractedClipId === selected.id || item.dialogueClipId === selected.id || item.musicClipId === selected.id) : undefined;
-    const videoClip = initialGroup?.sourceVideoClipId ? findClip(initial, initialGroup.sourceVideoClipId) : undefined;
+    const videoClip = initialGroup ? sourceVideoClipForAudioSelection(initial, selected, initialGroup) : undefined;
     const sourceAsset = videoClip?.assetId ? initial.assets.find((asset) => asset.id === videoClip.assetId) : undefined;
     if (!initialGroup || !videoClip || !sourceAsset) { setMessage("Selecione um vídeo ou uma de suas trilhas de áudio."); return; }
 
@@ -740,7 +770,10 @@ export function EditorV2Foundation() {
       await updateAudioSeparationJob({ data: { id: jobRecord.id, status } }).catch(() => undefined);
     };
     try {
-      let sourceWav = initialGroup.originalAudioAssetId ? sourceFilesRef.current.get(initialGroup.originalAudioAssetId) : undefined;
+      const cachedSourceAsset = initial.assets.find((asset) => asset.id === initialGroup.originalAudioAssetId);
+      let sourceWav = initialGroup.originalAudioAssetId && assetMatchesSourceRange(cachedSourceAsset, videoClip)
+        ? sourceFilesRef.current.get(initialGroup.originalAudioAssetId)
+        : undefined;
       if (!sourceWav) {
         const sourceFile = sourceFilesRef.current.get(sourceAsset.id);
         if (!sourceFile) throw new Error("O arquivo original precisa ser religado antes de separar o áudio.");
@@ -773,6 +806,7 @@ export function EditorV2Foundation() {
       controller.signal.throwIfAborted();
       const separationSourceRevision = workingGroup.sourceRevision;
       const separationSourceFingerprint = sourceAsset.hash ?? `asset:${sourceAsset.id}`;
+      const separationClipFingerprint = `${videoClip.id}:${videoClip.sourceIn}:${videoClip.sourceOut}:${videoClip.playbackRate}`;
       const clipDuration = videoClip.sourceOut - videoClip.sourceIn;
       const sourceDuration = Number.isFinite(clipDuration) && clipDuration > 0 ? clipDuration : sourceAsset.duration;
       if (!Number.isFinite(sourceDuration) || sourceDuration! <= 0) throw new Error("Não foi possível congelar a duração do áudio fonte.");
@@ -816,12 +850,15 @@ export function EditorV2Foundation() {
       const state = busRef.current.getState();
       const currentGroup = state.audioGroups.find((item) => item.id === workingGroup.id);
       const currentSourceAsset = state.assets.find((asset) => asset.id === sourceAsset.id);
+      const currentVideoClip = findClip(state, videoClip.id);
       const currentSourceFingerprint = currentSourceAsset?.hash ?? (currentSourceAsset ? `asset:${currentSourceAsset.id}` : undefined);
       if (
         !currentGroup
+        || !currentVideoClip
         || currentGroup.sourceAssetId !== sourceAsset.id
         || currentGroup.sourceRevision !== separationSourceRevision
         || currentSourceFingerprint !== separationSourceFingerprint
+        || `${currentVideoClip.id}:${currentVideoClip.sourceIn}:${currentVideoClip.sourceOut}:${currentVideoClip.playbackRate}` !== separationClipFingerprint
       ) throw new Error("A fonte mudou enquanto o áudio era processado. O resultado não foi aplicado.");
       const revision = Math.max(1, currentGroup.sourceRevision + 1);
       const dialogueId = `${sourceAsset.id}-stem-voice-r${revision}`;
@@ -842,12 +879,15 @@ export function EditorV2Foundation() {
       const applicationState = busRef.current.getState();
       const applicationGroup = applicationState.audioGroups.find((item) => item.id === workingGroup.id);
       const applicationSource = applicationState.assets.find((asset) => asset.id === sourceAsset.id);
+      const applicationVideoClip = findClip(applicationState, videoClip.id);
       const applicationFingerprint = applicationSource?.hash ?? (applicationSource ? `asset:${applicationSource.id}` : undefined);
       if (
         !applicationGroup
+        || !applicationVideoClip
         || applicationGroup.sourceRevision !== separationSourceRevision
         || applicationGroup.sourceAssetId !== sourceAsset.id
         || applicationFingerprint !== separationSourceFingerprint
+        || `${applicationVideoClip.id}:${applicationVideoClip.sourceIn}:${applicationVideoClip.sourceOut}:${applicationVideoClip.playbackRate}` !== separationClipFingerprint
       ) throw new Error("A fonte mudou antes da aplicação. As novas trilhas foram preservadas, mas não substituíram o projeto.");
       const dialogueStoragePath = dialoguePersisted ? editorMediaStoragePath(applicationState.id, dialogueId) : `local-session://${dialogueId}`;
       const musicStoragePath = musicPersisted ? editorMediaStoragePath(applicationState.id, musicId) : `local-session://${musicId}`;
@@ -862,7 +902,7 @@ export function EditorV2Foundation() {
         await updateAudioSeparationJob({ data: durableOutputs
           ? { id: jobRecord.id, status: "completed", outputs: durableOutputs }
           : { id: jobRecord.id, status: "failed", error: { code: "cloud_stem_persistence_failed", retryable: true } }
-        });
+        }).catch(() => undefined);
       }
       const built = buildSeparatedAudioMedia({
         sourceAsset,

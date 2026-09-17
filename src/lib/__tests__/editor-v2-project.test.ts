@@ -567,9 +567,9 @@ describe("áudio e performance da Fase 5", () => {
     const sourceClip: Clip = { ...clip(), id: "video", assetId: source.id, projectStart: asProjectTime(30), projectEnd: asProjectTime(36), sourceIn: 10, sourceOut: 22, playbackRate: 2 };
     const group: AudioSourceGroup = { id: "group", sourceAssetId: source.id, sourceStreamIndex: 0, sourceVideoClipId: sourceClip.id, activeRepresentation: "embedded", linkedEditing: true, sourceRevision: 1 };
     const analysis = { cacheKey: "wave", peaks: [.1, .5], rms: .2, peak: .5, sampleRate: 44100, channels: 2, duration: 22, durationMs: 5 };
-    const built = buildSeparatedAudioMedia({ sourceAsset: source, sourceClip, group, duration: 22, revision: 2, dialogue: { storagePath: "dialogue.wav", hash: "voice-hash", analysis }, music: { storagePath: "music.wav", hash: "music-hash", analysis }, jobId: "job-2", engine: "demucs", model: "htdemucs" });
-    expect(built.dialogueClip).toMatchObject({ trackId: "track-voice", projectStart: 30, projectEnd: 36, sourceIn: 10, sourceOut: 22, playbackRate: 2, audio: { stemRole: "voice" } });
-    expect(built.musicClip).toMatchObject({ trackId: "track-music", projectStart: 30, projectEnd: 36, sourceIn: 10, sourceOut: 22, playbackRate: 2, audio: { stemRole: "music" } });
+    const built = buildSeparatedAudioMedia({ sourceAsset: source, sourceClip, group, duration: 12, revision: 2, dialogue: { storagePath: "dialogue.wav", hash: "voice-hash", analysis }, music: { storagePath: "music.wav", hash: "music-hash", analysis }, jobId: "job-2", engine: "demucs", model: "htdemucs" });
+    expect(built.dialogueClip).toMatchObject({ trackId: "track-voice", projectStart: 30, projectEnd: 36, sourceIn: 0, sourceOut: 12, playbackRate: 2, audio: { stemRole: "voice" }, metadata: { sourceRangeIn: 10, sourceRangeOut: 22, rebasedSource: true } });
+    expect(built.musicClip).toMatchObject({ trackId: "track-music", projectStart: 30, projectEnd: 36, sourceIn: 0, sourceOut: 12, playbackRate: 2, audio: { stemRole: "music" }, metadata: { sourceRangeIn: 10, sourceRangeOut: 22, rebasedSource: true } });
     expect(built.musicAsset).toMatchObject({ kind: "audio", name: "conversa.mp4 · Música e ambiente", hash: "music-hash", stem: { sourceAssetId: source.id, revision: 2, role: "music", jobId: "job-2", engine: "demucs", model: "htdemucs" } });
     expect(project.audioGroups).toHaveLength(0);
   });
@@ -635,11 +635,11 @@ describe("áudio e performance da Fase 5", () => {
   it("constrói áudio extraído preservando recorte, velocidade, sample rate e vínculo", () => {
     const license: MediaAsset["license"] = { provider: "teste", sourceUrl: "fixture", licenseType: "fixture", licenseUrl: "fixture", author: "teste", attributionRequired: false, commercialUseAllowed: true, redistributionAllowed: false };
     const sourceAsset: MediaAsset = { id: "extract-source", kind: "video", name: "fonte.mp4", mimeType: "video/mp4", license };
-    const sourceClip: Clip = { ...clip(), id: "extract-video", assetId: sourceAsset.id, projectStart: asProjectTime(30), projectEnd: asProjectTime(36), sourceIn: 10, sourceOut: 22, playbackRate: 2 };
-    const group: AudioSourceGroup = { id: "extract-group", sourceAssetId: sourceAsset.id, sourceStreamIndex: 0, sourceVideoClipId: sourceClip.id, activeRepresentation: "embedded", linkedEditing: true, sourceRevision: 0 };
-    const extracted = buildExtractedAudioMedia({ sourceAsset, sourceClip, group, result: { wav: new Blob(["wav"]), duration: 40, sampleRate: 48000, channels: 2, peaks: [.2], rms: .1, peak: .2 }, revision: 3 });
-    expect(extracted.asset).toMatchObject({ kind: "audio", mimeType: "audio/wav", duration: 40, sourceAudio: { sourceAssetId: sourceAsset.id, streamIndex: 0 }, audioAnalysis: { sampleRate: 48000, channels: 2 } });
-    expect(extracted.clip).toMatchObject({ trackId: "track-voice", audioGroupId: group.id, projectStart: 30, projectEnd: 36, sourceIn: 10, sourceOut: 22, playbackRate: 2, audio: { stemRole: "original" } });
+    const sourceClip: Clip = { ...clip(), id: "extract-video-split", assetId: sourceAsset.id, audioGroupId: "extract-group", projectStart: asProjectTime(30), projectEnd: asProjectTime(36), sourceIn: 10, sourceOut: 22, playbackRate: 2 };
+    const group: AudioSourceGroup = { id: "extract-group", sourceAssetId: sourceAsset.id, sourceStreamIndex: 0, sourceVideoClipId: "extract-video-anchor", activeRepresentation: "embedded", linkedEditing: true, sourceRevision: 0 };
+    const extracted = buildExtractedAudioMedia({ sourceAsset, sourceClip, group, result: { wav: new Blob(["wav"]), duration: 12, sampleRate: 48000, channels: 2, peaks: [.2], rms: .1, peak: .2 }, revision: 3 });
+    expect(extracted.asset).toMatchObject({ kind: "audio", mimeType: "audio/wav", duration: 12, sourceAudio: { sourceAssetId: sourceAsset.id, streamIndex: 0, sourceIn: 10, sourceOut: 22 }, audioAnalysis: { sampleRate: 48000, channels: 2 } });
+    expect(extracted.clip).toMatchObject({ trackId: "track-voice", audioGroupId: group.id, projectStart: 30, projectEnd: 36, sourceIn: 0, sourceOut: 12, playbackRate: 2, audio: { stemRole: "original" }, metadata: { sourceRangeIn: 10, sourceRangeOut: 22, rebasedSource: true } });
     expect(extracted.group).toMatchObject({ activeRepresentation: "extracted", sourceRevision: 3, originalAudioAssetId: extracted.asset.id, extractedClipId: extracted.clip.id });
   });
 });

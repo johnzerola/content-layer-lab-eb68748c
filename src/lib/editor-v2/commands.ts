@@ -319,7 +319,14 @@ export class RegisterExtractedAudioCommand extends SnapshotCommand {
     const previousClipId = existingGroup?.extractedClipId;
     const previousAssetId = previousClipId ? project.tracks.flatMap((item) => item.clips).find((item) => item.id === previousClipId)?.assetId : undefined;
     if (previousClipId) for (const candidate of project.tracks) candidate.clips = candidate.clips.filter((item) => item.id !== previousClipId);
-    upsertAsset(project, { ...cloneProjectValue(this.asset), sourceAudio: { sourceAssetId: this.group.sourceAssetId, streamIndex: this.group.sourceStreamIndex } });
+    upsertAsset(project, {
+      ...cloneProjectValue(this.asset),
+      sourceAudio: {
+        ...cloneProjectValue(this.asset.sourceAudio),
+        sourceAssetId: this.group.sourceAssetId,
+        streamIndex: this.group.sourceStreamIndex,
+      },
+    });
     owner.clips.push({ ...cloneProjectValue(this.clip), audioGroupId: this.group.id, audio: { ...cloneProjectValue(this.clip.audio), stemRole: "original" } });
     if (existingGroup) Object.assign(existingGroup, cloneProjectValue(this.group), { activeRepresentation: "extracted" as const });
     else project.audioGroups.push({ ...cloneProjectValue(this.group), activeRepresentation: "extracted" });
