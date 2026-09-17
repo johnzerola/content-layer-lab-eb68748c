@@ -3,20 +3,15 @@ import {
   ChevronDown,
   FlaskConical,
   Loader2,
-  Mic2,
   Play,
   RotateCcw,
   SlidersHorizontal,
   Volume2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
-import { getVoiceEngineStatus } from "@/lib/chatscene/voice.functions";
-import { VoiceReferenceControl } from "./VoiceReferenceControl";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/base";
 import {
   attachPreset,
-  attachVoiceReference,
   preselectLocalVoices,
   voiceProfileOf,
 } from "@/lib/chatscene/voice-resolution";
@@ -75,45 +70,13 @@ export function VoicePanel(props: VoicePanelProps) {
   const setProject = (next: ChatSceneProject) => patch(next);
   const latestProject = useRef(project);
   latestProject.current = project;
-  const statusFn = useServerFn(getVoiceEngineStatus);
-  const [cloneAvailable, setCloneAvailable] = useState<boolean | null>(null);
-  const [statusError, setStatusError] = useState<string | null>(null);
-  const [cloneTargetId, setCloneTargetId] = useState<string | null>(
-    project.participants[0]?.id ?? null,
-  );
   const assignedProject = useRef<string | null>(null);
-  useEffect(() => {
-    if (
-      !cloneTargetId ||
-      !project.participants.some((participant) => participant.id === cloneTargetId)
-    ) {
-      setCloneTargetId(project.participants[0]?.id ?? null);
-    }
-  }, [cloneTargetId, project.participants]);
   useEffect(() => {
     if (assignedProject.current === project.id) return;
     assignedProject.current = project.id;
     const next = preselectLocalVoices(project);
     if (next !== project) patch(next);
   }, [project, patch]);
-  useEffect(() => {
-    let active = true;
-    statusFn()
-      .then((status) => {
-        if (active) setCloneAvailable(status.clone.installed);
-      })
-      .catch(() => {
-        if (active) {
-          setCloneAvailable(false);
-          setStatusError(
-            "Não foi possível verificar o motor de clonagem. Atualize a página para tentar novamente.",
-          );
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, [statusFn]);
   const updateProfile = (id: string, changes: Partial<VoiceProfile>) => {
     const profiles = (project.voiceProfiles ?? []).map((profile) =>
       profile.id === id ? { ...profile, ...changes } : profile,
@@ -142,25 +105,6 @@ export function VoicePanel(props: VoicePanelProps) {
   const missingItems = missingSpeakingMessages(project);
   const missing = missingItems.length;
   const characters = missingItems.reduce((sum, item) => sum + item.text.length, 0);
-  const cloneTarget =
-    project.participants.find((participant) => participant.id === cloneTargetId) ??
-    project.participants[0];
-  const cloneTargetVoice = cloneTarget ? voiceProfileOf(project, cloneTarget) : null;
-  const removeCloneFromTarget = () => {
-    if (!cloneTarget) return;
-    const current = latestProject.current;
-    const referenceId = voiceProfileOf(current, cloneTarget)?.reference?.id;
-    if (!referenceId) return;
-    setProject(
-      current.participants.reduce(
-        (next, person) =>
-          voiceProfileOf(next, person)?.reference?.id === referenceId
-            ? attachPreset(next, person.id, "faber-natural")
-            : next,
-        current,
-      ),
-    );
-  };
   const simpleTransformIds = [
     "adam_natural",
     "adam_young",
@@ -225,73 +169,6 @@ export function VoicePanel(props: VoicePanelProps) {
       >
         Preencher personagens sem voz
       </Button>
-      {statusError ? (
-        <p role="alert" className="text-xs text-destructive">
-          {statusError}
-        </p>
-      ) : null}
-
-      {cloneTarget ? (
-        <section
-          className="rounded-lg border border-primary/45 bg-primary/5 p-3"
-          aria-labelledby="voice-clone-title"
-        >
-          <div className="flex items-start gap-2">
-            <span className="grid size-8 shrink-0 place-items-center rounded-md bg-primary/15 text-primary">
-              <Mic2 className="size-4" aria-hidden />
-            </span>
-            <div className="min-w-0">
-              <p id="voice-clone-title" className="text-sm font-semibold">
-                Enviar amostra e clonar voz
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Envie 3 a 30 segundos de fala limpa. A voz será clonada e usada automaticamente nos
-                textos do personagem escolhido.
-              </p>
-            </div>
-          </div>
-          <label
-            className="mt-3 block text-[10px] font-medium text-muted-foreground"
-            htmlFor="chatscene-clone-target"
-          >
-            Aplicar ao personagem
-          </label>
-          <select
-            id="chatscene-clone-target"
-            value={cloneTarget.id}
-            onChange={(event) => setCloneTargetId(event.target.value)}
-            className="mt-1 h-10 w-full rounded-md border border-border bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {project.participants.map((participant) => (
-              <option key={participant.id} value={participant.id}>
-                {participant.name}
-              </option>
-            ))}
-          </select>
-          <VoiceReferenceControl
-            participantName={cloneTarget.name}
-            reference={cloneTargetVoice?.reference}
-            available={cloneAvailable}
-            open
-            title={
-              cloneTargetVoice?.reference
-                ? "Voz clonada — pronta para gerar os textos"
-                : "Escolher áudio da voz"
-            }
-            onAttach={(reference) =>
-              setProject(attachVoiceReference(latestProject.current, cloneTarget.id, reference))
-            }
-            onRemove={removeCloneFromTarget}
-          />
-          {cloneAvailable === true ? (
-            <p className="mt-2 text-[11px] text-emerald-400">
-              Motor pronto. Depois do upload, clique em “Gerar vozes ausentes” para narrar todas as
-              mensagens sem áudio.
-            </p>
-          ) : null}
-        </section>
-      ) : null}
-
       <div className="space-y-2">
         {project.participants.map((participant) => {
           const voice = voiceProfileOf(project, participant);

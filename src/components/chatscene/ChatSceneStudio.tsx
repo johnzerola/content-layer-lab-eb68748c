@@ -12,6 +12,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   Clock,
   Mic,
+  Mic2,
   MessageSquare,
   Palette,
   Download,
@@ -29,6 +30,7 @@ import { ChatScenePreview } from "@/components/chatscene/ChatScenePreview";
 import { ChatSceneTimeline } from "@/components/chatscene/ChatSceneTimeline";
 import { CreatorLayouts } from "@/components/chatscene/CreatorLayouts";
 import { VoicePanel } from "@/components/chatscene/VoicePanel";
+import { VoiceClonePanel } from "@/components/chatscene/VoiceClonePanel";
 import { VoiceUploadPanel } from "@/components/chatscene/VoiceUploadPanel";
 import { MessagesPanel } from "@/components/chatscene/MessagesPanel";
 import { ParticipantsPanel } from "@/components/chatscene/ParticipantsPanel";
@@ -66,7 +68,11 @@ import {
   speakingMessages,
   type VoiceClip,
 } from "@/lib/chatscene/voice-cast";
-import { effectiveVoice, preselectLocalVoices, voiceProfileOf } from "@/lib/chatscene/voice-resolution";
+import {
+  effectiveVoice,
+  preselectLocalVoices,
+  voiceProfileOf,
+} from "@/lib/chatscene/voice-resolution";
 
 import { loadMusic, mixConversationAudio } from "@/lib/chatscene/audio-mix";
 import { CAMERA_MODES, DEFAULT_CAMERA } from "@/lib/chatscene/camera";
@@ -110,12 +116,21 @@ import {
 const PALETTE = ["#7c5cff", "#ff5c8a", "#22c08a", "#f2b705", "#4ec3ff", "#ff8a4c"];
 
 type StudioTab =
-  "historia" | "participantes" | "mensagens" | "tempo" | "fundo" | "vozes" | "estilo" | "exportar";
+  | "historia"
+  | "participantes"
+  | "clonar"
+  | "mensagens"
+  | "tempo"
+  | "fundo"
+  | "vozes"
+  | "estilo"
+  | "exportar";
 
 /** Abas do editor: cada assunto em uma tela, com a prévia sempre ao lado. */
 const STUDIO_TABS: { id: StudioTab; label: string; icon: typeof Palette }[] = [
   { id: "historia", label: "Criar roteiro", icon: Wand2 },
   { id: "participantes", label: "Personagens", icon: Users },
+  { id: "clonar", label: "Clonar voz", icon: Mic2 },
   { id: "mensagens", label: "Revisar falas", icon: MessageSquare },
   { id: "tempo", label: "Linha do tempo", icon: Clock },
   { id: "fundo", label: "Fundo", icon: ImageIcon },
@@ -631,48 +646,57 @@ export function ChatSceneStudio() {
   useEffect(() => () => stopPreviewRef.current?.(), []);
 
   /** Gera (ou reaproveita) a fala de todas as mensagens com voz escolhida. */
-  const handleGenerateVoices = useCallback(async () => {
-    const withVoice = speakingMessages(project).filter((m) => {
-      const participant = project.participants.find((p) => p.id === m.message.participantId);
-      return participant ? voiceProfileOf(project, participant) : null;
-    });
-    if (!withVoice.length) {
-      toast.error("Escolha uma voz para pelo menos uma pessoa da conversa.");
-      return;
-    }
-    setPlaying(false);
-    setCastFailures([]);
-    setCastState("running");
-    setCastProgress({ done: 0, total: withVoice.length });
-    try {
-      const result = await generateCast(project, voiceProvider, {
-        batch: 3,
-        onProgress: (p) => setCastProgress({ done: p.done, total: p.total }),
+  const handleGenerateVoices = useCallback(
+    async (participantId?: string) => {
+      const generationProject = participantId
+        ? {
+            ...project,
+            messages: project.messages.filter((message) => message.participantId === participantId),
+          }
+        : project;
+      const withVoice = speakingMessages(generationProject).filter((m) => {
+        const participant = project.participants.find((p) => p.id === m.message.participantId);
+        return participant ? voiceProfileOf(project, participant) : null;
       });
-      setClips((prev) => {
-        const next = new Map(prev);
-        for (const [id, clip] of result.clips) next.set(id, clip);
-        return next;
-      });
-      setProject((prev) => applyVoiceDurations(prev, result.durations));
-      if (result.failures.length) {
-        setCastFailures(result.failures);
-        toast.warning(
-          `${result.generated} falas prontas, ${result.failures.length} não saíram: ${result.failures[0]!.reason}`,
-        );
-      } else {
-        toast.success(
-          result.reused
-            ? `${result.generated} falas novas e ${result.reused} reaproveitadas.`
-            : `${result.generated} falas prontas. O ritmo já acompanha a duração real.`,
-        );
+      if (!withVoice.length) {
+        toast.error("Escolha uma voz para pelo menos uma pessoa da conversa.");
+        return;
       }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível gerar as vozes.");
-    } finally {
-      setCastState("idle");
-    }
-  }, [project, voiceProvider]);
+      setPlaying(false);
+      setCastFailures([]);
+      setCastState("running");
+      setCastProgress({ done: 0, total: withVoice.length });
+      try {
+        const result = await generateCast(generationProject, voiceProvider, {
+          batch: 3,
+          onProgress: (p) => setCastProgress({ done: p.done, total: p.total }),
+        });
+        setClips((prev) => {
+          const next = new Map(prev);
+          for (const [id, clip] of result.clips) next.set(id, clip);
+          return next;
+        });
+        setProject((prev) => applyVoiceDurations(prev, result.durations));
+        if (result.failures.length) {
+          setCastFailures(result.failures);
+          toast.warning(
+            `${result.generated} falas prontas, ${result.failures.length} não saíram: ${result.failures[0]!.reason}`,
+          );
+        } else {
+          toast.success(
+            result.reused
+              ? `${result.generated} falas novas e ${result.reused} reaproveitadas.`
+              : `${result.generated} falas prontas. O ritmo já acompanha a duração real.`,
+          );
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Não foi possível gerar as vozes.");
+      } finally {
+        setCastState("idle");
+      }
+    },
+    [project, voiceProvider],
+  );
 
   /** Áudio próprio: entra no lugar da voz gerada e manda no tempo da mensagem. */
   const handleVoiceFile = useCallback(async (messageId: string, file: File) => {
@@ -928,6 +952,15 @@ export function ChatSceneStudio() {
               onAvatar={(target, file) => void handleAvatarUpload(target, file)}
               onAdd={addParticipant}
               onRemove={removeParticipant}
+            />
+          )}
+
+          {tab === "clonar" && (
+            <VoiceClonePanel
+              project={project}
+              patch={patch}
+              castState={castState}
+              onGenerate={(participantId) => void handleGenerateVoices(participantId)}
             />
           )}
 
