@@ -31,6 +31,13 @@ describe("sfxSchedule", () => {
     expect(schedule.some((s) => s.effect === "receive")).toBe(true);
   });
 
+  it("oferece o modo esparso para não apitar em cada bolha", () => {
+    const project = { ...demo(), sound: { enabled: true, volume: 0.2, mode: "transitions" as const } };
+    const schedule = sfxSchedule(project, buildPlan(project));
+    expect(schedule.length).toBeLessThan(project.messages.length);
+    expect(schedule.every((effect) => effect.effect === "alert" || effect.effect === "send" || effect.effect === "receive")).toBe(true);
+  });
+
   it("lista três efeitos disponíveis", () => {
     expect(SOUND_EFFECTS.map((s) => s.id)).toEqual(["send", "receive", "alert"]);
   });

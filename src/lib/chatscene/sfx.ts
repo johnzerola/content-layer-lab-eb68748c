@@ -7,7 +7,7 @@
  */
 import type { ConversationPlan } from "./clock";
 import type { ChatSceneProject } from "./types";
-import { participantOf } from "./types";
+import { participantOf, threadIdOf } from "./types";
 
 export type SoundEffectId = "send" | "receive" | "alert";
 
@@ -78,14 +78,19 @@ export interface ScheduledSfx {
  */
 export function sfxSchedule(project: ChatSceneProject, plan: ConversationPlan): ScheduledSfx[] {
   if (!project.sound?.enabled) return [];
-  const auto = true;
+  const sparse = project.sound.mode === "transitions";
   const out: ScheduledSfx[] = [];
+  let previousThread = "";
   for (const message of project.messages) {
     const entry = plan.byId[message.id];
-    if (!entry) continue;
+    if (!entry || (sparse && message.initial)) continue;
+    const thread = threadIdOf(project, message);
+    const transition = previousThread !== "" && previousThread !== thread;
+    previousThread = thread;
     let effect: SoundEffectId | null = (message.soundEffect as SoundEffectId | undefined) ?? null;
-    if (!effect && auto) {
-      if (message.kind === "system") effect = "alert";
+    if (effect && !SOUND_EFFECTS.some((item) => item.id === effect)) effect = null;
+    if (!effect && (!sparse || transition || message.kind === "card" || message.kind === "system")) {
+      if (message.kind === "system" || message.kind === "card") effect = "alert";
       else effect = participantOf(project, message.participantId).isSelf ? "send" : "receive";
     }
     if (!effect) continue;

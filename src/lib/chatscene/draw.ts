@@ -211,12 +211,12 @@ export function layoutMessages(
   metricsH?: number,
 ): Layout {
   const m = metricsFor(width, metricsH ?? height, project.layout?.pagination === "pages");
-  const isGroup = (project.chatKind ?? "direct") === "group" || project.participants.length > 2;
   const items: LaidOutMessage[] = [];
   let y = 0;
   let lastAuthor = "";
 
   messages.forEach((message) => {
+    const isGroup = threadOf(project, threadIdOf(project, message)).kind === "group";
     const index = project.messages.indexOf(message);
     const author = participantOf(project, message.participantId);
     const isSelf = author.isSelf;
@@ -587,7 +587,10 @@ function drawHeader(
     (thread?.subtitle || "").trim() ||
     (thread
       ? isGroup
-        ? "conversa em grupo"
+        ? project.participants.filter((person) => project.messages.some((message) =>
+            message.participantId === person.id && threadIdOf(project, message) === thread.id &&
+            message.kind !== "card" && message.kind !== "system"))
+            .map((person) => person.name).join(", ") || "conversa em grupo"
         : "online"
       : custom?.subtitle != null
         ? custom.subtitle
@@ -606,7 +609,7 @@ function drawHeader(
   const showChrome = style === "messenger";
 
   let cursorX = Math.round(26 * m.scale);
-  if (showChrome) {
+  if (showChrome && custom?.showBackButton !== false) {
     // seta de voltar
     const arrowX = cursorX;
     ctx.strokeStyle = textColor;
@@ -1555,7 +1558,7 @@ function paintConversation(
 
   if (typing) {
     const author = participantOf(project, typing.participantId);
-    const isGroup = (project.chatKind ?? "direct") === "group" || project.participants.length > 2;
+    const isGroup = threadOf(project, threadIdOf(project, typing)).kind === "group";
     const lane = isGroup && !author.isSelf ? m.avatar + Math.round(14 * m.scale) : 0;
     const x = author.isSelf ? width - m.pad - Math.round(130 * m.scale) : m.pad + lane;
     drawTypingBubble(ctx, theme, m, x, offsetY + layout.contentH, frame);

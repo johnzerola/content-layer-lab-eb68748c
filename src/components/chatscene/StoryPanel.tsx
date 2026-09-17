@@ -25,11 +25,11 @@ export interface StoryPanelProps {
 }
 const STARTERS = [
   {
-    label: "Segredo de família",
-    tag: "DRAMA",
-    tone: "drama" as const,
+    label: "Três gerações no grupo",
+    tag: "FAMÍLIA",
+    tone: "comedia" as const,
     topic:
-      "Uma filha encontra uma chave escondida e questiona a mãe no WhatsApp. A mãe tenta mudar de assunto. A chave abre uma caixa com cartas que explicam uma antiga briga da família. Termine com uma reconciliação concreta, sem narrador.",
+      "No grupo da família, um filho descobre que a avó vendeu seu videogame. A mãe tenta entender, o menino exige de volta e a avó manda o comprovante: ela vendeu apenas a caixa vazia que ele guardava. Revele a confusão aos poucos, com reações curtas e uma consequência engraçada. Elenco de criança, adulto e avó, com vozes sintéticas distintas.",
   },
   {
     label: "Mensagem errada",
@@ -70,7 +70,7 @@ export function StoryPanel({
           </h2>
           <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-muted-foreground">
             {format === "whatsapp"
-              ? "Descreva o conflito. A IA organiza personagens, respostas e uma virada para o final."
+              ? "Comece pelo problema. A IA monta respostas rápidas, vozes por personagem e uma virada preparada pelas próprias mensagens."
               : "Cole um relato e transforme cada trecho em uma cena narrada."}
           </p>
         </div>
@@ -88,7 +88,7 @@ export function StoryPanel({
             <button
               key={item.label}
               type="button"
-              onClick={() => set({ topic: item.topic, tone: item.tone })}
+              onClick={() => set({ topic: item.topic, tone: item.tone, characters: item.tag === "FAMÍLIA" ? 3 : item.tag === "SUSPENSE" ? 2 : 3 })}
               disabled={busy}
               className="rounded-xl border border-border bg-background/40 p-3 text-left transition hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
             >
@@ -183,14 +183,14 @@ export function StoryPanel({
           <div>
             <p className="flex items-center gap-2 text-sm font-semibold">
               <MessageCircle className="size-4 text-emerald-300" />
-              Visual de conversa para Shorts
+              Preset de conversa rápida
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Balões escuros, páginas rápidas e espaço para o fundo.
+              Painel no alto, páginas automáticas e sons só nos cortes. Com voz pronta, o ritmo segue a duração real do áudio.
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={onReferenceStyle} disabled={busy}>
-            Aplicar visual
+            Aplicar visual e ritmo
           </Button>
         </div>
         <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-3">

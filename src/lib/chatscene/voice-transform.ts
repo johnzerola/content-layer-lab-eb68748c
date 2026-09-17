@@ -45,7 +45,7 @@ export interface VoiceTransformSelection {
 export interface VoiceTransformPreset {
   id: string;
   displayName: string;
-  simpleLabel: "Natural" | "Young" | "Teen / Viral" | "Child-like" | "Deep" | "Mature Character" | "Normal speed high pitch";
+  simpleLabel: "Natural" | "Young" | "Teen / Viral" | "Child-like" | "Deep" | "Mature Character" | "Normal speed high pitch" | "Fast dialogue";
   sourceCompatibility: string[];
   baseVoiceHint?: string;
   config: VoiceTransformConfig;
@@ -111,6 +111,17 @@ const config = (
 const linkedPitch = (speed: number, extra = 0) => ratioToSemitones(speed) + extra;
 
 export const VOICE_TRANSFORM_PRESETS: VoiceTransformPreset[] = [
+  {
+    id: "dialogue_fast",
+    displayName: "Conversa rápida · experimental",
+    simpleLabel: "Fast dialogue",
+    sourceCompatibility: ["synthetic-voice", "licensed-voice"],
+    config: config("TEMPO_ONLY", 1.3, 0, false, true),
+    evidenceLevel: "EXPERIMENTAL",
+    description: "Acelera a fala preservando o tom. Ponto de partida para diálogo rápido; a velocidade final depende da voz-base, não garante palavras por minuto fixas.",
+    effectivePitchSemitones: 0,
+    safeSpeedRange: [1.1, 1.5],
+  },
   {
     id: "adam_natural",
     displayName: "Adam — Natural",

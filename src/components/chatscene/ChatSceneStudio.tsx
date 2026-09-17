@@ -1883,12 +1883,26 @@ export function ChatSceneStudio() {
                     checked={project.sound?.enabled ?? false}
                     onChange={(e) =>
                       patch({
-                        sound: { enabled: e.target.checked, volume: project.sound?.volume ?? 0.5 },
+                        sound: { ...project.sound, enabled: e.target.checked, volume: project.sound?.volume ?? 0.5 },
                       })
                     }
                   />
-                  Tocar som quando a mensagem chega
+                  Ativar efeitos da conversa
                 </label>
+                {project.sound?.enabled && (
+                  <label className="mt-2 block text-xs">
+                    Quando tocar
+                    <select
+                      aria-label="Quando tocar efeitos da conversa"
+                      value={project.sound.mode ?? "messages"}
+                      onChange={(event) => patch({ sound: { ...project.sound!, mode: event.target.value as "messages" | "transitions" } })}
+                      className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <option value="transitions">Só em cortes, avisos e trocas de conversa</option>
+                      <option value="messages">Em todas as mensagens</option>
+                    </select>
+                  </label>
+                )}
                 {project.sound?.enabled ? (
                   <label className="mt-1.5 block text-[11px] text-muted-foreground">
                     Volume dos sons
@@ -1899,7 +1913,7 @@ export function ChatSceneStudio() {
                       step={0.05}
                       value={project.sound?.volume ?? 0.5}
                       onChange={(e) =>
-                        patch({ sound: { enabled: true, volume: Number(e.target.value) } })
+                        patch({ sound: { ...project.sound, enabled: true, volume: Number(e.target.value) } })
                       }
                       className="mt-1 w-full"
                       aria-label="Volume dos sons"

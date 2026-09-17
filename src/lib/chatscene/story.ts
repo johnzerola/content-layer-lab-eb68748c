@@ -8,6 +8,7 @@
 import { PERSONALITY_PRESETS, splitByPersonality, type TextingPersonality } from "./personality";
 import { profileFromPreset, type VoiceAge, type VoiceEmotion, type VoiceGender, type VoiceProfile } from "./voice";
 import { normalizeStoryScript, storyNameKey } from "./story-generation";
+import { selectionFromTransformPreset } from "./voice-transform";
 import {
   createMessage,
   createParticipant,
@@ -150,6 +151,20 @@ export function storyToProject(base: ChatSceneProject, script: StoryScript): Cha
       language: "pt",
       locale: "pt-BR",
     }), ageStyle: characterAge(character), genderStyle: characterGender(character) };
+    if (base.timing.audioDriven) {
+      // One server-side tempo stage, retaining the synthetic casting's timbre.
+      // This is an experimental delivery preset, not a clone of a reference voice.
+      const transform = selectionFromTransformPreset("dialogue_fast");
+      const pitch = profile.pitch ?? 0;
+      if (pitch) {
+        transform.config.mode = "SPEED_AND_PITCH";
+        transform.config.pitchSemitones = pitch;
+        transform.config.preservePitch = false;
+      }
+      profile.speed = 1;
+      profile.pitch = 0;
+      profile.transform = transform;
+    }
     participant.voiceProfileId = profile.id!;
     participant.voice = profile;
     participants.push(participant);
@@ -211,6 +226,14 @@ export function storyToProject(base: ChatSceneProject, script: StoryScript): Cha
   });
 
   ensureThread(undefined);
+
+  // A title is not a reliable group classifier (e.g. "Almoço de domingo").
+  // Count speakers inside each conversation, not all characters in the story.
+  for (const thread of threads) {
+    const speakers = new Set(messages.filter((message) => message.threadId === thread.id &&
+      message.kind !== "card" && message.kind !== "system").map((message) => message.participantId));
+    if (speakers.size > 2) thread.kind = "group";
+  }
 
   return {
     ...base,

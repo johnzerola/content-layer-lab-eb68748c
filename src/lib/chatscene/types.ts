@@ -101,6 +101,8 @@ export const HEADER_STYLES: { id: HeaderStyle; label: string; hint: string }[] =
 /** Cabeçalho personalizado do criador (logo, texto e estilo). */
 export interface ChatSceneHeader {
   style: HeaderStyle;
+  /** The reference-style messenger header may omit the back affordance. */
+  showBackButton?: boolean;
   title?: string | null;
   subtitle?: string | null;
   logoUrl?: string | null;
@@ -111,6 +113,7 @@ export interface ChatSceneHeader {
 
 export const DEFAULT_HEADER: ChatSceneHeader = {
   style: "messenger",
+  showBackButton: true,
   title: null,
   subtitle: null,
   logoUrl: null,
@@ -472,6 +475,10 @@ export const CREATOR_LAYOUTS: {
 ];
 
 export interface ChatSceneTiming {
+  /** Narrated Shorts: measured audio starts at bubble arrival; no estimated reading tail. */
+  audioDriven?: boolean;
+  /** Optional duration for editorial time cards; legacy documents keep 1500+ ms. */
+  cardReadMs?: number;
   /** multiplicador global de velocidade: 0.5 = metade da velocidade */
   speed: number;
   /** pausa base entre mensagens (ms) */
@@ -543,7 +550,7 @@ export interface ChatSceneProject {
   /** enquadramento da conversa dentro do vídeo */
   layout?: ChatSceneLayout;
   /** sons curtos de envio/recebimento na prévia */
-  sound?: { enabled: boolean; volume: number };
+  sound?: { enabled: boolean; volume: number; mode?: "messages" | "transitions" };
   /** marca do criador sobre a cena */
   branding?: ChatSceneBranding;
   /** cabeçalho personalizado do vídeo */

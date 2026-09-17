@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildPlan } from "../clock";
-import { conversationPagesFor, paintFrame, type Ctx2D } from "../draw";
+import { conversationPagesFor, layoutMessages, paintFrame, type Ctx2D } from "../draw";
+import { createCreatorExample } from "../creator-presets";
 import { fitNarrativeText, narrativeCardRect, narrativeMessageAt, wrapNarrativeText } from "../reddit-draw";
 import { resolveTheme } from "../theme";
 import { createChatSceneProject, createMessage, DEFAULT_LAYOUT, normalizeChatSceneProject, type ChatSceneProject } from "../types";
@@ -38,6 +39,14 @@ function projectWithMessages(count = 20, text = "Mensagem que ocupa espaço real
 const theme = resolveTheme("zap", true);
 
 describe("Canvas story formats", () => {
+  it("shows sender names only in group threads, not every thread in a multi-person cast", () => {
+    const project = createCreatorExample("whatsapp");
+    const ctx = canvasRecorder().ctx;
+    const privateMessages = project.messages.filter(m => m.threadId === project.threads![0]!.id);
+    const groupMessages = project.messages.filter(m => m.threadId === project.threads![1]!.id);
+    expect(layoutMessages(ctx, project, theme, privateMessages, 928, 1200).items.some(m => m.showName)).toBe(false);
+    expect(layoutMessages(ctx, project, theme, groupMessages, 928, 1200).items.some(m => m.showName)).toBe(true);
+  });
   it("defaults old documents to WhatsApp/scroll and persists the chosen format/pages", () => {
     const legacy = normalizeChatSceneProject({ title: "Legado" });
     expect(legacy.storyFormat).toBe("whatsapp");

@@ -2,6 +2,7 @@ import {
   createChatSceneProject,
   DEFAULT_LAYOUT,
   DEFAULT_MOTION,
+  DEFAULT_HEADER,
   type ChatSceneProject,
 } from "./types";
 import { storyToProject, type StoryScript } from "./story";
@@ -22,8 +23,8 @@ export function applyCreatorFormat(
     themeOverrides: {
       ...project.themeOverrides,
       header: "#202d34",
-      wallpaper: "#0b141a",
-      selfBubble: "#075e54",
+      wallpaper: "#090b10",
+      selfBubble: "#005c53",
       peerBubble: "#202d34",
       selfText: "#f2f7f5",
       peerText: "#f2f7f5",
@@ -33,11 +34,11 @@ export function applyCreatorFormat(
       ...DEFAULT_LAYOUT,
       ...project.layout,
       preset: "custom",
-      x: 0.065,
+      x: 0.07,
       y: 0.075,
-      width: 0.87,
-      height: 0.6,
-      radius: 0.022,
+      width: 0.86,
+      height: 0.63,
+      radius: 0.004,
       opacity: 1,
       header: true,
       autoHeight: true,
@@ -53,17 +54,25 @@ export function applyCreatorFormat(
     timing: {
       ...project.timing,
       speed: 1,
+      audioDriven: true,
+      cardReadMs: 900,
+      msPerChar: 28,
+      minReadMs: 600,
       typing: false,
       humanTyping: false,
       typingMs: 0,
       gapMs: 80,
       senderSwitchMs: 0,
-      threadSwitchMs: 240,
-      tailMs: 700,
+      threadSwitchMs: 180,
+      tailMs: 500,
     },
     motion: { ...DEFAULT_MOTION, ...project.motion, enter: "fast-pop", enterMs: 80 },
     animation: "fast-pop",
     camera: { ...project.camera, mode: "off", intensity: 0 },
+    header: { ...DEFAULT_HEADER, ...project.header, showBackButton: false },
+    sound: format === "whatsapp"
+      ? { enabled: true, volume: 0.2, mode: "transitions" }
+      : project.sound,
     render: { ...project.render, safeZones: false },
   };
 }
@@ -111,7 +120,7 @@ export function createCreatorExample(
   format: CreatorFormat,
   base = createChatSceneProject(),
 ): ChatSceneProject {
-  if (format === "whatsapp") return applyCreatorFormat(storyToProject(base, SAMPLE), format);
+  if (format === "whatsapp") return storyToProject(applyCreatorFormat(base, format), SAMPLE);
   const empty = { ...base, messages: [], participants: [], voiceProfiles: [], threads: [] };
   return applyCreatorFormat(
     appendRedditStory(empty, {

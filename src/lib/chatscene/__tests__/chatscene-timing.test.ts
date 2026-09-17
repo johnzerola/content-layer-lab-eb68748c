@@ -67,6 +67,18 @@ describe("ritmo humano", () => {
     expect(plan.entries).toHaveLength(100);
     expect(plan.totalFrames).toBeGreaterThan(plan.entries[99]!.appearFrame);
   });
+
+  it("usa a duração de áudio medida sem acrescentar uma leitura estimada", () => {
+    const base = scene(2);
+    const audio = {
+      ...base,
+      timing: { ...base.timing, audioDriven: true },
+      messages: base.messages.map((message, index) => index === 1 ? { ...message, voiceMs: 2400 } : message),
+    };
+    const timing = computeMessageTimings(audio)[1]!;
+    expect(timing.readingMs).toBe(2400);
+    expect(timing.endMs - timing.appearMs).toBe(2400 + timing.pauseAfterMs);
+  });
 });
 
 describe("animação e enquadramento", () => {

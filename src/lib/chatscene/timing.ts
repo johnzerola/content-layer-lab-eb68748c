@@ -134,7 +134,9 @@ export function readingMs(message: ChatMessage, project: ChatSceneProject): numb
   const words = message.text.trim() ? message.text.trim().split(/\s+/).length : 0;
   const base = Math.max(message.text.length * t.msPerChar, words * 220);
   // cartão de cena (“Momentos antes”): fica mais tempo na tela, é um corte
-  if (message.kind === "card") return Math.round(clamp(base * 1.15 + 700, 1500, Math.max(t.maxReadMs, 3200)));
+  if (message.kind === "card") return t.cardReadMs != null && Number.isFinite(t.cardReadMs)
+    ? Math.round(clamp(t.cardReadMs, 600, 6000))
+    : Math.round(clamp(base * 1.15 + 700, 1500, Math.max(t.maxReadMs, 3200)));
   const mediaBonus = message.kind === "text" || message.kind === "system" ? 0 : 900;
   const emphasis = message.emphasis ? 1.18 : 1;
   return Math.round(clamp((base + mediaBonus) * emphasis, t.minReadMs, t.maxReadMs));
@@ -198,7 +200,7 @@ export function computeMessageTimings(project: ChatSceneProject): MessageTiming[
     const typing = threadSwitched ? 0 : typingMsOf(message, project);
     const entrance = entranceMsOf(project);
     const reading = readingMs(message, project);
-    const voice = Math.max(0, message.voiceMs ?? 0);
+    const voice = Number.isFinite(message.voiceMs) ? Math.max(0, message.voiceMs ?? 0) : 0;
     const pauseAfter = Math.max(
       0,
       (message.pauseAfterMs ?? t.gapMs) + Math.max(0, message.voiceDirection?.pauseAfterMs ?? 0),
@@ -209,8 +211,11 @@ export function computeMessageTimings(project: ChatSceneProject): MessageTiming[
     const appearMs = initial ? 0 : typingStartMs + typing;
     const hesitation = initial ? null : typingHesitation(message, author, typing);
     // a leitura só termina depois da fala, quando houver áudio
-    const hold = initial ? 0 : Math.max(reading, voice);
-    const endMs = initial ? cursor : appearMs + entrance + hold + pauseAfter;
+    const audioDriven = t.audioDriven === true && voice > 0;
+    const hold = initial ? 0 : audioDriven ? voice : Math.max(reading, voice);
+    // Audio is scheduled at appearFrame, concurrently with entrance (not after it).
+    const contentMs = audioDriven ? Math.max(entrance, hold) : entrance + hold;
+    const endMs = initial ? cursor : appearMs + contentMs + pauseAfter;
 
     out.push({
       messageId: message.id,

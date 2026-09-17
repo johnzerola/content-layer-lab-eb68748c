@@ -112,6 +112,7 @@ describe("story generation contract", () => {
     expect(request.personagensExatos).toBe(2);
     expect(request.duracaoAlvoSegundos).toBe(45);
     expect(request.mensagensAproximadas).toBeLessThanOrEqual(STORY_LIMITS.lines);
+    expect(request.palavrasAproximadas).toBe(Math.round(45 * 4.3));
   });
 
   it("valida quantidade inteira e tema preenchido antes de chamar o provedor", () => {
