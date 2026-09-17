@@ -106,6 +106,7 @@ export function VoicePanel(props: VoicePanelProps) {
   const missing = missingItems.length;
   const characters = missingItems.reduce((sum, item) => sum + item.text.length, 0);
   const simpleTransformIds = [
+    "dialogue_fast",
     "adam_natural",
     "adam_young",
     "adam_roblox_teen",
@@ -114,6 +115,7 @@ export function VoicePanel(props: VoicePanelProps) {
     "adam_mature_character",
   ];
   const labTransformIds = [
+    "dialogue_fast",
     "adam_natural",
     "adam_young",
     "adam_roblox_teen",
