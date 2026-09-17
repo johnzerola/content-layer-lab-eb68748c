@@ -662,13 +662,20 @@ export function ChatSceneStudio() {
         toast.error("Escolha uma voz para pelo menos uma pessoa da conversa.");
         return;
       }
+      const usesClonedVoice = withVoice.some(({ message }) => {
+        const participant = project.participants.find((p) => p.id === message.participantId);
+        return participant
+          ? voiceProfileOf(project, participant)?.provider === "chatterbox"
+          : false;
+      });
       setPlaying(false);
       setCastFailures([]);
       setCastState("running");
       setCastProgress({ done: 0, total: withVoice.length });
       try {
         const result = await generateCast(generationProject, voiceProvider, {
-          batch: 3,
+          batch: usesClonedVoice ? 1 : 3,
+          maxAttempts: usesClonedVoice ? 1 : 3,
           onProgress: (p) => setCastProgress({ done: p.done, total: p.total }),
         });
         setClips((prev) => {

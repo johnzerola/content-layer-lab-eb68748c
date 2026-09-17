@@ -16,6 +16,7 @@ import {
   saveVoiceReference,
   synthesizeClonedVoice,
   verifiedCloneEngineStatus,
+  warmCloneEngine,
 } from "./voice-clone.server";
 import { effectiveTransformPitch, selectionFromTransformPreset } from "./voice-transform";
 import { z } from "zod";
@@ -41,6 +42,10 @@ export const uploadVoiceReference = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => saveVoiceReference(context.userId, data.audio));
+
+export const prepareVoiceEngine = createServerFn({ method: "POST" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .handler(async () => warmCloneEngine());
 
 export const removeVoiceReference = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])

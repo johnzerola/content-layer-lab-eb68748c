@@ -32,7 +32,12 @@ export interface VoiceProvider {
   listVoices(): Promise<{ id: string; label: string }[]>;
   getCapabilities(): VoiceProviderCapabilities;
   previewVoice(profile: VoiceProfile, text: string, signal?: AbortSignal): Promise<VoiceClip>;
-  synthesize(text: string, profile: VoiceProfile, direction?: MessageVoiceDirection, signal?: AbortSignal): Promise<VoiceClip>;
+  synthesize(
+    text: string,
+    profile: VoiceProfile,
+    direction?: MessageVoiceDirection,
+    signal?: AbortSignal,
+  ): Promise<VoiceClip>;
   estimateCost?(characters: number): number | null;
 }
 
@@ -72,8 +77,12 @@ async function persistBlob(key: string, blob: Blob): Promise<void> {
 
 function context(): AudioContext {
   const Ctor =
-    (globalThis as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext })
-      .AudioContext ??
+    (
+      globalThis as unknown as {
+        AudioContext?: typeof AudioContext;
+        webkitAudioContext?: typeof AudioContext;
+      }
+    ).AudioContext ??
     (globalThis as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!Ctor) throw new Error("Este navegador não consegue trabalhar com áudio.");
   audioCtx ??= new Ctor();
@@ -105,7 +114,9 @@ export function clearVoiceCache() {
 /** Duração real da fala já com o tom aplicado, em milissegundos. */
 export function clipDurationMs(clip: VoiceClip, profile: VoiceProfile | null | undefined): number {
   // Áudio transformado já chega renderizado; sua duração decodificada é autoritativa.
-  return Math.round((clip.durationSec / (profile?.transform ? 1 : pitchRate(profile?.pitch))) * 1000);
+  return Math.round(
+    (clip.durationSec / (profile?.transform ? 1 : pitchRate(profile?.pitch))) * 1000,
+  );
 }
 
 /**
@@ -145,7 +156,15 @@ export async function previewVoice(
 
 /** Provedor padrão: IA da Lovable, sempre passando pelo servidor. */
 export function createGatewayVoiceProvider(
-  call: (input: { text: string; voice: string; provider?: VoiceProfile["provider"]; referenceId?: string; direction?: string; speed?: number; transform?: VoiceProfile["transform"] }) => Promise<{
+  call: (input: {
+    text: string;
+    voice: string;
+    provider?: VoiceProfile["provider"];
+    referenceId?: string;
+    direction?: string;
+    speed?: number;
+    transform?: VoiceProfile["transform"];
+  }) => Promise<{
     audio: string;
     mime: string;
   }>,
@@ -156,7 +175,22 @@ export function createGatewayVoiceProvider(
       return [];
     },
     getCapabilities() {
-      return { languages: ["pt-BR"], maxCharacters: 600, controls: { speed: true, pitch: true, energy: false, expressiveness: true, roughness: false, warmth: false, brightness: false, emotion: true }, costEstimate: false, local: false };
+      return {
+        languages: ["pt-BR"],
+        maxCharacters: 600,
+        controls: {
+          speed: true,
+          pitch: true,
+          energy: false,
+          expressiveness: true,
+          roughness: false,
+          warmth: false,
+          brightness: false,
+          emotion: true,
+        },
+        costEstimate: false,
+        local: false,
+      };
     },
     previewVoice(profile, text, signal) {
       return this.synthesize(text, profile, undefined, signal);
@@ -185,7 +219,9 @@ export function createGatewayVoiceProvider(
           profile.ageStyle ?? preset.age,
           profile.genderStyle ?? preset.gender,
           {
-            ...(profile.expressiveness === undefined ? {} : { expressiveness: profile.expressiveness }),
+            ...(profile.expressiveness === undefined
+              ? {}
+              : { expressiveness: profile.expressiveness }),
             ...(profile.roughness === undefined ? {} : { roughness: profile.roughness }),
             ...(profile.warmth === undefined ? {} : { warmth: profile.warmth }),
             ...(profile.brightness === undefined ? {} : { brightness: profile.brightness }),
@@ -243,10 +279,16 @@ export function missingSpeakingMessages(project: ChatSceneProject) {
 export async function generateCast(
   project: ChatSceneProject,
   provider: VoiceProvider,
-  options: { batch?: number; onProgress?: (p: CastProgress) => void; signal?: AbortSignal } = {},
+  options: {
+    batch?: number;
+    maxAttempts?: number;
+    onProgress?: (p: CastProgress) => void;
+    signal?: AbortSignal;
+  } = {},
 ): Promise<CastResult> {
   const items = speakingMessages(project);
   const batch = Math.max(1, options.batch ?? 3);
+  const maxAttempts = Math.max(1, options.maxAttempts ?? 3);
   const result: CastResult = {
     clips: new Map(),
     durations: {},
@@ -270,12 +312,13 @@ export async function generateCast(
         try {
           let clip = hit;
           let lastError: unknown;
-          for (let attempt = 0; !clip && attempt < 3; attempt += 1) {
+          for (let attempt = 0; !clip && attempt < maxAttempts; attempt += 1) {
             try {
               clip = await provider.synthesize(text, profile, direction, options.signal);
             } catch (error) {
               lastError = error;
-              if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 350 * 2 ** attempt));
+              if (attempt + 1 < maxAttempts)
+                await new Promise((resolve) => setTimeout(resolve, 350 * 2 ** attempt));
             }
           }
           if (!clip) throw lastError ?? new Error("falhou");

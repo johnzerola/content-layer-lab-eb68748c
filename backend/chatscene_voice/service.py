@@ -135,9 +135,28 @@ def decode_reference(audio):
 def relay_health():
     try:
         with urllib.request.urlopen(f"{GPU_RELAY_URL}/health", timeout=2) as response:
-            return response.status == 200
-    except (OSError, urllib.error.URLError):
-        return False
+            if response.status != 200:
+                return None
+            return json.loads(response.read())
+    except (OSError, ValueError, TypeError, urllib.error.URLError):
+        return None
+
+
+def gpu_warm():
+    if not GPU_RELAY_TOKEN:
+        raise RuntimeError("GPU relay unavailable")
+    request = urllib.request.Request(
+        f"{GPU_RELAY_URL}/warm",
+        data=b"{}",
+        headers={
+            "Authorization": f"Bearer {GPU_RELAY_TOKEN}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=600) as response:
+        if response.status != 200:
+            raise RuntimeError("GPU relay warmup failed")
 
 
 def gpu_synthesize(text, reference):
@@ -210,11 +229,32 @@ class CpuWorkerManager:
         self.worker = None
         self.timer = None
 
+    @property
+    def loaded(self):
+        return self.worker is not None and self.worker.process.poll() is None
+
+    def _cancel_idle_locked(self):
+        if self.timer:
+            self.timer.cancel()
+            self.timer = None
+
+    def _schedule_idle_locked(self):
+        if self.loaded:
+            self.timer = threading.Timer(IDLE_SECONDS, self.close)
+            self.timer.daemon = True
+            self.timer.start()
+
+    def warm(self):
+        with self.lock:
+            self._cancel_idle_locked()
+            if not self.loaded:
+                self.worker = CpuWorker()
+            self._schedule_idle_locked()
+
     def synthesize(self, text, path):
         with self.lock:
-            if self.timer:
-                self.timer.cancel()
-            if self.worker is None or self.worker.process.poll() is not None:
+            self._cancel_idle_locked()
+            if not self.loaded:
                 self.worker = CpuWorker()
             try:
                 return self.worker.synthesize(text, path)
@@ -222,10 +262,7 @@ class CpuWorkerManager:
                 self.close_locked()
                 raise
             finally:
-                if self.worker is not None:
-                    self.timer = threading.Timer(IDLE_SECONDS, self.close)
-                    self.timer.daemon = True
-                    self.timer.start()
+                self._schedule_idle_locked()
 
     def close_locked(self):
         if self.timer:
@@ -242,6 +279,31 @@ class CpuWorkerManager:
 
 CPU = CpuWorkerManager()
 INFERENCE_SLOTS = threading.BoundedSemaphore(8)
+WARMING = threading.Event()
+WARMING_LOCK = threading.Lock()
+
+
+def warm_engine():
+    try:
+        try:
+            gpu_warm()
+        except Exception:
+            CPU.warm()
+    finally:
+        WARMING.clear()
+
+
+def request_warm():
+    with WARMING_LOCK:
+        if WARMING.is_set():
+            return False
+        status = relay_health()
+        if (status and status.get("modelLoaded")) or CPU.loaded:
+            return False
+        WARMING.set()
+        thread = threading.Thread(target=warm_engine, name="voice-warmup", daemon=True)
+        thread.start()
+        return True
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -275,11 +337,15 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != "/v1/voice/health" or not self.authorized():
             self.respond(404, {"detail": "not found"})
             return
+        relay = relay_health()
+        gpu_loaded = bool(relay and relay.get("modelLoaded"))
         self.respond(
             200,
             {
                 "installed": engine_installed(),
-                "device": "remote-cuda" if relay_health() else "cpu",
+                "device": "remote-cuda" if relay and not CPU.loaded else "cpu",
+                "modelLoaded": gpu_loaded or CPU.loaded,
+                "warming": WARMING.is_set(),
             },
         )
 
@@ -289,6 +355,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             body = self.body()
+            if self.path == "/v1/voice/warm":
+                self.respond(202, {"warming": request_warm() or WARMING.is_set()})
+                return
             if self.path == "/v1/voice/references":
                 user_id = str(body.get("userId", ""))
                 audio = base64.b64decode(body.get("audio", ""), validate=True)
@@ -311,6 +380,7 @@ class Handler(BaseHTTPRequestHandler):
                     encoding="utf-8",
                 )
                 os.chmod(metadata, 0o600)
+                request_warm()
                 self.respond(201, {"id": reference_id, "durationSec": duration})
                 return
             if self.path == "/v1/voice/synthesize":

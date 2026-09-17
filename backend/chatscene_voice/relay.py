@@ -71,11 +71,27 @@ class WorkerManager:
     def loaded(self):
         return self.worker is not None and self.worker.process.poll() is None
 
+    def _cancel_idle_locked(self):
+        if self.idle_timer:
+            self.idle_timer.cancel()
+            self.idle_timer = None
+
+    def _schedule_idle_locked(self):
+        if self.loaded:
+            self.idle_timer = threading.Timer(IDLE_SECONDS, self.close)
+            self.idle_timer.daemon = True
+            self.idle_timer.start()
+
+    def warm(self):
+        with self.lock:
+            self._cancel_idle_locked()
+            if not self.loaded:
+                self.worker = VoiceWorker()
+            self._schedule_idle_locked()
+
     def synthesize(self, text, reference):
         with self.lock:
-            if self.idle_timer:
-                self.idle_timer.cancel()
-                self.idle_timer = None
+            self._cancel_idle_locked()
             if not self.loaded:
                 self.worker = VoiceWorker()
             try:
@@ -84,10 +100,7 @@ class WorkerManager:
                 self._close_locked()
                 raise
             finally:
-                if self.loaded:
-                    self.idle_timer = threading.Timer(IDLE_SECONDS, self.close)
-                    self.idle_timer.daemon = True
-                    self.idle_timer.start()
+                self._schedule_idle_locked()
 
     def _close_locked(self):
         if self.idle_timer:
@@ -121,10 +134,19 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         supplied = self.headers.get("Authorization", "")
-        if self.path != "/synthesize" or not TOKEN or not hmac.compare_digest(supplied, f"Bearer {TOKEN}"):
+        if self.path not in ("/warm", "/synthesize") or not TOKEN or not hmac.compare_digest(supplied, f"Bearer {TOKEN}"):
             self.send_error(404)
             return
         try:
+            if self.path == "/warm":
+                self.server.worker_manager.warm()
+                payload = json.dumps({"ready": True, "modelLoaded": True}).encode("ascii")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+                return
             length = int(self.headers.get("Content-Length", "0"))
             if length <= 0 or length > MAX_BODY:
                 raise ValueError("body too large")

@@ -20,6 +20,7 @@ $token = (Get-Content -LiteralPath $tokenFile -Raw).Trim()
 $env:CHATSCENE_GPU_TOKEN = $token
 $env:CHATSCENE_GPU_BIND = '127.0.0.1'
 $env:CHATSCENE_GPU_PORT = '18096'
+$env:CHATSCENE_GPU_IDLE_SECONDS = '600'
 $env:CHATSCENE_VOICE_CONFIG = Join-Path $projectRoot 'backend/data/chatscene-voices/runtime.json'
 $env:CHATSCENE_VOICE_PYTHON_PATH = $python
 $relayScript = Join-Path $projectRoot 'backend/chatscene_voice/relay.py'

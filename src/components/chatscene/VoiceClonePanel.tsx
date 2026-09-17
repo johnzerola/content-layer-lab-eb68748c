@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Check, Loader2, Mic2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/base";
-import { getVoiceEngineStatus } from "@/lib/chatscene/voice.functions";
+import { getVoiceEngineStatus, prepareVoiceEngine } from "@/lib/chatscene/voice.functions";
 import { VoiceReferenceControl } from "./VoiceReferenceControl";
 import {
   attachPreset,
@@ -24,10 +24,12 @@ export function VoiceClonePanel({
   castState: string;
 }) {
   const statusFn = useServerFn(getVoiceEngineStatus);
+  const prepareFn = useServerFn(prepareVoiceEngine);
   const latestProject = useRef(project);
   latestProject.current = project;
   const [targetId, setTargetId] = useState<string | null>(project.participants[0]?.id ?? null);
   const [available, setAvailable] = useState<boolean | null>(null);
+  const [modelReady, setModelReady] = useState<boolean | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -39,7 +41,10 @@ export function VoiceClonePanel({
     let active = true;
     statusFn()
       .then((status) => {
-        if (active) setAvailable(status.clone.installed);
+        if (active) {
+          setAvailable(status.clone.installed);
+          setModelReady(status.clone.modelLoaded);
+        }
       })
       .catch(() => {
         if (active) {
@@ -55,6 +60,47 @@ export function VoiceClonePanel({
   const target =
     project.participants.find((participant) => participant.id === targetId) ??
     project.participants[0];
+  const voice = target ? voiceProfileOf(project, target) : undefined;
+  const reference = voice?.reference;
+  const referenceId = reference?.id;
+
+  useEffect(() => {
+    if (!referenceId || available !== true) {
+      if (!referenceId) setModelReady(null);
+      return;
+    }
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      try {
+        const status = await statusFn();
+        if (!active) return;
+        setAvailable(status.clone.installed);
+        setModelReady(status.clone.modelLoaded);
+        if (!status.clone.modelLoaded) timer = setTimeout(poll, 3_000);
+      } catch {
+        if (active) {
+          setStatusError(
+            "A preparação do clonador perdeu a conexão. Recarregue e tente novamente.",
+          );
+        }
+      }
+    };
+    setModelReady(false);
+    setStatusError(null);
+    prepareFn()
+      .then(poll)
+      .catch(() => {
+        if (active) {
+          setStatusError("Não foi possível preparar o modelo de voz na RTX 2060.");
+        }
+      });
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [available, prepareFn, referenceId, statusFn]);
+
   if (!target) {
     return (
       <div className="rounded-lg border border-border bg-background/30 p-4">
@@ -66,8 +112,6 @@ export function VoiceClonePanel({
     );
   }
 
-  const voice = voiceProfileOf(project, target);
-  const reference = voice?.reference;
   const missingCount = missingSpeakingMessages(project).filter(
     (item) => item.message.participantId === target.id,
   ).length;
@@ -158,10 +202,17 @@ export function VoiceClonePanel({
             Verificando disponibilidade do clonador…
           </p>
         ) : null}
-        {available === true ? (
+        {available === true && reference && modelReady === false ? (
+          <p role="status" className="mt-2 flex items-center gap-2 text-xs text-amber-300">
+            <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
+            Preparando o modelo na RTX 2060. No primeiro uso isso pode levar alguns minutos.
+          </p>
+        ) : null}
+        {available === true && (!reference || modelReady === true) ? (
           <p className="mt-2 flex items-center gap-2 text-xs text-emerald-400">
-            <Check className="size-3.5" aria-hidden /> Clonador disponível. Use somente voz própria
-            ou autorizada.
+            <Check className="size-3.5" aria-hidden />
+            {reference ? "Modelo pronto para gerar as falas." : "Clonador disponível."} Use somente
+            voz própria ou autorizada.
           </p>
         ) : null}
         {statusError ? (
@@ -190,15 +241,19 @@ export function VoiceClonePanel({
         <Button
           type="button"
           className="mt-3 min-h-11 w-full"
-          disabled={!reference || castState === "running" || missingCount === 0}
+          disabled={
+            !reference || modelReady !== true || castState === "running" || missingCount === 0
+          }
           onClick={() => onGenerate(target.id)}
         >
           <Sparkles className="mr-2 size-4" aria-hidden />
-          {castState === "running"
-            ? "Gerando falas…"
-            : missingCount
-              ? `Gerar ${missingCount} fala${missingCount === 1 ? "" : "s"} com esta voz`
-              : "Todas as falas já têm áudio"}
+          {reference && modelReady === false
+            ? "Preparando modelo…"
+            : castState === "running"
+              ? "Gerando falas…"
+              : missingCount
+                ? `Gerar ${missingCount} fala${missingCount === 1 ? "" : "s"} com esta voz`
+                : "Todas as falas já têm áudio"}
         </Button>
       </section>
     </div>

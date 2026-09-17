@@ -110,16 +110,43 @@ export function cloneEngineStatus() {
   return {
     installed: remote || localCloneEngineInstalled(c),
     device: remote ? "remote-cuda" : (c?.device ?? "auto"),
+    modelLoaded: workerReady,
+    warming: ready !== null && !workerReady,
   };
 }
 
 export async function verifiedCloneEngineStatus() {
   if (!remoteVoiceServiceConfig()) return cloneEngineStatus();
   try {
-    return await remoteVoiceRequest<{ installed: boolean; device: string }>("/health", {}, 5_000);
+    return await remoteVoiceRequest<{
+      installed: boolean;
+      device: string;
+      modelLoaded: boolean;
+      warming: boolean;
+    }>("/health", {}, 5_000);
   } catch {
-    return { installed: false, device: "remote-unavailable" };
+    return {
+      installed: false,
+      device: "remote-unavailable",
+      modelLoaded: false,
+      warming: false,
+    };
   }
+}
+
+export async function warmCloneEngine() {
+  if (remoteVoiceServiceConfig()) {
+    return await remoteVoiceRequest<{ warming: boolean }>(
+      "/warm",
+      { method: "POST", body: "{}" },
+      10_000,
+    );
+  }
+  if (!cloneEngineStatus().installed) throw new Error("O motor de clonagem não está instalado.");
+  void startWorker().catch((error) => {
+    console.error("[ChatScene voice] falha ao preparar o modelo local", error);
+  });
+  return { warming: true };
 }
 function referenceDirectory(userId: string) {
   const config = voiceRuntimeConfig();
@@ -255,6 +282,7 @@ export async function deleteVoiceReference(userId: string, id: string) {
 
 let worker: ChildProcessWithoutNullStreams | null = null;
 let ready: Promise<void> | null = null;
+let workerReady = false;
 let idleTimer: ReturnType<typeof setTimeout> | undefined;
 let queued = 0;
 let queue: Promise<unknown> = Promise.resolve();
@@ -266,6 +294,7 @@ function stopWorker() {
   worker?.kill();
   worker = null;
   ready = null;
+  workerReady = false;
 }
 export function shutdownVoiceWorker() {
   if (queued !== 0) throw new Error("Ainda existem falas na fila.");
@@ -313,6 +342,7 @@ async function startWorker() {
         pending.clear();
         worker = null;
         ready = null;
+        workerReady = false;
       }
     };
     child.on("error", fail);
@@ -323,6 +353,7 @@ async function startWorker() {
         const message = JSON.parse(line);
         if (message.ready) {
           clearTimeout(timer);
+          workerReady = true;
           accept();
           return;
         }
@@ -332,6 +363,7 @@ async function startWorker() {
           if (worker === child) {
             worker = null;
             ready = null;
+            workerReady = false;
           }
           child.kill();
           return;

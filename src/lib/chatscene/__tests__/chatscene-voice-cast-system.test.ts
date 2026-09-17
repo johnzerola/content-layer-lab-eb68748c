@@ -5,11 +5,23 @@ import { attachPreset, effectiveVoice } from "../voice-resolution";
 import { DEFAULT_VOICE, voiceKey } from "../voice";
 import { applyVoiceDurations, createGatewayVoiceProvider, generateCast } from "../voice-cast";
 import { deserializeChatSceneProject, serializeChatSceneProject } from "../serialize";
-import { createChatSceneProject, createMessage, createParticipant, normalizeChatSceneProject } from "../types";
+import {
+  createChatSceneProject,
+  createMessage,
+  createParticipant,
+  normalizeChatSceneProject,
+} from "../types";
 
 const projectWithCast = () => {
   const person = createParticipant({ id: "pedro", name: "Pedro" });
-  return attachPreset(createChatSceneProject({ participants: [person], messages: [createMessage(person.id, { id: "m1", text: "Oi" })] }), person.id, "teen-boy-casual");
+  return attachPreset(
+    createChatSceneProject({
+      participants: [person],
+      messages: [createMessage(person.id, { id: "m1", text: "Oi" })],
+    }),
+    person.id,
+    "teen-boy-casual",
+  );
 };
 
 describe("Voice Cast System", () => {
@@ -31,16 +43,23 @@ describe("Voice Cast System", () => {
     });
     const updated = attachPreset(project, pedro.id, "acting-adult-sad");
     expect(updated.participants[0]?.voiceProfileId).toBe("voice_pedro");
-    expect(updated.voiceProfiles?.find((profile) => profile.id === "voice_pedro")?.presetId).toBe("acting-adult-sad");
+    expect(updated.voiceProfiles?.find((profile) => profile.id === "voice_pedro")?.presetId).toBe(
+      "acting-adult-sad",
+    );
     expect(updated.messages.find((message) => message.id === "p1")?.voiceMs).toBeNull();
     expect(updated.messages.find((message) => message.id === "a1")?.voiceMs).toBe(800);
     const reopened = deserializeChatSceneProject(serializeChatSceneProject(updated));
-    expect(reopened.voiceProfiles?.find((profile) => profile.id === "voice_pedro")?.presetId).toBe("acting-adult-sad");
+    expect(reopened.voiceProfiles?.find((profile) => profile.id === "voice_pedro")?.presetId).toBe(
+      "acting-adult-sad",
+    );
   });
 
   it("mantém identidade e aplica emoção por mensagem", () => {
     const project = projectWithCast();
-    const message = { ...project.messages[0]!, voiceDirection: { emotion: "annoyed" as const, speedMultiplier: 1.1 } };
+    const message = {
+      ...project.messages[0]!,
+      voiceDirection: { emotion: "annoyed" as const, speedMultiplier: 1.1 },
+    };
     const result = effectiveVoice({ ...project, messages: [message] }, message);
     expect(result?.profile.presetId).toBe("teen-boy-casual");
     expect(result?.direction.emotion).toBe("annoyed");
@@ -50,12 +69,17 @@ describe("Voice Cast System", () => {
     const project = projectWithCast();
     const profile = effectiveVoice(project, project.messages[0]!)!.profile;
     expect(voiceKey("Oi", profile)).toBe(voiceKey("Oi", profile));
-    expect(voiceKey("Oi", profile, { emotion: "happy" })).not.toBe(voiceKey("Oi", profile, { emotion: "sad" }));
+    expect(voiceKey("Oi", profile, { emotion: "happy" })).not.toBe(
+      voiceKey("Oi", profile, { emotion: "sad" }),
+    );
   });
 
   it("migra a voz embutida de projetos antigos", () => {
     const old = createChatSceneProject();
-    old.participants[0] = { ...old.participants[0]!, voice: { presetId: "mother-warm", style: "calma", speed: 1, gain: 1 } };
+    old.participants[0] = {
+      ...old.participants[0]!,
+      voice: { presetId: "mother-warm", style: "calma", speed: 1, gain: 1 },
+    };
     const legacy = { ...old } as Partial<typeof old> & { voiceProfiles?: typeof old.voiceProfiles };
     delete legacy.voiceProfiles;
     const reopened = normalizeChatSceneProject(legacy);
@@ -65,7 +89,10 @@ describe("Voice Cast System", () => {
 
   it("recalcula pausas do override no relógio", () => {
     const project = projectWithCast();
-    project.messages[0] = { ...project.messages[0]!, voiceDirection: { pauseBeforeMs: 300, pauseAfterMs: 500 } };
+    project.messages[0] = {
+      ...project.messages[0]!,
+      voiceDirection: { pauseBeforeMs: 300, pauseAfterMs: 500 },
+    };
     const timing = computeMessageTimings(project)[0]!;
     expect(timing.leadInMs).toBe(300);
     expect(timing.pauseAfterMs).toBe(project.timing.gapMs + 500);
@@ -77,7 +104,9 @@ describe("Voice Cast System", () => {
       sentVoice = input.voice;
       throw new Error("parar antes da decodificação");
     });
-    await expect(provider.synthesize("Olá", { ...DEFAULT_VOICE, providerVoiceId: "ash" })).rejects.toThrow();
+    await expect(
+      provider.synthesize("Olá", { ...DEFAULT_VOICE, providerVoiceId: "ash" }),
+    ).rejects.toThrow();
     expect(sentVoice).toBe("ash");
   });
 
@@ -87,8 +116,25 @@ describe("Voice Cast System", () => {
     const provider = {
       id: "retry-test",
       listVoices: async () => [],
-      getCapabilities: () => ({ languages: ["pt-BR"], maxCharacters: 600, controls: { speed: true, pitch: true, energy: false, expressiveness: true, roughness: false, warmth: false, brightness: false, emotion: true }, costEstimate: false, local: false }),
-      previewVoice: async () => { throw new Error("não usado"); },
+      getCapabilities: () => ({
+        languages: ["pt-BR"],
+        maxCharacters: 600,
+        controls: {
+          speed: true,
+          pitch: true,
+          energy: false,
+          expressiveness: true,
+          roughness: false,
+          warmth: false,
+          brightness: false,
+          emotion: true,
+        },
+        costEstimate: false,
+        local: false,
+      }),
+      previewVoice: async () => {
+        throw new Error("não usado");
+      },
       synthesize: async () => {
         calls += 1;
         if (calls < 3) throw new Error("temporário");
@@ -99,17 +145,70 @@ describe("Voice Cast System", () => {
     expect(calls).toBeGreaterThanOrEqual(3);
     expect(result.failures).toHaveLength(0);
   });
+
+  it("não repete uma geração pesada quando maxAttempts é um", async () => {
+    const project = projectWithCast();
+    let calls = 0;
+    const provider = {
+      id: "single-attempt-test",
+      listVoices: async () => [],
+      getCapabilities: () => ({
+        languages: ["pt-BR"],
+        maxCharacters: 600,
+        controls: {
+          speed: true,
+          pitch: true,
+          energy: false,
+          expressiveness: true,
+          roughness: false,
+          warmth: false,
+          brightness: false,
+          emotion: true,
+        },
+        costEstimate: false,
+        local: true,
+      }),
+      previewVoice: async () => {
+        throw new Error("não usado");
+      },
+      synthesize: async () => {
+        calls += 1;
+        throw new Error("timeout");
+      },
+    };
+    const result = await generateCast(project, provider, { maxAttempts: 1 });
+    expect(calls).toBe(1);
+    expect(result.failures).toHaveLength(1);
+  });
 });
 
 describe("ScrollPlanner", () => {
   it("é determinístico e termina no offset alvo", () => {
-    const input = { frame: 40, appearFrame: 10, fps: 30, currentContentHeight: 800, previousContentHeight: 600, typingHeight: 0, viewportBottom: 1000 };
+    const input = {
+      frame: 40,
+      appearFrame: 10,
+      fps: 30,
+      currentContentHeight: 800,
+      previousContentHeight: 600,
+      typingHeight: 0,
+      viewportBottom: 1000,
+    };
     expect(planScroll(input)).toBe(200);
     expect(planScroll(input)).toBe(planScroll(input));
   });
 
   it("interpola sem salto no início da mensagem", () => {
-    expect(planScroll({ frame: 10, appearFrame: 10, fps: 30, currentContentHeight: 800, previousContentHeight: 600, typingHeight: 0, viewportBottom: 1000 })).toBe(400);
+    expect(
+      planScroll({
+        frame: 10,
+        appearFrame: 10,
+        fps: 30,
+        currentContentHeight: 800,
+        previousContentHeight: 600,
+        typingHeight: 0,
+        viewportBottom: 1000,
+      }),
+    ).toBe(400);
   });
 });
 
