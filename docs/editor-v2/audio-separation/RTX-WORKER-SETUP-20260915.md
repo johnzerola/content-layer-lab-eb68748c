@@ -7,10 +7,14 @@ O código do Editor V2 já aceita Bandit, mas a Hostear sem GPU permanece no Dem
 O peso não fica no Git. Use o checkout e o checkpoint já validados no piloto ou forneça caminhos equivalentes. No PowerShell:
 
 ```powershell
-$env:CLEANER_WORKER_SECRET = '<o mesmo segredo do worker, sem publicar>'
-$env:BANDIT_PYTHON = 'C:\caminho\para\python.exe'
-.\backend\scripts\run_bandit_gpu_worker.ps1
+& C:\Users\DINO\content-layer-lab\backend\scripts\run_bandit_gpu_worker.ps1 `
+  -StorageDirectory 'G:\dowloand\teste\bandit-gpu-storage' `
+  -PublicHostname 'seu-hostname-do-tunel'
 ```
+
+Substitua somente o hostname pelo endereço atual do túnel, sem `https://`. O iniciador lê `CLEANER_WORKER_SECRET` do `.env.local` na raiz do projeto quando a sessão não tem um segredo válido. Não copie valores de exemplo para o segredo. Ele encontra o Python GPU local já instalado; `-Python` permite indicar outro executável explicitamente. `BANDIT_PYTHON`, `BANDIT_CHECKOUT`, `BANDIT_CHECKPOINT` e `BANDIT_STORAGE` também podem ser definidos no `.env.local`. Valores explícitos têm precedência. O arquivo é lido como dados, sem executar seu conteúdo nem imprimir o segredo.
+
+Use `-CheckOnly` para validar a configuração sem iniciar outro servidor. Se a porta estiver ocupada, o iniciador informa o PID e pede para parar o processo na janela que mostra os acessos `GET /v1/audio` e `POST /v1/audio`; a janela do túnel é diferente e deve continuar aberta. Uma janela nova do PowerShell não herda variáveis definidas em outra janela.
 
 O script valida espaço em disco, CUDA, FFmpeg, numpy, soundfile, uvicorn, o checkout e a existência do checkpoint. Ele inicia uma aplicação isolada só de áudio, portanto não exige OpenCV, OCR ou os modelos de vídeo. O serviço escuta somente `127.0.0.1:8095`. Por padrão, o áudio original e as saídas ficam em `bandit-gpu-storage` ao lado da pasta do checkout Bandit. Use `-StorageDirectory` ou `BANDIT_STORAGE` para escolher outro destino.
 
@@ -25,7 +29,7 @@ Pare o worker com **Ctrl+C na janela que o iniciou** e reinicie usando um disco 
   -StorageDirectory 'G:\dowloand\teste\bandit-gpu-storage'
 ```
 
-Mantenha as variáveis de autenticação da sessão e o túnel apontando para a porta 8095. O script imprime o destino e o espaço livre antes de iniciar. O Editor V2 mostra a etapa atual e mantém o erro junto ao botão caso o upload seja recusado. Alterar o destino não move nem apaga jobs antigos; aguarde jobs em andamento antes de trocar a pasta.
+Mantenha o túnel apontando para a porta 8095 e forneça `-PublicHostname` ao usar uma sessão nova. O script imprime o destino e o espaço livre antes de iniciar. O Editor V2 mostra a etapa atual e mantém o erro junto ao botão caso o upload seja recusado. Alterar o destino não move nem apaga jobs antigos; aguarde jobs em andamento antes de trocar a pasta.
 
 ## Ligar ao Editor V2
 
