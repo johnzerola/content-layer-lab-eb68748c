@@ -1,0 +1,32 @@
+[Unit]
+Description=VaiViral ChatScene private voice service
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/chatscene-voice
+EnvironmentFile=/opt/cleaner-cpu/.env
+EnvironmentFile=/opt/chatscene-voice/gpu-relay.env
+EnvironmentFile=/opt/chatscene-voice/service-secret.env
+EnvironmentFile=-/opt/chatscene-voice/service.env
+Environment=CHATSCENE_VOICE_ROOT=/opt/chatscene-voice
+Environment=CHATSCENE_VOICE_CONFIG=/opt/chatscene-voice/runtime.json
+Environment=CHATSCENE_VOICE_WORKER=/opt/chatscene-voice/worker.py
+Environment=CHATSCENE_VOICE_SERVICE_PORT=18097
+ExecStart=/opt/chatscene-voice/.venv/bin/python -u /opt/chatscene-voice/service.py
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/chatscene-voice
+UMask=0077
+MemoryMax=8G
+CPUQuota=350%
+
+[Install]
+WantedBy=multi-user.target

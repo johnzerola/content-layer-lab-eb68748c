@@ -59,6 +59,17 @@ changed from `modelLoaded:false` to `true` and back to `false` after the idle
 timeout. An unauthenticated request returned 404, and a connection to public
 `104.234.186.50:18096` was refused.
 
+The published app reaches that private runtime through
+`backend/chatscene_voice/service.py`. The service binds only to the private
+Docker bridge gateway on port 18097; Caddy exposes only `/v1/voice/*` over the
+existing HTTPS Cleaner hostname. Every request requires a server-side bearer
+secret. The browser never receives that secret, the GPU relay token or a model
+path. `CHATSCENE_VOICE_SERVICE_URL` and
+`CHATSCENE_VOICE_SERVICE_SECRET` can override the endpoint; when omitted, the
+server reuses `CLEANER_WORKER_PUBLIC_URL`/`CLEANER_WORKER_SECRET`. The systemd
+unit is `backend/chatscene_voice/chatscene-voice.service`, and Caddy uses
+`backend/chatscene_voice/Caddyfile.hostear`.
+
 ## Contract
 
 After import validation, set `ready: true` in the runtime JSON. The UI keeps uploads disabled until that flag and the required assets are present. `scripts/install-chatscene-voice-cpu.sh` prepares the CPU environment; it does not change the live web service or open an inference port.

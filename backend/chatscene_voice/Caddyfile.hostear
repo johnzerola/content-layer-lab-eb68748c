@@ -1,0 +1,23 @@
+{$CLEANER_PUBLIC_HOST:cleaner-104-234-186-50.nip.io} {
+	encode zstd gzip
+
+	request_body {
+		max_size 4GB
+	}
+
+	@voice path /v1/voice/*
+	handle @voice {
+		reverse_proxy {$CHATSCENE_VOICE_UPSTREAM:172.18.0.1:18097}
+	}
+	handle {
+		reverse_proxy worker:8000
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+}

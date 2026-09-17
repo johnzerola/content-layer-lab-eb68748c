@@ -11,23 +11,44 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { voiceSynthesisInput } from "./voice-request";
 import { voiceTransformEngine } from "./voice-transform.server";
 import { getPiperLocalStatus, synthesizePiperWav } from "./voice-piper.server";
-import { cloneEngineStatus, deleteVoiceReference, saveVoiceReference, synthesizeClonedVoice } from "./voice-clone.server";
+import {
+  deleteVoiceReference,
+  saveVoiceReference,
+  synthesizeClonedVoice,
+  verifiedCloneEngineStatus,
+} from "./voice-clone.server";
 import { effectiveTransformPitch, selectionFromTransformPreset } from "./voice-transform";
 import { z } from "zod";
 
 export const getVoiceEngineStatus = createServerFn({ method: "GET" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .handler(async () => ({ clone: cloneEngineStatus(), piper: getPiperLocalStatus().available }));
+  .handler(async () => ({
+    clone: await verifiedCloneEngineStatus(),
+    piper: getPiperLocalStatus().available,
+  }));
 
 export const uploadVoiceReference = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .validator((input: unknown) => z.object({ audio: z.string().min(1).max(16 * 1024 * 1024), authorized: z.literal(true) }).parse(input))
+  .validator((input: unknown) =>
+    z
+      .object({
+        audio: z
+          .string()
+          .min(1)
+          .max(16 * 1024 * 1024),
+        authorized: z.literal(true),
+      })
+      .parse(input),
+  )
   .handler(async ({ data, context }) => saveVoiceReference(context.userId, data.audio));
 
 export const removeVoiceReference = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
-  .handler(async ({ data, context }) => { await deleteVoiceReference(context.userId, data.id); return { removed: true }; });
+  .handler(async ({ data, context }) => {
+    await deleteVoiceReference(context.userId, data.id);
+    return { removed: true };
+  });
 
 export function resolveVoiceProviderConfig(env: Record<string, string | undefined>) {
   if (env["LOVABLE_API_KEY"]) {
@@ -51,29 +72,32 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .validator((input: unknown) => voiceSynthesisInput.parse(input))
   .handler(async ({ data, context }) => {
-    if (data.provider === "chatterbox" && !data.referenceId) throw new Error("Envie a referência de voz deste personagem.");
+    if (data.provider === "chatterbox" && !data.referenceId)
+      throw new Error("Envie a referência de voz deste personagem.");
     const isClone = data.provider === "chatterbox";
     const localRequested = data.provider === "piper" || isClone;
     const provider = localRequested ? null : resolveVoiceProviderConfig(process.env);
     let buffer: Buffer;
     let mime = "audio/mpeg";
     let providerName = "gateway";
-    const res = provider ? await fetch(provider.endpoint, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${provider.key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: provider.model,
-        input: data.text,
-        voice: data.voice,
-        // Transformações recebem PCM/WAV e fazem uma única codificação final.
-        response_format: data.transform ? "wav" : "mp3",
-        speed: data.speed ?? 1,
-        // o idioma nunca é opcional: o estilo pedido é somado ao português do Brasil
-        instructions:
-          data.direction ??
-          "Você é um ator brasileiro de dublagem. Fale em português do Brasil (pt-BR) com pronúncia brasileira natural, interpretando a fala com respiração, micro-pausas e variação de entonação, sem soar robótico ou de locutor.",
-      }),
-    }) : null;
+    const res = provider
+      ? await fetch(provider.endpoint, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${provider.key}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: provider.model,
+            input: data.text,
+            voice: data.voice,
+            // Transformações recebem PCM/WAV e fazem uma única codificação final.
+            response_format: data.transform ? "wav" : "mp3",
+            speed: data.speed ?? 1,
+            // o idioma nunca é opcional: o estilo pedido é somado ao português do Brasil
+            instructions:
+              data.direction ??
+              "Você é um ator brasileiro de dublagem. Fale em português do Brasil (pt-BR) com pronúncia brasileira natural, interpretando a fala com respiração, micro-pausas e variação de entonação, sem soar robótico ou de locutor.",
+          }),
+        })
+      : null;
 
     if (res && !res.ok) {
       await res.body?.cancel().catch(() => undefined);
@@ -104,13 +128,29 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
       mime = "audio/wav";
       providerName = "piper-local";
     } else {
-      throw new Error("Nenhum gerador de voz está disponível. Instale a voz local Piper ou configure uma chave no servidor.");
+      throw new Error(
+        "Nenhum gerador de voz está disponível. Instale a voz local Piper ou configure uma chave no servidor.",
+      );
     }
-    const transform = data.transform ?? (isClone ? selectionFromTransformPreset("adam_natural") : undefined);
+    const transform =
+      data.transform ?? (isClone ? selectionFromTransformPreset("adam_natural") : undefined);
     if (transform) {
       // Chatterbox produces a natural-speed base. Apply requested tempo only once.
-      const sourceSpeed = ["PITCH_ONLY", "VARISPEED_THEN_RESTORE_TEMPO"].includes(transform.config.mode) ? 1 : transform.config.speedMultiplier;
-      const config = isClone ? { ...transform.config, mode: "SPEED_AND_PITCH" as const, linkedPitchToSpeed: false, preservePitch: false, pitchSemitones: effectiveTransformPitch(transform.config), speedMultiplier: sourceSpeed * (data.speed ?? 1) } : transform.config;
+      const sourceSpeed = ["PITCH_ONLY", "VARISPEED_THEN_RESTORE_TEMPO"].includes(
+        transform.config.mode,
+      )
+        ? 1
+        : transform.config.speedMultiplier;
+      const config = isClone
+        ? {
+            ...transform.config,
+            mode: "SPEED_AND_PITCH" as const,
+            linkedPitchToSpeed: false,
+            preservePitch: false,
+            pitchSemitones: effectiveTransformPitch(transform.config),
+            speedMultiplier: sourceSpeed * (data.speed ?? 1),
+          }
+        : transform.config;
       const transformed = await voiceTransformEngine.transform(buffer, config, transform.presetId);
       return {
         mime: transformed.mime,

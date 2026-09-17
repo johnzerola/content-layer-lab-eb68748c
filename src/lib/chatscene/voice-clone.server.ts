@@ -19,6 +19,48 @@ const requiredModelFiles = [
   "t3_mtl23ls_v2.safetensors",
   "grapheme_mtl_merged_expanded_v1.json",
 ];
+
+interface RemoteVoiceServiceConfig {
+  baseUrl: string;
+  secret: string;
+}
+
+function remoteVoiceServiceConfig(): RemoteVoiceServiceConfig | null {
+  const configuredUrl =
+    process.env["CHATSCENE_VOICE_SERVICE_URL"] ??
+    process.env["CLEANER_WORKER_PUBLIC_URL"] ??
+    process.env["CLEANER_WORKER_URL"];
+  const secret =
+    process.env["CHATSCENE_VOICE_SERVICE_SECRET"] ?? process.env["CLEANER_WORKER_SECRET"];
+  if (!configuredUrl || !secret || secret.length < 32) return null;
+  const baseUrl = configuredUrl.replace(/\/+$/, "");
+  if (!/^https:\/\//i.test(baseUrl) && process.env["NODE_ENV"] === "production") return null;
+  return { baseUrl: `${baseUrl}/v1/voice`, secret };
+}
+
+async function remoteVoiceRequest<T>(
+  path: string,
+  init: RequestInit = {},
+  timeoutMs = 30_000,
+): Promise<T> {
+  const config = remoteVoiceServiceConfig();
+  if (!config) throw new Error("O serviço seguro de clonagem não está configurado.");
+  const response = await fetch(`${config.baseUrl}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${config.secret}`,
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...init.headers,
+    },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  const result = (await response.json().catch(() => null)) as (T & { detail?: string }) | null;
+  if (!response.ok) {
+    throw new Error(result?.detail || "O serviço de clonagem não conseguiu concluir a operação.");
+  }
+  if (!result) throw new Error("O serviço de clonagem retornou uma resposta inválida.");
+  return result;
+}
 export function voiceRuntimeConfig(): VoiceRuntimeConfig | null {
   try {
     const env = process.env;
@@ -62,13 +104,22 @@ function localCloneEngineInstalled(config: VoiceRuntimeConfig | null) {
 }
 export function cloneEngineStatus() {
   const c = voiceRuntimeConfig();
-  const remote = Boolean(
-    process.env["CHATSCENE_GPU_RELAY_URL"] && process.env["CHATSCENE_GPU_RELAY_TOKEN"],
-  );
+  const remote =
+    Boolean(remoteVoiceServiceConfig()) ||
+    Boolean(process.env["CHATSCENE_GPU_RELAY_URL"] && process.env["CHATSCENE_GPU_RELAY_TOKEN"]);
   return {
     installed: remote || localCloneEngineInstalled(c),
     device: remote ? "remote-cuda" : (c?.device ?? "auto"),
   };
+}
+
+export async function verifiedCloneEngineStatus() {
+  if (!remoteVoiceServiceConfig()) return cloneEngineStatus();
+  try {
+    return await remoteVoiceRequest<{ installed: boolean; device: string }>("/health", {}, 5_000);
+  } catch {
+    return { installed: false, device: "remote-unavailable" };
+  }
 }
 function referenceDirectory(userId: string) {
   const config = voiceRuntimeConfig();
@@ -82,6 +133,12 @@ export function referencePath(userId: string, id: string) {
 }
 
 export async function saveVoiceReference(userId: string, audioBase64: string) {
+  if (remoteVoiceServiceConfig()) {
+    return await remoteVoiceRequest<{ id: string; durationSec: number }>("/references", {
+      method: "POST",
+      body: JSON.stringify({ userId, audio: audioBase64 }),
+    });
+  }
   if (!cloneEngineStatus().installed)
     throw new Error("Instale o motor de clonagem antes de enviar a referência.");
   const input = Buffer.from(audioBase64, "base64");
@@ -185,6 +242,13 @@ export async function saveVoiceReference(userId: string, audioBase64: string) {
   return { id, durationSec };
 }
 export async function deleteVoiceReference(userId: string, id: string) {
+  if (remoteVoiceServiceConfig()) {
+    await remoteVoiceRequest<{ removed: boolean }>("/references", {
+      method: "DELETE",
+      body: JSON.stringify({ userId, referenceId: id }),
+    });
+    return;
+  }
   await rm(referencePath(userId, id), { force: true });
   await rm(join(referenceDirectory(userId), `${id}.json`), { force: true });
 }
@@ -297,6 +361,17 @@ export async function synthesizeClonedVoice(
   referenceId: string,
   text: string,
 ): Promise<Buffer> {
+  if (remoteVoiceServiceConfig()) {
+    const result = await remoteVoiceRequest<{ audio: string; device: string }>(
+      "/synthesize",
+      {
+        method: "POST",
+        body: JSON.stringify({ userId, referenceId, text }),
+      },
+      300_000,
+    );
+    return Buffer.from(result.audio, "base64");
+  }
   const path = referencePath(userId, referenceId);
   const reference = await readFile(path).catch(() => {
     throw new Error("Voice reference is unavailable for this account.");
