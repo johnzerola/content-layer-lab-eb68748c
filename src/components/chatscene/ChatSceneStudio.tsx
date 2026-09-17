@@ -66,7 +66,7 @@ import {
   speakingMessages,
   type VoiceClip,
 } from "@/lib/chatscene/voice-cast";
-import { effectiveVoice, voiceProfileOf } from "@/lib/chatscene/voice-resolution";
+import { effectiveVoice, preselectLocalVoices, voiceProfileOf } from "@/lib/chatscene/voice-resolution";
 
 import { loadMusic, mixConversationAudio } from "@/lib/chatscene/audio-mix";
 import { CAMERA_MODES, DEFAULT_CAMERA } from "@/lib/chatscene/camera";
@@ -137,7 +137,7 @@ function slugify(text: string): string {
 
 export function ChatSceneStudio() {
   const [project, setProject] = useState<ChatSceneProject>(() =>
-    applyCreatorFormat(createChatSceneProject(), "whatsapp"),
+    preselectLocalVoices(applyCreatorFormat(createChatSceneProject(), "whatsapp")),
   );
   const [recordId, setRecordId] = useState<string | null>(null);
   const [script, setScript] = useState("");
@@ -614,12 +614,12 @@ export function ChatSceneStudio() {
   const stopPreviewRef = useRef<(() => void) | null>(null);
   const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
   const handlePreviewVoice = useCallback(
-    async (participantId: string, profile: VoiceProfile) => {
+    async (participantId: string, profile: VoiceProfile, text?: string) => {
       stopPreviewRef.current?.();
       stopPreviewRef.current = null;
       setPreviewingVoice(participantId);
       try {
-        stopPreviewRef.current = await previewVoice(voiceProvider, profile);
+        stopPreviewRef.current = await previewVoice(voiceProvider, profile, text);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Não foi possível ouvir esta voz.");
       } finally {
@@ -1646,7 +1646,7 @@ export function ChatSceneStudio() {
                 castProgress={castProgress}
                 onGenerate={() => void handleGenerateVoices()}
                 previewing={previewingVoice}
-                onPreview={(id, profile) => void handlePreviewVoice(id, profile)}
+                onPreview={(id, profile, text) => void handlePreviewVoice(id, profile, text)}
                 failures={castFailures}
                 onRetry={() => void handleGenerateVoices()}
                 onContinue={() => setCastFailures([])}

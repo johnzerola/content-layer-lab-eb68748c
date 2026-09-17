@@ -1,0 +1,7 @@
+{
+  "pythonPath": "/opt/chatscene-voice/.venv/bin/python",
+  "modelPath": "/opt/chatscene-voice/models",
+  "storagePath": "/opt/chatscene-voice/references",
+  "device": "cpu",
+  "ready": false
+}

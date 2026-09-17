@@ -108,6 +108,11 @@ describe("voice synthesis request contract", () => {
 });
 
 describe("participant preset assignment", () => {
+  it("seleciona a voz local Faber como provedor Piper", () => {
+    const profile = profileFromPreset("piper-faber-local");
+    expect(profile).toMatchObject({ provider: "piper", providerVoiceId: "pt_BR-faber-medium", locale: "pt-BR" });
+  });
+
   it("replaces all previous sound controls while preserving user metadata", () => {
     const previous = profileFromPreset("child-boy-raspy", {
       id: "saved-pedro", name: "Minha voz", gain: 0.72, provider: "lovable-ai", language: "pt",

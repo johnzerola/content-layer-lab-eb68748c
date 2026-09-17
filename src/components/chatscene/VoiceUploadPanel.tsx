@@ -34,10 +34,10 @@ export function VoiceUploadPanel({
 
   return (
     <div className="mt-4 border-t border-border pt-3">
-      <p className="mono-label mb-1.5 text-muted-foreground">Áudio próprio</p>
+      <p className="mono-label mb-1.5 text-muted-foreground">Áudio pronto por mensagem</p>
       <p className="mb-2 text-[11px] text-muted-foreground">
         Envie um arquivo de áudio para qualquer fala. Ele substitui a voz gerada e o tempo da
-        mensagem passa a seguir a duração real do arquivo.
+        mensagem passa a seguir a duração real do arquivo. Para gerar novas falas com uma voz enviada, use “Clonar voz a partir de um áudio” no personagem acima.
       </p>
 
       {speaking.length === 0 && (

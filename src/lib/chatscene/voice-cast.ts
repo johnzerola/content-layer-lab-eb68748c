@@ -104,7 +104,8 @@ export function clearVoiceCache() {
 
 /** Duração real da fala já com o tom aplicado, em milissegundos. */
 export function clipDurationMs(clip: VoiceClip, profile: VoiceProfile | null | undefined): number {
-  return Math.round((clip.durationSec / pitchRate(profile?.pitch)) * 1000);
+  // Áudio transformado já chega renderizado; sua duração decodificada é autoritativa.
+  return Math.round((clip.durationSec / (profile?.transform ? 1 : pitchRate(profile?.pitch))) * 1000);
 }
 
 /**
@@ -116,7 +117,7 @@ export function playClip(clip: VoiceClip, profile?: VoiceProfile | null): () => 
   void ctx.resume().catch(() => {});
   const source = ctx.createBufferSource();
   source.buffer = clip.buffer;
-  source.playbackRate.value = pitchRate(profile?.pitch);
+  source.playbackRate.value = profile?.transform ? 1 : pitchRate(profile?.pitch);
   const gain = ctx.createGain();
   gain.gain.value = Math.max(0.2, Math.min(1.5, profile?.gain ?? 1));
   source.connect(gain).connect(ctx.destination);
@@ -136,13 +137,15 @@ export async function previewVoice(
   profile: VoiceProfile,
   text = VOICE_SAMPLE_TEXT,
 ): Promise<() => void> {
+  // Unlock playback inside the click gesture, before waiting for inference.
+  await context().resume();
   const clip = await provider.synthesize(text.slice(0, 160), profile);
   return playClip(clip, profile);
 }
 
 /** Provedor padrão: IA da Lovable, sempre passando pelo servidor. */
 export function createGatewayVoiceProvider(
-  call: (input: { text: string; voice: string; direction?: string; speed?: number }) => Promise<{
+  call: (input: { text: string; voice: string; provider?: VoiceProfile["provider"]; referenceId?: string; direction?: string; speed?: number; transform?: VoiceProfile["transform"] }) => Promise<{
     audio: string;
     mime: string;
   }>,
@@ -173,6 +176,8 @@ export function createGatewayVoiceProvider(
       const { audio, mime } = await call({
         text,
         voice: profile.providerVoiceId ?? preset.providerVoice,
+        provider: profile.provider,
+        ...(profile.reference ? { referenceId: profile.reference.id } : {}),
         direction: voiceDirection(
           profile.style,
           direction?.emotion,
@@ -187,6 +192,7 @@ export function createGatewayVoiceProvider(
           },
         ),
         speed: Math.max(0.7, Math.min(1.3, profile.speed * (direction?.speedMultiplier ?? 1))),
+        ...(profile.transform ? { transform: profile.transform } : {}),
       });
       const bytes = Uint8Array.from(atob(audio), (c) => c.charCodeAt(0));
       const blob = new Blob([bytes], { type: mime || "audio/mpeg" });

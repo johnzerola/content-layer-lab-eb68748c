@@ -1,5 +1,5 @@
 import type { ChatMessage, ChatParticipant, ChatSceneProject } from "./types";
-import { DEFAULT_MESSAGE_VOICE_DIRECTION, DEFAULT_VOICE, profileFromPreset, type MessageVoiceDirection, type VoiceProfile } from "./voice";
+import { DEFAULT_MESSAGE_VOICE_DIRECTION, DEFAULT_VOICE, profileFromPreset, voicePreset, type MessageVoiceDirection, type VoiceProfile } from "./voice";
 
 export function voiceProfileOf(project: ChatSceneProject, participant: ChatParticipant): VoiceProfile | null {
   const linked = participant.voiceProfileId ? project.voiceProfiles?.find((v) => v.id === participant.voiceProfileId) : undefined;
@@ -32,8 +32,10 @@ export function attachPreset(project: ChatSceneProject, participantId: string, p
     while (occupied.has(id)) id = `${baseId}_${suffix++}`;
   }
   // A preset replaces the sound; retain only the participant's saved metadata.
+  const targetPreset = voicePreset(presetId);
   const metadata: Partial<VoiceProfile> = { id };
-  for (const key of ["name", "gain", "provider", "language", "locale", "seed", "providerSettings"] as const) {
+  for (const key of ["name", "gain", "provider", "language", "locale", "seed", "providerSettings", "transform"] as const) {
+    if (key === "provider" && (targetPreset.provider || previous?.provider === "chatterbox" || previous?.provider === "piper")) continue;
     if (previous?.[key] !== undefined) Object.assign(metadata, { [key]: previous[key] });
   }
   const profile = profileFromPreset(presetId, metadata);
@@ -43,4 +45,17 @@ export function attachPreset(project: ChatSceneProject, participantId: string, p
     participants: project.participants.map((p) => p.id === participantId ? { ...p, voiceProfileId: id, voice: profile } : p),
     messages: project.messages.map((message) => message.participantId === participantId ? { ...message, voiceMs: null } : message),
   };
+}
+
+/** Only fill unassigned participants; existing saved casting remains untouched. */
+export function preselectLocalVoices(project: ChatSceneProject): ChatSceneProject {
+  return project.participants.reduce((next, participant, index) => voiceProfileOf(next, participant) ? next : attachPreset(next, participant.id, index === 0 ? "faber-viral" : "faber-natural"), project);
+}
+
+export function attachVoiceReference(project: ChatSceneProject, participantId: string, reference: NonNullable<VoiceProfile["reference"]>): ChatSceneProject {
+  const next = attachPreset(project, participantId, "piper-faber-local");
+  const person = next.participants.find(p => p.id === participantId);
+  if (!person) return project;
+  const profile: VoiceProfile = { ...voiceProfileOf(next, person)!, provider: "chatterbox", providerVoiceId: "reference", reference, name: `Voz de ${person.name}`, pitch: 0, speed: 1, transform: undefined };
+  return { ...next, voiceProfiles: (next.voiceProfiles ?? []).map(p => p.id === profile.id ? profile : p), participants: next.participants.map(p => p.id === participantId ? { ...p, voice: profile } : p) };
 }

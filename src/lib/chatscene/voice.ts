@@ -1,10 +1,12 @@
+import { selectionFromTransformPreset, type VoiceTransformSelection } from "./voice-transform";
+
 /** Identidades vocais sintéticas do ChatScene. Nenhum preset representa pessoa real. */
 export type VoiceGender = "feminina" | "masculina" | "neutra";
 export type VoiceAge = "juvenil" | "teen" | "adulta" | "madura";
 export type VoiceStyle =
   | "natural" | "animada" | "calma" | "seria" | "sussurro" | "nervosa"
   | "sarcastica" | "assustada" | "brava" | "autoritaria" | "dramatic" | "comedy";
-export type VoiceProviderId = "lovable-ai" | "kokoro" | "elevenlabs";
+export type VoiceProviderId = "lovable-ai" | "kokoro" | "elevenlabs" | "piper" | "chatterbox";
 export type VoiceProviderMode = "auto" | "local" | "premium";
 export type VoiceEmotion =
   | "neutral" | "happy" | "excited" | "serious" | "nervous" | "annoyed"
@@ -19,6 +21,7 @@ export interface MessageVoiceDirection {
 }
 
 export interface VoiceProfile {
+  reference?: { id: string; name: string; durationSec: number };
   id?: string;
   name?: string;
   presetId: string;
@@ -39,6 +42,8 @@ export interface VoiceProfile {
   gain: number;
   seed?: number;
   providerSettings?: Record<string, string | number | boolean>;
+  /** Pós-processamento genérico; não altera identidade nem provedor. */
+  transform?: VoiceTransformSelection | undefined;
 }
 
 export interface VoiceProviderCapabilities {
@@ -66,21 +71,32 @@ export function pitchRate(pitch: number | undefined): number {
 export interface VoicePreset {
   id: string;
   label: string;
-  group: "Presets de atuação" | "Juvenil sintética" | "Teen" | "Adulto masculino" | "Adulto feminino" | "Família" | "Personagens";
+  group: "Voz local gratuita" | "Presets de atuação" | "Juvenil sintética" | "Teen" | "Adulto masculino" | "Adulto feminino" | "Família" | "Personagens";
   description: string;
   gender: VoiceGender;
   age: VoiceAge;
   providerVoice: string;
+  provider?: VoiceProviderId;
   profile: Pick<VoiceProfile, "style" | "speed" | "energy" | "expressiveness" | "roughness" | "warmth" | "brightness" | "pitch">;
 }
 
 const preset = (
   id: string, label: string, group: VoicePreset["group"], description: string,
   gender: VoiceGender, age: VoiceAge, providerVoice: string,
-  profile: VoicePreset["profile"],
-): VoicePreset => ({ id, label, group, description, gender, age, providerVoice, profile });
+  profile: VoicePreset["profile"], provider?: VoiceProviderId,
+): VoicePreset => ({ id, label, group, description, gender, age, providerVoice, profile, ...(provider ? { provider } : {}) });
 
 export const VOICE_PRESETS: VoicePreset[] = [
+  ...[
+    ["viral", "Viral / rápido", "adam_roblox_teen"],
+    ["natural", "Natural", "adam_natural"],
+    ["young", "Jovem estilizado", "adam_young"],
+    ["child", "Infantilizado · experimental", "adam_child_male"],
+    ["deep", "Grave", "adam_deep"],
+    ["mature", "Personagem maduro", "adam_mature_character"],
+    ["high", "Agudo em velocidade normal", "adam_child_pitch_only"],
+  ].map(([id, label]) => preset(`faber-${id}`, `Faber — ${label}`, "Voz local gratuita", "Masculina sintética • português brasileiro", "masculina", "adulta", "pt_BR-faber-medium", { style: "natural", speed: 1, pitch: 0 }, "piper")),
+  preset("piper-faber-local", "Faber local — masculino PT-BR", "Voz local gratuita", "Masculina adulta • PT-BR • roda neste computador", "masculina", "adulta", "pt_BR-faber-medium", { style:"natural",speed:1,energy:.55,expressiveness:.5,roughness:.12,warmth:.55,brightness:.5,pitch:0 }, "piper"),
   preset("acting-narrator-melancholic", "Narrador grave e melancólico", "Presets de atuação", "Grave • cinematográfico • melancólico", "masculina", "adulta", "onyx", { style:"dramatic",speed:.86,energy:.34,expressiveness:.72,roughness:.24,warmth:.5,brightness:.26,pitch:-2 }),
   preset("acting-adult-sad", "Adulto triste e contido", "Presets de atuação", "Triste • íntimo • pausado", "masculina", "adulta", "ash", { style:"calma",speed:.88,energy:.25,expressiveness:.58,roughness:.14,warmth:.42,brightness:.34,pitch:-1 }),
   preset("acting-child-sad", "Criança sintética triste", "Presets de atuação", "Juvenil • triste • delicada", "neutra", "juvenil", "shimmer", { style:"calma",speed:.9,energy:.24,expressiveness:.62,roughness:.02,warmth:.62,brightness:.68,pitch:1.5 }),
@@ -173,7 +189,9 @@ export const DEFAULT_MESSAGE_VOICE_DIRECTION: MessageVoiceDirection = { emotion:
 
 export function voicePreset(id: string | undefined): VoicePreset { return VOICE_PRESETS.find(v=>v.id===id) ?? VOICE_PRESETS.find(v=>v.id==="adult-female-casual") ?? VOICE_PRESETS[0]!; }
 export function profileFromPreset(id: string, base: Partial<VoiceProfile> = {}): VoiceProfile {
-  const p=voicePreset(id); return { ...DEFAULT_VOICE,...p.profile,...base,presetId:p.id,providerVoiceId:base.providerVoiceId??p.providerVoice,ageStyle:p.age,genderStyle:p.gender,name:base.name??voiceDisplayLabel(p) };
+  const p=voicePreset(id);
+  const styles: Record<string, string> = { "faber-viral": "adam_roblox_teen", "faber-natural": "adam_natural", "faber-young": "adam_young", "faber-child": "adam_child_male", "faber-deep": "adam_deep", "faber-mature": "adam_mature_character", "faber-high": "adam_child_pitch_only" };
+  return { ...DEFAULT_VOICE,...p.profile,...base,presetId:p.id,provider:p.provider??base.provider??DEFAULT_VOICE.provider??"lovable-ai",providerVoiceId:base.providerVoiceId??p.providerVoice,ageStyle:p.age,genderStyle:p.gender,name:base.name??voiceDisplayLabel(p), ...(styles[p.id] ? { transform: selectionFromTransformPreset(styles[p.id]!) } : {}) };
 }
 export interface VoiceTimbre { expressiveness?: number; roughness?: number; warmth?: number; brightness?: number; }
 
@@ -204,8 +222,9 @@ export const DEFAULT_VOICE_MIX: VoiceMixSettings = { enabled:false,ducking:true,
 
 export function voiceKey(text:string, profile:VoiceProfile, direction?:Partial<MessageVoiceDirection>):string {
   const preset = voicePreset(profile.presetId);
-  // v3 excludes cached audio generated before full acting directions reached the server.
-  const raw=JSON.stringify({v:"ator-br-3",text:text.trim(),provider:profile.provider??"lovable-ai",voice:profile.providerVoiceId??preset.providerVoice,preset:profile.presetId,locale:profile.locale??"pt-BR",age:profile.ageStyle??preset.age,gender:profile.genderStyle??preset.gender,style:profile.style,speed:Number(profile.speed.toFixed(3)),pitch:profile.pitch??0,energy:profile.energy??.5,expression:profile.expressiveness??.5,roughness:profile.roughness??0,warmth:profile.warmth??.5,brightness:profile.brightness??.5,emotion:direction?.emotion??"neutral",speedMultiplier:direction?.speedMultiplier??1,energyMultiplier:direction?.energyMultiplier??1,settings:profile.providerSettings??{}});
-  let h1=2166136261,h2=5381; for(let i=0;i<raw.length;i++){h1=Math.imul(h1^raw.charCodeAt(i),16777619)>>>0;h2=((h2<<5)+h2+raw.charCodeAt(i))>>>0;} return `${h1.toString(36)}${h2.toString(36)}`;
+  // v4 adds the complete post-processing configuration to cache identity.
+  const raw=JSON.stringify({v:"ator-br-transform-1",text:text.trim(),provider:profile.provider??"lovable-ai",voice:profile.providerVoiceId??preset.providerVoice,preset:profile.presetId,locale:profile.locale??"pt-BR",age:profile.ageStyle??preset.age,gender:profile.genderStyle??preset.gender,style:profile.style,speed:Number(profile.speed.toFixed(3)),pitch:profile.pitch??0,energy:profile.energy??.5,expression:profile.expressiveness??.5,roughness:profile.roughness??0,warmth:profile.warmth??.5,brightness:profile.brightness??.5,emotion:direction?.emotion??"neutral",speedMultiplier:direction?.speedMultiplier??1,energyMultiplier:direction?.energyMultiplier??1,settings:profile.providerSettings??{},transform:profile.transform??null});
+  const identity = raw + JSON.stringify(profile.reference ?? null);
+  let h1=2166136261,h2=5381; for(let i=0;i<identity.length;i++){h1=Math.imul(h1^identity.charCodeAt(i),16777619)>>>0;h2=((h2<<5)+h2+identity.charCodeAt(i))>>>0;} return `${h1.toString(36)}${h2.toString(36)}`;
 }
 export function speakableText(kind:string,text:string):string { if(kind==="system"||kind==="sticker"||kind==="card")return ""; return text.replace(/\s+/g," ").trim(); }
