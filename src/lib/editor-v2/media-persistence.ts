@@ -1,4 +1,4 @@
-import { persistSourceFile, readSourceFile } from "@/lib/editor/media-store";
+import { forgetSourceFile, persistSourceFile, readSourceFile } from "@/lib/editor/media-store";
 import { normalizeProject } from "./project";
 import type { EditorProjectV2, MediaAsset } from "./types";
 
@@ -24,6 +24,10 @@ export async function persistEditorMedia(projectId: string, assetId: string, fil
 
 export async function readEditorMedia(projectId: string, assetId: string) {
   return readSourceFile(editorMediaStorageKey(projectId, assetId));
+}
+
+export async function deleteEditorMedia(projectId: string, assetId: string) {
+  await forgetSourceFile(editorMediaStorageKey(projectId, assetId));
 }
 
 export function serializeEditorProject(project: EditorProjectV2): string {

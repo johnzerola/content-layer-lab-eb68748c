@@ -464,6 +464,22 @@ export class UpdateMediaAssetCommand extends SnapshotCommand {
   serialize() { return { type: this.type, payload: { assetId: this.assetId, patch: this.patch } }; }
 }
 
+/** Removes an unused source, or only hides a source that still feeds timeline clips. */
+export class RemoveMediaAssetFromLibraryCommand extends SnapshotCommand {
+  readonly type = "removeMediaAssetFromLibrary";
+  readonly renderImpact = "none" as const;
+  constructor(private readonly assetId: string) { super(); }
+  protected apply(project: EditorProjectV2) {
+    const asset = project.assets.find((item) => item.id === this.assetId);
+    if (!asset) throw new Error(`Mídia não encontrada: ${this.assetId}`);
+    const inUse = project.tracks.some((owner) => owner.clips.some((clip) => clip.assetId === this.assetId));
+    if (inUse) asset.libraryHidden = true;
+    else project.assets = project.assets.filter((item) => item.id !== this.assetId);
+    return project;
+  }
+  serialize() { return { type: this.type, payload: { assetId: this.assetId } }; }
+}
+
 export class UpsertAudioEnvelopePointCommand extends SnapshotCommand {
   readonly type = "upsertAudioEnvelopePoint";
   readonly renderImpact = "audio" as const;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Captions, Check, ChevronDown, Film, FolderOpen, Import, Library, PanelRight, Pause, Play, Redo2, Undo2 } from "lucide-react";
+import { ArrowLeft, Captions, Check, ChevronDown, Download, Film, FolderOpen, Import, Library, PanelRight, Pause, Play, Redo2, Undo2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
@@ -27,6 +27,7 @@ import {
   MoveCompoundClipCommand,
   MoveKeyframeCommand,
   RegisterExtractedAudioCommand,
+  RemoveMediaAssetFromLibraryCommand,
   RestoreOriginalAudioCommand,
   SelectItemCommand,
   SetAudioRepresentationCommand,
@@ -49,6 +50,7 @@ import {
   clipLocalTime,
   createEditorProjectV2,
   createMediaClipFromAsset,
+  deleteEditorMedia,
   editorMediaStoragePath,
   extractAudioFromMediaFile,
   findClip,
@@ -625,7 +627,7 @@ export function EditorV2Foundation() {
     }
   }, [exporting]);
 
-  const importFiles = useCallback(async (files: FileList | null) => {
+  const importFiles = useCallback(async (files: FileList | null, insertAt?: number) => {
     if (!files?.length) return;
     setImporting(true);
     let imported = 0;
@@ -645,7 +647,7 @@ export function EditorV2Foundation() {
         }
         const waveformPromise = file.type.startsWith("audio/") ? analyzeAudioFile(file) : null;
         if (waveformPromise) void waveformPromise.catch(() => undefined);
-        const runtime = await prepareLocalMedia(file, Number(clockRef.current.getSnapshot().projectTime), state.revisions.document + imported + 1);
+        const runtime = await prepareLocalMedia(file, insertAt ?? Number(clockRef.current.getSnapshot().projectTime), state.revisions.document + imported + 1);
         const persisted = await persistEditorMedia(state.id, runtime.asset.id, file);
         if (persisted) runtime.asset.storagePath = editorMediaStoragePath(state.id, runtime.asset.id);
         else volatileImports += 1;
@@ -672,10 +674,10 @@ export function EditorV2Foundation() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, [registry, run]);
 
-  const insertMediaAsset = useCallback((asset: MediaAsset) => {
+  const insertMediaAsset = useCallback((asset: MediaAsset, insertAt?: number) => {
     try {
       const state = busRef.current.getState();
-      const at = Number(clockRef.current.getSnapshot().projectTime);
+      const at = insertAt ?? Number(clockRef.current.getSnapshot().projectTime);
       const serial = state.revisions.document + state.tracks.reduce((total, track) => total + track.clips.length, 0) + 1;
       const insertion = createMediaClipFromAsset(asset, at, serial);
       run(new InsertMediaClipCommand(insertion.clip, insertion.audioGroup), `${asset.name} inserido em ${formatProjectTime(at)}.`);
@@ -683,6 +685,25 @@ export function EditorV2Foundation() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível inserir a mídia novamente.");
     }
+  }, [run]);
+
+  const removeMediaAsset = useCallback(async (asset: MediaAsset) => {
+    const state = busRef.current.getState();
+    const inUse = state.tracks.some((owner) => owner.clips.some((clip) => clip.assetId === asset.id));
+    run(new RemoveMediaAssetFromLibraryCommand(asset.id), inUse
+      ? `${asset.name} foi removido da biblioteca. Os clipes existentes foram preservados.`
+      : `${asset.name} foi excluído da biblioteca e do armazenamento local.`);
+    if (inUse) return;
+    sourceFilesRef.current.delete(asset.id);
+    const release = (url?: string) => {
+      if (!url) return;
+      URL.revokeObjectURL(url);
+      runtimeUrlsRef.current.delete(url);
+    };
+    setAssetSources((current) => { release(current[asset.id]); const { [asset.id]: _removed, ...next } = current; return next; });
+    setAssetThumbnails((current) => { release(current[asset.id]); const { [asset.id]: _removed, ...next } = current; return next; });
+    setAssetWaveforms((current) => { const { [asset.id]: _removed, ...next } = current; return next; });
+    await deleteEditorMedia(state.id, asset.id);
   }, [run]);
 
   const extractSelectedAudio = useCallback(async () => {
@@ -1123,6 +1144,8 @@ export function EditorV2Foundation() {
     onSelect: (id: string | null, additive?: boolean) => selectClip(id, additive, "canvas"),
     onTransform: (id: string, transform: ClipTransform) => run(new UpdateTransformAtTimeCommand(id, Number(clock.projectTime), transform, "easeInOut", String(project.revisions.document + 1)), "Posição atualizada."),
     onDropLibraryItem: (id: string) => { const item = registry.get(id); if (item) addLibraryItem(item); },
+    onDropMediaAsset: (id: string) => { const asset = busRef.current.getState().assets.find((item) => item.id === id); if (asset) insertMediaAsset(asset); },
+    onImportFiles: (files: FileList) => void importFiles(files),
   };
   const inspectorProps = {
     clip: selectedClip,
@@ -1213,6 +1236,8 @@ export function EditorV2Foundation() {
     onToggleRipple: () => run(new UpdateProjectSettingsCommand({ rippleEnabled: !project.settings.rippleEnabled })),
     onTrackPatch: (trackId: string, patch: Partial<Pick<Track, "muted" | "solo" | "gain" | "hidden" | "locked">>) => run(new UpdateTrackCommand(trackId, patch)),
     onDropLibraryItem: dropLibraryItem,
+    onDropMediaAsset: (id: string, at: number) => { const asset = busRef.current.getState().assets.find((item) => item.id === id); if (asset) insertMediaAsset(asset, at); },
+    onImportFiles: (files: FileList, at: number) => void importFiles(files, at),
     onSelectTransition: (transitionId: string) => {
       const state = busRef.current.getState();
       const transition = state.transitions.find((item) => item.id === transitionId);
@@ -1258,8 +1283,9 @@ export function EditorV2Foundation() {
     mediaAssets: project.assets,
     assetThumbnails,
     importingMedia: importing,
-    onImportFiles: (files: FileList) => void importFiles(files),
+    onImportFiles: (files: FileList, at?: number) => void importFiles(files, at),
     onInsertMedia: insertMediaAsset,
+    onRemoveMedia: (asset: MediaAsset) => void removeMediaAsset(asset),
     onPreviewSoundEffect: previewSoundEffect,
   };
 
@@ -1279,7 +1305,7 @@ export function EditorV2Foundation() {
           <button type="button" onClick={redo} disabled={!busRef.current.canRedo} className="editor-icon-button" aria-label="Refazer"><Redo2 className="size-4" /></button>
           <span className="mx-1 hidden h-5 w-px bg-white/8 sm:block" />
           <div className="hidden items-center gap-1.5 text-[10px] text-muted-foreground md:flex"><Check className={`size-3 ${missingAssetIds.length ? "text-amber-300" : "text-emerald-400"}`} />{hydrated ? missingAssetIds.length ? `Local · ${missingAssetIds.length} ausente(s)` : `Local · rev. ${project.revisions.document}` : "Recuperando…"}</div>
-          <button type="button" onClick={() => void exportProject()} title={exporting ? "Cancelar exportação" : "Exportar MP4 com o mix atual"} className="editor-export-button ml-1 h-8 rounded-lg px-3 text-[11px] font-semibold">{exporting ? `Cancelar ${exportProgress}%` : "Exportar"}</button>
+          <button type="button" onClick={() => void exportProject()} aria-label={exporting ? `Cancelar download em ${exportProgress}%` : "Baixar vídeo"} title={exporting ? "Cancelar download" : "Baixar vídeo MP4 com o mix atual"} className="editor-export-button ml-1 flex h-8 items-center gap-1.5 rounded-lg px-3 text-[11px] font-semibold"><Download className="size-3.5" />{exporting ? `Cancelar ${exportProgress}%` : <span className="hidden sm:inline">Baixar vídeo</span>}</button>
         </div>
       </header>
 

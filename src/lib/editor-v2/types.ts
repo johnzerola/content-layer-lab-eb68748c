@@ -36,6 +36,8 @@ export interface MediaAsset {
   width?: number;
   height?: number;
   hash?: string;
+  /** Keeps a source available to existing clips while hiding it from the library. */
+  libraryHidden?: boolean;
   audioAnalysis?: { cacheKey: string; status: "pending" | "ready" | "error"; sampleRate?: number; channels?: number; durationMs?: number; peaks?: number[]; error?: string };
   sourceAudio?: {
     sourceAssetId: string;

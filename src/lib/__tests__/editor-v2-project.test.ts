@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it } from "vitest";
-import { AddCaptionBatchCommand, AddCaptionCueCommand, AddClipCommand, AddMediaClipCommand, ApplyCaptionPresetCommand, ApplySeparatedAudioCommand, ApplyTemplateCommand, ApplyTransitionCommand, CompositionClock, DeleteAudioEnvelopePointCommand, DeleteClipCommand, DeleteClipsCommand, DeleteKeyframeCommand, DuplicateClipsCommand, EditorCommandBus, MoveClipCommand, MoveKeyframeCommand, RegisterExtractedAudioCommand, RestoreOriginalAudioCommand, SelectItemCommand, SetAudioRepresentationCommand, SplitClipCommand, TrimClipCommand, UpdateClipCommand, UpdateProjectSettingsCommand, UpdateTrackCommand, UpdateTransformAtTimeCommand, UpsertAudioEnvelopePointCommand, UpsertKeyframeCommand, adaptEditorProjectV1, asProjectTime, buildExtractedAudioMedia, buildSeparatedAudioMedia, clampTransitionDuration, clipAudioGainAt, createCaptionBatch, createCaptionBatchFromTimedWords, createEditorProjectV2, createEditorRenderManifest, createPlaybackSurfaceKeys, createStemAsset, editorProjectFromManifest, findTransitionTarget, interpolateKeyframes, isEditorV2Enabled, isTrackCompatible, parseTimedText, projectToSourceTime, resolveAnimatedTransform, resolveAudioMixFrame, resolveAudioRenderFrameFromManifest, resolveCaptionInsertion, resolveClipPresentation, resolveCompositionFrame, resolveCompositionFrameFromManifest, resolveLibraryInsertion, resolveTemplateApplication, snapProjectTime, sourceToProjectTime, summarizeWaveform, visibleTimelineRange, type AudioSourceGroup, type Clip, type MediaAsset } from "@/lib/editor-v2";
+import { AddCaptionBatchCommand, AddCaptionCueCommand, AddClipCommand, AddMediaClipCommand, ApplyCaptionPresetCommand, ApplySeparatedAudioCommand, ApplyTemplateCommand, ApplyTransitionCommand, CompositionClock, DeleteAudioEnvelopePointCommand, DeleteClipCommand, DeleteClipsCommand, DeleteKeyframeCommand, DuplicateClipsCommand, EditorCommandBus, MoveClipCommand, MoveKeyframeCommand, RegisterExtractedAudioCommand, RemoveMediaAssetFromLibraryCommand, RestoreOriginalAudioCommand, SelectItemCommand, SetAudioRepresentationCommand, SplitClipCommand, TrimClipCommand, UpdateClipCommand, UpdateProjectSettingsCommand, UpdateTrackCommand, UpdateTransformAtTimeCommand, UpsertAudioEnvelopePointCommand, UpsertKeyframeCommand, adaptEditorProjectV1, asProjectTime, buildExtractedAudioMedia, buildSeparatedAudioMedia, clampTransitionDuration, clipAudioGainAt, createCaptionBatch, createCaptionBatchFromTimedWords, createEditorProjectV2, createEditorRenderManifest, createPlaybackSurfaceKeys, createStemAsset, editorProjectFromManifest, findTransitionTarget, interpolateKeyframes, isEditorV2Enabled, isTrackCompatible, parseTimedText, projectToSourceTime, resolveAnimatedTransform, resolveAudioMixFrame, resolveAudioRenderFrameFromManifest, resolveCaptionInsertion, resolveClipPresentation, resolveCompositionFrame, resolveCompositionFrameFromManifest, resolveLibraryInsertion, resolveTemplateApplication, snapProjectTime, sourceToProjectTime, summarizeWaveform, visibleTimelineRange, type AudioSourceGroup, type Clip, type MediaAsset } from "@/lib/editor-v2";
 import { BUILT_IN_LIBRARY_ITEMS, type CaptionPresetDefinition, type LibraryItem, type TemplateDefinition } from "@/lib/editor-v2/library";
 import { AddTrackCommand, AutoSplitClipsCommand, CreateCompoundClipCommand, DissolveCompoundClipCommand, InsertMediaClipCommand, MoveCompoundClipCommand, RemoveSilenceCommand, UpdateClipsCommand, createMediaClipFromAsset } from "@/lib/editor-v2";
 import { createEditorProject } from "@/lib/editor/project";
@@ -306,6 +306,27 @@ describe("Command bus", () => {
     bus.undo();
     expect(bus.getState().assets).toHaveLength(1);
     expect(bus.getState().tracks[0]!.clips).toHaveLength(1);
+  });
+
+  it("remove da biblioteca sem apagar clipes que ainda usam a mídia", () => {
+    const license: MediaAsset["license"] = { provider: "teste", sourceUrl: "fixture", licenseType: "fixture", licenseUrl: "fixture", author: "teste", attributionRequired: false, commercialUseAllowed: true, redistributionAllowed: false };
+    const asset: MediaAsset = { id: "used-video", kind: "video", name: "usado.mp4", mimeType: "video/mp4", duration: 8, license };
+    const insertion = createMediaClipFromAsset(asset, 0, 1);
+    const bus = new EditorCommandBus(createEditorProjectV2({ duration: 8 }));
+    bus.execute(new AddMediaClipCommand(asset, insertion.clip, insertion.audioGroup));
+    bus.execute(new RemoveMediaAssetFromLibraryCommand(asset.id));
+    expect(bus.getState().assets).toEqual([expect.objectContaining({ id: asset.id, libraryHidden: true })]);
+    expect(bus.getState().tracks[0]!.clips).toEqual([expect.objectContaining({ assetId: asset.id })]);
+  });
+
+  it("exclui completamente da biblioteca uma mídia sem clipes", () => {
+    const license: MediaAsset["license"] = { provider: "teste", sourceUrl: "fixture", licenseType: "fixture", licenseUrl: "fixture", author: "teste", attributionRequired: false, commercialUseAllowed: true, redistributionAllowed: false };
+    const asset: MediaAsset = { id: "unused-audio", kind: "audio", name: "sem-uso.wav", mimeType: "audio/wav", duration: 4, license };
+    const project = createEditorProjectV2({ duration: 8 });
+    project.assets.push(asset);
+    const bus = new EditorCommandBus(project);
+    bus.execute(new RemoveMediaAssetFromLibraryCommand(asset.id));
+    expect(bus.getState().assets).toEqual([]);
   });
 
   it("cria, move e remove keyframes por propriedade com undo", () => {

@@ -63,10 +63,16 @@ export async function readSourceFile(sourceId: string): Promise<File | null> {
 export async function forgetSourceFile(sourceId: string): Promise<void> {
   const db = await openDb();
   if (!db) return;
-  try {
-    db.transaction(STORE, "readwrite").objectStore(STORE).delete(sourceId);
-  } catch {
-    /* ignora */
-  }
+  await new Promise<void>((resolve) => {
+    try {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).delete(sourceId);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+      tx.onabort = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
   db.close();
 }

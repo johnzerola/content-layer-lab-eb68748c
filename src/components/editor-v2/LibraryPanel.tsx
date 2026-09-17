@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Captions, Check, Film, Heart, Image as ImageIcon, LoaderCircle, Music2, Plus, Search, SlidersHorizontal, Upload, Volume2 } from "lucide-react";
+import { Captions, Check, Film, GripVertical, Heart, Image as ImageIcon, LoaderCircle, Music2, Plus, Search, SlidersHorizontal, Trash2, Upload, Volume2 } from "lucide-react";
 import { LibraryRegistry, loadLibraryUserState, markRecent, saveLibraryUserState, toggleFavorite, type LibraryItem, type LibraryItemType } from "@/lib/editor-v2/library";
 import type { MediaAsset } from "@/lib/editor-v2/types";
 import { LibraryPreview } from "./LibraryPreview";
@@ -28,15 +28,16 @@ interface LibraryPanelProps {
   mediaAssets: MediaAsset[];
   assetThumbnails: Record<string, string>;
   importingMedia: boolean;
-  onImportFiles: (files: FileList) => void;
+  onImportFiles: (files: FileList, at?: number) => void;
   onInsertMedia: (asset: MediaAsset) => void;
+  onRemoveMedia: (asset: MediaAsset) => void;
   onPreviewSoundEffect: (item: LibraryItem) => void;
   revision?: number;
 }
 
 type MediaFilter = "all" | "video" | "image" | "audio";
 
-export function LibraryPanel({ registry, selectedId, onSelect, onAdd, onGenerateCaptions, generatingCaptions, captionProgress, mediaAssets, assetThumbnails, importingMedia, onImportFiles, onInsertMedia, onPreviewSoundEffect, revision = 0 }: LibraryPanelProps) {
+export function LibraryPanel({ registry, selectedId, onSelect, onAdd, onGenerateCaptions, generatingCaptions, captionProgress, mediaAssets, assetThumbnails, importingMedia, onImportFiles, onInsertMedia, onRemoveMedia, onPreviewSoundEffect, revision = 0 }: LibraryPanelProps) {
   const [section, setSection] = useState("Mídia");
   const [scope, setScope] = useState<Scope>("built-in");
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
@@ -51,6 +52,7 @@ export function LibraryPanel({ registry, selectedId, onSelect, onAdd, onGenerate
   }, [registry, revision, query, section]);
   const items = result.items.filter((item) => scope === "favorites" ? userState.favorites.includes(item.id) : scope === "recent" ? userState.recent.includes(item.id) : scope === "mine" ? item.source === "user" : item.source === "built-in");
   const visibleMedia = useMemo(() => mediaAssets.filter((asset) => {
+    if (asset.libraryHidden) return false;
     if (asset.kind !== "video" && asset.kind !== "image" && asset.kind !== "audio") return false;
     if (mediaFilter !== "all" && asset.kind !== mediaFilter) return false;
     return !query.trim() || asset.name.toLocaleLowerCase("pt-BR").includes(query.trim().toLocaleLowerCase("pt-BR"));
@@ -103,7 +105,7 @@ export function LibraryPanel({ registry, selectedId, onSelect, onAdd, onGenerate
             <button type="button" onClick={() => mediaInputRef.current?.click()} disabled={importingMedia} className="editor-primary-button mt-3 flex min-h-9 w-full items-center justify-center gap-2 rounded-lg px-3 text-[10px] font-semibold text-primary-foreground disabled:cursor-wait disabled:opacity-65">{importingMedia ? <LoaderCircle className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}{importingMedia ? "Importando…" : "Escolher arquivos"}</button>
             <p className="mt-2 text-center text-[8px] text-muted-foreground">MP4, MOV, WebM, JPG, PNG, WebP, MP3 e WAV</p>
           </div>
-          {visibleMedia.length ? <div className="grid grid-cols-2 gap-2">{visibleMedia.map((asset) => <MediaCard key={asset.id} asset={asset} {...(assetThumbnails[asset.id] ? { thumbnail: assetThumbnails[asset.id] } : {})} onInsert={() => onInsertMedia(asset)} />)}</div> : <div className="grid min-h-40 place-items-center rounded-xl border border-dashed border-white/10 px-5 text-center"><div><span className="mx-auto grid size-10 place-items-center rounded-full bg-white/5 text-muted-foreground"><Film className="size-4" /></span><p className="mt-3 text-xs font-medium">Sua mídia aparecerá aqui</p><p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">Depois de importar, você pode inserir o mesmo arquivo novamente em qualquer ponto da timeline.</p></div></div>}
+          {visibleMedia.length ? <div className="grid grid-cols-2 gap-2">{visibleMedia.map((asset) => <MediaCard key={asset.id} asset={asset} {...(assetThumbnails[asset.id] ? { thumbnail: assetThumbnails[asset.id] } : {})} onInsert={() => onInsertMedia(asset)} onRemove={() => onRemoveMedia(asset)} />)}</div> : <div className="grid min-h-40 place-items-center rounded-xl border border-dashed border-white/10 px-5 text-center"><div><span className="mx-auto grid size-10 place-items-center rounded-full bg-white/5 text-muted-foreground"><Film className="size-4" /></span><p className="mt-3 text-xs font-medium">Sua mídia aparecerá aqui</p><p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">Arraste arquivos para importar ou use o botão acima.</p></div></div>}
         </>}
         {section === "Modelos" && <div className="mb-3 rounded-xl border border-violet-300/15 bg-[linear-gradient(135deg,rgba(124,92,255,.12),rgba(38,211,169,.05))] p-3">
           <p className="text-[11px] font-semibold text-foreground">Layouts prontos para o vídeo atual</p>
@@ -137,16 +139,17 @@ export function LibraryPanel({ registry, selectedId, onSelect, onAdd, onGenerate
   );
 }
 
-function MediaCard({ asset, thumbnail, onInsert }: { asset: MediaAsset; thumbnail?: string; onInsert: () => void }) {
+function MediaCard({ asset, thumbnail, onInsert, onRemove }: { asset: MediaAsset; thumbnail?: string; onInsert: () => void; onRemove: () => void }) {
   const Icon = asset.kind === "video" ? Film : asset.kind === "image" ? ImageIcon : Music2;
-  return <article className="editor-library-card group overflow-hidden rounded-xl focus-within:ring-2 focus-within:ring-primary">
+  return <article draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("application/x-vaiviral-media-asset", asset.id); }} className="editor-library-card group overflow-hidden rounded-xl focus-within:ring-2 focus-within:ring-primary">
     <div className="relative aspect-[4/3] overflow-hidden bg-[radial-gradient(circle_at_50%_25%,hsl(var(--primary)/.22),transparent_55%),hsl(var(--muted)/.35)]">
       {thumbnail && asset.kind !== "audio" ? <img src={thumbnail} alt="" className="size-full object-cover transition duration-300 group-hover:scale-[1.04]" /> : <div className="grid size-full place-items-center"><span className={`grid size-11 place-items-center rounded-2xl ${asset.kind === "audio" ? "bg-cyan-400/14 text-cyan-300" : "bg-primary/14 text-primary"}`}><Icon className="size-5" /></span></div>}
       <span className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-md border border-white/10 bg-black/55 px-1.5 py-1 text-[8px] font-semibold text-white backdrop-blur"><Icon className="size-2.5" />{asset.kind === "video" ? "VÍDEO" : asset.kind === "image" ? "FOTO" : "ÁUDIO"}</span>
       {asset.duration ? <span className="absolute bottom-1.5 right-1.5 rounded bg-black/65 px-1.5 py-0.5 font-mono text-[8px] text-white">{formatDuration(asset.duration)}</span> : null}
+      <span className="absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-md bg-black/55 text-white/80 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100" aria-hidden><GripVertical className="size-3" /></span>
     </div>
     <div className="px-2 pb-2 pt-2"><p className="truncate text-[10px] font-medium text-foreground" title={asset.name}>{asset.name}</p><p className="mt-0.5 truncate text-[8px] text-muted-foreground">{asset.width && asset.height ? `${asset.width} × ${asset.height}` : asset.mimeType || "Arquivo local"}</p></div>
-    <div className="border-t border-white/5 p-1.5"><button type="button" onClick={onInsert} className="editor-primary-button flex h-7 w-full items-center justify-center gap-1 rounded-md px-2 text-[9px] font-semibold text-primary-foreground"><Plus className="size-3" />Inserir na agulha</button></div>
+    <div className="flex gap-1 border-t border-white/5 p-1.5"><button type="button" onClick={onInsert} className="editor-primary-button flex h-7 min-w-0 flex-1 items-center justify-center gap-1 rounded-md px-2 text-[9px] font-semibold text-primary-foreground"><Plus className="size-3" />Inserir</button><button type="button" onClick={onRemove} aria-label={`Remover ${asset.name} da biblioteca`} title="Remover da biblioteca" className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-destructive/12 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"><Trash2 className="size-3.5" /></button></div>
   </article>;
 }
 

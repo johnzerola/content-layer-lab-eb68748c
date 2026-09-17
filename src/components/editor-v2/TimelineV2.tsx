@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Captions, ChevronDown, Copy, Eye, EyeOff, Film, FlipHorizontal2, FlipVertical2, Gauge, Group, Headphones, Image, Layers3, Lock, Magnet, Music2, Pause, Play, Rewind, RotateCcw, Scissors, Sparkles, Timer, Trash2, Ungroup, Unlock, Volume2, VolumeX, Waves } from "lucide-react";
+import { Captions, ChevronDown, Copy, Eye, EyeOff, Film, FlipHorizontal2, FlipVertical2, Gauge, Group, Headphones, Image, Layers3, Lock, Magnet, Maximize2, Music2, Pause, Play, Rewind, RotateCcw, Scissors, Sparkles, Timer, Trash2, Ungroup, Unlock, Volume2, VolumeX, Waves, ZoomIn, ZoomOut } from "lucide-react";
 import { formatProjectTime, isTrackCompatible, snapProjectTime, visibleTimelineRange, type AnimatableProperty, type Clip, type EditorProjectV2, type Track, type TrackKind } from "@/lib/editor-v2";
 
 interface TimelineProps {
@@ -33,6 +33,8 @@ interface TimelineProps {
   onToggleRipple: () => void;
   onTrackPatch: (trackId: string, patch: Partial<Pick<Track, "muted" | "solo" | "gain" | "hidden" | "locked">>) => void;
   onDropLibraryItem: (id: string, at: number) => void;
+  onDropMediaAsset: (id: string, at: number) => void;
+  onImportFiles: (files: FileList, at: number) => void;
   onSelectTransition: (transitionId: string) => void;
   onResizeTransition: (transitionId: string, duration: number) => void;
   onEditEffectRange: (clipId: string, effectId: string, start: number, end: number) => void;
@@ -44,7 +46,7 @@ const TRACK_HEIGHT = 48;
 const RULER_HEIGHT = 28;
 
 export function TimelineV2(props: TimelineProps) {
-  const { project, currentTime, playing, zoom, assetThumbnails, assetWaveforms, onZoom, onSeek, onSelect, onMove, onTrim, onMoveKeyframe, onSplit, onAutoSplit, onRemoveSilence, removingSilence, onDuplicate, onDelete, onTogglePlayback, onSkip, onBatchSpeed, onBatchToggleReverse, onBatchToggleFlip, onCreateCompound, onDissolveCompound, onAddTrack, onToggleSnap, onToggleRipple, onTrackPatch, onDropLibraryItem, onSelectTransition, onResizeTransition, onEditEffectRange } = props;
+  const { project, currentTime, playing, zoom, assetThumbnails, assetWaveforms, onZoom, onSeek, onSelect, onMove, onTrim, onMoveKeyframe, onSplit, onAutoSplit, onRemoveSilence, removingSilence, onDuplicate, onDelete, onTogglePlayback, onSkip, onBatchSpeed, onBatchToggleReverse, onBatchToggleFlip, onCreateCompound, onDissolveCompound, onAddTrack, onToggleSnap, onToggleRipple, onTrackPatch, onDropLibraryItem, onDropMediaAsset, onImportFiles, onSelectTransition, onResizeTransition, onEditEffectRange } = props;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [autoCutOpen, setAutoCutOpen] = useState(false);
@@ -94,6 +96,21 @@ export function TimelineV2(props: TimelineProps) {
     if (!rect) return project.tracks[0]!;
     const index = Math.max(0, Math.min(project.tracks.length - 1, Math.floor((clientY - rect.top + scrollRef.current!.scrollTop - RULER_HEIGHT) / TRACK_HEIGHT)));
     return project.tracks[index]!;
+  };
+
+  const changeZoom = (value: number) => {
+    const next = Math.max(.35, Math.min(8, value));
+    const element = scrollRef.current;
+    const playheadViewportX = element ? TRACK_LABEL_WIDTH + currentTime * pxPerSecond - element.scrollLeft : 0;
+    onZoom(next);
+    if (element) requestAnimationFrame(() => {
+      element.scrollLeft = Math.max(0, TRACK_LABEL_WIDTH + currentTime * 52 * next - playheadViewportX);
+    });
+  };
+
+  const fitTimeline = () => {
+    const available = Math.max(240, (scrollRef.current?.clientWidth ?? 900) - TRACK_LABEL_WIDTH - 40);
+    changeZoom(available / Math.max(1, project.settings.duration * 52));
   };
 
   const beginPlayheadGesture = (event: React.PointerEvent) => {
@@ -215,6 +232,7 @@ export function TimelineV2(props: TimelineProps) {
   return (
     <section className="editor-v2-timeline flex h-full min-h-0 flex-col" aria-label="Timeline multitrack">
       <header className="editor-v2-timeline-toolbar flex h-11 shrink-0 items-center gap-1 px-2 sm:px-3">
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto vaiviral-scrollbar">
         <div className="mr-1 flex items-center gap-0.5 rounded-lg border border-white/8 bg-black/20 p-0.5" role="group" aria-label="Controles de reprodução">
           <button type="button" onClick={() => onSkip(-5)} className="editor-icon-button size-7" aria-label="Voltar 5 segundos"><RotateCcw className="size-3.5" /></button>
           <button type="button" onClick={onTogglePlayback} className="editor-icon-button size-7 bg-primary/18 text-primary" aria-label={playing ? "Pausar" : "Reproduzir"}>{playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}</button>
@@ -257,10 +275,11 @@ export function TimelineV2(props: TimelineProps) {
           <button type="button" onClick={() => setLayerOpen((open) => !open)} aria-expanded={layerOpen} className={`editor-tool-button ${layerOpen ? "text-primary" : ""}`}><Layers3 className="size-3.5" /><span className="hidden xl:inline">Camada</span><ChevronDown className="size-3" /></button>
           {layerOpen && <div className="editor-auto-cut-popover absolute right-0 top-9 z-50 w-56 rounded-xl border border-white/10 p-2 shadow-2xl"><p className="px-2 pb-1 text-[9px] font-semibold text-foreground">Adicionar camada</p>{([['overlay','Sobreposição'],['voice','Voz'],['music','Música'],['sfx','Efeito sonoro']] as const).map(([kind, label]) => <button key={kind} type="button" onClick={() => { onAddTrack(kind); setLayerOpen(false); }} className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-[9px] text-muted-foreground hover:bg-primary/12 hover:text-primary"><TrackIcon kind={kind} />{label}</button>)}</div>}
         </div>
-        <div className="ml-auto flex items-center gap-2"><label htmlFor="timeline-zoom" className="text-[10px] text-muted-foreground">Zoom</label><input id="timeline-zoom" aria-label="Zoom da timeline" type="range" min="0.55" max="3" step="0.05" value={zoom} onChange={(event) => onZoom(Number(event.target.value))} className="w-20 accent-violet-500 sm:w-32" /><span className="w-8 text-right text-[10px] tabular-nums text-muted-foreground">{Math.round(zoom * 100)}%</span></div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1 rounded-lg border border-white/8 bg-black/35 p-0.5 shadow-[-10px_0_18px_rgba(4,5,10,.72)]" role="group" aria-label="Zoom da timeline"><button type="button" onClick={() => changeZoom(zoom / 1.25)} className="editor-icon-button size-7" aria-label="Diminuir zoom"><ZoomOut className="size-3.5" /></button><input id="timeline-zoom" aria-label="Zoom da timeline" type="range" min="0.35" max="8" step="0.05" value={zoom} onChange={(event) => changeZoom(Number(event.target.value))} className="w-16 accent-violet-500 sm:w-28" /><button type="button" onClick={() => changeZoom(zoom * 1.25)} className="editor-icon-button size-7" aria-label="Aumentar zoom"><ZoomIn className="size-3.5" /></button><button type="button" onClick={fitTimeline} className="editor-icon-button size-7" aria-label="Ajustar projeto inteiro à timeline" title="Mostrar projeto inteiro"><Maximize2 className="size-3.5" /></button><output htmlFor="timeline-zoom" className="hidden w-9 text-right text-[9px] tabular-nums text-muted-foreground sm:block">{Math.round(zoom * 100)}%</output></div>
       </header>
 
-      <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-auto vaiviral-scrollbar" onScroll={(event) => setViewport({ scrollLeft: event.currentTarget.scrollLeft, width: event.currentTarget.clientWidth })} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const id = event.dataTransfer.getData("application/x-vaiviral-library-item"); if (id) onDropLibraryItem(id, timeFromPointer(event.clientX)); }}>
+      <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-auto vaiviral-scrollbar" onScroll={(event) => setViewport({ scrollLeft: event.currentTarget.scrollLeft, width: event.currentTarget.clientWidth })} onWheel={(event) => { if (!event.ctrlKey && !event.metaKey) return; event.preventDefault(); changeZoom(zoom * (event.deltaY > 0 ? .88 : 1.12)); }} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; }} onDrop={(event) => { event.preventDefault(); const at = timeFromPointer(event.clientX); if (event.dataTransfer.files.length) { onImportFiles(event.dataTransfer.files, at); return; } const mediaId = event.dataTransfer.getData("application/x-vaiviral-media-asset"); if (mediaId) { onDropMediaAsset(mediaId, at); return; } const id = event.dataTransfer.getData("application/x-vaiviral-library-item"); if (id) onDropLibraryItem(id, at); }}>
         <div className="relative min-h-full" style={{ width: width + TRACK_LABEL_WIDTH }}>
           <div className="editor-v2-ruler sticky top-0 z-30 flex h-7 backdrop-blur">
             <div className="sticky left-0 z-40 flex shrink-0 items-center border-r border-white/8 bg-[oklch(0.105_0.012_270)] px-3 text-[9px] font-medium text-muted-foreground" style={{ width: TRACK_LABEL_WIDTH }}>{formatProjectTime(currentTime)}</div>
