@@ -357,8 +357,12 @@ class AudioSeparation:
                 if directory.exists():
                     raise HTTPException(409, "Este upload já existe; crie outro trabalho.")
                 reserve = MAX_BYTES * (8 if engine_name() == "bandit" else 4)
-                if shutil.disk_usage(self.settings.storage_dir).free < self.settings.min_free_bytes + reserve:
-                    raise HTTPException(507, "Espaço insuficiente para separar áudio.")
+                free = shutil.disk_usage(self.settings.storage_dir).free
+                required = self.settings.min_free_bytes + reserve
+                if free < required:
+                    raise HTTPException(507, f"O disco do worker de áudio tem {free / 1024**3:.1f} GB livres; "
+                                        f"são necessários {required / 1024**3:.1f} GB. "
+                                        "Reinicie o worker com -StorageDirectory em um disco com espaço livre.")
                 if directory_size(self.settings.storage_dir) + reserve > self.settings.storage_quota_bytes:
                     raise HTTPException(507, "Cota de armazenamento atingida.")
                 directory.mkdir(parents=True)

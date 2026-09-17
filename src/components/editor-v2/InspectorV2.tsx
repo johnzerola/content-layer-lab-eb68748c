@@ -46,6 +46,8 @@ interface InspectorProps {
   onRelink: (assetId: string) => void;
   extractingAudio: boolean;
   separatingAudio: boolean;
+  audioSeparationStatus: string;
+  audioSeparationError: boolean;
   onAddLibraryItem: (item: LibraryItem) => void;
 }
 
@@ -99,12 +101,16 @@ export function InspectorV2(props: InspectorProps) {
             >
               {separatingAudio && <LoaderCircle aria-hidden="true" className="size-3.5 motion-safe:animate-spin" />}
               {separatingAudio
-                ? "Separando automaticamente com a RTX…"
+                ? "Processando áudio…"
                 : audioGroup.dialogueClipId || audioGroup.musicClipId
                   ? "Separar novamente com a RTX"
                   : "Separar diálogo e música"}
             </button>
-            {separatingAudio && <div role="status" aria-live="polite" className="rounded-lg border border-primary/20 bg-primary/[0.06] px-3 py-2 text-[9px] leading-relaxed text-muted-foreground">O áudio original continua ativo. As faixas <span className="font-semibold text-foreground">Diálogo</span> e <span className="font-semibold text-foreground">Música e ambiente</span> aparecerão juntas quando a RTX terminar.</div>}
+            {props.audioSeparationStatus && <div role={props.audioSeparationError ? "alert" : "status"} className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs leading-relaxed text-foreground">
+              {props.audioSeparationError && <strong className="mb-1 block">A separação não foi concluída</strong>}
+              {props.audioSeparationStatus}
+              {separatingAudio && <p className="mt-1 text-muted-foreground">O áudio atual fica preservado até as duas faixas estarem prontas.</p>}
+            </div>}
             {separatingAudio && <button type="button" onClick={onCancelAudioSeparation} className="flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg px-3 text-[10px] font-medium text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"><X aria-hidden="true" className="size-3.5" />Cancelar processamento</button>}
             {audioGroup.dialogueClipId || audioGroup.musicClipId ? <button type="button" disabled={extractingAudio || separatingAudio} onClick={onRestoreOriginalAudio} className="min-h-9 w-full rounded-lg px-3 text-[10px] font-medium text-muted-foreground transition hover:bg-white/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-45">Restaurar áudio original</button> : null}
             <p className="text-[9px] leading-relaxed text-muted-foreground">O original fica preservado. Depois, use Solo ou Mudo nas faixas Diálogo e Música e ambiente.</p>

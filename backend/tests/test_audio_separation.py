@@ -111,6 +111,22 @@ def test_real_wav_upload_duplicate_and_invalid_media(service):
         assert not (manager.root / other / "input.wav").exists()
 
 
+def test_upload_disk_shortage_is_actionable_and_releases_slot(service):
+    manager, client = service
+    job_id = str(uuid.uuid4())
+    manager.settings.min_free_bytes = 10 * 1024**3
+    with patch("app.audio_separation.capabilities", return_value={"ready": True}), \
+         patch("app.audio_separation.engine_name", return_value="bandit"), \
+         patch("app.audio_separation.shutil.disk_usage", return_value=SimpleNamespace(free=5 * 1024**3)):
+        result = client.post(f"/v1/audio/jobs/{job_id}/upload", content=wav(), headers=header(manager, job_id, "upload"))
+    assert result.status_code == 507
+    assert "5.0 GB" in result.json()["detail"]
+    assert "10.5 GB" in result.json()["detail"]
+    assert "-StorageDirectory" in result.json()["detail"]
+    assert not (manager.root / job_id).exists()
+    assert not manager.slot.locked()
+
+
 def test_upload_normalizes_48khz_before_engine(service):
     manager, client = service
     job_id = str(uuid.uuid4())

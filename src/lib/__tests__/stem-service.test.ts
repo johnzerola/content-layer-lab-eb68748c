@@ -18,6 +18,15 @@ const validWav = () => encodeStereoWav([new Float32Array([0, 0])], 44100);
 afterEach(() => vi.unstubAllGlobals());
 
 describe("real audio separation", () => {
+  it("reports worker disk exhaustion before starting the engine", async () => {
+    const fetcher = vi.fn(async (url: string) => url.endsWith("/upload")
+      ? json({ detail: "Espaço insuficiente para separar áudio." }, 507)
+      : json({}));
+    vi.stubGlobal("fetch", fetcher);
+    await expect(runStemJob(ticket, validWav())).rejects.toThrow("disco usado pelo worker");
+    expect(fetcher.mock.calls.some(([url]) => url.endsWith("/start"))).toBe(false);
+    expect(fetcher.mock.calls.some(([url]) => url.includes("/stems/"))).toBe(false);
+  });
   it("encodes stereo without mixing left/right", async () => {
     const blob = encodeStereoWav([new Float32Array([1, 0]), new Float32Array([0, -1])], 44100);
     const data = new DataView(await blob.arrayBuffer());

@@ -49,6 +49,13 @@ export async function runStemJob(
     });
     if (!response.ok) {
       const body = (await response.json().catch(() => ({}))) as { detail?: unknown };
+      if (response.status === 507) {
+        throw new Error(
+          "O disco usado pelo worker está sem espaço disponível para processar áudio. " +
+          "Reinicie o worker escolhendo uma pasta em um disco com espaço livre (-StorageDirectory). " +
+          (typeof body.detail === "string" ? body.detail : ""),
+        );
+      }
       throw new Error(
         typeof body.detail === "string" ? body.detail : `Falha na separação (${response.status}).`,
       );

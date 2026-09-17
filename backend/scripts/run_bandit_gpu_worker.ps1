@@ -2,6 +2,7 @@ param(
   [string]$Python = $env:BANDIT_PYTHON,
   [string]$Checkout = $env:BANDIT_CHECKOUT,
   [string]$Checkpoint = $env:BANDIT_CHECKPOINT,
+  [string]$StorageDirectory = $env:BANDIT_STORAGE,
   [int]$Port = 8095
 )
 
@@ -27,7 +28,14 @@ $env:CLEANER_ENV = 'development'
 $env:CLEANER_BIND_PORT = [string]$Port
 $env:CLEANER_ALLOWED_HOSTS = if ($env:CLEANER_ALLOWED_HOSTS) { $env:CLEANER_ALLOWED_HOSTS } else { 'localhost,127.0.0.1' }
 $env:CORS_ORIGINS = if ($env:CORS_ORIGINS) { $env:CORS_ORIGINS } else { 'https://content-layer-lab.lovable.app,http://localhost:5173,http://127.0.0.1:5173' }
-$env:CLEANER_STORAGE = (Join-Path $PSScriptRoot '..\storage\bandit-gpu')
+# Keep temporary audio beside the model checkout, which may be on a data disk.
+# An inherited CLEANER_STORAGE from an older launcher must not force C: again.
+if (-not $StorageDirectory) { $StorageDirectory = Join-Path (Split-Path $env:BANDIT_CHECKOUT -Parent) 'bandit-gpu-storage' }
+New-Item -ItemType Directory -Path $StorageDirectory -Force | Out-Null
+$env:CLEANER_STORAGE = (Resolve-Path -LiteralPath $StorageDirectory).Path
+$env:BANDIT_STORAGE = $env:CLEANER_STORAGE
+& $Python -c "import os, shutil; from pathlib import Path; p=Path(os.environ['CLEANER_STORAGE']); free=shutil.disk_usage(p).free/1024**3; required=max(1,float(os.environ.get('CLEANER_MIN_FREE_GB','10')))+0.5; print(f'Audio storage: {p} | free: {free:.1f} GiB | required: {required:.1f} GiB'); assert free >= required, 'Insufficient storage. Choose -StorageDirectory on a disk with free space.'"
+if ($LASTEXITCODE -ne 0) { throw 'Sem espaco para audio. Use -StorageDirectory em um disco com espaco livre.' }
 $env:OMP_NUM_THREADS = '2'
 $env:MKL_NUM_THREADS = '2'
 

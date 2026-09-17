@@ -153,6 +153,8 @@ export function EditorV2Foundation() {
   const [captionProgress, setCaptionProgress] = useState(0);
   const [extractingAudio, setExtractingAudio] = useState(false);
   const [separatingAudio, setSeparatingAudio] = useState(false);
+  const [audioSeparationStatus, setAudioSeparationStatus] = useState("");
+  const [audioSeparationError, setAudioSeparationError] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [hydrated, setHydrated] = useState(false);
@@ -740,12 +742,14 @@ export function EditorV2Foundation() {
 
   const separateSelectedAudio = useCallback(async () => {
     if (audioSeparationRef.current) return;
+    setAudioSeparationError(false);
+    const report = (status: string) => { setAudioSeparationStatus(status); setMessage(status); };
     const initial = busRef.current.getState();
     const selected = findClip(initial, initial.selection.primaryId);
     const initialGroup = selected ? initial.audioGroups.find((item) => item.id === selected.audioGroupId || item.sourceVideoClipId === selected.id || item.extractedClipId === selected.id || item.dialogueClipId === selected.id || item.musicClipId === selected.id) : undefined;
     const videoClip = initialGroup ? sourceVideoClipForAudioSelection(initial, selected, initialGroup) : undefined;
     const sourceAsset = videoClip?.assetId ? initial.assets.find((asset) => asset.id === videoClip.assetId) : undefined;
-    if (!initialGroup || !videoClip || !sourceAsset) { setMessage("Selecione um vídeo ou uma de suas trilhas de áudio."); return; }
+    if (!initialGroup || !videoClip || !sourceAsset) { setAudioSeparationError(true); report("Selecione um vídeo ou uma de suas trilhas de áudio."); return; }
 
     // Bandit accepts at most 180 seconds. Reject known-long sources before
     // Web Audio decodes them, otherwise the UI appears stuck while the worker
@@ -753,7 +757,8 @@ export function EditorV2Foundation() {
     const clipDuration = Number(videoClip.sourceOut - videoClip.sourceIn);
     const knownDuration = Number.isFinite(clipDuration) && clipDuration > 0 ? clipDuration : Number(sourceAsset.duration);
     if (Number.isFinite(knownDuration) && knownDuration > 180.15) {
-      setMessage(`Este vídeo tem ${Math.round(knownDuration)} segundos. Separe um trecho de até 180 segundos por vez.`);
+      setAudioSeparationError(true);
+      report(`Este trecho tem ${Math.round(knownDuration)} segundos. Separe um trecho de até 180 segundos por vez.`);
       return;
     }
 
@@ -780,12 +785,12 @@ export function EditorV2Foundation() {
       if (!sourceWav) {
         const sourceFile = sourceFilesRef.current.get(sourceAsset.id);
         if (!sourceFile) throw new Error("O arquivo original precisa ser religado antes de separar o áudio.");
-        setMessage("Preparando temporariamente o trecho para a RTX…");
+        report("Preparando o trecho de áudio…");
         const extracted = await extractAudioFromMediaFile(sourceFile, {
           signal: controller.signal,
           sourceIn: videoClip.sourceIn,
           sourceOut: videoClip.sourceOut,
-          onStage: (stage) => setMessage(stage === "reading" ? "Lendo o vídeo…" : stage === "decoding" ? "Decodificando o áudio…" : "Criando a fonte de áudio…"),
+          onStage: (stage) => report(stage === "reading" ? "Lendo o vídeo…" : stage === "decoding" ? "Decodificando o áudio…" : "Criando a fonte de áudio…"),
         });
         sourceWav = new File(
           [extracted.wav],
@@ -801,7 +806,7 @@ export function EditorV2Foundation() {
       const clipDuration = videoClip.sourceOut - videoClip.sourceIn;
       const sourceDuration = Number.isFinite(clipDuration) && clipDuration > 0 ? clipDuration : sourceAsset.duration;
       if (!Number.isFinite(sourceDuration) || sourceDuration! <= 0) throw new Error("Não foi possível congelar a duração do áudio fonte.");
-      setMessage("Conectando ao separador de diálogo e música…");
+      report("Conectando ao separador de diálogo e música…");
       const ticket = await prepareAudioSeparation({ data: {
         projectId: initial.id,
         groupId: workingGroup.id,
@@ -825,7 +830,7 @@ export function EditorV2Foundation() {
       });
       jobRepository.save(jobRecord);
       const separationSampleRate: 44_100 | 48_000 = ticket.sampleRate === 48_000 ? 48_000 : 44_100;
-      setMessage(`Preparando o áudio em ${separationSampleRate.toLocaleString("pt-BR")} Hz…`);
+      report(`Preparando o áudio em ${separationSampleRate.toLocaleString("pt-BR")} Hz…`);
       const separationWav = await prepareAudioForSeparation(sourceWav, {
         signal: controller.signal,
         maxDuration: ticket.maxDuration,
@@ -833,11 +838,12 @@ export function EditorV2Foundation() {
       });
       const result = await runStemJob(ticket, separationWav, {
         signal: controller.signal,
-        onStage: setMessage,
+        onStage: report,
         onStatus: recordJobStatus,
       });
       controller.signal.throwIfAborted();
 
+      report("Preparando as faixas de diálogo e música para a timeline…");
       const state = busRef.current.getState();
       const currentGroup = state.audioGroups.find((item) => item.id === workingGroup.id);
       const currentSourceAsset = state.assets.find((asset) => asset.id === sourceAsset.id);
@@ -936,7 +942,7 @@ export function EditorV2Foundation() {
         });
         setProject(next);
         setMobileSurface("timeline");
-        setMessage(dialogueCloudPath && musicCloudPath
+        report(dialogueCloudPath && musicCloudPath
           ? ticket.persistenceReady
             ? "Diálogo e música foram separados, salvos na conta e aplicados em duas faixas. Use solo ou mudo para comparar."
             : "Diálogo e música foram separados, salvos e aplicados. O histórico do processamento será ativado após a atualização do banco."
@@ -949,6 +955,11 @@ export function EditorV2Foundation() {
         throw error;
       }
     } catch (error) {
+      const cancelled = error instanceof DOMException && error.name === "AbortError";
+      const failure = cancelled ? "Separação cancelada; o áudio anterior foi preservado." : error instanceof Error ? error.message : "Não foi possível separar diálogo e música.";
+      setAudioSeparationError(!cancelled);
+      report(failure);
+      if (!cancelled) toast.error("Não foi possível separar o áudio", { description: failure, duration: 12_000 });
       if (jobRecord && jobRecord.status !== "completed" && jobRecord.status !== "failed" && jobRecord.status !== "cancelled") {
         try {
           if (error instanceof DOMException && error.name === "AbortError") {
@@ -963,7 +974,6 @@ export function EditorV2Foundation() {
           jobRepository.save(jobRecord);
         } catch { /* preserve the original processing error */ }
       }
-      setMessage(error instanceof DOMException && error.name === "AbortError" ? "Separação cancelada; o áudio original foi preservado." : error instanceof Error ? error.message : "Não foi possível separar diálogo e música.");
     } finally {
       if (audioSeparationRef.current === controller) audioSeparationRef.current = null;
       setSeparatingAudio(false);
@@ -1162,6 +1172,8 @@ export function EditorV2Foundation() {
     onCancelAudioSeparation: () => audioSeparationRef.current?.abort(),
     onRestoreOriginalAudio: () => { if (selectedAudioGroup) run(new RestoreOriginalAudioCommand(selectedAudioGroup.id), "Áudio original restaurado."); },
     separatingAudio,
+    audioSeparationStatus,
+    audioSeparationError,
     onAddLibraryItem: addLibraryItem,
   };
   const timelineProps = {

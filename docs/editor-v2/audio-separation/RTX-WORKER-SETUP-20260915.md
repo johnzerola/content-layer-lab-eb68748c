@@ -12,7 +12,20 @@ $env:BANDIT_PYTHON = 'C:\caminho\para\python.exe'
 .\backend\scripts\run_bandit_gpu_worker.ps1
 ```
 
-O script valida CUDA, FFmpeg, numpy, soundfile, uvicorn, o checkout e a existência do checkpoint. Ele inicia uma aplicação isolada só de áudio, portanto não exige OpenCV, OCR ou os modelos de vídeo. O serviço escuta somente `127.0.0.1:8095`; o áudio original e as saídas ficam em `backend/storage/bandit-gpu`.
+O script valida espaço em disco, CUDA, FFmpeg, numpy, soundfile, uvicorn, o checkout e a existência do checkpoint. Ele inicia uma aplicação isolada só de áudio, portanto não exige OpenCV, OCR ou os modelos de vídeo. O serviço escuta somente `127.0.0.1:8095`. Por padrão, o áudio original e as saídas ficam em `bandit-gpu-storage` ao lado da pasta do checkout Bandit. Use `-StorageDirectory` ou `BANDIT_STORAGE` para escolher outro destino.
+
+### Erro 507: espaço insuficiente no worker
+
+`ready=true` em `/v1/audio/capabilities` confirma a disponibilidade do modelo, mas não garante espaço para receber um job. O upload exige a reserva `CLEANER_MIN_FREE_GB` (10 GiB por padrão) mais 0,5 GiB para Bandit. A verificação ocorre antes da criação do job; por isso não aparece uma nova pasta quando o upload é recusado.
+
+Pare o worker com **Ctrl+C na janela que o iniciou** e reinicie usando um disco com espaço:
+
+```powershell
+& C:\Users\DINO\content-layer-lab\backend\scripts\run_bandit_gpu_worker.ps1 `
+  -StorageDirectory 'G:\dowloand\teste\bandit-gpu-storage'
+```
+
+Mantenha as variáveis de autenticação da sessão e o túnel apontando para a porta 8095. O script imprime o destino e o espaço livre antes de iniciar. O Editor V2 mostra a etapa atual e mantém o erro junto ao botão caso o upload seja recusado. Alterar o destino não move nem apaga jobs antigos; aguarde jobs em andamento antes de trocar a pasta.
 
 ## Ligar ao Editor V2
 
