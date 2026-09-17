@@ -53,7 +53,15 @@ function metricsFor(width: number, height: number, paginated = false): Metrics {
   // referência: 1080x1920. Tudo escala pela menor dimensão relativa para que
   // 1:1 e 16:9 não fiquem com texto gigante.
   // Pages use readable width-based type; scrolling documents keep legacy metrics.
-  const scale = paginated ? width / 1080 * 1.35
+  const paginatedWidthScale = width / 1080 * 1.35;
+  // A wide, shallow chat panel cannot size type from width alone: in 16:9
+  // that made the header consume almost half the panel and forced one bubble
+  // per page. Vertical and square compositions retain the calibrated width
+  // scale; landscape panels also respect the available height.
+  const scale = paginated ? Math.min(
+    paginatedWidthScale,
+    width > height ? (height / 680) * 1.35 : paginatedWidthScale,
+  )
     : Math.min(width / 1080, height / 1920) * (width >= height ? 1.35 : 1);
   const pad = Math.round(34 * scale);
   return {

@@ -36,6 +36,15 @@ Saída: JSON com hash, segmentos, palavras, tempos e avisos em `output/inspirar-
 ASR não é transcrição humana: erros de nomes, pontuação e sobreposição precisam de revisão.
 Não deduz identidade, idade real ou qualidade vocal a partir da transcrição.
 
+Ritmo automático medido nas três referências:
+
+- conversa familiar em grupo: 279,2 palavras/minuto;
+- conversa privada: 280,2 palavras/minuto;
+- referência somente em áudio: 266,5 palavras/minuto.
+
+O preset do produto usa uma meta ligeiramente mais conservadora, cerca de 258
+palavras/minuto, para manter a leitura clara e não transformar erro de ASR em regra.
+
 Ferramenta: [faster-whisper 1.2.1](https://github.com/SYSTRAN/faster-whisper),
 SYSTRAN, licença MIT; modelo [Systran/faster-whisper-small](https://huggingface.co/Systran/faster-whisper-small),
 conversão Whisper, MIT no model card. Uso comercial permitido pela licença;
@@ -52,3 +61,16 @@ com o aplicativo. Nenhuma licença dos vídeos/vozes de referência foi presumid
 - Tipo de conversa calculado por thread, nunca pelo tamanho total do elenco.
 - Roteiro original: conflito na abertura, respostas causais, motivos distintos,
   virada preparada, consequência final; cortes de tempo só quando necessários.
+
+## Verificação local
+
+- Renderer real inspecionado em 9:16, 16:9 e 1:1, incluindo 390 px de largura.
+- Temas claro e escuro verificados; nenhum overflow horizontal observado no fluxo testado.
+- Ordem de foco por teclado conferida nos starters de roteiro.
+- Console do navegador sem erros ou avisos da implementação durante o ensaio isolado.
+- Testes ChatScene: 23 arquivos aprovados, 1 ignorado; 249 testes aprovados,
+  2 ignorados; build cliente/SSR/Nitro concluído.
+
+O ensaio visual usou os componentes e o canvas reais em um ambiente isolado. A rota
+autenticada completa continua dependente de uma sessão válida do usuário e deve receber
+a aprovação visual antes de publicação.

@@ -47,6 +47,22 @@ describe("Canvas story formats", () => {
     expect(layoutMessages(ctx, project, theme, privateMessages, 928, 1200).items.some(m => m.showName)).toBe(false);
     expect(layoutMessages(ctx, project, theme, groupMessages, 928, 1200).items.some(m => m.showName)).toBe(true);
   });
+
+  it("keeps more than one short bubble on the first 16:9 page", () => {
+    const project = createCreatorExample("whatsapp");
+    const pages = conversationPagesFor(
+      canvasRecorder().ctx,
+      project,
+      theme,
+      buildPlan(project),
+      1651,
+      680,
+      true,
+      undefined,
+      680,
+    );
+    expect(pages[0]?.messageIds.length).toBeGreaterThanOrEqual(2);
+  });
   it("defaults old documents to WhatsApp/scroll and persists the chosen format/pages", () => {
     const legacy = normalizeChatSceneProject({ title: "Legado" });
     expect(legacy.storyFormat).toBe("whatsapp");
