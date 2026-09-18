@@ -518,7 +518,13 @@ export function TemplateEditor({
       h: next.video.h,
       radius: next.video.radius,
     };
-    setT(patchVideoAtTime({ ...next, video: t.video, videoKeyframes: t.videoKeyframes }, time, geometry));
+    setT(
+      patchVideoAtTime(
+        { ...next, video: t.video, videoKeyframes: t.videoKeyframes ?? [] },
+        time,
+        geometry,
+      ),
+    );
   };
 
   const patchExtra = (extraId: string, data: Record<string, unknown>) =>

@@ -126,6 +126,7 @@ describe("YouTube publisher", () => {
     process.env["YOUTUBE_PRIVACY_STATUS"] = "unlisted";
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse(200, { items: [{ id: "UC-1" }] }))
       .mockResolvedValueOnce(
         new Response(null, {
           status: 200,
@@ -158,20 +159,43 @@ describe("YouTube publisher", () => {
     });
 
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      "https://www.googleapis.com/youtube/v3/channels?part=id&mine=true",
+    );
+    expect(String(fetchMock.mock.calls[1]?.[0])).toBe(
       "https://www.googleapis.com/upload/youtube/v3/videos?part=snippet%2Cstatus&uploadType=resumable",
     );
-    expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(
+    expect(new Headers(fetchMock.mock.calls[1]?.[1]?.headers).get("authorization")).toBe(
       "Bearer youtube-access-token",
     );
-    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({
       snippet: { title: "Titulo do video", description: "Titulo do video\n#shorts" },
       status: { privacyStatus: "unlisted", selfDeclaredMadeForKids: false },
     });
-    expect(String(fetchMock.mock.calls[1]?.[0])).toBe("https://storage.example/fresh-signed-url");
-    expect(String(fetchMock.mock.calls[2]?.[0])).toBe("https://upload.youtube.test/resumable");
-    expect(new Headers(fetchMock.mock.calls[2]?.[1]?.headers).get("authorization")).toBe(
+    expect(String(fetchMock.mock.calls[2]?.[0])).toBe("https://storage.example/fresh-signed-url");
+    expect(String(fetchMock.mock.calls[3]?.[0])).toBe("https://upload.youtube.test/resumable");
+    expect(new Headers(fetchMock.mock.calls[3]?.[1]?.headers).get("authorization")).toBe(
       "Bearer youtube-access-token",
     );
+  });
+
+  it("refuses to upload when the credential belongs to another channel", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse(200, { items: [{ id: "UC-other" }] }));
+
+    await expect(
+      publish({
+        kind: "shorts",
+        caption: "Video",
+        videoUrl: "https://storage.example/video.mp4",
+        username: "canal",
+        platform: "youtube",
+        provider: "youtube",
+        providerAccountId: "UC-selected",
+        providerAccessToken: "youtube-access-token",
+      }),
+    ).resolves.toMatchObject({ ok: false, code: "ACCOUNT_MISMATCH", retryable: false });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

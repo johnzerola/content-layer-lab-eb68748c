@@ -24,7 +24,7 @@ describe("TikTok resolver", () => {
     const hit = await resolveTikTok("https://vt.tiktok.com/ABC123/");
 
     expect(hit?.videoUrl).toBe("https://v16.tiktokcdn.com/video.mp4");
-    expect(hit?.headers?.referer).toBe("https://www.tiktok.com/");
+    expect(hit?.headers?.["referer"]).toBe("https://www.tiktok.com/");
     expect(String(fetchMock.mock.calls[2]?.[0])).toContain(encodeURIComponent(canonical));
   });
 
