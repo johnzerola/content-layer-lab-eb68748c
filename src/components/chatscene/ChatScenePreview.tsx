@@ -24,15 +24,40 @@ interface Props {
   music?: AudioBuffer | null;
 }
 
-export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPlaying, clips, music }: Props) {
+export function ChatScenePreview({
+  project,
+  plan,
+  frame,
+  playing,
+  onFrame,
+  onPlaying,
+  clips,
+  music,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const backgroundVideoRef = useRef<HTMLVideoElement | null>(null);
   const [ready, setReady] = useState(false);
+  const [nativeVideoFailed, setNativeVideoFailed] = useState(false);
   const frameRef = useRef(frame);
   frameRef.current = frame;
+  const backgroundVideoUrl =
+    project.background?.kind === "video"
+      ? project.background.videoUrl || project.background.imageUrl || null
+      : null;
+  const useNativeVideo = Boolean(backgroundVideoUrl) && !nativeVideoFailed;
   const renderer = useMemo(
-    () => new CanvasConversationRenderer({ safeZones: project.render.safeZones }),
-    [project.render.safeZones],
+    () =>
+      new CanvasConversationRenderer({
+        safeZones: project.render.safeZones,
+        nativeVideoBackground: useNativeVideo,
+        mediaProfile: "preview",
+      }),
+    [project.render.safeZones, useNativeVideo],
   );
+
+  useEffect(() => {
+    setNativeVideoFailed(false);
+  }, [backgroundVideoUrl]);
 
   // recarrega imagens/fontes quando o conteúdo muda
   useEffect(() => {
@@ -52,6 +77,35 @@ export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPla
     if (!canvas || !ready) return;
     paintPreview(canvas, renderer, project, plan, frame);
   }, [renderer, project, plan, frame, ready]);
+
+  // Preserve the source resolution and cadence by letting the browser decode
+  // the background video directly instead of building a low-FPS bitmap cache.
+  useEffect(() => {
+    const video = backgroundVideoRef.current;
+    if (!video || !backgroundVideoUrl) return;
+    const terminal = frameRef.current >= plan.totalFrames - 1;
+    const targetSeconds = (terminal ? 0 : frameRef.current) / plan.fps;
+    const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+    const target =
+      duration && project.background?.loop !== false
+        ? targetSeconds % duration
+        : Math.min(targetSeconds, Math.max(0, duration - 0.001));
+    if (duration && Math.abs(video.currentTime - target) > 0.12) video.currentTime = target;
+    if (playing) void video.play().catch(() => setNativeVideoFailed(true));
+    else video.pause();
+  }, [playing, backgroundVideoUrl, plan.fps, plan.totalFrames, project.background?.loop]);
+
+  useEffect(() => {
+    const video = backgroundVideoRef.current;
+    if (!video || !backgroundVideoUrl || playing) return;
+    const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+    if (!duration) return;
+    const seconds = frame / plan.fps;
+    video.currentTime =
+      project.background?.loop !== false
+        ? seconds % duration
+        : Math.min(seconds, Math.max(0, duration - 0.001));
+  }, [frame, playing, backgroundVideoUrl, plan.fps, project.background?.loop]);
 
   // relógio da reprodução: o quadro vem sempre do tempo real decorrido, nunca
   // de um contador acumulado — assim a prévia não "escorrega" do vídeo final
@@ -122,7 +176,10 @@ export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPla
       gain.gain.setValueAtTime(base * current, ctx.currentTime);
       for (const point of curve) {
         if (point.time <= fromSec) continue;
-        gain.gain.linearRampToValueAtTime(base * point.value, ctx.currentTime + (point.time - fromSec));
+        gain.gain.linearRampToValueAtTime(
+          base * point.value,
+          ctx.currentTime + (point.time - fromSec),
+        );
       }
       source.connect(gain).connect(ctx.destination);
       source.start(ctx.currentTime, fromSec % music.duration);
@@ -160,9 +217,6 @@ export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPla
     // a lista de falas só muda quando o documento ou o plano muda
   }, [playing, clips, project, plan, music]);
 
-
-
-
   const { width, height } = renderSize(project.render);
   const seconds = (frame / plan.fps).toFixed(1);
   const total = (plan.totalFrames / plan.fps).toFixed(1);
@@ -173,7 +227,42 @@ export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPla
         className="glass relative mx-auto w-full overflow-hidden rounded-2xl border border-border"
         style={{ aspectRatio: `${width} / ${height}`, maxWidth: "min(100%, 380px)" }}
       >
-        <canvas ref={canvasRef} className="h-full w-full" aria-label="Prévia da conversa" />
+        {useNativeVideo && backgroundVideoUrl && (
+          <video
+            ref={backgroundVideoRef}
+            src={backgroundVideoUrl}
+            muted
+            playsInline
+            preload="auto"
+            loop={project.background?.loop !== false}
+            aria-hidden="true"
+            onLoadedMetadata={(event) => {
+              const video = event.currentTarget;
+              const duration = video.duration > 0 ? video.duration : 0;
+              const seconds = frameRef.current / plan.fps;
+              if (duration) {
+                video.currentTime =
+                  project.background?.loop !== false
+                    ? seconds % duration
+                    : Math.min(seconds, Math.max(0, duration - 0.001));
+              }
+              if (playing) void video.play().catch(() => setNativeVideoFailed(true));
+            }}
+            onError={() => setNativeVideoFailed(true)}
+            className="absolute inset-0 z-0 h-full w-full object-cover"
+            style={{
+              filter: project.layout?.backgroundBlur
+                ? `blur(${Math.max(0, project.layout.backgroundBlur) / 3}px)`
+                : undefined,
+              transform: `translateY(${Math.max(-0.3, Math.min(0.3, project.layout?.backgroundOffsetY ?? 0)) * 100}%) scale(${Math.max(1, Math.min(2, project.layout?.backgroundScale ?? 1))})`,
+            }}
+          />
+        )}
+        <canvas
+          ref={canvasRef}
+          className="relative z-10 h-full w-full"
+          aria-label="Prévia da conversa"
+        />
         {!ready && (
           <div className="absolute inset-0 grid place-items-center bg-background/60 text-xs text-muted-foreground">
             preparando…
@@ -245,4 +334,3 @@ export function ChatScenePreview({ project, plan, frame, playing, onFrame, onPla
     </div>
   );
 }
-

@@ -37,6 +37,9 @@ necessária para esse fluxo.
 
 ## O que está no código
 
+- `Vozes e atuação` mostra a conexão da chave dentro do próprio fluxo, com
+  campo protegido, atalho para criar a chave e explicação de cobrança. A página
+  `Contas e credenciais` continua sendo a área de administração e desconexão.
 - `Contas e credenciais` valida a chave com o catálogo oficial e guarda somente o
   valor criptografado por conta. O navegador recebe apenas a máscara, o nome e a
   quantidade de vozes.

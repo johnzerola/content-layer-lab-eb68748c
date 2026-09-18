@@ -348,9 +348,17 @@ export function ChatSceneStudio() {
 
   /** Foto de um participante ou do grupo. */
   const handleAvatarUpload = useCallback(async (target: string, file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Escolha uma imagem PNG, JPG ou WebP.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("A foto precisa ter no máximo 8 MB.");
+      return;
+    }
     setUploading(target);
     try {
-      const { url } = await uploadChatSceneMedia(file);
+      const { url, temporary } = await uploadChatSceneMedia(file);
       setProject((prev) =>
         target === "group"
           ? { ...prev, groupAvatarUrl: url }
@@ -361,6 +369,13 @@ export function ChatSceneStudio() {
               ),
             },
       );
+      if (temporary) {
+        toast.warning("A foto foi aplicada nesta sessão, mas não pôde ser salva na nuvem.");
+      } else {
+        toast.success(
+          target === "group" ? "Foto do grupo aplicada." : "Foto do personagem aplicada.",
+        );
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível usar esta foto.");
     } finally {
@@ -1884,7 +1899,11 @@ export function ChatSceneStudio() {
                     checked={project.sound?.enabled ?? false}
                     onChange={(e) =>
                       patch({
-                        sound: { ...project.sound, enabled: e.target.checked, volume: project.sound?.volume ?? 0.5 },
+                        sound: {
+                          ...project.sound,
+                          enabled: e.target.checked,
+                          volume: project.sound?.volume ?? 0.5,
+                        },
                       })
                     }
                   />
@@ -1896,7 +1915,14 @@ export function ChatSceneStudio() {
                     <select
                       aria-label="Quando tocar efeitos da conversa"
                       value={project.sound.mode ?? "messages"}
-                      onChange={(event) => patch({ sound: { ...project.sound!, mode: event.target.value as "messages" | "transitions" } })}
+                      onChange={(event) =>
+                        patch({
+                          sound: {
+                            ...project.sound!,
+                            mode: event.target.value as "messages" | "transitions",
+                          },
+                        })
+                      }
                       className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <option value="transitions">Só em cortes, avisos e trocas de conversa</option>
@@ -1914,7 +1940,13 @@ export function ChatSceneStudio() {
                       step={0.05}
                       value={project.sound?.volume ?? 0.5}
                       onChange={(e) =>
-                        patch({ sound: { ...project.sound, enabled: true, volume: Number(e.target.value) } })
+                        patch({
+                          sound: {
+                            ...project.sound,
+                            enabled: true,
+                            volume: Number(e.target.value),
+                          },
+                        })
                       }
                       className="mt-1 w-full"
                       aria-label="Volume dos sons"

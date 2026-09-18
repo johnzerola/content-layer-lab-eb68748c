@@ -35,6 +35,7 @@ export interface PaintOptions {
   media?: Map<string, LoadedMedia>;
   /** desenhar as margens seguras por cima (só na prévia) */
   safeZones?: boolean;
+  nativeVideoBackground?: boolean;
 }
 
 interface Metrics {
@@ -53,15 +54,13 @@ function metricsFor(width: number, height: number, paginated = false): Metrics {
   // referência: 1080x1920. Tudo escala pela menor dimensão relativa para que
   // 1:1 e 16:9 não fiquem com texto gigante.
   // Pages use readable width-based type; scrolling documents keep legacy metrics.
-  const paginatedWidthScale = width / 1080 * 1.35;
+  const paginatedWidthScale = (width / 1080) * 1.35;
   // A wide, shallow chat panel cannot size type from width alone: in 16:9
   // that made the header consume almost half the panel and forced one bubble
   // per page. Vertical and square compositions retain the calibrated width
   // scale; landscape panels also respect the available height.
-  const scale = paginated ? Math.min(
-    paginatedWidthScale,
-    width > height ? (height / 680) * 1.35 : paginatedWidthScale,
-  )
+  const scale = paginated
+    ? Math.min(paginatedWidthScale, width > height ? (height / 680) * 1.35 : paginatedWidthScale)
     : Math.min(width / 1080, height / 1920) * (width >= height ? 1.35 : 1);
   const pad = Math.round(34 * scale);
   return {
@@ -126,7 +125,10 @@ interface BubbleStyle {
 }
 
 /** Resolve o estilo do personagem por cima do tema (sem alterar o tema). */
-function bubbleStyleOf(author: { style?: import("./types").ParticipantStyle }, theme: ChatTheme): BubbleStyle {
+function bubbleStyleOf(
+  author: { style?: import("./types").ParticipantStyle },
+  theme: ChatTheme,
+): BubbleStyle {
   const st = author.style ?? {};
   return {
     bubble: st.bubbleColor || null,
@@ -185,7 +187,8 @@ function emojiOnly(text: string): boolean {
   return stripped.length <= 6 && !/[a-z0-9à-ú]/i.test(stripped);
 }
 
-const isMedia = (kind: ChatMessage["kind"]) => kind === "image" || kind === "video" || kind === "sticker";
+const isMedia = (kind: ChatMessage["kind"]) =>
+  kind === "image" || kind === "video" || kind === "sticker";
 
 /** Como a mensagem citada aparece quando ela não tem texto. */
 function quotedKindLabel(kind: ChatMessage["kind"]): string {
@@ -371,7 +374,9 @@ export function layoutMessages(
 
     ctx.font = `400 ${m.metaSize}px ${theme.fontFamily}`;
     void style;
-    const metaW = ctx.measureText(`${messageClock(project, index, message)}  `).width + (isSelf ? m.metaSize * 1.6 : 0);
+    const metaW =
+      ctx.measureText(`${messageClock(project, index, message)}  `).width +
+      (isSelf ? m.metaSize * 1.6 : 0);
     const metaH = Math.round(m.metaSize * 1.35);
 
     const bubbleW = Math.min(
@@ -468,8 +473,10 @@ function drawWallpaper(
   background?: ChatSceneBackground,
   media?: Map<string, LoadedMedia>,
   seconds = 0,
+  nativeVideoBackground = false,
 ) {
   const bg = background ?? { kind: "theme" as const };
+  if (nativeVideoBackground && bg.kind === "video" && (bg.videoUrl || bg.imageUrl)) return;
   if (bg.kind === "solid" && bg.color) {
     ctx.fillStyle = bg.color;
     ctx.fillRect(0, 0, width, height);
@@ -579,7 +586,12 @@ function drawHeader(
     ctx.restore();
   }
   ctx.fillStyle = theme.divider;
-  ctx.fillRect(0, m.headerH - Math.max(1, Math.round(2 * m.scale)), width, Math.max(1, Math.round(2 * m.scale)));
+  ctx.fillRect(
+    0,
+    m.headerH - Math.max(1, Math.round(2 * m.scale)),
+    width,
+    Math.max(1, Math.round(2 * m.scale)),
+  );
 
   const isGroup = thread
     ? (thread.kind ?? "direct") === "group"
@@ -590,15 +602,23 @@ function drawHeader(
     (custom?.title || "").trim() ||
     (isGroup
       ? project.groupName || project.title || "Grupo"
-      : peers[0]?.name ?? project.participants[0]?.name ?? "Conversa");
+      : (peers[0]?.name ?? project.participants[0]?.name ?? "Conversa"));
   const baseSubtitle =
     (thread?.subtitle || "").trim() ||
     (thread
       ? isGroup
-        ? project.participants.filter((person) => project.messages.some((message) =>
-            message.participantId === person.id && threadIdOf(project, message) === thread.id &&
-            message.kind !== "card" && message.kind !== "system"))
-            .map((person) => person.name).join(", ") || "conversa em grupo"
+        ? project.participants
+            .filter((person) =>
+              project.messages.some(
+                (message) =>
+                  message.participantId === person.id &&
+                  threadIdOf(project, message) === thread.id &&
+                  message.kind !== "card" &&
+                  message.kind !== "system",
+              ),
+            )
+            .map((person) => person.name)
+            .join(", ") || "conversa em grupo"
         : "online"
       : custom?.subtitle != null
         ? custom.subtitle
@@ -638,12 +658,23 @@ function drawHeader(
     drawAvatarCircle(ctx, theme, cx, cy, size, peers[0]?.color ?? theme.selfBubble, title, logoImg);
   } else {
     const avatarUrl = thread
-      ? thread.avatarUrl ?? project.participants.find((p) => p.name === thread.name)?.avatarUrl ?? null
+      ? (thread.avatarUrl ??
+        project.participants.find((p) => p.name === thread.name)?.avatarUrl ??
+        null)
       : isGroup
         ? project.groupAvatarUrl
         : peers[0]?.avatarUrl;
     const avatarImg = avatarUrl ? media?.get(avatarUrl)?.frames[0] : undefined;
-    drawAvatarCircle(ctx, theme, cx, cy, size, peers[0]?.color ?? theme.selfBubble, title, avatarImg);
+    drawAvatarCircle(
+      ctx,
+      theme,
+      cx,
+      cy,
+      size,
+      peers[0]?.color ?? theme.selfBubble,
+      title,
+      avatarImg,
+    );
   }
 
   ctx.textAlign = "left";
@@ -780,7 +811,11 @@ function baseEntrance(
       return { alpha: easeOut, dy: (1 - easeOut) * 1, scale: 1 };
     case "bubble-pop": {
       const overshoot = 1 + Math.sin(p * Math.PI) * 0.06;
-      return { alpha: Math.min(1, p * 1.6), dy: 0, scale: p >= 1 ? 1 : overshoot * (0.86 + easeOut * 0.14) };
+      return {
+        alpha: Math.min(1, p * 1.6),
+        dy: 0,
+        scale: p >= 1 ? 1 : overshoot * (0.86 + easeOut * 0.14),
+      };
     }
     case "fast-pop":
       return { alpha: Math.min(1, p * 2), dy: 0, scale: 0.94 + easeOut * 0.06 };
@@ -797,7 +832,15 @@ export function chatRect(
   layout: ChatSceneProject["layout"],
   width: number,
   height: number,
-): { x: number; y: number; w: number; h: number; radius: number; opacity: number; header: boolean } {
+): {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  radius: number;
+  opacity: number;
+  header: boolean;
+} {
   const l = layout ?? DEFAULT_LAYOUT;
   const w = Math.max(80, Math.round(width * clampUnit(l.width, 0.2, 1)));
   const h = Math.max(120, Math.round(height * clampUnit(l.height, 0.2, 1)));
@@ -833,8 +876,14 @@ export interface ThreadFrame {
  * Qual conversa está no ar neste quadro e como está o corte para ela.
  * Determinístico: depende só do documento e do quadro.
  */
-export function threadFrame(project: ChatSceneProject, plan: ConversationPlan, frame: number): ThreadFrame {
-  const appeared = project.messages.filter((msg) => frame >= (plan.byId[msg.id]?.appearFrame ?? Infinity));
+export function threadFrame(
+  project: ChatSceneProject,
+  plan: ConversationPlan,
+  frame: number,
+): ThreadFrame {
+  const appeared = project.messages.filter(
+    (msg) => frame >= (plan.byId[msg.id]?.appearFrame ?? Infinity),
+  );
   const reference = appeared[appeared.length - 1] ?? project.messages[0] ?? null;
   const threadId = reference ? threadIdOf(project, reference) : threadsOf(project)[0]!.id;
 
@@ -863,7 +912,9 @@ export function threadFrame(project: ChatSceneProject, plan: ConversationPlan, f
     thread: threadOf(project, threadId),
     messages,
     previousThread: threadOf(project, previousId),
-    previousMessages: appeared.slice(0, start).filter((msg) => threadIdOf(project, msg) === previousId),
+    previousMessages: appeared
+      .slice(0, start)
+      .filter((msg) => threadIdOf(project, msg) === previousId),
     cut,
   };
 }
@@ -877,12 +928,20 @@ interface PagedLayouts {
 }
 
 const pageCache = new WeakMap<ChatSceneProject, PagedLayouts[]>();
-const messageListKey = (messages: ChatMessage[]) => JSON.stringify(messages.map((message) => message.id));
+const messageListKey = (messages: ChatMessage[]) =>
+  JSON.stringify(messages.map((message) => message.id));
 
 /** Page measurements belong to one immutable project/plan and media geometry. */
 function pagedLayoutsFor(
-  ctx: Ctx2D, project: ChatSceneProject, theme: ChatTheme, plan: ConversationPlan,
-  width: number, height: number, showHeader: boolean, media?: Map<string, LoadedMedia>, metricsH?: number,
+  ctx: Ctx2D,
+  project: ChatSceneProject,
+  theme: ChatTheme,
+  plan: ConversationPlan,
+  width: number,
+  height: number,
+  showHeader: boolean,
+  media?: Map<string, LoadedMedia>,
+  metricsH?: number,
 ): PagedLayouts {
   const m = metricsFor(width, metricsH ?? height, project.layout?.pagination === "pages");
   const headerH = showHeader && (project.header?.style ?? "messenger") !== "none" ? m.headerH : 0;
@@ -894,7 +953,12 @@ function pagedLayoutsFor(
     return ctx.measureText("Hamburgefontsiv 0123456789").width;
   });
   ctx.restore();
-  const mediaGeometry = [...(media ?? [])].map(([url, item]) => [url, item.width, item.height, item.aspect]);
+  const mediaGeometry = [...(media ?? [])].map(([url, item]) => [
+    url,
+    item.width,
+    item.height,
+    item.aspect,
+  ]);
   const key = JSON.stringify([width, height, metricsH, headerH, theme, fontMetrics, mediaGeometry]);
   let cache = pageCache.get(project);
   const hit = cache?.find((entry) => entry.plan === plan && entry.key === key);
@@ -909,18 +973,38 @@ function pagedLayoutsFor(
     }
     return layout.contentH;
   };
-  const bottom = metricsH != null ? height - m.pad : height - Math.max(m.pad, Math.round(height * 0.1));
+  const bottom =
+    metricsH != null ? height - m.pad : height - Math.max(m.pad, Math.round(height * 0.1));
   const typingReserve = plan.entries.some((entry) => entry.typingFrame < entry.appearFrame)
-    ? Math.round(72 * m.scale) + m.gap : 0;
+    ? Math.round(72 * m.scale) + m.gap
+    : 0;
   const budget = Math.max(1, bottom - headerH - m.pad - typingReserve);
   const entries = project.messages.flatMap((message) => {
     const entry = plan.byId[message.id];
-    return entry ? [{ message, sessionId: threadIdOf(project, message), startMs: entry.appearFrame / plan.fps * 1000 }] : [];
+    return entry
+      ? [
+          {
+            message,
+            sessionId: threadIdOf(project, message),
+            startMs: (entry.appearFrame / plan.fps) * 1000,
+          },
+        ]
+      : [];
   });
   const pages = buildConversationPages(entries, measure, budget, Math.max(1, entries.length));
-  const result: PagedLayouts = { plan, key, pages, layouts,
-    pageByMessage: new Map(pages.flatMap((page) => page.messageIds.map((id) => [id, page] as const))) };
-  if (!cache) { cache = []; pageCache.set(project, cache); }
+  const result: PagedLayouts = {
+    plan,
+    key,
+    pages,
+    layouts,
+    pageByMessage: new Map(
+      pages.flatMap((page) => page.messageIds.map((id) => [id, page] as const)),
+    ),
+  };
+  if (!cache) {
+    cache = [];
+    pageCache.set(project, cache);
+  }
   if (cache.length >= 8) cache.shift();
   cache.push(result);
   return result;
@@ -928,10 +1012,18 @@ function pagedLayoutsFor(
 
 /** Uses the production bubble measurements and existing ConversationPlan, never V3 timing. */
 export function conversationPagesFor(
-  ctx: Ctx2D, project: ChatSceneProject, theme: ChatTheme, plan: ConversationPlan,
-  width: number, height: number, showHeader = true, media?: Map<string, LoadedMedia>, metricsH?: number,
+  ctx: Ctx2D,
+  project: ChatSceneProject,
+  theme: ChatTheme,
+  plan: ConversationPlan,
+  width: number,
+  height: number,
+  showHeader = true,
+  media?: Map<string, LoadedMedia>,
+  metricsH?: number,
 ): readonly ConversationPage[] {
-  return pagedLayoutsFor(ctx, project, theme, plan, width, height, showHeader, media, metricsH).pages;
+  return pagedLayoutsFor(ctx, project, theme, plan, width, height, showHeader, media, metricsH)
+    .pages;
 }
 
 function pageMessages(appeared: ChatMessage[], cache: PagedLayouts): ChatMessage[] {
@@ -943,8 +1035,15 @@ function pageMessages(appeared: ChatMessage[], cache: PagedLayouts): ChatMessage
 }
 
 function cachedPageLayout(
-  ctx: Ctx2D, cache: PagedLayouts, project: ChatSceneProject, theme: ChatTheme,
-  messages: ChatMessage[], width: number, height: number, media?: Map<string, LoadedMedia>, metricsH?: number,
+  ctx: Ctx2D,
+  cache: PagedLayouts,
+  project: ChatSceneProject,
+  theme: ChatTheme,
+  messages: ChatMessage[],
+  width: number,
+  height: number,
+  media?: Map<string, LoadedMedia>,
+  metricsH?: number,
 ): Layout {
   const key = messageListKey(messages);
   let layout = cache.layouts.get(key);
@@ -971,20 +1070,36 @@ export function autoPanelHeight(
   media?: Map<string, LoadedMedia>,
 ): number {
   const m = metricsFor(width, maxHeight, project.layout?.pagination === "pages");
-  const headerVisible = (project.header?.style ?? "messenger") !== "none" &&
+  const headerVisible =
+    (project.header?.style ?? "messenger") !== "none" &&
     (project.layout?.pagination !== "pages" || project.layout?.header !== false);
   const headerH = headerVisible ? m.headerH : 0;
-  const pages = project.layout?.pagination === "pages"
-    ? pagedLayoutsFor(ctx, project, theme, plan, width, maxHeight, headerVisible, media, maxHeight) : null;
+  const pages =
+    project.layout?.pagination === "pages"
+      ? pagedLayoutsFor(
+          ctx,
+          project,
+          theme,
+          plan,
+          width,
+          maxHeight,
+          headerVisible,
+          media,
+          maxHeight,
+        )
+      : null;
   const allAppeared = threadFrame(project, plan, frame).messages;
   const appeared = pages ? pageMessages(allAppeared, pages) : allAppeared;
   const typing = typingAt(project, plan, frame);
   const typingH = typing ? Math.round(72 * m.scale) + m.gap : 0;
 
   const heightFor = (list: ChatMessage[]) => {
-    const content = list.length ? (pages
-      ? cachedPageLayout(ctx, pages, project, theme, list, width, maxHeight, media, maxHeight)
-      : layoutMessages(ctx, project, theme, list, width, maxHeight, media, maxHeight)).contentH : 0;
+    const content = list.length
+      ? (pages
+          ? cachedPageLayout(ctx, pages, project, theme, list, width, maxHeight, media, maxHeight)
+          : layoutMessages(ctx, project, theme, list, width, maxHeight, media, maxHeight)
+        ).contentH
+      : 0;
     const total = headerH + content + typingH + m.pad * 2;
     return Math.max(headerH + m.pad * 2, Math.min(maxHeight, Math.round(total)));
   };
@@ -1000,8 +1115,6 @@ export function autoPanelHeight(
   const ease = 1 - Math.pow(1 - p, 3);
   return Math.round(previous + (target - previous) * ease);
 }
-
-
 
 /** Pinta um quadro completo da conversa. */
 export function paintFrame(
@@ -1024,8 +1137,21 @@ export function paintFrame(
     const scale = clampUnit(layout.backgroundScale, 1, 2);
     const bw = width * scale;
     const bh = height * scale;
-    ctx.translate((width - bw) / 2, (height - bh) / 2 + height * clampUnit(layout.backgroundOffsetY, -0.3, 0.3));
-    drawWallpaper(ctx, theme, bw, bh, metricsFor(bw, bh), project.background, media, frame / plan.fps);
+    ctx.translate(
+      (width - bw) / 2,
+      (height - bh) / 2 + height * clampUnit(layout.backgroundOffsetY, -0.3, 0.3),
+    );
+    drawWallpaper(
+      ctx,
+      theme,
+      bw,
+      bh,
+      metricsFor(bw, bh),
+      project.background,
+      media,
+      frame / plan.fps,
+      options.nativeVideoBackground,
+    );
     ctx.restore();
     paintRedditCard(ctx, project, theme, plan, frame, width, height);
     drawBranding(ctx, project, width, height, media);
@@ -1062,13 +1188,27 @@ export function paintFrame(
     const l = project.layout ?? DEFAULT_LAYOUT;
     ctx.save();
     if (l.backgroundBlur > 0 && "filter" in ctx) {
-      (ctx as CanvasRenderingContext2D).filter = `blur(${Math.round((l.backgroundBlur * width) / 1080)}px)`;
+      (ctx as CanvasRenderingContext2D).filter =
+        `blur(${Math.round((l.backgroundBlur * width) / 1080)}px)`;
     }
     const scale = clampUnit(l.backgroundScale, 1, 2);
     const bw = width * scale;
     const bh = height * scale;
-    ctx.translate((width - bw) / 2, (height - bh) / 2 + height * clampUnit(l.backgroundOffsetY, -0.3, 0.3));
-    drawWallpaper(ctx, theme, bw, bh, metricsFor(bw, bh), project.background, media, frame / plan.fps);
+    ctx.translate(
+      (width - bw) / 2,
+      (height - bh) / 2 + height * clampUnit(l.backgroundOffsetY, -0.3, 0.3),
+    );
+    drawWallpaper(
+      ctx,
+      theme,
+      bw,
+      bh,
+      metricsFor(bw, bh),
+      project.background,
+      media,
+      frame / plan.fps,
+      options.nativeVideoBackground,
+    );
     ctx.restore();
   }
 
@@ -1119,7 +1259,6 @@ export function paintFrame(
     ctx.stroke();
     ctx.restore();
   }
-
 
   if (moving) ctx.restore();
 
@@ -1215,366 +1354,423 @@ function paintConversation(
   const headerVisible = showHeader && (project.header?.style ?? "messenger") !== "none";
   const headerH = headerVisible ? m.headerH : 0;
 
-  drawWallpaper(ctx, theme, width, height, m, conversationBackground, media, frame / plan.fps);
+  drawWallpaper(
+    ctx,
+    theme,
+    width,
+    height,
+    m,
+    conversationBackground,
+    media,
+    frame / plan.fps,
+    options.nativeVideoBackground,
+  );
 
   const view = threadFrame(project, plan, frame);
   const typingMsg = typingAt(project, plan, frame);
-  const typingActive = typingMsg && threadIdOf(project, typingMsg) === view.threadId ? typingMsg : null;
-  const pages = project.layout?.pagination === "pages"
-    ? pagedLayoutsFor(ctx, project, theme, plan, width, fit?.metricsH ?? height, showHeader, media, fit?.metricsH) : null;
+  const typingActive =
+    typingMsg && threadIdOf(project, typingMsg) === view.threadId ? typingMsg : null;
+  const pages =
+    project.layout?.pagination === "pages"
+      ? pagedLayoutsFor(
+          ctx,
+          project,
+          theme,
+          plan,
+          width,
+          fit?.metricsH ?? height,
+          showHeader,
+          media,
+          fit?.metricsH,
+        )
+      : null;
 
   // desenha uma conversa inteira deslocada e com opacidade própria: é isso que
   // permite o corte de um chat para o outro sem duplicar o código de desenho
-  const drawList = (appeared: ChatMessage[], dx: number, alphaMul: number, allowTyping: boolean) => {
-  if (pages) appeared = pageMessages(appeared, pages);
-  ctx.save();
-  if (dx) ctx.translate(dx, 0);
-  const typing = allowTyping ? typingActive : null;
-  const layout = pages
-    ? cachedPageLayout(ctx, pages, project, theme, appeared, width, fit?.metricsH ?? height, media, fit?.metricsH)
-    : layoutMessages(ctx, project, theme, appeared, width, height, media, fit?.metricsH);
-  const typingH = typing ? Math.round(72 * m.scale) + m.gap : 0;
-
-  // deixa a margem inferior livre para a interface das plataformas
-  const areaBottom = fit ? height - m.pad : height - Math.max(m.pad, Math.round(height * 0.1));
-  // ScrollPlanner: a conversa fica ancorada embaixo, mas a rolagem entre uma
-  // mensagem e a seguinte é suavizada — e continua determinística, porque só
-  // depende do quadro atual.
-  const targetNow = areaBottom - (layout.contentH + typingH);
-  let offsetY = pages ? headerH + m.pad : targetNow;
-  const last = appeared[appeared.length - 1];
-  const lastEntry = last ? plan.byId[last.id] : undefined;
-  if (lastEntry && !fit && !pages) {
-    const scrollFrames = Math.max(1, Math.round(plan.fps * 0.28));
-    const p = Math.max(0, Math.min(1, (frame - lastEntry.appearFrame) / scrollFrames));
-    if (p < 1) {
-      const previous = layoutMessages(ctx, project, theme, appeared.slice(0, -1), width, height, media);
-      offsetY = planScroll({
-        frame,
-        appearFrame: lastEntry.appearFrame,
-        fps: plan.fps,
-        currentContentHeight: layout.contentH,
-        previousContentHeight: previous.contentH,
-        typingHeight: typingH,
-        viewportBottom: areaBottom,
-      });
-    }
-  }
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, headerH, width, height - headerH);
-  ctx.clip();
-
-  // An individual oversized bubble gets its own page and remains fully visible.
-  if (pages) {
-    // Em painel auto-height, o recorte cresce. A escala deve ser calculada
-    // contra a altura final, senão todas as mensagens pulam a cada chegada.
-    const available = Math.max(1, (fit?.metricsH ?? height) - headerH - m.pad * 2);
-    const contentScale = Math.min(1, available / Math.max(1, layout.contentH + typingH));
-    if (contentScale < 1) {
-      ctx.translate(width / 2, headerH + m.pad);
-      ctx.scale(contentScale, contentScale);
-      ctx.translate(-width / 2, -(headerH + m.pad));
-    }
-  }
-
-  // destaque: quando a mensagem recém-chegada é um momento de peso, ela cresce
-  // um pouco e as anteriores escurecem, como nos vídeos virais
-  const revealFromBottomOnly = Boolean(fit && project.layout?.autoHeight);
-  const spotlight = revealFromBottomOnly ? null : last?.emphasis === true ? last : null;
-
-  for (const item of layout.items) {
-    const entry = plan.byId[item.message.id];
-    const age = entry ? frame - entry.appearFrame : 0;
-    const t = entry ? age / Math.max(1, entry.entranceFrames) : 1;
-    const anim = messageEntranceTransform(project, t);
-    const rise = anim.dy * Math.round(34 * m.scale);
-    const y = offsetY + item.y + rise;
-    const seconds = Math.max(0, age) / plan.fps;
-    const isSpot = spotlight != null && item.message.id === spotlight.id;
-    const spotT = spotlight ? Math.max(0, Math.min(1, t)) : 0;
-    ctx.globalAlpha = alphaMul * anim.alpha * (spotlight && !isSpot ? 1 - 0.55 * spotT : 1);
-    const scale = anim.scale * (isSpot ? 1 + 0.06 * spotT : 1);
-    const scaling = Math.abs(scale - 1) > 0.001;
-    if (scaling) {
-      ctx.save();
-      const px = item.isSelf ? item.x + item.width : item.x;
-      const py = y + item.height;
-      ctx.translate(px, py);
-      ctx.scale(scale, scale);
-      ctx.translate(-px, -py);
-    }
-
-
-
-
-
-    if (item.message.kind === "system") {
-      const label = item.lines.join(" ");
-      ctx.font = `500 ${Math.round(26 * m.scale)}px ${theme.fontFamily}`;
-      const w = ctx.measureText(label).width + Math.round(40 * m.scale);
-      const h = Math.round(48 * m.scale);
-      ctx.fillStyle = theme.systemBubble;
-      roundRect(ctx, (width - w) / 2, y, w, h, h / 2);
-      ctx.fill();
-      ctx.fillStyle = theme.systemText;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(label, width / 2, y + h / 2);
-      ctx.textAlign = "left";
-      ctx.textBaseline = "alphabetic";
-      if (scaling) ctx.restore();
-      continue;
-    }
-
-    // cartão de cena: faixa escura translúcida com texto grande branco,
-    // como os cortes “Momentos antes” / “Enquanto isso” dos canais de referência
-    if (item.message.kind === "card") {
-      const cardSize = Math.round(m.fontSize * 1.5);
-      ctx.fillStyle = "rgba(10,10,16,0.62)";
-      roundRect(ctx, m.pad / 2, y, width - m.pad, item.height, Math.round(28 * m.scale));
-      ctx.fill();
-      ctx.fillStyle = "#ffffff";
-      ctx.font = `800 ${cardSize}px ${theme.fontFamily}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      const lh = Math.round(cardSize * 1.25);
-      item.lines.forEach((l, i) =>
-        ctx.fillText(l, width / 2, y + item.height / 2 + (i - (item.lines.length - 1) / 2) * lh),
-      );
-      ctx.textAlign = "left";
-      ctx.textBaseline = "alphabetic";
-      if (scaling) ctx.restore();
-      continue;
-    }
-
-    const padX = Math.round(24 * m.scale);
-    const padY = Math.round(18 * m.scale);
-    const loaded = item.message.mediaUrl ? media?.get(item.message.mediaUrl) : undefined;
-
-    if (item.showAvatar) {
-      const size = m.avatar;
-      const avatarImg = item.avatarUrl ? media?.get(item.avatarUrl)?.frames[0] : undefined;
-      drawAvatarCircle(
-        ctx,
-        theme,
-        m.pad + size / 2,
-        y + size / 2,
-        size,
-        item.nameColor,
-        item.name,
-        avatarImg,
-      );
-    }
-
-    // figurinha: sem bolha, só o desenho e a hora embaixo
-    if (item.bare) {
-      const src = loaded ? mediaFrameAt(loaded, seconds) : null;
-      if (src) {
-        ctx.drawImage(src, item.x, y, item.mediaW, item.mediaH);
-      } else {
-        ctx.fillStyle = theme.systemBubble;
-        roundRect(ctx, item.x, y, item.mediaW, item.mediaH, Math.round(24 * m.scale));
-        ctx.fill();
-      }
-      ctx.fillStyle = theme.meta;
-      ctx.font = `400 ${m.metaSize}px ${theme.fontFamily}`;
-      const label = item.clock;
-      const lx = item.isSelf ? item.x + item.mediaW - ctx.measureText(label).width : item.x;
-      ctx.fillText(label, lx, y + item.mediaH + m.metaSize);
-      if (scaling) ctx.restore();
-      continue;
-    }
-
-    if (item.showName) {
-      ctx.fillStyle = item.nameColor;
-      ctx.font = fontOf(item.style, 600, m.fontSize * 0.68);
-      ctx.fillText(item.name, item.x + Math.round(8 * m.scale), y - Math.round(8 * m.scale));
-    }
-
-    // bolha com rabinho apontando para o autor, com sombra suave
+  const drawList = (
+    appeared: ChatMessage[],
+    dx: number,
+    alphaMul: number,
+    allowTyping: boolean,
+  ) => {
+    if (pages) appeared = pageMessages(appeared, pages);
     ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,0.28)";
-    ctx.shadowBlur = Math.round(10 * m.scale);
-    ctx.shadowOffsetY = Math.round(3 * m.scale);
-    ctx.fillStyle = item.style.bubble ?? (item.isSelf ? theme.selfBubble : theme.peerBubble);
-    const radius = Math.min(item.height, Math.round(70 * m.scale)) * theme.radius * 1.6;
-    roundRect(ctx, item.x, y, item.width, item.height, radius);
-    ctx.fill();
-    ctx.restore();
-    ctx.fillStyle = item.style.bubble ?? (item.isSelf ? theme.selfBubble : theme.peerBubble);
-    if (theme.tail && item.showTail !== false) {
-      const tw = Math.round(16 * m.scale);
-      ctx.beginPath();
-      if (item.isSelf) {
-        ctx.moveTo(item.x + item.width - tw * 0.2, y);
-        ctx.lineTo(item.x + item.width + tw, y);
-        ctx.lineTo(item.x + item.width - tw * 0.2, y + tw * 1.5);
-      } else {
-        ctx.moveTo(item.x + tw * 0.2, y);
-        ctx.lineTo(item.x - tw, y);
-        ctx.lineTo(item.x + tw * 0.2, y + tw * 1.5);
+    if (dx) ctx.translate(dx, 0);
+    const typing = allowTyping ? typingActive : null;
+    const layout = pages
+      ? cachedPageLayout(
+          ctx,
+          pages,
+          project,
+          theme,
+          appeared,
+          width,
+          fit?.metricsH ?? height,
+          media,
+          fit?.metricsH,
+        )
+      : layoutMessages(ctx, project, theme, appeared, width, height, media, fit?.metricsH);
+    const typingH = typing ? Math.round(72 * m.scale) + m.gap : 0;
+
+    // deixa a margem inferior livre para a interface das plataformas
+    const areaBottom = fit ? height - m.pad : height - Math.max(m.pad, Math.round(height * 0.1));
+    // ScrollPlanner: a conversa fica ancorada embaixo, mas a rolagem entre uma
+    // mensagem e a seguinte é suavizada — e continua determinística, porque só
+    // depende do quadro atual.
+    const targetNow = areaBottom - (layout.contentH + typingH);
+    let offsetY = pages ? headerH + m.pad : targetNow;
+    const last = appeared[appeared.length - 1];
+    const lastEntry = last ? plan.byId[last.id] : undefined;
+    if (lastEntry && !fit && !pages) {
+      const scrollFrames = Math.max(1, Math.round(plan.fps * 0.28));
+      const p = Math.max(0, Math.min(1, (frame - lastEntry.appearFrame) / scrollFrames));
+      if (p < 1) {
+        const previous = layoutMessages(
+          ctx,
+          project,
+          theme,
+          appeared.slice(0, -1),
+          width,
+          height,
+          media,
+        );
+        offsetY = planScroll({
+          frame,
+          appearFrame: lastEntry.appearFrame,
+          fps: plan.fps,
+          currentContentHeight: layout.contentH,
+          previousContentHeight: previous.contentH,
+          typingHeight: typingH,
+          viewportBottom: areaBottom,
+        });
       }
-      ctx.closePath();
-      ctx.fill();
     }
 
-    let cursorY = y + padY;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, headerH, width, height - headerH);
+    ctx.clip();
 
-    // trecho respondido, com a barrinha colorida do autor citado
-    if (item.reply) {
-      const rw = item.width - padX * 2;
-      const rh = item.reply.height;
-      ctx.save();
-      ctx.globalAlpha = ctx.globalAlpha * 0.92;
-      ctx.fillStyle = item.isSelf ? theme.peerBubble : theme.systemBubble;
-      roundRect(ctx, item.x + padX, cursorY, rw, rh, Math.round(10 * m.scale));
-      ctx.fill();
-      ctx.fillStyle = item.reply.color;
-      ctx.fillRect(item.x + padX, cursorY, Math.round(6 * m.scale), rh);
-      ctx.font = `600 ${Math.round(m.fontSize * 0.62)}px ${theme.fontFamily}`;
-      ctx.fillText(item.reply.name, item.x + padX + Math.round(18 * m.scale), cursorY + rh * 0.42);
-      ctx.font = `400 ${Math.round(m.fontSize * 0.62)}px ${theme.fontFamily}`;
-      ctx.fillStyle = theme.meta;
-      ctx.fillText(item.reply.text, item.x + padX + Math.round(18 * m.scale), cursorY + rh * 0.85);
-      ctx.restore();
-      cursorY += rh + Math.round(10 * m.scale);
+    // An individual oversized bubble gets its own page and remains fully visible.
+    if (pages) {
+      // Em painel auto-height, o recorte cresce. A escala deve ser calculada
+      // contra a altura final, senão todas as mensagens pulam a cada chegada.
+      const available = Math.max(1, (fit?.metricsH ?? height) - headerH - m.pad * 2);
+      const contentScale = Math.min(1, available / Math.max(1, layout.contentH + typingH));
+      if (contentScale < 1) {
+        ctx.translate(width / 2, headerH + m.pad);
+        ctx.scale(contentScale, contentScale);
+        ctx.translate(-width / 2, -(headerH + m.pad));
+      }
     }
 
-    // recado de voz: play, onda e duração
-    if (item.voiceH) {
-      const vh = item.voiceH;
-      const vw = item.width - padX * 2;
-      const r = Math.round(vh * 0.36);
-      const cx = item.x + padX + r;
-      const cy = cursorY + vh / 2;
-      ctx.fillStyle = item.style.text ?? (item.isSelf ? theme.selfText : theme.peerText);
-      ctx.globalAlpha = ctx.globalAlpha * 0.85;
-      ctx.beginPath();
-      ctx.moveTo(cx - r * 0.3, cy - r * 0.45);
-      ctx.lineTo(cx + r * 0.5, cy);
-      ctx.lineTo(cx - r * 0.3, cy + r * 0.45);
-      ctx.closePath();
-      ctx.fill();
-      ctx.globalAlpha = alphaMul * anim.alpha;
+    // destaque: quando a mensagem recém-chegada é um momento de peso, ela cresce
+    // um pouco e as anteriores escurecem, como nos vídeos virais
+    const revealFromBottomOnly = Boolean(fit && project.layout?.autoHeight);
+    const spotlight = revealFromBottomOnly ? null : last?.emphasis === true ? last : null;
 
-      const seconds = voiceSeconds(item.message);
-      const label = durationLabel(seconds);
-      ctx.font = `400 ${m.metaSize}px ${theme.fontFamily}`;
-      const labelW = ctx.measureText(label).width + Math.round(12 * m.scale);
-      const waveX = cx + r + Math.round(16 * m.scale);
-      const waveW = Math.max(Math.round(40 * m.scale), item.x + padX + vw - labelW - waveX);
-      const bars = Math.max(10, Math.min(34, Math.round(waveW / Math.max(6, 10 * m.scale))));
-      const wave = voiceWave(item.message.id, bars);
-      const barW = Math.max(2, Math.round(waveW / (bars * 1.9)));
-      const played = Math.max(0, Math.min(1, (age / plan.fps) / Math.max(0.5, seconds)));
-      for (let i = 0; i < bars; i += 1) {
-        const bh = Math.max(barW, wave[i]! * vh * 0.52);
-        const bx = waveX + i * (waveW / bars);
-        ctx.fillStyle = i / bars <= played ? theme.check : item.isSelf ? theme.metaSelf : theme.meta;
-        roundRect(ctx, bx, cy - bh / 2, barW, bh, barW / 2);
+    for (const item of layout.items) {
+      const entry = plan.byId[item.message.id];
+      const age = entry ? frame - entry.appearFrame : 0;
+      const t = entry ? age / Math.max(1, entry.entranceFrames) : 1;
+      const anim = messageEntranceTransform(project, t);
+      const rise = anim.dy * Math.round(34 * m.scale);
+      const y = offsetY + item.y + rise;
+      const seconds = Math.max(0, age) / plan.fps;
+      const isSpot = spotlight != null && item.message.id === spotlight.id;
+      const spotT = spotlight ? Math.max(0, Math.min(1, t)) : 0;
+      ctx.globalAlpha = alphaMul * anim.alpha * (spotlight && !isSpot ? 1 - 0.55 * spotT : 1);
+      const scale = anim.scale * (isSpot ? 1 + 0.06 * spotT : 1);
+      const scaling = Math.abs(scale - 1) > 0.001;
+      if (scaling) {
+        ctx.save();
+        const px = item.isSelf ? item.x + item.width : item.x;
+        const py = y + item.height;
+        ctx.translate(px, py);
+        ctx.scale(scale, scale);
+        ctx.translate(-px, -py);
+      }
+
+      if (item.message.kind === "system") {
+        const label = item.lines.join(" ");
+        ctx.font = `500 ${Math.round(26 * m.scale)}px ${theme.fontFamily}`;
+        const w = ctx.measureText(label).width + Math.round(40 * m.scale);
+        const h = Math.round(48 * m.scale);
+        ctx.fillStyle = theme.systemBubble;
+        roundRect(ctx, (width - w) / 2, y, w, h, h / 2);
         ctx.fill();
+        ctx.fillStyle = theme.systemText;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, width / 2, y + h / 2);
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+        if (scaling) ctx.restore();
+        continue;
       }
-      ctx.fillStyle = item.isSelf ? theme.metaSelf : theme.meta;
-      ctx.fillText(label, item.x + padX + vw - labelW + Math.round(6 * m.scale), cy + m.metaSize * 0.35);
-      cursorY += vh;
-    }
 
-    if (item.mediaH) {
-      const mw = item.width - padX * 2;
-      const mh = Math.round(mw / (loaded?.aspect || item.message.mediaAspect || 1.4));
-      const src = loaded ? mediaFrameAt(loaded, seconds) : null;
-      ctx.save();
-      roundRect(ctx, item.x + padX, cursorY, mw, mh, Math.round(16 * m.scale));
-      ctx.clip();
-      if (src) {
-        ctx.drawImage(src, item.x + padX, cursorY, mw, mh);
-      } else {
-        ctx.fillStyle = theme.divider;
-        ctx.fillRect(item.x + padX, cursorY, mw, mh);
-      }
-      ctx.restore();
-      if (item.message.kind === "video" && !loaded?.animated) {
-        // vídeo ainda não carregado: marca de reprodução no centro
-        const r = Math.round(44 * m.scale);
-        ctx.fillStyle = "rgba(0,0,0,0.45)";
-        ctx.beginPath();
-        ctx.arc(item.x + padX + mw / 2, cursorY + mh / 2, r, 0, Math.PI * 2);
+      // cartão de cena: faixa escura translúcida com texto grande branco,
+      // como os cortes “Momentos antes” / “Enquanto isso” dos canais de referência
+      if (item.message.kind === "card") {
+        const cardSize = Math.round(m.fontSize * 1.5);
+        ctx.fillStyle = "rgba(10,10,16,0.62)";
+        roundRect(ctx, m.pad / 2, y, width - m.pad, item.height, Math.round(28 * m.scale));
         ctx.fill();
         ctx.fillStyle = "#ffffff";
+        ctx.font = `800 ${cardSize}px ${theme.fontFamily}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const lh = Math.round(cardSize * 1.25);
+        item.lines.forEach((l, i) =>
+          ctx.fillText(l, width / 2, y + item.height / 2 + (i - (item.lines.length - 1) / 2) * lh),
+        );
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+        if (scaling) ctx.restore();
+        continue;
+      }
+
+      const padX = Math.round(24 * m.scale);
+      const padY = Math.round(18 * m.scale);
+      const loaded = item.message.mediaUrl ? media?.get(item.message.mediaUrl) : undefined;
+
+      if (item.showAvatar) {
+        const size = m.avatar;
+        const avatarImg = item.avatarUrl ? media?.get(item.avatarUrl)?.frames[0] : undefined;
+        drawAvatarCircle(
+          ctx,
+          theme,
+          m.pad + size / 2,
+          y + size / 2,
+          size,
+          item.nameColor,
+          item.name,
+          avatarImg,
+        );
+      }
+
+      // figurinha: sem bolha, só o desenho e a hora embaixo
+      if (item.bare) {
+        const src = loaded ? mediaFrameAt(loaded, seconds) : null;
+        if (src) {
+          ctx.drawImage(src, item.x, y, item.mediaW, item.mediaH);
+        } else {
+          ctx.fillStyle = theme.systemBubble;
+          roundRect(ctx, item.x, y, item.mediaW, item.mediaH, Math.round(24 * m.scale));
+          ctx.fill();
+        }
+        ctx.fillStyle = theme.meta;
+        ctx.font = `400 ${m.metaSize}px ${theme.fontFamily}`;
+        const label = item.clock;
+        const lx = item.isSelf ? item.x + item.mediaW - ctx.measureText(label).width : item.x;
+        ctx.fillText(label, lx, y + item.mediaH + m.metaSize);
+        if (scaling) ctx.restore();
+        continue;
+      }
+
+      if (item.showName) {
+        ctx.fillStyle = item.nameColor;
+        ctx.font = fontOf(item.style, 600, m.fontSize * 0.68);
+        ctx.fillText(item.name, item.x + Math.round(8 * m.scale), y - Math.round(8 * m.scale));
+      }
+
+      // bolha com rabinho apontando para o autor, com sombra suave
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.28)";
+      ctx.shadowBlur = Math.round(10 * m.scale);
+      ctx.shadowOffsetY = Math.round(3 * m.scale);
+      ctx.fillStyle = item.style.bubble ?? (item.isSelf ? theme.selfBubble : theme.peerBubble);
+      const radius = Math.min(item.height, Math.round(70 * m.scale)) * theme.radius * 1.6;
+      roundRect(ctx, item.x, y, item.width, item.height, radius);
+      ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = item.style.bubble ?? (item.isSelf ? theme.selfBubble : theme.peerBubble);
+      if (theme.tail && item.showTail !== false) {
+        const tw = Math.round(16 * m.scale);
         ctx.beginPath();
-        ctx.moveTo(item.x + padX + mw / 2 - r * 0.25, cursorY + mh / 2 - r * 0.4);
-        ctx.lineTo(item.x + padX + mw / 2 + r * 0.45, cursorY + mh / 2);
-        ctx.lineTo(item.x + padX + mw / 2 - r * 0.25, cursorY + mh / 2 + r * 0.4);
+        if (item.isSelf) {
+          ctx.moveTo(item.x + item.width - tw * 0.2, y);
+          ctx.lineTo(item.x + item.width + tw, y);
+          ctx.lineTo(item.x + item.width - tw * 0.2, y + tw * 1.5);
+        } else {
+          ctx.moveTo(item.x + tw * 0.2, y);
+          ctx.lineTo(item.x - tw, y);
+          ctx.lineTo(item.x + tw * 0.2, y + tw * 1.5);
+        }
         ctx.closePath();
         ctx.fill();
       }
-      cursorY += mh + (item.lines.length ? Math.round(12 * m.scale) : 0);
+
+      let cursorY = y + padY;
+
+      // trecho respondido, com a barrinha colorida do autor citado
+      if (item.reply) {
+        const rw = item.width - padX * 2;
+        const rh = item.reply.height;
+        ctx.save();
+        ctx.globalAlpha = ctx.globalAlpha * 0.92;
+        ctx.fillStyle = item.isSelf ? theme.peerBubble : theme.systemBubble;
+        roundRect(ctx, item.x + padX, cursorY, rw, rh, Math.round(10 * m.scale));
+        ctx.fill();
+        ctx.fillStyle = item.reply.color;
+        ctx.fillRect(item.x + padX, cursorY, Math.round(6 * m.scale), rh);
+        ctx.font = `600 ${Math.round(m.fontSize * 0.62)}px ${theme.fontFamily}`;
+        ctx.fillText(
+          item.reply.name,
+          item.x + padX + Math.round(18 * m.scale),
+          cursorY + rh * 0.42,
+        );
+        ctx.font = `400 ${Math.round(m.fontSize * 0.62)}px ${theme.fontFamily}`;
+        ctx.fillStyle = theme.meta;
+        ctx.fillText(
+          item.reply.text,
+          item.x + padX + Math.round(18 * m.scale),
+          cursorY + rh * 0.85,
+        );
+        ctx.restore();
+        cursorY += rh + Math.round(10 * m.scale);
+      }
+
+      // recado de voz: play, onda e duração
+      if (item.voiceH) {
+        const vh = item.voiceH;
+        const vw = item.width - padX * 2;
+        const r = Math.round(vh * 0.36);
+        const cx = item.x + padX + r;
+        const cy = cursorY + vh / 2;
+        ctx.fillStyle = item.style.text ?? (item.isSelf ? theme.selfText : theme.peerText);
+        ctx.globalAlpha = ctx.globalAlpha * 0.85;
+        ctx.beginPath();
+        ctx.moveTo(cx - r * 0.3, cy - r * 0.45);
+        ctx.lineTo(cx + r * 0.5, cy);
+        ctx.lineTo(cx - r * 0.3, cy + r * 0.45);
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = alphaMul * anim.alpha;
+
+        const seconds = voiceSeconds(item.message);
+        const label = durationLabel(seconds);
+        ctx.font = `400 ${m.metaSize}px ${theme.fontFamily}`;
+        const labelW = ctx.measureText(label).width + Math.round(12 * m.scale);
+        const waveX = cx + r + Math.round(16 * m.scale);
+        const waveW = Math.max(Math.round(40 * m.scale), item.x + padX + vw - labelW - waveX);
+        const bars = Math.max(10, Math.min(34, Math.round(waveW / Math.max(6, 10 * m.scale))));
+        const wave = voiceWave(item.message.id, bars);
+        const barW = Math.max(2, Math.round(waveW / (bars * 1.9)));
+        const played = Math.max(0, Math.min(1, age / plan.fps / Math.max(0.5, seconds)));
+        for (let i = 0; i < bars; i += 1) {
+          const bh = Math.max(barW, wave[i]! * vh * 0.52);
+          const bx = waveX + i * (waveW / bars);
+          ctx.fillStyle =
+            i / bars <= played ? theme.check : item.isSelf ? theme.metaSelf : theme.meta;
+          roundRect(ctx, bx, cy - bh / 2, barW, bh, barW / 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = item.isSelf ? theme.metaSelf : theme.meta;
+        ctx.fillText(
+          label,
+          item.x + padX + vw - labelW + Math.round(6 * m.scale),
+          cy + m.metaSize * 0.35,
+        );
+        cursorY += vh;
+      }
+
+      if (item.mediaH) {
+        const mw = item.width - padX * 2;
+        const mh = Math.round(mw / (loaded?.aspect || item.message.mediaAspect || 1.4));
+        const src = loaded ? mediaFrameAt(loaded, seconds) : null;
+        ctx.save();
+        roundRect(ctx, item.x + padX, cursorY, mw, mh, Math.round(16 * m.scale));
+        ctx.clip();
+        if (src) {
+          ctx.drawImage(src, item.x + padX, cursorY, mw, mh);
+        } else {
+          ctx.fillStyle = theme.divider;
+          ctx.fillRect(item.x + padX, cursorY, mw, mh);
+        }
+        ctx.restore();
+        if (item.message.kind === "video" && !loaded?.animated) {
+          // vídeo ainda não carregado: marca de reprodução no centro
+          const r = Math.round(44 * m.scale);
+          ctx.fillStyle = "rgba(0,0,0,0.45)";
+          ctx.beginPath();
+          ctx.arc(item.x + padX + mw / 2, cursorY + mh / 2, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath();
+          ctx.moveTo(item.x + padX + mw / 2 - r * 0.25, cursorY + mh / 2 - r * 0.4);
+          ctx.lineTo(item.x + padX + mw / 2 + r * 0.45, cursorY + mh / 2);
+          ctx.lineTo(item.x + padX + mw / 2 - r * 0.25, cursorY + mh / 2 + r * 0.4);
+          ctx.closePath();
+          ctx.fill();
+        }
+        cursorY += mh + (item.lines.length ? Math.round(12 * m.scale) : 0);
+      }
+
+      const big = item.message.kind === "emoji" || emojiOnly(item.message.text);
+      const fontSize = (big ? m.fontSize * 2.1 : m.fontSize) * item.style.scale;
+      const lineH = (big ? m.lineH * 2.1 : m.lineH) * item.style.scale;
+      ctx.font = fontOf(item.style, big ? 400 : item.style.weight, fontSize);
+      ctx.fillStyle = item.style.text ?? (item.isSelf ? theme.selfText : theme.peerText);
+      item.lines.forEach((line, i) => {
+        ctx.fillText(line, item.x + padX, cursorY + (i + 1) * lineH - lineH * 0.3);
+      });
+
+      // hora e confirmação de leitura, no canto inferior direito da bolha
+      ctx.font = `400 ${m.metaSize}px ${theme.fontFamily}`;
+      ctx.fillStyle = item.isSelf ? theme.metaSelf : theme.meta;
+      const showChecks = item.isSelf && (project.receipts ?? true);
+      const status = showChecks ? deliveryStateAt(project, plan, item.message, frame) : "sent";
+      const checkW = showChecks ? m.metaSize * 1.7 : 0;
+      const clockW = ctx.measureText(item.clock).width;
+      const metaX = item.x + item.width - padX - clockW - checkW;
+      const metaY = y + item.height - padY * 0.6;
+      ctx.fillText(item.clock, metaX, metaY);
+      if (showChecks) {
+        drawChecks(
+          ctx,
+          metaX + clockW + m.metaSize * 0.4,
+          metaY - m.metaSize * 0.35,
+          m.metaSize,
+          status === "read" ? theme.check : item.isSelf ? theme.metaSelf : theme.meta,
+          status === "sent" ? 1 : 2,
+        );
+      }
+
+      if (item.message.reaction) {
+        const rSize = Math.round(m.metaSize * 1.7);
+        const rx = item.isSelf
+          ? item.x + item.width - rSize * 1.8
+          : item.x + Math.round(14 * m.scale);
+        const ry = y + item.height - rSize * 0.35;
+        ctx.fillStyle = theme.peerBubble;
+        roundRect(ctx, rx, ry, rSize * 1.6, rSize, rSize / 2);
+        ctx.fill();
+        ctx.font = `400 ${Math.round(rSize * 0.72)}px ${theme.fontFamily}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = theme.peerText;
+        ctx.fillText(item.message.reaction, rx + rSize * 0.8, ry + rSize / 2);
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+      }
+
+      if (scaling) ctx.restore();
     }
 
-    const big = item.message.kind === "emoji" || emojiOnly(item.message.text);
-    const fontSize = (big ? m.fontSize * 2.1 : m.fontSize) * item.style.scale;
-    const lineH = (big ? m.lineH * 2.1 : m.lineH) * item.style.scale;
-    ctx.font = fontOf(item.style, big ? 400 : item.style.weight, fontSize);
-    ctx.fillStyle = item.style.text ?? (item.isSelf ? theme.selfText : theme.peerText);
-    item.lines.forEach((line, i) => {
-      ctx.fillText(line, item.x + padX, cursorY + (i + 1) * lineH - lineH * 0.3);
-    });
+    ctx.globalAlpha = alphaMul;
 
-    // hora e confirmação de leitura, no canto inferior direito da bolha
-    ctx.font = `400 ${m.metaSize}px ${theme.fontFamily}`;
-    ctx.fillStyle = item.isSelf ? theme.metaSelf : theme.meta;
-    const showChecks = item.isSelf && (project.receipts ?? true);
-    const status = showChecks ? deliveryStateAt(project, plan, item.message, frame) : "sent";
-    const checkW = showChecks ? m.metaSize * 1.7 : 0;
-    const clockW = ctx.measureText(item.clock).width;
-    const metaX = item.x + item.width - padX - clockW - checkW;
-    const metaY = y + item.height - padY * 0.6;
-    ctx.fillText(item.clock, metaX, metaY);
-    if (showChecks) {
-      drawChecks(
-        ctx,
-        metaX + clockW + m.metaSize * 0.4,
-        metaY - m.metaSize * 0.35,
-        m.metaSize,
-        status === "read" ? theme.check : item.isSelf ? theme.metaSelf : theme.meta,
-        status === "sent" ? 1 : 2,
-      );
+    if (typing) {
+      const author = participantOf(project, typing.participantId);
+      const isGroup = threadOf(project, threadIdOf(project, typing)).kind === "group";
+      const lane = isGroup && !author.isSelf ? m.avatar + Math.round(14 * m.scale) : 0;
+      const x = author.isSelf ? width - m.pad - Math.round(130 * m.scale) : m.pad + lane;
+      drawTypingBubble(ctx, theme, m, x, offsetY + layout.contentH, frame);
     }
 
-    if (item.message.reaction) {
-      const rSize = Math.round(m.metaSize * 1.7);
-      const rx = item.isSelf ? item.x + item.width - rSize * 1.8 : item.x + Math.round(14 * m.scale);
-      const ry = y + item.height - rSize * 0.35;
-      ctx.fillStyle = theme.peerBubble;
-      roundRect(ctx, rx, ry, rSize * 1.6, rSize, rSize / 2);
-      ctx.fill();
-      ctx.font = `400 ${Math.round(rSize * 0.72)}px ${theme.fontFamily}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = theme.peerText;
-      ctx.fillText(item.message.reaction, rx + rSize * 0.8, ry + rSize / 2);
-      ctx.textAlign = "left";
-      ctx.textBaseline = "alphabetic";
-    }
-
-    if (scaling) ctx.restore();
-  }
-
-  ctx.globalAlpha = alphaMul;
-
-  if (typing) {
-    const author = participantOf(project, typing.participantId);
-    const isGroup = threadOf(project, threadIdOf(project, typing)).kind === "group";
-    const lane = isGroup && !author.isSelf ? m.avatar + Math.round(14 * m.scale) : 0;
-    const x = author.isSelf ? width - m.pad - Math.round(130 * m.scale) : m.pad + lane;
-    drawTypingBubble(ctx, theme, m, x, offsetY + layout.contentH, frame);
-  }
-
-  ctx.globalAlpha = 1;
-  ctx.restore();
-  ctx.restore();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    ctx.restore();
   };
 
   // corte entre conversas: a anterior sai para a esquerda enquanto a nova entra
@@ -1587,12 +1783,13 @@ function paintConversation(
   }
 
   if (headerVisible) {
-    const typingName = typingActive ? participantOf(project, typingActive.participantId).name : null;
+    const typingName = typingActive
+      ? participantOf(project, typingActive.participantId).name
+      : null;
     const headThread = view.cut < 0.5 && view.previousThread ? view.previousThread : view.thread;
     drawHeader(ctx, project, theme, width, m, media, typingName, headThread);
   }
 }
-
 
 /**
  * Saída da cena: nos últimos milissegundos do vídeo a conversa some com o

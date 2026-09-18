@@ -23,7 +23,11 @@ The isolated environment, model weights and references live on G:. The ignored `
 
 CPU server: Python 3.10 or 3.11 is supported. Run `scripts/install-chatscene-voice-cpu.sh /opt/chatscene-voice`; it creates the isolated environment, installs the CPU PyTorch build, downloads the pinned weights and auxiliary tokenizer data, and verifies the runtime import. Configure `pythonPath`, `modelPath`, `storagePath` and `device: "cpu"` in the runtime JSON. Set `CHATSCENE_VOICE_CONFIG` to an alternative absolute config path if needed.
 
-The app must run as a persistent **Node server with subprocess access**, Python, FFmpeg and persistent private storage. An edge-only deployment cannot spawn the model. CPU compatibility does not establish acceptable latency on a particular VPS: measure before offering interactive previews there. No remote host was accessed or deployed by this change.
+The app may run at the edge when it is configured to call the authenticated
+Hostear service. A fully local installation still requires a persistent **Node
+server with subprocess access**, Python, FFmpeg and private storage. CPU
+compatibility does not establish acceptable latency on a particular VPS:
+measure before offering interactive previews there.
 
 ## Hostear + GPU local
 
@@ -70,6 +74,12 @@ server reuses `CLEANER_WORKER_PUBLIC_URL`/`CLEANER_WORKER_SECRET`. The systemd
 unit is `backend/chatscene_voice/chatscene-voice.service`, and Caddy uses
 `backend/chatscene_voice/Caddyfile.hostear`.
 
+The same authenticated service also exposes `/v1/voice/generic`, backed by
+`piper-tts` 1.8.0 and the pinned `pt_BR-faber-medium` voice. This is the free
+default-voice path used when no paid provider is selected. The installer checks
+both downloaded files against their recorded SHA-256 values before accepting
+them. The browser never calls this endpoint directly.
+
 ## Contract
 
 After import validation, set `ready: true` in the runtime JSON. The UI keeps uploads disabled until that flag and the required assets are present. `scripts/install-chatscene-voice-cpu.sh` prepares the CPU environment; it does not change the live web service or open an inference port.
@@ -94,4 +104,14 @@ Runtime logs record device, inference time, output duration and peak allocated V
 
 Real clone verification passed on 2026-09-17 using only a Piper-generated synthetic reference. The final transformed MP3 is 3.912 s, mono 24 kHz, -2.5 dB peak and -18.5 dB mean volume. Account isolation, reference deletion and final-duration analysis passed in the integration test. Artifacts are in `output/chatscene-voice-cloning`.
 
-Earlier checks completed during implementation: 243 ChatScene tests passed; production build and scoped ESLint passed. TypeScript reports three existing errors outside ChatScene (`TemplateEditor`, `captions-timing.test`, `tiktok-resolver.test`). Isolated voice-panel screenshots captured at 1440, 1366 and 390 px. At 390 px document width equals viewport width. The isolated browser had no authenticated account, so the final authenticated click-through remains a separate manual check. No preview renderer or timeline visuals were changed.
+Remote verification on 2026-09-18 passed against the authenticated Hostear
+service. Generic PT-BR synthesis returned a valid 3.13 s RIFF/WAVE at 22.05 kHz.
+A full synthetic-reference clone returned valid WAV through the CUDA relay. The
+cold run took about five minutes to load the model; the warm repeat completed in
+12.8 s. The UI therefore starts warming immediately after upload, polls health,
+and keeps generation disabled until `modelLoaded` is true.
+
+Latest checks completed during implementation: the scoped voice/render tests,
+TypeScript, ESLint and the full production build passed. The authenticated
+Hostear smoke tests used only Piper-generated synthetic speech and removed the
+temporary references afterward.

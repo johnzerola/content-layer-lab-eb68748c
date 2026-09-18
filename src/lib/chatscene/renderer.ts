@@ -23,12 +23,17 @@ export interface ConversationRenderer {
   /** carrega tudo que o desenho precisa (imagens, fontes) antes do primeiro quadro */
   prepare(project: ChatSceneProject): Promise<void>;
   /** desenha um quadro no destino informado */
-  drawFrame(target: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, ctx: RenderFrameContext): void;
+  drawFrame(
+    target: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+    ctx: RenderFrameContext,
+  ): void;
   plan(project: ChatSceneProject): ConversationPlan;
 }
 
 export interface CanvasRendererOptions {
   safeZones?: boolean;
+  nativeVideoBackground?: boolean;
+  mediaProfile?: "preview" | "export";
 }
 
 /** Nunca deixa uma mídia travar o preparo: estourado o prazo, segue sem ela. */
@@ -59,9 +64,9 @@ export class CanvasConversationRenderer implements ConversationRenderer {
     for (const p of project.participants) if (p.avatarUrl) urls.add(p.avatarUrl);
     if (project.groupAvatarUrl) urls.add(project.groupAvatarUrl);
     const bg = project.background;
-    const bgVideoUrl = bg?.kind === "video" ? (bg.videoUrl || bg.imageUrl) : undefined;
+    const bgVideoUrl = bg?.kind === "video" ? bg.videoUrl || bg.imageUrl : undefined;
     if (bg?.kind === "image" && bg.imageUrl) urls.add(bg.imageUrl);
-    if (bgVideoUrl) urls.add(bgVideoUrl);
+    if (bgVideoUrl && !this.options.nativeVideoBackground) urls.add(bgVideoUrl);
     if (project.branding?.enabled && project.branding.logoUrl) urls.add(project.branding.logoUrl);
     if (project.header?.logoUrl) urls.add(project.header.logoUrl);
     if (project.header?.bgImageUrl) urls.add(project.header.bgImageUrl);
@@ -72,9 +77,17 @@ export class CanvasConversationRenderer implements ConversationRenderer {
           // fundo em vídeo é decorativo: amostra mais leve e nunca segura a
           // prévia — se demorar ou falhar, o restante abre mesmo assim
           const isBgVideo = u === bgVideoUrl;
+          const exportBackground = isBgVideo && this.options.mediaProfile === "export";
           const item = await withTimeout(
-            loadMedia(u, isBgVideo ? { sampleFps: 6, maxSeconds: 8, decodeBudgetMs: 9000 } : {}),
-            isBgVideo ? 20000 : 30000,
+            loadMedia(
+              u,
+              isBgVideo
+                ? exportBackground
+                  ? { sampleFps: 18, maxSeconds: 10, decodeBudgetMs: 25000, maxSide: 960 }
+                  : { sampleFps: 12, maxSeconds: 8, decodeBudgetMs: 12000, maxSide: 720 }
+                : {},
+            ),
+            isBgVideo ? (exportBackground ? 35000 : 22000) : 30000,
           );
           if (item) this.media.set(u, item);
         }),
@@ -116,6 +129,7 @@ export class CanvasConversationRenderer implements ConversationRenderer {
     paintFrame(target, project, theme, ctx.plan, ctx.frame, ctx.width, ctx.height, {
       media: this.media,
       safeZones: this.options.safeZones ?? false,
+      nativeVideoBackground: this.options.nativeVideoBackground ?? false,
     });
     if (leaving) target.restore();
   }
@@ -134,7 +148,8 @@ export function paintPreview(
     canvas.width = width;
     canvas.height = height;
   }
-  const ctx = canvas.getContext("2d", { alpha: false });
+  const ctx = canvas.getContext("2d", { alpha: true });
   if (!ctx) return;
+  ctx.clearRect(0, 0, width, height);
   renderer.drawFrame(ctx, { width, height, frame, plan });
 }

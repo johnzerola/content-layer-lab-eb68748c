@@ -1,7 +1,11 @@
 import {
   Check,
   ChevronDown,
+  ExternalLink,
+  Eye,
+  EyeOff,
   FlaskConical,
+  KeyRound,
   Loader2,
   Play,
   RotateCcw,
@@ -39,7 +43,11 @@ import {
   type VoiceTransformConfig,
   type VoiceTransformMode,
 } from "@/lib/chatscene/voice-transform";
-import { getElevenLabsConnection, listElevenLabsVoices } from "@/lib/elevenlabs.functions";
+import {
+  connectElevenLabs,
+  getElevenLabsConnection,
+  listElevenLabsVoices,
+} from "@/lib/elevenlabs.functions";
 import type { ElevenLabsVoice } from "@/lib/elevenlabs.server";
 
 export interface VoicePanelProps {
@@ -74,6 +82,7 @@ export function VoicePanel(props: VoicePanelProps) {
   } = props;
   const setProject = (next: ChatSceneProject) => patch(next);
   const connectionFn = useServerFn(getElevenLabsConnection);
+  const connectFn = useServerFn(connectElevenLabs);
   const voicesFn = useServerFn(listElevenLabsVoices);
   const [elevenConnection, setElevenConnection] = useState<
     "checking" | "connected" | "disconnected" | "error"
@@ -83,6 +92,10 @@ export function VoicePanel(props: VoicePanelProps) {
   const [elevenCatalogLoaded, setElevenCatalogLoaded] = useState(false);
   const [elevenLoading, setElevenLoading] = useState(false);
   const [elevenError, setElevenError] = useState("");
+  const [elevenApiKey, setElevenApiKey] = useState("");
+  const [elevenConnecting, setElevenConnecting] = useState(false);
+  const [showElevenKey, setShowElevenKey] = useState(false);
+  const [showElevenForm, setShowElevenForm] = useState(true);
   const connectionRequest = useRef(0);
   const latestProject = useRef(project);
   latestProject.current = project;
@@ -135,6 +148,32 @@ export function VoicePanel(props: VoicePanelProps) {
       );
     } finally {
       setElevenLoading(false);
+    }
+  };
+  const connectElevenLabsAccount = async () => {
+    const apiKey = elevenApiKey.trim();
+    if (elevenConnecting || apiKey.length < 12) {
+      if (apiKey.length < 12) setElevenError("Cole uma chave de API válida da ElevenLabs.");
+      return;
+    }
+    setElevenConnecting(true);
+    setElevenError("");
+    try {
+      await connectFn({ data: { apiKey, accountLabel: "Minha ElevenLabs" } });
+      const voices = await voicesFn();
+      setElevenConnection("connected");
+      setElevenConnectionError("");
+      setElevenVoices(voices);
+      setElevenCatalogLoaded(true);
+      setElevenApiKey("");
+      setShowElevenKey(false);
+      setShowElevenForm(false);
+    } catch (error) {
+      setElevenError(
+        error instanceof Error ? error.message : "Não foi possível conectar sua ElevenLabs.",
+      );
+    } finally {
+      setElevenConnecting(false);
     }
   };
   const applyAnimatedElevenLabsCast = () => {
@@ -280,12 +319,16 @@ export function VoicePanel(props: VoicePanelProps) {
                     : "Carregar vozes"}
             </Button>
           ) : elevenConnection === "disconnected" ? (
-            <a
-              href="/contas#elevenlabs"
-              className="interactive inline-flex min-h-11 shrink-0 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            <Button
+              type="button"
+              size="sm"
+              className="min-h-11 shrink-0"
+              onClick={() => setShowElevenForm((value) => !value)}
+              aria-expanded={showElevenForm}
             >
-              Conectar ElevenLabs
-            </a>
+              <KeyRound className="size-3.5" aria-hidden />
+              Conectar minha chave
+            </Button>
           ) : elevenConnection === "error" ? (
             <Button
               type="button"
@@ -307,6 +350,77 @@ export function VoicePanel(props: VoicePanelProps) {
           <p role="alert" className="mt-2 break-words text-xs text-destructive">
             {elevenError}
           </p>
+        ) : null}
+        {(elevenConnection === "disconnected" || elevenConnection === "error") && showElevenForm ? (
+          <form
+            className="mt-3 space-y-3 border-t border-primary/15 pt-3"
+            aria-busy={elevenConnecting}
+            onSubmit={(event) => {
+              event.preventDefault();
+              void connectElevenLabsAccount();
+            }}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold">Use sua própria conta</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  O consumo e os limites ficam na sua ElevenLabs, não na conta da plataforma.
+                </p>
+              </div>
+              <a
+                href="https://elevenlabs.io/app/settings/api-keys"
+                target="_blank"
+                rel="noreferrer"
+                className="interactive inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Criar/ver chave <ExternalLink className="size-3.5" aria-hidden />
+              </a>
+            </div>
+            <label className="block text-xs font-medium">
+              Chave de API da ElevenLabs
+              <span className="relative mt-1 block">
+                <input
+                  type={showElevenKey ? "text" : "password"}
+                  value={elevenApiKey}
+                  onChange={(event) => setElevenApiKey(event.target.value)}
+                  minLength={12}
+                  maxLength={300}
+                  required
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className="h-11 w-full rounded-md border border-border bg-background px-3 pr-11 font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-describedby="elevenlabs-inline-key-help"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowElevenKey((value) => !value)}
+                  className="absolute inset-y-0 right-0 grid w-11 place-items-center text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  aria-label={showElevenKey ? "Ocultar chave" : "Mostrar chave"}
+                  aria-pressed={showElevenKey}
+                >
+                  {showElevenKey ? (
+                    <EyeOff className="size-4" aria-hidden />
+                  ) : (
+                    <Eye className="size-4" aria-hidden />
+                  )}
+                </button>
+              </span>
+            </label>
+            <p id="elevenlabs-inline-key-help" className="text-[11px] text-muted-foreground">
+              A chave é validada e criptografada no servidor. Ela não é salva no projeto nem volta
+              para o navegador.
+            </p>
+            <Button type="submit" className="min-h-11 w-full" disabled={elevenConnecting}>
+              {elevenConnecting ? (
+                <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+              ) : (
+                <KeyRound className="size-4" aria-hidden />
+              )}
+              {elevenConnecting ? "Validando chave…" : "Conectar e carregar minhas vozes"}
+            </Button>
+          </form>
         ) : null}
         {elevenConnection === "connected" && elevenCatalogLoaded && !elevenVoices.length ? (
           <a

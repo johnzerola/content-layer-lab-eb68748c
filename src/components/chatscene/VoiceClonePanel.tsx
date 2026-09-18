@@ -49,7 +49,7 @@ export function VoiceClonePanel({
       setAvailable(false);
       setModelReady(false);
       setStatusError(
-        "O servidor de voz perdeu a conexão. Confirme que o servidor local está ativo e tente novamente.",
+        "Não foi possível alcançar o serviço privado de voz. Tente novamente em instantes.",
       );
     } finally {
       setChecking(false);
@@ -94,7 +94,9 @@ export function VoiceClonePanel({
       .then(poll)
       .catch(() => {
         if (active) {
-          setStatusError("Não foi possível preparar o modelo de voz na RTX 2060.");
+          setStatusError(
+            "Não foi possível preparar o modelo de clonagem na GPU nem no fallback da Hostear.",
+          );
         }
       });
     return () => {
@@ -207,7 +209,7 @@ export function VoiceClonePanel({
         {available === true && reference && modelReady === false ? (
           <p role="status" className="mt-2 flex items-center gap-2 text-xs text-amber-300">
             <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
-            Preparando o modelo na RTX 2060. No primeiro uso isso pode levar alguns minutos.
+            Preparando o modelo de clonagem. No primeiro uso isso pode levar alguns minutos.
           </p>
         ) : null}
         {available === true && (!reference || modelReady === true) ? (

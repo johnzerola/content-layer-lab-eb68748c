@@ -17,6 +17,7 @@ import {
   remoteCloneEngineStatus,
   remoteVoiceServiceConfigured,
   saveRemoteVoiceReference,
+  synthesizeRemoteGenericVoice,
   synthesizeRemoteVoice,
   warmRemoteCloneEngine,
 } from "./voice-clone.remote.server";
@@ -25,7 +26,7 @@ export const getVoiceEngineStatus = createServerFn({ method: "GET" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .handler(async () => {
     const remote = await remoteCloneEngineStatus();
-    if (remote) return { clone: remote, piper: false };
+    if (remote) return { clone: remote, piper: Boolean(remote.genericInstalled) };
     // Do not import the Node-only worker in an edge deployment unless the
     // runtime explicitly advertises a local installation.
     if (
@@ -106,8 +107,8 @@ export function resolveVoiceProviderConfig(env: Record<string, string | undefine
 function nativeVoicePipelineConfigured() {
   return Boolean(
     process.env["CHATSCENE_VOICE_PYTHON_PATH"] &&
-      process.env["CHATSCENE_VOICE_MODEL_PATH"] &&
-      process.env["CHATSCENE_VOICE_STORAGE_PATH"],
+    process.env["CHATSCENE_VOICE_MODEL_PATH"] &&
+    process.env["CHATSCENE_VOICE_STORAGE_PATH"],
   );
 }
 
@@ -120,7 +121,8 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
     const isClone = data.provider === "chatterbox";
     const isElevenLabs = data.provider === "elevenlabs";
     const localRequested = data.provider === "piper" || isClone;
-    const provider = localRequested || isElevenLabs ? null : resolveVoiceProviderConfig(process.env);
+    const provider =
+      localRequested || isElevenLabs ? null : resolveVoiceProviderConfig(process.env);
     let buffer: Buffer;
     let mime = "audio/mpeg";
     let providerName = "gateway";
@@ -140,6 +142,9 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
               data.direction ??
               "Você é um ator brasileiro de dublagem. Fale em português do Brasil (pt-BR) com pronúncia brasileira natural, interpretando a fala com respiração, micro-pausas e variação de entonação, sem soar robótico ou de locutor.",
           }),
+        }).catch((error) => {
+          if (remoteVoiceServiceConfigured()) return null;
+          throw error;
         })
       : null;
 
@@ -162,9 +167,8 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
     }
 
     if (isElevenLabs) {
-      const { resolveElevenLabsApiKey, synthesizeElevenLabs } = await import(
-        "@/lib/elevenlabs.server"
-      );
+      const { resolveElevenLabsApiKey, synthesizeElevenLabs } =
+        await import("@/lib/elevenlabs.server");
       const apiKey = await resolveElevenLabsApiKey(context.userId);
       const settings = data.providerSettings;
       buffer = await synthesizeElevenLabs({
@@ -193,6 +197,13 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
       providerName = "chatterbox";
     } else if (res) {
       buffer = Buffer.from(await res.arrayBuffer());
+    } else if (remoteVoiceServiceConfigured()) {
+      buffer = Buffer.from(
+        await synthesizeRemoteGenericVoice(data.text, data.speed ?? 1),
+        "base64",
+      );
+      mime = "audio/wav";
+      providerName = "piper-remote";
     } else {
       const { getPiperLocalStatus, synthesizePiperWav } = await import("./voice-piper.server");
       if (getPiperLocalStatus().available) {

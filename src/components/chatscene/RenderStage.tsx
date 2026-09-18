@@ -98,7 +98,10 @@ export function RenderStage() {
 
   const setMix = useCallback(
     (changes: Partial<typeof mix>) =>
-      setProject((prev) => ({ ...prev, voiceMix: { ...DEFAULT_VOICE_MIX, ...prev.voiceMix, ...changes } })),
+      setProject((prev) => ({
+        ...prev,
+        voiceMix: { ...DEFAULT_VOICE_MIX, ...prev.voiceMix, ...changes },
+      })),
     [],
   );
 
@@ -162,7 +165,7 @@ export function RenderStage() {
     const controller = new AbortController();
     exportAbortRef.current = controller;
     try {
-      const renderer = new CanvasConversationRenderer({ safeZones: false });
+      const renderer = new CanvasConversationRenderer({ safeZones: false, mediaProfile: "export" });
       await renderer.prepare(project);
       const { width, height } = renderSize(project.render);
 
@@ -295,7 +298,10 @@ export function RenderStage() {
             onMotion={setMotion}
           />
 
-          <section className="glass rounded-2xl border border-border p-4 text-xs" aria-label="Efeitos de entrada e saída">
+          <section
+            className="glass rounded-2xl border border-border p-4 text-xs"
+            aria-label="Efeitos de entrada e saída"
+          >
             <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
               <Wand2 className="size-4" />
               Efeitos
@@ -305,7 +311,9 @@ export function RenderStage() {
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="flex flex-col gap-1">
-                <span className="mono-label text-[10px] text-muted-foreground">Entrada das mensagens</span>
+                <span className="mono-label text-[10px] text-muted-foreground">
+                  Entrada das mensagens
+                </span>
                 <select
                   className="rounded-md border border-border bg-background/60 px-2 py-1"
                   value={motion.enter}
@@ -361,7 +369,10 @@ export function RenderStage() {
             </div>
           </section>
 
-          <section className="glass rounded-2xl border border-border p-4 text-xs" aria-label="Trilha de fundo">
+          <section
+            className="glass rounded-2xl border border-border p-4 text-xs"
+            aria-label="Trilha de fundo"
+          >
             <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
               <Music className="size-4" />
               Trilha de fundo
@@ -391,7 +402,9 @@ export function RenderStage() {
               )}
             </div>
             <div className="mt-3 flex items-center gap-2">
-              <span className="mono-label w-16 shrink-0 text-[10px] text-muted-foreground">volume</span>
+              <span className="mono-label w-16 shrink-0 text-[10px] text-muted-foreground">
+                volume
+              </span>
               <input
                 type="range"
                 min={0}
@@ -419,8 +432,9 @@ export function RenderStage() {
 
           <p className="flex items-start gap-2 text-xs text-muted-foreground">
             <Sparkles className="mt-0.5 size-3.5 shrink-0" />
-            Toque em qualquer ponto da linha do tempo para saltar. A trilha entra no mesmo instante do
-            cursor e as falas tocam quando a bolha aparece — o vídeo gerado sai igual ao que você ouve.
+            Toque em qualquer ponto da linha do tempo para saltar. A trilha entra no mesmo instante
+            do cursor e as falas tocam quando a bolha aparece — o vídeo gerado sai igual ao que você
+            ouve.
           </p>
         </div>
       </div>

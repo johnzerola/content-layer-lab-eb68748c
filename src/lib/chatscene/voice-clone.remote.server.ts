@@ -9,6 +9,7 @@
 
 export interface RemoteVoiceEngineStatus {
   installed: boolean;
+  genericInstalled?: boolean;
   device: string;
   modelLoaded: boolean;
   warming: boolean;
@@ -104,6 +105,18 @@ export async function synthesizeRemoteVoice(userId: string, referenceId: string,
       body: JSON.stringify({ userId, referenceId, text }),
     },
     300_000,
+  );
+  return result.audio;
+}
+
+export async function synthesizeRemoteGenericVoice(text: string, speed = 1) {
+  const result = await remoteVoiceRequest<{ audio: string; device: string }>(
+    "/generic",
+    {
+      method: "POST",
+      body: JSON.stringify({ text, speed }),
+    },
+    90_000,
   );
   return result.audio;
 }

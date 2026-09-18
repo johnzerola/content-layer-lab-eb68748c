@@ -32,10 +32,16 @@ export interface LoadMediaOptions {
   maxSeconds?: number;
   /** orçamento de tempo de decodificação em ms; ao estourar, usa o que já tem */
   decodeBudgetMs?: number;
+  maxSide?: number;
 }
 
 function sizeOf(source: CanvasImageSource): { width: number; height: number } {
-  const any = source as { width?: number; height?: number; videoWidth?: number; videoHeight?: number };
+  const any = source as {
+    width?: number;
+    height?: number;
+    videoWidth?: number;
+    videoHeight?: number;
+  };
   const width = any.videoWidth || any.width || 1;
   const height = any.videoHeight || any.height || 1;
   return { width: Number(width), height: Number(height) };
@@ -83,8 +89,11 @@ async function decodeStill(blob: Blob): Promise<CanvasImageSource | null> {
 
 /** GIF, WebP e APNG animados: decodificados quadro a quadro pelo navegador. */
 async function decodeAnimatedImage(blob: Blob): Promise<LoadedMedia | null> {
-  const Decoder = (globalThis as { ImageDecoder?: new (init: { data: ArrayBuffer; type: string }) => ImageDecoderLike })
-    .ImageDecoder;
+  const Decoder = (
+    globalThis as {
+      ImageDecoder?: new (init: { data: ArrayBuffer; type: string }) => ImageDecoderLike;
+    }
+  ).ImageDecoder;
   if (!Decoder) return null;
   try {
     const data = await blob.arrayBuffer();
@@ -124,7 +133,10 @@ async function decodeAnimatedImage(blob: Blob): Promise<LoadedMedia | null> {
 }
 
 /** Vídeo (meme, clipe curto): amostrado em quadros para entrar na conversa. */
-async function decodeVideo(blob: Blob, options: LoadMediaOptions = {}): Promise<LoadedMedia | null> {
+async function decodeVideo(
+  blob: Blob,
+  options: LoadMediaOptions = {},
+): Promise<LoadedMedia | null> {
   const sampleFps = Math.max(2, options.sampleFps ?? ANIMATED_SAMPLE_FPS);
   const maxSeconds = Math.max(1, options.maxSeconds ?? MAX_ANIMATION_SECONDS);
   // vídeos grandes do usuário não podem segurar a prévia: decodifica no
@@ -148,7 +160,8 @@ async function decodeVideo(blob: Blob, options: LoadMediaOptions = {}): Promise<
     if (!duration) return null;
     const vw = video.videoWidth || 720;
     const vh = video.videoHeight || 1280;
-    const scale = Math.min(1, MAX_SIDE / Math.max(vw, vh));
+    const maxSide = Math.max(240, options.maxSide ?? MAX_SIDE);
+    const scale = Math.min(1, maxSide / Math.max(vw, vh));
     const w = Math.max(2, Math.round(vw * scale));
     const h = Math.max(2, Math.round(vh * scale));
     const canvas = document.createElement("canvas");
@@ -202,7 +215,10 @@ async function decodeVideo(blob: Blob, options: LoadMediaOptions = {}): Promise<
 }
 
 /** Carrega qualquer mídia suportada; devolve null quando não dá para usar. */
-export async function loadMedia(url: string, options: LoadMediaOptions = {}): Promise<LoadedMedia | null> {
+export async function loadMedia(
+  url: string,
+  options: LoadMediaOptions = {},
+): Promise<LoadedMedia | null> {
   const blob = await toBlob(url);
   if (!blob) return null;
   if (blob.type.startsWith("video/")) {
@@ -225,5 +241,7 @@ export function mediaFrameAt(media: LoadedMedia, seconds: number): CanvasImageSo
 // tipagem mínima da API ImageDecoder (ainda não está no lib.dom padrão)
 interface ImageDecoderLike {
   tracks: { ready: Promise<void>; selectedTrack?: { frameCount: number } };
-  decode(init: { frameIndex: number }): Promise<{ image: CanvasImageSource & { duration?: number } }>;
+  decode(init: {
+    frameIndex: number;
+  }): Promise<{ image: CanvasImageSource & { duration?: number } }>;
 }

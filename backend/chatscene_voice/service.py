@@ -34,6 +34,12 @@ GPU_RELAY_URL = os.environ.get("CHATSCENE_GPU_RELAY_URL", "http://127.0.0.1:1809
 GPU_RELAY_TOKEN = os.environ.get("CHATSCENE_GPU_RELAY_TOKEN", "")
 BIND = os.environ.get("CHATSCENE_VOICE_SERVICE_BIND", "127.0.0.1")
 PORT = int(os.environ.get("CHATSCENE_VOICE_SERVICE_PORT", "18097"))
+PIPER_MODEL = Path(
+    os.environ.get("PIPER_MODEL_PATH", str(ROOT / "piper" / "pt_BR-faber-medium.onnx"))
+).resolve()
+PIPER_CONFIG = Path(
+    os.environ.get("PIPER_CONFIG_PATH", f"{PIPER_MODEL}.json")
+).resolve()
 MAX_BODY = 16 * 1024 * 1024
 MAX_AUDIO = 12 * 1024 * 1024
 IDLE_SECONDS = int(os.environ.get("CHATSCENE_VOICE_IDLE_SECONDS", "120"))
@@ -65,6 +71,49 @@ def engine_installed():
         return bool(config.get("ready")) and all((model / name).is_file() for name in MODEL_FILES)
     except (OSError, KeyError, ValueError, TypeError):
         return False
+
+
+def piper_installed():
+    return PIPER_MODEL.is_file() and PIPER_CONFIG.is_file()
+
+
+def synthesize_piper(text, speed=1.0):
+    if not piper_installed():
+        raise RuntimeError("A voz padrão PT-BR não está instalada.")
+    safe_speed = max(0.7, min(1.3, float(speed)))
+    process = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "piper",
+            "-m",
+            str(PIPER_MODEL),
+            "-c",
+            str(PIPER_CONFIG),
+            "--output-raw",
+            "--length-scale",
+            str(1 / safe_speed),
+        ],
+        input=(text.strip() + "\n").encode("utf-8"),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        timeout=60,
+        check=False,
+    )
+    if process.returncode or not process.stdout:
+        raise RuntimeError("A voz padrão PT-BR não produziu áudio.")
+    try:
+        config = json.loads(PIPER_CONFIG.read_text(encoding="utf-8"))
+        sample_rate = int(config.get("audio", {}).get("sample_rate", 22050))
+    except (OSError, ValueError, TypeError):
+        sample_rate = 22050
+    output = io.BytesIO()
+    with wave.open(output, "wb") as target:
+        target.setnchannels(1)
+        target.setsampwidth(2)
+        target.setframerate(sample_rate)
+        target.writeframes(process.stdout)
+    return output.getvalue()
 
 
 def account_directory(user_id):
@@ -343,6 +392,7 @@ class Handler(BaseHTTPRequestHandler):
             200,
             {
                 "installed": engine_installed(),
+                "genericInstalled": piper_installed(),
                 "device": "remote-cuda" if relay and not CPU.loaded else "cpu",
                 "modelLoaded": gpu_loaded or CPU.loaded,
                 "warming": WARMING.is_set(),
@@ -382,6 +432,25 @@ class Handler(BaseHTTPRequestHandler):
                 os.chmod(metadata, 0o600)
                 request_warm()
                 self.respond(201, {"id": reference_id, "durationSec": duration})
+                return
+            if self.path == "/v1/voice/generic":
+                text = body.get("text")
+                if not isinstance(text, str) or not 1 <= len(text) <= 600:
+                    raise ValueError("Texto deve ter entre 1 e 600 caracteres.")
+                if not INFERENCE_SLOTS.acquire(blocking=False):
+                    self.respond(
+                        429,
+                        {"detail": "A fila de vozes está cheia. Tente novamente em instantes."},
+                    )
+                    return
+                try:
+                    audio = synthesize_piper(text, body.get("speed", 1))
+                finally:
+                    INFERENCE_SLOTS.release()
+                self.respond(
+                    200,
+                    {"audio": base64.b64encode(audio).decode("ascii"), "device": "cpu"},
+                )
                 return
             if self.path == "/v1/voice/synthesize":
                 user_id = str(body.get("userId", ""))
