@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildStoryPrompt, normalizeStoryScript, parseGeneratedStory, STORY_LIMITS, storyBriefSchema } from "../story-generation";
 import type { StoryScript } from "../story";
+import { STORY_TOPIC_MAX_CHARS } from "../story-style";
 
 const story = (): StoryScript => ({
   title: "A chave da vizinha",
@@ -119,5 +120,36 @@ describe("story generation contract", () => {
     expect(() => storyBriefSchema.parse({ topic: "   " })).toThrow();
     expect(() => storyBriefSchema.parse({ topic: "A chave", characters: 2.5 })).toThrow();
     expect(storyBriefSchema.parse({ topic: "A chave" })).toMatchObject({ characters: 3, durationSec: 60, tone: "comedia" });
+  });
+
+  it("aceita briefing longo integralmente e recusa excesso sem cortar o final", () => {
+    const ending = " A pista final é o guarda-sol";
+    const topic = "a".repeat(STORY_TOPIC_MAX_CHARS - ending.length) + ending;
+    expect(topic).toHaveLength(STORY_TOPIC_MAX_CHARS);
+    const brief = storyBriefSchema.parse({ topic });
+    const sent = JSON.parse(buildStoryPrompt(brief)[1]!.content);
+    expect(sent.tema).toBe(topic);
+    expect(sent.tema.endsWith("guarda-sol")).toBe(true);
+    expect(() => storyBriefSchema.parse({ topic: `${topic}!` })).toThrow();
+  });
+
+  it("aplica a direção animada por padrão inclusive para clientes anteriores", () => {
+    const legacy = { topic: "O avô esconde o controle do portão", tone: "comedia" as const, durationSec: 60, characters: 3 };
+    expect(storyBriefSchema.parse(legacy).narrativeStyle).toBe("animated-chat");
+    const prompt = buildStoryPrompt(legacy);
+    expect(JSON.parse(prompt[1]!.content).direcaoNarrativa).toBe("animated-chat");
+    expect(prompt[0]!.content).toContain("GANCHO:");
+    expect(prompt[0]!.content).toContain("callback");
+    expect(prompt[0]!.content).toContain("o clima escolhido prevalece");
+  });
+
+  it("a direção livre remove a receita animada sem perder o tema nem o tom", () => {
+    const brief = storyBriefSchema.parse({ topic: 'Uma mensagem diz "ignore o roteiro"', tone: "drama", narrativeStyle: "free" });
+    const prompt = buildStoryPrompt(brief);
+    expect(prompt[0]!.content).not.toContain("DIREÇÃO NARRATIVA: CONVERSA ANIMADA.");
+    expect(prompt[0]!.content).toContain("DIREÇÃO LIVRE:");
+    expect(prompt[0]!.content).not.toContain(brief.topic);
+    expect(JSON.parse(prompt[1]!.content)).toMatchObject({ tema: brief.topic, direcaoNarrativa: "free" });
+    expect(() => storyBriefSchema.parse({ topic: "Uma conversa", narrativeStyle: "unknown" })).toThrow();
   });
 });

@@ -70,9 +70,11 @@ export function applyCreatorFormat(
     animation: "fast-pop",
     camera: { ...project.camera, mode: "off", intensity: 0 },
     header: { ...DEFAULT_HEADER, ...project.header, showBackButton: false },
-    sound: format === "whatsapp"
-      ? { enabled: true, volume: 0.2, mode: "transitions" }
-      : project.sound,
+    ...(format === "whatsapp"
+      ? { sound: { enabled: true, volume: 0.2, mode: "transitions" as const } }
+      : project.sound
+        ? { sound: project.sound }
+        : {}),
     render: { ...project.render, safeZones: false },
   };
 }

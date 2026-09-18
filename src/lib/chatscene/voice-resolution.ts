@@ -33,9 +33,12 @@ export function attachPreset(project: ChatSceneProject, participantId: string, p
   }
   // A preset replaces the sound; retain only the participant's saved metadata.
   const targetPreset = voicePreset(presetId);
+  const providerChanged = previous?.provider !== (targetPreset.provider ?? DEFAULT_VOICE.provider);
   const metadata: Partial<VoiceProfile> = { id };
   for (const key of ["name", "gain", "provider", "language", "locale", "seed", "providerSettings", "transform"] as const) {
-    if (key === "provider" && (targetPreset.provider || previous?.provider === "chatterbox" || previous?.provider === "piper")) continue;
+    if (key === "provider") continue;
+    if (key === "providerSettings" && providerChanged) continue;
+    if (key === "name" && previous?.provider === "elevenlabs") continue;
     if (previous?.[key] !== undefined) Object.assign(metadata, { [key]: previous[key] });
   }
   const profile = profileFromPreset(presetId, metadata);
@@ -44,6 +47,56 @@ export function attachPreset(project: ChatSceneProject, participantId: string, p
     voiceProfiles: [...(project.voiceProfiles ?? []).filter((p) => p.id !== id), profile],
     participants: project.participants.map((p) => p.id === participantId ? { ...p, voiceProfileId: id, voice: profile } : p),
     messages: project.messages.map((message) => message.participantId === participantId ? { ...message, voiceMs: null } : message),
+  };
+}
+
+/** Vincula uma identidade vocal externa sem misturá-la aos presets sintéticos internos. */
+export function attachElevenLabsVoice(
+  project: ChatSceneProject,
+  participantId: string,
+  voice: { id: string; name: string },
+): ChatSceneProject {
+  const originalParticipant = project.participants.find((item) => item.id === participantId);
+  const previous = originalParticipant ? voiceProfileOf(project, originalParticipant) : null;
+  const seeded = attachPreset(project, participantId, "adult-male-casual");
+  const participant = seeded.participants.find((item) => item.id === participantId);
+  if (!participant) return project;
+  const current = voiceProfileOf(seeded, participant);
+  if (!current?.id) return project;
+  const profileId = current.id;
+  const currentPreset = voicePreset(current.presetId);
+  const profile: VoiceProfile = {
+    ...current,
+    provider: "elevenlabs",
+    providerVoiceId: voice.id,
+    name: `ElevenLabs · ${voice.name}`,
+    ageStyle: previous?.ageStyle ?? current.ageStyle ?? currentPreset.age,
+    genderStyle: previous?.genderStyle ?? current.genderStyle ?? currentPreset.gender,
+    speed: 1.04,
+    pitch: 0,
+    style: "animada",
+    energy: 0.72,
+    expressiveness: 0.75,
+    transform: undefined,
+    providerSettings: {
+      modelId: "eleven_flash_v2_5",
+      stability: 0.38,
+      similarityBoost: 0.78,
+      style: 0.42,
+      speakerBoost: true,
+    },
+  };
+  return {
+    ...seeded,
+    voiceProfiles: (seeded.voiceProfiles ?? []).map((item) =>
+      item.id === profile.id ? profile : item,
+    ),
+    participants: seeded.participants.map((item) =>
+      item.id === participantId ? { ...item, voiceProfileId: profileId, voice: profile } : item,
+    ),
+    messages: seeded.messages.map((message) =>
+      message.participantId === participantId ? { ...message, voiceMs: null } : message,
+    ),
   };
 }
 

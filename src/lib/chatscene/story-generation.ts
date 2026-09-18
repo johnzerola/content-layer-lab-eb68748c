@@ -1,5 +1,11 @@
 import { z } from "zod";
 import type { StoryBrief, StoryScript, StoryTone } from "./story";
+import {
+  ANIMATED_CHAT_DIRECTION,
+  DEFAULT_STORY_NARRATIVE_STYLE,
+  STORY_NARRATIVE_STYLES,
+  STORY_TOPIC_MAX_CHARS,
+} from "./story-style";
 
 /** Application limits; invalid output is rejected whole so the ending is never cut. */
 export const STORY_LIMITS = {
@@ -14,10 +20,11 @@ export const STORY_LIMITS = {
 } as const;
 
 export const storyBriefSchema = z.object({
-  topic: z.string().trim().min(3).max(400),
+  topic: z.string().trim().min(3).max(STORY_TOPIC_MAX_CHARS),
   tone: z.enum(["comedia", "drama", "suspense", "emotivo", "cotidiano"]).default("comedia"),
   durationSec: z.number().min(20).max(300).default(60),
   characters: z.number().int().min(2).max(STORY_LIMITS.characters).default(3),
+  narrativeStyle: z.enum(STORY_NARRATIVE_STYLES).default(DEFAULT_STORY_NARRATIVE_STYLE),
 });
 
 export const storyNameKey = (value: string) => value.normalize("NFD")
@@ -99,6 +106,7 @@ const TONE_HINT: Record<StoryTone, string> = {
 };
 
 export function buildStoryPrompt(brief: StoryBrief) {
+  const narrativeStyle = brief.narrativeStyle ?? DEFAULT_STORY_NARRATIVE_STYLE;
   // Local reference ASR: 266–280 words/video-minute. Budget slightly below
   // that range for breathing, time cards and variation between TTS providers.
   const lineCount = Math.max(10, Math.min(80, Math.round(brief.durationSec / 1.5)));
@@ -110,6 +118,9 @@ export function buildStoryPrompt(brief: StoryBrief) {
         "Escreva uma história original de ficção em português do Brasil para um vídeo vertical de conversa estilo WhatsApp.",
         "A história acontece nas mensagens entre personagens. Não escreva um relato de narrador, post de Reddit, rubricas de roteiro ou nomes antes das falas.",
         "Planeje em silêncio o que cada pessoa quer, o que sabe naquele momento e o detalhe que preparará a virada. Não inclua esse planejamento no JSON.",
+        narrativeStyle === "animated-chat"
+          ? ANIMATED_CHAT_DIRECTION
+          : "DIREÇÃO LIVRE: desenvolva o estilo, o humor e a estrutura a partir do briefing e do clima escolhido. Preserve a clareza, a causalidade e o desfecho, sem impor uma fórmula de comédia.",
         "Abra com uma mensagem que já mostre um problema específico, uma descoberta ou uma pergunta urgente. A segunda deve reagir a ela. Dispense cumprimentos e apresentação do contexto; revele o contexto pelas respostas.",
         "Dê a cada personagem um motivo diferente e um padrão de escrita consistente: vocabulário, pontuação, abreviações e ritmo próprios. Use os papéis e as idades sem caricaturas. Ninguém explica ao outro fatos que ambos já sabem só para informar o público.",
         "Cada mensagem responde, contradiz, pergunta, revela algo ou muda a situação. Use uma ideia por bolha, geralmente 3 a 12 palavras, no máximo 24. Varie o tamanho; cabem duas ou três mensagens seguidas da mesma pessoa. Emojis e abreviações só quando combinarem com ela.",
@@ -134,6 +145,7 @@ export function buildStoryPrompt(brief: StoryBrief) {
         personagensExatos: brief.characters,
         mensagensAproximadas: lineCount,
         palavrasAproximadas: wordCount,
+        direcaoNarrativa: narrativeStyle,
       }),
     },
   ];

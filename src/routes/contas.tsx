@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { RequireAuth } from "@/components/RequireAuth";
 import { RouteShell } from "@/components/RouteShell";
+import { ElevenLabsIntegrationCard } from "@/components/integrations/ElevenLabsIntegrationCard";
 import {
   deleteManualCredential,
   listManualCredentials,
@@ -124,6 +125,8 @@ function ContasPage() {
           .
         </p>
       </header>
+
+      <ElevenLabsIntegrationCard />
 
       <section className="glass space-y-3 rounded-2xl border border-border/60 p-4">
         <div className="grid gap-3 sm:grid-cols-2">

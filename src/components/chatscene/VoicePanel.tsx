@@ -6,11 +6,14 @@ import {
   Play,
   RotateCcw,
   SlidersHorizontal,
+  Sparkles,
   Volume2,
 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/base";
 import {
+  attachElevenLabsVoice,
   attachPreset,
   preselectLocalVoices,
   voiceProfileOf,
@@ -36,6 +39,8 @@ import {
   type VoiceTransformConfig,
   type VoiceTransformMode,
 } from "@/lib/chatscene/voice-transform";
+import { getElevenLabsConnection, listElevenLabsVoices } from "@/lib/elevenlabs.functions";
+import type { ElevenLabsVoice } from "@/lib/elevenlabs.server";
 
 export interface VoicePanelProps {
   project: ChatSceneProject;
@@ -68,6 +73,17 @@ export function VoicePanel(props: VoicePanelProps) {
     onChangeVoice,
   } = props;
   const setProject = (next: ChatSceneProject) => patch(next);
+  const connectionFn = useServerFn(getElevenLabsConnection);
+  const voicesFn = useServerFn(listElevenLabsVoices);
+  const [elevenConnection, setElevenConnection] = useState<
+    "checking" | "connected" | "disconnected" | "error"
+  >("checking");
+  const [elevenConnectionError, setElevenConnectionError] = useState("");
+  const [elevenVoices, setElevenVoices] = useState<ElevenLabsVoice[]>([]);
+  const [elevenCatalogLoaded, setElevenCatalogLoaded] = useState(false);
+  const [elevenLoading, setElevenLoading] = useState(false);
+  const [elevenError, setElevenError] = useState("");
+  const connectionRequest = useRef(0);
   const latestProject = useRef(project);
   latestProject.current = project;
   const assignedProject = useRef<string | null>(null);
@@ -77,6 +93,63 @@ export function VoicePanel(props: VoicePanelProps) {
     const next = preselectLocalVoices(project);
     if (next !== project) patch(next);
   }, [project, patch]);
+  const checkElevenLabsConnection = useCallback(async () => {
+    const request = ++connectionRequest.current;
+    setElevenConnection("checking");
+    setElevenConnectionError("");
+    try {
+      const status = await connectionFn();
+      if (request !== connectionRequest.current) return;
+      setElevenConnection(status.connected ? "connected" : "disconnected");
+      if (!status.connected) {
+        setElevenVoices([]);
+        setElevenCatalogLoaded(false);
+      }
+    } catch (error) {
+      if (request !== connectionRequest.current) return;
+      setElevenConnection("error");
+      setElevenConnectionError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível verificar sua conexão ElevenLabs.",
+      );
+    }
+  }, [connectionFn]);
+  useEffect(() => {
+    void checkElevenLabsConnection();
+    return () => {
+      connectionRequest.current += 1;
+    };
+  }, [checkElevenLabsConnection]);
+  const loadElevenLabsVoices = async () => {
+    if (elevenLoading) return;
+    setElevenLoading(true);
+    setElevenError("");
+    try {
+      const voices = await voicesFn();
+      setElevenVoices(voices);
+      setElevenCatalogLoaded(true);
+    } catch (error) {
+      setElevenError(
+        error instanceof Error ? error.message : "Não foi possível carregar as vozes.",
+      );
+    } finally {
+      setElevenLoading(false);
+    }
+  };
+  const applyAnimatedElevenLabsCast = () => {
+    if (!elevenVoices.length) return;
+    const used = new Set<string>();
+    let next = latestProject.current;
+    for (const participant of next.participants) {
+      const current = voiceProfileOf(next, participant);
+      const choice = bestElevenLabsVoice(elevenVoices, current, used);
+      if (!choice) continue;
+      used.add(choice.id);
+      next = attachElevenLabsVoice(next, participant.id, choice);
+    }
+    setProject(next);
+  };
   const updateProfile = (id: string, changes: Partial<VoiceProfile>) => {
     const profiles = (project.voiceProfiles ?? []).map((profile) =>
       profile.id === id ? { ...profile, ...changes } : profile,
@@ -163,6 +236,105 @@ export function VoicePanel(props: VoicePanelProps) {
         Presets prontos em português: Natural, Viral, Jovem, Grave e variações experimentais. A voz
         Faber é sintética; os estilos usam os ajustes de velocidade e tom do seu template.
       </p>
+      <section
+        className="rounded-lg border border-primary/25 bg-primary/5 p-3"
+        aria-label="ElevenLabs"
+      >
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="flex items-center gap-1.5 text-xs font-semibold">
+              <Sparkles className="size-3.5 text-primary" aria-hidden /> Minha ElevenLabs
+            </p>
+            <p role="status" className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              {elevenConnection === "checking"
+                ? "Verificando sua conexão…"
+                : elevenConnection === "error"
+                  ? "A verificação da conexão não foi concluída."
+                  : elevenConnection === "connected"
+                    ? elevenVoices.length
+                      ? `${elevenVoices.length} vozes carregadas. Escolha abaixo ou monte um elenco variado.`
+                      : elevenCatalogLoaded
+                        ? "Sua conta está conectada, mas o catálogo retornou vazio. Adicione uma voz na ElevenLabs e atualize aqui."
+                        : "Conexão salva. Carregue seu catálogo quando quiser usar essas vozes."
+                    : "Conecte uma chave restrita para usar as vozes disponíveis na sua conta."}
+            </p>
+          </div>
+          {elevenConnection === "connected" ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="min-h-11 shrink-0"
+              disabled={elevenLoading}
+              onClick={() => void loadElevenLabsVoices()}
+            >
+              {elevenLoading ? (
+                <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
+              ) : null}
+              {elevenLoading
+                ? "Carregando vozes…"
+                : elevenError
+                  ? "Tentar carregar novamente"
+                  : elevenCatalogLoaded
+                    ? "Atualizar catálogo"
+                    : "Carregar vozes"}
+            </Button>
+          ) : elevenConnection === "disconnected" ? (
+            <a
+              href="/contas#elevenlabs"
+              className="interactive inline-flex min-h-11 shrink-0 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Conectar ElevenLabs
+            </a>
+          ) : elevenConnection === "error" ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="min-h-11 shrink-0"
+              onClick={() => void checkElevenLabsConnection()}
+            >
+              Tentar verificar novamente
+            </Button>
+          ) : null}
+        </div>
+        {elevenConnectionError ? (
+          <p role="alert" className="mt-2 break-words text-xs text-destructive">
+            {elevenConnectionError}
+          </p>
+        ) : null}
+        {elevenError ? (
+          <p role="alert" className="mt-2 break-words text-xs text-destructive">
+            {elevenError}
+          </p>
+        ) : null}
+        {elevenConnection === "connected" && elevenCatalogLoaded && !elevenVoices.length ? (
+          <a
+            href="https://elevenlabs.io/app/voice-library"
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-flex min-h-11 items-center rounded-sm text-xs underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Abrir biblioteca da ElevenLabs (nova aba)
+          </a>
+        ) : null}
+        {elevenVoices.length ? (
+          <div className="mt-3 border-t border-primary/15 pt-3">
+            <Button
+              type="button"
+              size="sm"
+              className="min-h-11 w-full gap-1.5"
+              onClick={applyAnimatedElevenLabsCast}
+            >
+              <Sparkles className="size-3.5" /> Montar elenco · conversa animada
+            </Button>
+            <p className="mt-1.5 text-[10px] text-muted-foreground">
+              Combina vozes distintas e ritmo rápido por características genéricas; não copia a
+              identidade vocal de canal ou pessoa real.
+            </p>
+          </div>
+        ) : null}
+      </section>
       <Button
         type="button"
         variant="secondary"
@@ -203,25 +375,46 @@ export function VoicePanel(props: VoicePanelProps) {
                 ) : null}
               </div>
 
-              <label className="mt-3 block text-[10px] font-medium text-muted-foreground">
+              <label
+                htmlFor={`voice-base-${participant.id}`}
+                className="mt-3 block text-[10px] font-medium text-muted-foreground"
+              >
                 Voz base
               </label>
               <div className="relative mt-1">
                 <select
-                  value={voice?.reference ? "cloned-reference" : (voice?.presetId ?? "")}
+                  id={`voice-base-${participant.id}`}
+                  value={
+                    voice?.reference
+                      ? "cloned-reference"
+                      : voice?.provider === "elevenlabs" && voice.providerVoiceId
+                        ? `elevenlabs:${voice.providerVoiceId}`
+                        : (voice?.presetId ?? "")
+                  }
                   disabled={!!voice?.reference}
                   onChange={(e) =>
                     setProject(
-                      e.target.value
-                        ? attachPreset(project, participant.id, e.target.value)
-                        : {
-                            ...project,
-                            participants: project.participants.map((p) =>
-                              p.id === participant.id
-                                ? { ...p, voice: null, voiceProfileId: null }
-                                : p,
-                            ),
-                          },
+                      e.target.value.startsWith("elevenlabs:")
+                        ? attachElevenLabsVoice(
+                            project,
+                            participant.id,
+                            elevenVoices.find(
+                              (item) => item.id === e.target.value.slice("elevenlabs:".length),
+                            ) ?? {
+                              id: e.target.value.slice("elevenlabs:".length),
+                              name: "Voz ElevenLabs",
+                            },
+                          )
+                        : e.target.value
+                          ? attachPreset(project, participant.id, e.target.value)
+                          : {
+                              ...project,
+                              participants: project.participants.map((p) =>
+                                p.id === participant.id
+                                  ? { ...p, voice: null, voiceProfileId: null }
+                                  : p,
+                              ),
+                            },
                     )
                   }
                   className="h-10 w-full appearance-none rounded-md border border-border bg-background px-2 pr-8 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -230,6 +423,20 @@ export function VoicePanel(props: VoicePanelProps) {
                   <option value="">Escolher voz</option>
                   {voice?.reference ? (
                     <option value="cloned-reference">Voz clonada — {participant.name}</option>
+                  ) : null}
+                  {voice?.provider === "elevenlabs" &&
+                  voice.providerVoiceId &&
+                  !elevenVoices.some((item) => item.id === voice.providerVoiceId) ? (
+                    <option value={`elevenlabs:${voice.providerVoiceId}`}>{voice.name}</option>
+                  ) : null}
+                  {elevenVoices.length ? (
+                    <optgroup label="Minha ElevenLabs">
+                      {elevenVoices.map((item) => (
+                        <option key={item.id} value={`elevenlabs:${item.id}`}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </optgroup>
                   ) : null}
                   {Array.from(new Set(VOICE_PRESETS.map((p) => p.group))).map((group) => (
                     <optgroup key={group} label={group}>
@@ -246,11 +453,15 @@ export function VoicePanel(props: VoicePanelProps) {
 
               {voice ? (
                 <>
-                  <label className="mt-3 block text-[10px] font-medium text-muted-foreground">
+                  <label
+                    htmlFor={`voice-style-${participant.id}`}
+                    className="mt-3 block text-[10px] font-medium text-muted-foreground"
+                  >
                     Estilo da voz
                   </label>
                   <div className="relative mt-1">
                     <select
+                      id={`voice-style-${participant.id}`}
                       value={voice.transform?.presetId ?? "adam_natural"}
                       onChange={(event) =>
                         voice.id &&
@@ -295,7 +506,10 @@ export function VoicePanel(props: VoicePanelProps) {
                       aria-label={`Ouvir a voz de ${participant.name}`}
                     >
                       {previewing === participant.id ? (
-                        <Loader2 className="size-3.5 animate-spin" />
+                        <Loader2
+                          className="size-3.5 animate-spin motion-reduce:animate-none"
+                          aria-hidden
+                        />
                       ) : (
                         <Play className="size-3.5" />
                       )}{" "}
@@ -478,19 +692,24 @@ export function VoicePanel(props: VoicePanelProps) {
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-7 w-full gap-1 text-[11px]"
+                          className="min-h-11 w-full gap-1 text-[11px]"
                           onClick={() =>
                             updateProfile(
                               voice.id ?? `voice_${participant.id}`,
                               voice.reference
                                 ? { speed: 1, pitch: 0, transform: undefined }
-                                : profileFromPreset(voice.presetId, {
-                                    id: voice.id ?? `voice_${participant.id}`,
-                                  }),
+                                : voice.provider === "elevenlabs"
+                                  ? { speed: 1.04, pitch: 0, transform: undefined }
+                                  : profileFromPreset(voice.presetId, {
+                                      id: voice.id ?? `voice_${participant.id}`,
+                                    }),
                             )
                           }
                         >
-                          <RotateCcw className="size-3" /> Restaurar preset
+                          <RotateCcw className="size-3" aria-hidden />{" "}
+                          {voice.provider === "elevenlabs" || voice.reference
+                            ? "Restaurar ajustes"
+                            : "Restaurar preset"}
                         </Button>
                       </div>
                     </details>
@@ -529,7 +748,10 @@ export function VoicePanel(props: VoicePanelProps) {
                               }
                             >
                               {previewing === previewId ? (
-                                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                                <Loader2
+                                  className="size-3.5 animate-spin motion-reduce:animate-none"
+                                  aria-hidden
+                                />
                               ) : (
                                 <Play className="size-3.5" aria-hidden />
                               )}
@@ -576,8 +798,8 @@ export function VoicePanel(props: VoicePanelProps) {
         >
           {castState === "running" ? (
             <>
-              <Loader2 className="size-4 animate-spin" /> Gerando {castProgress.done}/
-              {castProgress.total}
+              <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />{" "}
+              Gerando {castProgress.done}/{castProgress.total}
             </>
           ) : (
             <>
@@ -633,6 +855,27 @@ export function VoicePanel(props: VoicePanelProps) {
   );
 }
 
+function bestElevenLabsVoice(
+  voices: ElevenLabsVoice[],
+  profile: VoiceProfile | null,
+  used: Set<string>,
+): ElevenLabsVoice | undefined {
+  const desiredGender = profile?.genderStyle;
+  const desiredAge = profile?.ageStyle;
+  const score = (voice: ElevenLabsVoice) => {
+    const labels = Object.values(voice.labels).join(" ").toLowerCase();
+    let value = used.has(voice.id) ? -20 : 0;
+    if (desiredGender === "masculina" && /\b(male|masculin)/.test(labels)) value += 5;
+    if (desiredGender === "feminina" && /\b(female|feminin)/.test(labels)) value += 5;
+    if (desiredAge === "juvenil" && /(child|young|youth)/.test(labels)) value += 4;
+    if (desiredAge === "teen" && /(teen|young|youth)/.test(labels)) value += 4;
+    if (desiredAge === "madura" && /(old|mature|senior)/.test(labels)) value += 4;
+    if (/(conversational|casual|animated|energetic|characters)/.test(labels)) value += 2;
+    return value;
+  };
+  return [...voices].sort((a, b) => score(b) - score(a))[0];
+}
+
 function formatSigned(value: number): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
 }
@@ -641,6 +884,7 @@ function transformUiLabel(id: string, baseName: string): string {
   return (
     (
       {
+        dialogue_fast: `${baseName} · Conversa rápida`,
         adam_natural: `${baseName} · Natural`,
         adam_young: `${baseName} · Jovem`,
         adam_roblox_teen: `${baseName} · Adolescente / Viral`,
@@ -658,6 +902,7 @@ function simpleTransformUiLabel(id: string): string {
   return (
     (
       {
+        dialogue_fast: "Conversa rápida",
         adam_natural: "Natural",
         adam_young: "Jovem",
         adam_roblox_teen: "Adolescente / Viral",

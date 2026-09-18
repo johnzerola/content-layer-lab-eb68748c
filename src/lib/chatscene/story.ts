@@ -9,6 +9,7 @@ import { PERSONALITY_PRESETS, splitByPersonality, type TextingPersonality } from
 import { profileFromPreset, type VoiceAge, type VoiceEmotion, type VoiceGender, type VoiceProfile } from "./voice";
 import { normalizeStoryScript, storyNameKey } from "./story-generation";
 import { selectionFromTransformPreset } from "./voice-transform";
+import { DEFAULT_STORY_NARRATIVE_STYLE, type StoryNarrativeStyle } from "./story-style";
 import {
   createMessage,
   createParticipant,
@@ -62,9 +63,11 @@ export interface StoryBrief {
   tone: StoryTone;
   durationSec: number;
   characters: number;
+  /** Optional for compatibility with previously saved requests. */
+  narrativeStyle?: StoryNarrativeStyle;
 }
 
-export const DEFAULT_BRIEF: StoryBrief = { topic: "", tone: "comedia", durationSec: 60, characters: 3 };
+export const DEFAULT_BRIEF: StoryBrief = { topic: "", tone: "comedia", durationSec: 60, characters: 3, narrativeStyle: DEFAULT_STORY_NARRATIVE_STYLE };
 
 const PALETTE = ["#7c5cff", "#25d366", "#ff5c8a", "#28c6ff", "#ffb347", "#8bd450", "#ff8a5c", "#9d7bff"];
 

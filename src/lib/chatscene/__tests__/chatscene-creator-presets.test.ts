@@ -4,6 +4,16 @@ import { createChatSceneProject } from "../types";
 import { serializeChatSceneProject, deserializeChatSceneProject } from "../serialize";
 
 describe("creator format selection", () => {
+  it("preserves absent sound settings in legacy projects when selecting Reddit", () => {
+    const project = createChatSceneProject();
+    delete project.sound;
+    const reddit = applyCreatorFormat(project, "reddit");
+    expect(Object.hasOwn(reddit, "sound")).toBe(false);
+    expect(applyCreatorFormat(reddit, "whatsapp").sound).toMatchObject({
+      enabled: true, mode: "transitions", volume: 0.2,
+    });
+  });
+
   it("changes presentation without deleting conversations, voices, or uploaded backgrounds", () => {
     const project = createCreatorExample("whatsapp");
     project.background = { kind: "image", imageUrl: "https://example.com/own-background.png" };

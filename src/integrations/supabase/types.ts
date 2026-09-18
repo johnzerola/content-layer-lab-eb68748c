@@ -492,6 +492,42 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_provider_credentials: {
+        Row: {
+          account_label: string
+          api_key_ciphertext: string
+          created_at: string
+          id: string
+          masked_key: string
+          metadata: Json
+          provider: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_label?: string
+          api_key_ciphertext: string
+          created_at?: string
+          id?: string
+          masked_key?: string
+          metadata?: Json
+          provider: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_label?: string
+          api_key_ciphertext?: string
+          created_at?: string
+          id?: string
+          masked_key?: string
+          metadata?: Json
+          provider?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       manual_social_credentials: {
         Row: {
           access_token_ciphertext: string

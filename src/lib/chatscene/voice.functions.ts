@@ -80,8 +80,9 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
     if (data.provider === "chatterbox" && !data.referenceId)
       throw new Error("Envie a referência de voz deste personagem.");
     const isClone = data.provider === "chatterbox";
+    const isElevenLabs = data.provider === "elevenlabs";
     const localRequested = data.provider === "piper" || isClone;
-    const provider = localRequested ? null : resolveVoiceProviderConfig(process.env);
+    const provider = localRequested || isElevenLabs ? null : resolveVoiceProviderConfig(process.env);
     let buffer: Buffer;
     let mime = "audio/mpeg";
     let providerName = "gateway";
@@ -122,7 +123,25 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
       throw new Error("Não foi possível gerar esta fala agora.");
     }
 
-    if (isClone) {
+    if (isElevenLabs) {
+      const { resolveElevenLabsApiKey, synthesizeElevenLabs } = await import(
+        "@/lib/elevenlabs.server"
+      );
+      const apiKey = await resolveElevenLabsApiKey(context.userId);
+      const settings = data.providerSettings;
+      buffer = await synthesizeElevenLabs({
+        apiKey,
+        voiceId: data.voice,
+        text: data.text,
+        speed: data.speed ?? 1,
+        stability: settings?.stability ?? 0.38,
+        similarityBoost: settings?.similarityBoost ?? 0.78,
+        style: settings?.style ?? 0.42,
+        speakerBoost: settings?.speakerBoost ?? true,
+        modelId: settings?.modelId ?? "eleven_flash_v2_5",
+      });
+      providerName = "elevenlabs";
+    } else if (isClone) {
       buffer = await synthesizeClonedVoice(context.userId, data.referenceId!, data.text);
       mime = "audio/wav";
       providerName = "chatterbox";

@@ -7,6 +7,7 @@
  */
 import type { ChatSceneProject } from "./types";
 import { effectiveVoice } from "./voice-resolution";
+import { elevenLabsVoiceSettingsInput, type VoiceSynthesisRequest } from "./voice-request";
 import {
   pitchRate,
   speakableText,
@@ -163,6 +164,7 @@ export function createGatewayVoiceProvider(
     referenceId?: string;
     direction?: string;
     speed?: number;
+    providerSettings?: VoiceSynthesisRequest["providerSettings"];
     transform?: VoiceProfile["transform"];
   }) => Promise<{
     audio: string;
@@ -228,6 +230,9 @@ export function createGatewayVoiceProvider(
           },
         ),
         speed: Math.max(0.7, Math.min(1.3, profile.speed * (direction?.speedMultiplier ?? 1))),
+        ...(profile.provider === "elevenlabs" && profile.providerSettings
+          ? { providerSettings: elevenLabsVoiceSettingsInput.parse(profile.providerSettings) }
+          : {}),
         ...(profile.transform ? { transform: profile.transform } : {}),
       });
       const bytes = Uint8Array.from(atob(audio), (c) => c.charCodeAt(0));
