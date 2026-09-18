@@ -48,6 +48,7 @@ import {
 import { appendRedditStory, type RedditStoryDraft } from "@/lib/chatscene/reddit-story";
 import { generateStory } from "@/lib/chatscene/story.functions";
 import { storyToProject, type StoryBrief } from "@/lib/chatscene/story";
+import { chatSceneClientError } from "@/lib/chatscene/client-error";
 
 import { buildPlan } from "@/lib/chatscene/clock";
 import { encodeFrameSequence, frameEncoderSupported } from "@/lib/chatscene/encode-frames";
@@ -600,7 +601,7 @@ export function ChatSceneStudio() {
           );
         }
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível criar a história.");
+        toast.error(chatSceneClientError(error, "Não foi possível criar a história."));
       } finally {
         setCastState("idle");
         setStoryBusy(false);
@@ -636,7 +637,7 @@ export function ChatSceneStudio() {
       try {
         stopPreviewRef.current = await previewVoice(voiceProvider, profile, text);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Não foi possível ouvir esta voz.");
+        toast.error(chatSceneClientError(err, "Não foi possível ouvir esta voz."));
       } finally {
         setPreviewingVoice(null);
       }
@@ -697,7 +698,7 @@ export function ChatSceneStudio() {
           );
         }
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Não foi possível gerar as vozes.");
+        toast.error(chatSceneClientError(err, "Não foi possível gerar as vozes."));
       } finally {
         setCastState("idle");
       }

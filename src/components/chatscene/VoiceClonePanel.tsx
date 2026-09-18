@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, Loader2, Mic2, Sparkles } from "lucide-react";
+import { Check, Loader2, Mic2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/base";
 import { getVoiceEngineStatus, prepareVoiceEngine } from "@/lib/chatscene/voice.functions";
 import { VoiceReferenceControl } from "./VoiceReferenceControl";
@@ -31,31 +31,33 @@ export function VoiceClonePanel({
   const [available, setAvailable] = useState<boolean | null>(null);
   const [modelReady, setModelReady] = useState<boolean | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     if (!targetId || !project.participants.some((participant) => participant.id === targetId)) {
       setTargetId(project.participants[0]?.id ?? null);
     }
   }, [project.participants, targetId]);
-  useEffect(() => {
-    let active = true;
-    statusFn()
-      .then((status) => {
-        if (active) {
-          setAvailable(status.clone.installed);
-          setModelReady(status.clone.modelLoaded);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setAvailable(false);
-          setStatusError("Não foi possível verificar o motor de clonagem neste servidor.");
-        }
-      });
-    return () => {
-      active = false;
-    };
+  const checkStatus = useCallback(async () => {
+    setChecking(true);
+    setStatusError(null);
+    try {
+      const status = await statusFn();
+      setAvailable(status.clone.installed);
+      setModelReady(status.clone.modelLoaded);
+    } catch {
+      setAvailable(false);
+      setModelReady(false);
+      setStatusError(
+        "O servidor de voz perdeu a conexão. Confirme que o servidor local está ativo e tente novamente.",
+      );
+    } finally {
+      setChecking(false);
+    }
   }, [statusFn]);
+  useEffect(() => {
+    void checkStatus();
+  }, [checkStatus]);
 
   const target =
     project.participants.find((participant) => participant.id === targetId) ??
@@ -196,7 +198,7 @@ export function VoiceClonePanel({
           onAttach={attach}
           onRemove={remove}
         />
-        {available === null ? (
+        {available === null || checking ? (
           <p role="status" className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden />{" "}
             Verificando disponibilidade do clonador…
@@ -216,9 +218,25 @@ export function VoiceClonePanel({
           </p>
         ) : null}
         {statusError ? (
-          <p role="alert" className="mt-2 text-xs text-destructive">
-            {statusError}
-          </p>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/35 bg-destructive/5 p-3">
+            <p role="alert" className="text-xs text-destructive">
+              {statusError}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={checking}
+              onClick={() => void checkStatus()}
+            >
+              {checking ? (
+                <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
+              ) : (
+                <RefreshCw className="size-3.5" aria-hidden />
+              )}
+              Tentar novamente
+            </Button>
+          </div>
         ) : null}
       </section>
 

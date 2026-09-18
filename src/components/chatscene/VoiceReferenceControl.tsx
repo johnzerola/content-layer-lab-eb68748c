@@ -4,6 +4,7 @@ import { Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/base";
 import { uploadVoiceReference, removeVoiceReference } from "@/lib/chatscene/voice.functions";
 import type { VoiceProfile } from "@/lib/chatscene/voice";
+import { chatSceneClientError } from "@/lib/chatscene/client-error";
 
 type Reference = NonNullable<VoiceProfile["reference"]>;
 export function VoiceReferenceControl({
@@ -47,7 +48,7 @@ export function VoiceReferenceControl({
       const result = await upload({ data: { audio, authorized: true } });
       onAttach({ ...result, name: file.name.slice(0, 100) });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Falha ao enviar a referência.");
+      setError(chatSceneClientError(cause, "Falha ao enviar a referência."));
     } finally {
       setBusy(false);
     }
@@ -60,7 +61,7 @@ export function VoiceReferenceControl({
       await remove({ data: { id: reference.id } });
       onRemove();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Falha ao excluir a referência.");
+      setError(chatSceneClientError(cause, "Falha ao excluir a referência."));
     } finally {
       setBusy(false);
     }
