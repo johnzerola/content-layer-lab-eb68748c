@@ -12,6 +12,8 @@ import { resolveTheme } from "../theme";
 import {
   createChatSceneProject,
   createMessage,
+  createParticipant,
+  createThread,
   DEFAULT_LAYOUT,
   normalizeChatSceneProject,
   type ChatSceneProject,
@@ -86,6 +88,62 @@ function projectWithMessages(
 const theme = resolveTheme("zap", true);
 
 describe("Canvas story formats", () => {
+  it.each([
+    [1080, 1920],
+    [1080, 1080],
+    [1920, 1080],
+  ])("renders the current contact photo after chat switches at %i × %i", (width, height) => {
+    const self = createParticipant({ name: "Leo", isSelf: true });
+    const mother = createParticipant({ name: "Mae", avatarUrl: "mother.jpg", isSelf: false });
+    const father = createParticipant({ name: "Pai", avatarUrl: "father.jpg", isSelf: false });
+    const motherChat = createThread({ id: "mother", name: "mãe", kind: "direct" });
+    const fatherChat = createThread({ id: "father", name: "pai_leo", kind: "direct" });
+    const project = createChatSceneProject({
+      participants: [self, mother, father],
+      threads: [motherChat, fatherChat],
+      messages: [
+        createMessage(mother.id, { threadId: motherChat.id, text: "Oi" }),
+        createMessage(father.id, { threadId: fatherChat.id, text: "Olá" }),
+      ],
+    });
+    const motherImage = { id: "mother-photo" } as unknown as CanvasImageSource;
+    project.threads = [motherChat, fatherChat];
+    const fatherImage = { id: "father-photo" } as unknown as CanvasImageSource;
+    const media = new Map<string, LoadedMedia>(
+      [
+        ["mother.jpg", motherImage],
+        ["father.jpg", fatherImage],
+      ].map(([url, source]) => [
+        url as string,
+        {
+          frames: [source as CanvasImageSource],
+          fps: 1,
+          width: 100,
+          height: 100,
+          aspect: 1,
+          animated: false,
+          transparent: false,
+        },
+      ]),
+    );
+    const plan = buildPlan(project);
+    for (const [index, image] of [motherImage, fatherImage].entries()) {
+      const canvas = canvasRecorder();
+      const entry = plan.entries[index]!;
+      paintFrame(
+        canvas.ctx,
+        project,
+        theme,
+        plan,
+        entry.appearFrame + entry.entranceFrames,
+        width,
+        height,
+        { media },
+      );
+      expect(canvas.operations.some((op) => op[0] === "drawImage" && op[1] === image)).toBe(true);
+    }
+  });
+
   it("shows sender names only in group threads, not every thread in a multi-person cast", () => {
     const project = createCreatorExample("whatsapp");
     const ctx = canvasRecorder().ctx;

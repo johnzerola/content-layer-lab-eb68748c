@@ -9,6 +9,7 @@ import { cameraAt } from "./camera";
 import type { ConversationPlan } from "./clock";
 import { typingAt } from "./clock";
 import { deliveryStateAt } from "./events";
+import { threadAvatarUrl } from "./header-avatar";
 import { mediaFrameAt, type LoadedMedia } from "./media";
 import { durationLabel, voiceSeconds, voiceWave } from "./message-kinds";
 import { buildConversationPages, type ConversationPage } from "./page-manager";
@@ -658,9 +659,7 @@ function drawHeader(
     drawAvatarCircle(ctx, theme, cx, cy, size, peers[0]?.color ?? theme.selfBubble, title, logoImg);
   } else {
     const avatarUrl = thread
-      ? (thread.avatarUrl ??
-        project.participants.find((p) => p.name === thread.name)?.avatarUrl ??
-        null)
+      ? threadAvatarUrl(project, thread)
       : isGroup
         ? project.groupAvatarUrl
         : peers[0]?.avatarUrl;

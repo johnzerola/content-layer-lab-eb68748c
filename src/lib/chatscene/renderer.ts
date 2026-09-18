@@ -9,7 +9,7 @@ import { buildPlan, type ConversationPlan } from "./clock";
 import { paintFrame, sceneExitAt } from "./draw";
 import { loadMedia, type LoadedMedia } from "./media";
 import { resolveTheme } from "./theme";
-import { renderSize, type ChatSceneProject } from "./types";
+import { renderSize, threadsOf, type ChatSceneProject } from "./types";
 
 export interface RenderFrameContext {
   width: number;
@@ -62,6 +62,7 @@ export class CanvasConversationRenderer implements ConversationRenderer {
     const urls = new Set<string>();
     for (const m of project.messages) if (m.mediaUrl) urls.add(m.mediaUrl);
     for (const p of project.participants) if (p.avatarUrl) urls.add(p.avatarUrl);
+    for (const thread of threadsOf(project)) if (thread.avatarUrl) urls.add(thread.avatarUrl);
     if (project.groupAvatarUrl) urls.add(project.groupAvatarUrl);
     const bg = project.background;
     const bgVideoUrl = bg?.kind === "video" ? bg.videoUrl || bg.imageUrl : undefined;
