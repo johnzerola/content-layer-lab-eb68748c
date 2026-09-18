@@ -182,7 +182,14 @@ function AgendaPage() {
       const [a, p] = await Promise.all([listAccounts(), listPosts()]);
       setAccounts(a);
       setPosts(p);
-      if (!accountId && a[0]) setAccountId(a[0].id);
+      if (!a.some((account) => account.id === accountId)) {
+        const connected = a.filter(
+          (account) => account.status === "conectado" && account.provider !== "pending",
+        );
+        const primary = connected.find((account) => account.is_primary);
+        // Com mais de uma conta, exija escolha explícita para não publicar no canal errado.
+        setAccountId(primary?.id ?? (connected.length === 1 ? connected[0]?.id ?? "" : ""));
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao carregar a agenda.");
     } finally {
