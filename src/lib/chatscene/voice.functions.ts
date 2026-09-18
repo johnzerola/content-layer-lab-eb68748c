@@ -9,24 +9,39 @@ import { createServerFn } from "@tanstack/react-start";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { voiceSynthesisInput } from "./voice-request";
-import { voiceTransformEngine } from "./voice-transform.server";
-import { getPiperLocalStatus, synthesizePiperWav } from "./voice-piper.server";
-import {
-  deleteVoiceReference,
-  saveVoiceReference,
-  synthesizeClonedVoice,
-  verifiedCloneEngineStatus,
-  warmCloneEngine,
-} from "./voice-clone.server";
 import { effectiveTransformPitch, selectionFromTransformPreset } from "./voice-transform";
 import { z } from "zod";
 
+import {
+  deleteRemoteVoiceReference,
+  remoteCloneEngineStatus,
+  remoteVoiceServiceConfigured,
+  saveRemoteVoiceReference,
+  synthesizeRemoteVoice,
+  warmRemoteCloneEngine,
+} from "./voice-clone.remote.server";
+
 export const getVoiceEngineStatus = createServerFn({ method: "GET" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .handler(async () => ({
-    clone: await verifiedCloneEngineStatus(),
-    piper: getPiperLocalStatus().available,
-  }));
+  .handler(async () => {
+    const remote = await remoteCloneEngineStatus();
+    if (remote) return { clone: remote, piper: false };
+    // Do not import the Node-only worker in an edge deployment unless the
+    // runtime explicitly advertises a local installation.
+    if (
+      process.env["CHATSCENE_VOICE_PYTHON_PATH"] &&
+      process.env["CHATSCENE_VOICE_MODEL_PATH"] &&
+      process.env["CHATSCENE_VOICE_STORAGE_PATH"]
+    ) {
+      const { verifiedCloneEngineStatus } = await import("./voice-clone.server");
+      const { getPiperLocalStatus } = await import("./voice-piper.server");
+      return { clone: await verifiedCloneEngineStatus(), piper: getPiperLocalStatus().available };
+    }
+    return {
+      clone: { installed: false, device: "not-configured", modelLoaded: false, warming: false },
+      piper: false,
+    };
+  });
 
 export const uploadVoiceReference = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
@@ -41,16 +56,31 @@ export const uploadVoiceReference = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data, context }) => saveVoiceReference(context.userId, data.audio));
+  .handler(async ({ data, context }) => {
+    if (remoteVoiceServiceConfigured()) {
+      return saveRemoteVoiceReference(context.userId, data.audio);
+    }
+    const { saveVoiceReference } = await import("./voice-clone.server");
+    return saveVoiceReference(context.userId, data.audio);
+  });
 
 export const prepareVoiceEngine = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .handler(async () => warmCloneEngine());
+  .handler(async () => {
+    if (remoteVoiceServiceConfigured()) return warmRemoteCloneEngine();
+    const { warmCloneEngine } = await import("./voice-clone.server");
+    return warmCloneEngine();
+  });
 
 export const removeVoiceReference = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
+    if (remoteVoiceServiceConfigured()) {
+      await deleteRemoteVoiceReference(context.userId, data.id);
+      return { removed: true };
+    }
+    const { deleteVoiceReference } = await import("./voice-clone.server");
     await deleteVoiceReference(context.userId, data.id);
     return { removed: true };
   });
@@ -71,6 +101,14 @@ export function resolveVoiceProviderConfig(env: Record<string, string | undefine
     };
   }
   return null;
+}
+
+function nativeVoicePipelineConfigured() {
+  return Boolean(
+    process.env["CHATSCENE_VOICE_PYTHON_PATH"] &&
+      process.env["CHATSCENE_VOICE_MODEL_PATH"] &&
+      process.env["CHATSCENE_VOICE_STORAGE_PATH"],
+  );
 }
 
 export const synthesizeVoice = createServerFn({ method: "POST" })
@@ -142,23 +180,38 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
       });
       providerName = "elevenlabs";
     } else if (isClone) {
-      buffer = await synthesizeClonedVoice(context.userId, data.referenceId!, data.text);
+      if (remoteVoiceServiceConfigured()) {
+        buffer = Buffer.from(
+          await synthesizeRemoteVoice(context.userId, data.referenceId!, data.text),
+          "base64",
+        );
+      } else {
+        const { synthesizeClonedVoice } = await import("./voice-clone.server");
+        buffer = await synthesizeClonedVoice(context.userId, data.referenceId!, data.text);
+      }
       mime = "audio/wav";
       providerName = "chatterbox";
     } else if (res) {
       buffer = Buffer.from(await res.arrayBuffer());
-    } else if (getPiperLocalStatus().available) {
-      buffer = await synthesizePiperWav(data.text, data.speed ?? 1);
-      mime = "audio/wav";
-      providerName = "piper-local";
     } else {
-      throw new Error(
-        "Nenhum gerador de voz está disponível. Instale a voz local Piper ou configure uma chave no servidor.",
-      );
+      const { getPiperLocalStatus, synthesizePiperWav } = await import("./voice-piper.server");
+      if (getPiperLocalStatus().available) {
+        buffer = await synthesizePiperWav(data.text, data.speed ?? 1);
+        mime = "audio/wav";
+        providerName = "piper-local";
+      } else {
+        throw new Error(
+          "Nenhum gerador de voz está disponível. Instale a voz local Piper ou configure uma chave no servidor.",
+        );
+      }
     }
     const transform =
       data.transform ?? (isClone ? selectionFromTransformPreset("adam_natural") : undefined);
-    if (transform) {
+    // FFmpeg pitch/tempo transforms run only in the Node worker. The published
+    // edge runtime still returns the valid provider audio instead of trying to
+    // load node:child_process and failing after a successful synthesis.
+    if (transform && nativeVoicePipelineConfigured()) {
+      const { voiceTransformEngine } = await import("./voice-transform.server");
       // Chatterbox produces a natural-speed base. Apply requested tempo only once.
       const sourceSpeed = ["PITCH_ONLY", "VARISPEED_THEN_RESTORE_TEMPO"].includes(
         transform.config.mode,

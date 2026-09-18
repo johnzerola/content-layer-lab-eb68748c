@@ -1,5 +1,40 @@
 # ElevenLabs no ChatScene
 
+## O que cada usuário paga
+
+O projeto usa uma chave ElevenLabs por usuário. A chave colada em **Contas e
+credenciais** é validada no servidor, criptografada com
+`SOCIAL_TOKEN_ENCRYPTION_KEY` e gravada na linha do próprio `user_id`; ela nunca
+vai para o bundle do navegador, para logs ou para outro usuário. A síntese de
+uma cena sempre resolve a chave da sessão autenticada, portanto o dono da
+plataforma não paga o consumo de terceiros.
+
+Isso é diferente do clonador: o clonador ChatScene usa Chatterbox na RTX local
+ou o fallback CPU da Hostear e não consome créditos da ElevenLabs.
+
+## Ativação no projeto publicado
+
+Depois de sincronizar o commit, o administrador precisa fazer uma única
+configuração no projeto Lovable:
+
+1. Em **More → Cloud → SQL editor**, executar o conteúdo de
+   `supabase/migrations/20260918150000_ai_provider_credentials.sql`.
+2. Em **More → Cloud → Secrets**, cadastrar uma chave aleatória estável de pelo
+   menos 32 caracteres como `SOCIAL_TOKEN_ENCRYPTION_KEY`. Não troque esse valor
+   depois que usuários começarem a conectar contas; para uma rotação, migre as
+   credenciais antes.
+3. Para o clonador remoto, cadastrar também `CLEANER_WORKER_PUBLIC_URL` (URL
+   HTTPS do serviço Cleaner/ChatScene da Hostear) e `CLEANER_WORKER_SECRET` (o
+   segredo correspondente). Como alternativa, use os nomes explícitos
+   `CHATSCENE_VOICE_SERVICE_URL` e `CHATSCENE_VOICE_SERVICE_SECRET`.
+4. Republicar o projeto e conferir **ChatScene → Clonar voz**. O status deve
+   mostrar `remote-cuda`; o upload só fica habilitado quando o health check
+   autenticado responde.
+
+Os segredos acima são do servidor e não devem ser colocados no `.env` público,
+no GitHub ou no navegador. A chave `ELEVENLABS_API_KEY` compartilhada não é
+necessária para esse fluxo.
+
 ## O que está no código
 
 - `Contas e credenciais` valida a chave com o catálogo oficial e guarda somente o
