@@ -524,7 +524,7 @@ export function VoicePanel(props: VoicePanelProps) {
                           label="Velocidade"
                           value={voice.speed}
                           min={0.7}
-                          max={1.3}
+                          max={voice.provider === "elevenlabs" ? 1.2 : 1.3}
                           step={0.05}
                           suffix="×"
                           onChange={(speed) => voice.id && updateProfile(voice.id, { speed })}

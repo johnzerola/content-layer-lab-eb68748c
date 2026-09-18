@@ -250,7 +250,8 @@ export async function synthesizeElevenLabs(input: {
             similarity_boost: input.similarityBoost,
             style: input.style,
             use_speaker_boost: input.speakerBoost,
-            speed: input.speed,
+            // Keep the provider boundary defensive: ElevenLabs accepts 0.7–1.2.
+            speed: Math.max(0.7, Math.min(1.2, input.speed)),
           },
         }),
       },

@@ -229,7 +229,15 @@ export function createGatewayVoiceProvider(
             ...(profile.brightness === undefined ? {} : { brightness: profile.brightness }),
           },
         ),
-        speed: Math.max(0.7, Math.min(1.3, profile.speed * (direction?.speedMultiplier ?? 1))),
+        // ElevenLabs rejects values above 1.2 even though the shared project
+        // contract allows 1.3 for other providers.
+        speed: Math.max(
+          0.7,
+          Math.min(
+            profile.provider === "elevenlabs" ? 1.2 : 1.3,
+            profile.speed * (direction?.speedMultiplier ?? 1),
+          ),
+        ),
         ...(profile.provider === "elevenlabs" && profile.providerSettings
           ? { providerSettings: elevenLabsVoiceSettingsInput.parse(profile.providerSettings) }
           : {}),

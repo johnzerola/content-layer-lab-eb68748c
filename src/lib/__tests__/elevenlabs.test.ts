@@ -157,6 +157,18 @@ describe("ElevenLabs server adapter", () => {
     });
   });
 
+  it("clamps the shared project's 1.3 speed to ElevenLabs' 1.2 maximum", async () => {
+    const request = vi.fn().mockResolvedValue(
+      new Response(Uint8Array.from([1, 2, 3]), {
+        status: 200,
+        headers: { "Content-Type": "audio/mpeg" },
+      }),
+    );
+    await synthesizeElevenLabs({ ...synthesisInput, speed: 1.3, request });
+    const [, init] = request.mock.calls[0]!;
+    expect(JSON.parse(init.body).voice_settings.speed).toBe(1.2);
+  });
+
   it.each([401, 403, 429])(
     "preserves a provider error instead of substituting another voice (%s)",
     async (status) => {
