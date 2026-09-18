@@ -54,3 +54,9 @@ o vídeo: a duração desejada continua sendo um controle independente. O limite
 
 Geração real com IA e revisão editorial de roteiros gerados não foram executadas
 nesta etapa; os ensaios de contrato usam dados controlados e não consomem créditos.
+
+O formulário real foi exercitado em navegador isolado: envio integral de 5.000
+caracteres, seleção Livre, bloqueio durante geração simulada, abertura da explicação
+por teclado e preservação do briefing ao alternar para Reddit e voltar. Não houve
+overflow nas larguras 375, 390, 768, 1280, 1366 e 1440 pixels, nem erros de console
+nesse fluxo. Isso valida o formulário, não a qualidade editorial da saída da IA.

@@ -30,6 +30,28 @@ O catálogo usa paginação, deduplicação e timeout. Falhas de quota, permiss�
 chave inválida, servidor sem migração e timeout aparecem como estados distintos.
 Nenhuma chamada real à ElevenLabs é feita pelos testes automatizados.
 
+## Verificação realizada
+
+Em 18/09/2026, o navegador isolado exercitou os componentes reais com respostas
+simuladas, sem chave pessoal nem consumo de créditos:
+
+- chave inválida, conexão bem-sucedida, máscara e desconexão;
+- erro ao verificar conexão sem exibir falso estado desconectado;
+- catálogo vazio, erro de catálogo e nova tentativa bem-sucedida;
+- elenco com duas identidades distintas e restauração que preserva a voz;
+- velocidade máxima de 1,2 para ElevenLabs, inclusive na fronteira do servidor;
+- capturas em 1280 e 390 pixels, sem overflow horizontal no painel de vozes.
+
+Artefatos locais em `output/playwright/elevenlabs-*.png`, não versionados.
+O servidor simulado teve um 404 de favicon; não houve erro de execução React no
+fluxo de vozes. A captura automática ADS não pôde rodar por falta das dependências
+Playwright no caminho de resolução do script; não se declara auditoria WCAG completa.
+
+O código foi enviado à `main`, mas a migração e os segredos do ambiente publicado
+não foram aplicados/verificados nesta sessão. Os `.env` locais não contêm a chave
+de serviço Supabase nem a chave de criptografia. Teste autenticado com conta real,
+síntese real e qualidade auditiva continuam pendentes após essa configuração.
+
 ## Plano e uso comercial
 
 O plano gratuito atual da ElevenLabs inclui 10.000 créditos mensais, mas a página
