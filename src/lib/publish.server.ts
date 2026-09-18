@@ -2,6 +2,7 @@ import type { PostKind, PublishErrorCode, SocialProvider } from "@/lib/publishin
 import { facebookGraphBase, globalMetaCredentials, metaGraphBase } from "@/lib/meta.server";
 
 const YOUTUBE_UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos";
+const YOUTUBE_CHANNELS_URL = "https://www.googleapis.com/youtube/v3/channels";
 const TIKTOK_API_BASE = "https://open.tiktokapis.com/v2";
 const TIKTOK_CHUNK_BYTES = 10 * 1024 * 1024;
 
@@ -411,6 +412,28 @@ async function publishYoutube(input: PublishInput): Promise<PublishResult> {
   }
 
   try {
+    // A API publica no canal representado pela credencial, não aceita um canal
+    // arbitrário no upload. Confirme a identidade antes de enviar qualquer byte.
+    const channelUrl = new URL(YOUTUBE_CHANNELS_URL);
+    channelUrl.searchParams.set("part", "id");
+    channelUrl.searchParams.set("mine", "true");
+    const channelResponse = await fetch(channelUrl, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const channelPayload: unknown = await channelResponse.json().catch(() => null);
+    if (!channelResponse.ok) {
+      return providerFailure("YouTube validar canal", channelResponse.status, channelPayload);
+    }
+    const authorizedChannelId = nestedString(channelPayload, ["items", "0", "id"]);
+    if (!authorizedChannelId || authorizedChannelId !== channelId) {
+      return {
+        ok: false,
+        code: "ACCOUNT_MISMATCH",
+        retryable: false,
+        error: "A conta Google autorizada não corresponde ao canal selecionado. Reconecte este canal.",
+      };
+    }
+
     const uploadUrl = new URL(YOUTUBE_UPLOAD_URL);
     uploadUrl.searchParams.set("part", "snippet,status");
     uploadUrl.searchParams.set("uploadType", "resumable");

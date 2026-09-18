@@ -30,6 +30,7 @@ export type PublishingAccount = {
 
 export type PublishingConnection = {
   id: string;
+  social_account_id?: string;
   provider: string;
   provider_account_id: string | null;
   status: string;

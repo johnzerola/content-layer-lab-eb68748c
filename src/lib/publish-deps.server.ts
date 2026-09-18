@@ -47,7 +47,7 @@ export async function createPublishDependencies(): Promise<QueueDependencies> {
     loadConnection: async (accountId, userId) => {
       const { data, error } = await supabaseAdmin
         .from("social_connections")
-        .select("id,provider,provider_account_id,status,expires_at")
+        .select("id,social_account_id,provider,provider_account_id,status,expires_at")
         .eq("social_account_id", accountId)
         .eq("user_id", userId)
         .maybeSingle();
@@ -110,7 +110,19 @@ export async function createPublishDependencies(): Promise<QueueDependencies> {
           const refreshToken = decryptSocialToken(data.refresh_token_ciphertext);
           const refreshed = await refreshYoutubeAccessToken({ refreshToken });
           return refreshed.accessToken ? { accessToken: refreshed.accessToken } : null;
-        } catch {
+        } catch (failure) {
+          if ((failure as { code?: string } | null)?.code === "META_AUTH_INVALID") {
+            await supabaseAdmin
+              .from("social_connections")
+              .update({ status: "reconexao_necessaria" })
+              .eq("id", connection.id);
+            if (connection.social_account_id) {
+              await supabaseAdmin
+                .from("social_accounts")
+                .update({ status: "reconexao_necessaria" })
+                .eq("id", connection.social_account_id);
+            }
+          }
           return null;
         }
       }

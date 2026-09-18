@@ -33,7 +33,7 @@ describe("caption word timing", () => {
   });
 
   it("reports when a batch had to use estimated timing", () => {
-    const cue = (timing: CaptionCue["timing"]): CaptionCue => ({
+    const cue = (timing: NonNullable<CaptionCue["timing"]>): CaptionCue => ({
       start: 0,
       end: 1,
       words: [{ text: "teste", start: 0, end: 1 }],
