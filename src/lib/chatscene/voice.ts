@@ -87,6 +87,8 @@ const preset = (
 ): VoicePreset => ({ id, label, group, description, gender, age, providerVoice, profile, ...(provider ? { provider } : {}) });
 
 export const VOICE_PRESETS: VoicePreset[] = [
+  preset("piper-cadu-local", "Cadu local · PT-BR", "Voz local gratuita", "Voz-base PT-BR distinta · Piper open source", "neutra", "adulta", "pt_BR-cadu-medium", { style:"natural",speed:1,energy:.55,expressiveness:.5,roughness:.1,warmth:.5,brightness:.5,pitch:0 }, "piper"),
+  preset("piper-jeff-local", "Jeff local · PT-BR", "Voz local gratuita", "Voz-base PT-BR distinta · Piper open source", "neutra", "adulta", "pt_BR-jeff-medium", { style:"natural",speed:1,energy:.55,expressiveness:.5,roughness:.1,warmth:.5,brightness:.5,pitch:0 }, "piper"),
   ...[
     ["viral", "Viral / rápido", "adam_roblox_teen"],
     ["natural", "Natural", "adam_natural"],

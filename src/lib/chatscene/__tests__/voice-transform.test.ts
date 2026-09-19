@@ -7,6 +7,7 @@ import {
   ratioToSemitones,
   selectionFromTransformPreset,
   semitonesToRatio,
+  synthesisTransformForProfile,
 } from "../voice-transform";
 import { VoiceTransformEngine } from "../voice-transform.server";
 
@@ -52,6 +53,27 @@ describe("VoiceTransform math", () => {
   it("mantém IDs únicos e limites conservadores nos presets", () => {
     expect(new Set(VOICE_TRANSFORM_PRESETS.map((preset) => preset.id)).size).toBe(VOICE_TRANSFORM_PRESETS.length);
     expect(VOICE_TRANSFORM_PRESETS.find((preset) => preset.id === "adam_child_cartoon")?.safePitchRange).toEqual([5.5, 6.2]);
+  });
+
+  it("transforma tom fino e grave sem mudar o tempo da fala", () => {
+    for (const pitch of [-4, 4]) {
+      const userSelection = selectionFromTransformPreset("adam_natural");
+      userSelection.presetId = "user-pitch";
+      userSelection.config.mode = "PITCH_ONLY";
+      userSelection.config.pitchSemitones = pitch;
+      const selection = synthesisTransformForProfile({ transform: userSelection });
+      expect(selection?.config).toMatchObject({
+        mode: "PITCH_ONLY", speedMultiplier: 1, pitchSemitones: pitch,
+        linkedPitchToSpeed: false,
+      });
+    }
+    const fast = selectionFromTransformPreset("dialogue_fast");
+    const tuned = synthesisTransformForProfile({ pitch: -4, transform: fast });
+    expect(tuned?.config.mode).toBe("SPEED_AND_PITCH");
+    expect(tuned?.config.speedMultiplier).toBe(1.3);
+    expect(tuned?.config.pitchSemitones).toBe(-4);
+    expect(fast.config.pitchSemitones).toBe(0);
+    expect(synthesisTransformForProfile({ pitch: 2 })).toBeUndefined();
   });
 });
 

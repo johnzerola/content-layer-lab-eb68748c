@@ -16,9 +16,11 @@ import {
   deleteRemoteVoiceReference,
   remoteCloneEngineStatus,
   remoteVoiceServiceConfigured,
+  remoteVoiceTransformSupported,
   saveRemoteVoiceReference,
   synthesizeRemoteGenericVoice,
   synthesizeRemoteVoice,
+  transformRemoteVoice,
   warmRemoteCloneEngine,
 } from "./voice-clone.remote.server";
 
@@ -26,7 +28,12 @@ export const getVoiceEngineStatus = createServerFn({ method: "GET" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .handler(async () => {
     const remote = await remoteCloneEngineStatus();
-    if (remote) return { clone: remote, piper: Boolean(remote.genericInstalled) };
+    if (remote) return {
+      clone: remote,
+      piper: Boolean(remote.genericInstalled),
+      piperVoices: remote.piperVoices ?? (remote.genericInstalled ? ["pt_BR-faber-medium"] : []),
+      pitchTransform: remote.pitchTransform === true,
+    };
     // Do not import the Node-only worker in an edge deployment unless the
     // runtime explicitly advertises a local installation.
     if (
@@ -36,11 +43,17 @@ export const getVoiceEngineStatus = createServerFn({ method: "GET" })
     ) {
       const { verifiedCloneEngineStatus } = await import("./voice-clone.server");
       const { getPiperLocalStatus } = await import("./voice-piper.server");
-      return { clone: await verifiedCloneEngineStatus(), piper: getPiperLocalStatus().available };
+      const piper = getPiperLocalStatus().available;
+      return {
+        clone: await verifiedCloneEngineStatus(), piper,
+        piperVoices: piper ? ["pt_BR-faber-medium"] : [], pitchTransform: true,
+      };
     }
     return {
       clone: { installed: false, device: "not-configured", modelLoaded: false, warming: false },
       piper: false,
+      piperVoices: [],
+      pitchTransform: false,
     };
   });
 
@@ -116,6 +129,13 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .validator((input: unknown) => voiceSynthesisInput.parse(input))
   .handler(async ({ data, context }) => {
+    if (
+      data.transform?.presetId === "user-pitch" &&
+      !nativeVoicePipelineConfigured() &&
+      !(await remoteVoiceTransformSupported())
+    ) {
+      throw new Error("O ajuste de tom ainda não está disponível no servidor de voz. Atualize e reinicie o serviço antes de gerar.");
+    }
     if (data.provider === "chatterbox" && !data.referenceId)
       throw new Error("Envie a referência de voz deste personagem.");
     const isClone = data.provider === "chatterbox";
@@ -199,21 +219,19 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
       buffer = Buffer.from(await res.arrayBuffer());
     } else if (remoteVoiceServiceConfigured()) {
       buffer = Buffer.from(
-        await synthesizeRemoteGenericVoice(data.text, data.speed ?? 1),
+        await synthesizeRemoteGenericVoice(data.text, data.speed ?? 1, data.voice),
         "base64",
       );
       mime = "audio/wav";
       providerName = "piper-remote";
     } else {
       const { getPiperLocalStatus, synthesizePiperWav } = await import("./voice-piper.server");
-      if (getPiperLocalStatus().available) {
+      if (getPiperLocalStatus().available && data.voice === "pt_BR-faber-medium") {
         buffer = await synthesizePiperWav(data.text, data.speed ?? 1);
         mime = "audio/wav";
         providerName = "piper-local";
       } else {
-        throw new Error(
-          "Nenhum gerador de voz está disponível. Instale a voz local Piper ou configure uma chave no servidor.",
-        );
+        throw new Error("Esta voz Piper não está instalada neste servidor. Instale o modelo escolhido no serviço de voz.");
       }
     }
     const transform =
@@ -256,6 +274,27 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
           processingMs: transformed.processingMs,
         },
       };
+    }
+    if (transform) {
+      if (!(await remoteVoiceTransformSupported())) {
+        // Old worker contract: keep historical presets playing until upgrade.
+        return { mime, audio: buffer.toString("base64"), provider: providerName };
+      }
+      try {
+        const rendered = await transformRemoteVoice(buffer.toString("base64"), transform.config);
+        return { mime: rendered.mime, audio: rendered.audio, provider: providerName };
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : "Falha no processamento de áudio.";
+        if (/not found/i.test(reason)) {
+          if (transform.presetId === "user-pitch") {
+            throw new Error("O servidor de voz ainda não tem o ajuste de tom. Atualize e reinicie o serviço de voz.");
+          }
+          // Existing projects used these presets before the remote renderer
+          // existed. Keep their previous audio path until the worker upgrades.
+          return { mime, audio: buffer.toString("base64"), provider: providerName };
+        }
+        throw error;
+      }
     }
     return {
       mime,

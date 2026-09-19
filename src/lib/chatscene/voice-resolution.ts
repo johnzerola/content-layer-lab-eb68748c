@@ -35,7 +35,7 @@ export function attachPreset(project: ChatSceneProject, participantId: string, p
   const targetPreset = voicePreset(presetId);
   const providerChanged = previous?.provider !== (targetPreset.provider ?? DEFAULT_VOICE.provider);
   const metadata: Partial<VoiceProfile> = { id };
-  for (const key of ["name", "gain", "provider", "language", "locale", "seed", "providerSettings", "transform"] as const) {
+  for (const key of ["name", "gain", "provider", "language", "locale", "seed", "providerSettings"] as const) {
     if (key === "provider") continue;
     if (key === "providerSettings" && providerChanged) continue;
     if (key === "name" && previous?.provider === "elevenlabs") continue;

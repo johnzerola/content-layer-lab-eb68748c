@@ -40,6 +40,17 @@ PIPER_MODEL = Path(
 PIPER_CONFIG = Path(
     os.environ.get("PIPER_CONFIG_PATH", f"{PIPER_MODEL}.json")
 ).resolve()
+PIPER_VOICES = {
+    "pt_BR-faber-medium": (PIPER_MODEL, PIPER_CONFIG),
+    "pt_BR-cadu-medium": (
+        ROOT / "piper" / "pt_BR-cadu-medium.onnx",
+        ROOT / "piper" / "pt_BR-cadu-medium.onnx.json",
+    ),
+    "pt_BR-jeff-medium": (
+        ROOT / "piper" / "pt_BR-jeff-medium.onnx",
+        ROOT / "piper" / "pt_BR-jeff-medium.onnx.json",
+    ),
+}
 MAX_BODY = 16 * 1024 * 1024
 MAX_AUDIO = 12 * 1024 * 1024
 IDLE_SECONDS = int(os.environ.get("CHATSCENE_VOICE_IDLE_SECONDS", "120"))
@@ -73,13 +84,17 @@ def engine_installed():
         return False
 
 
-def piper_installed():
-    return PIPER_MODEL.is_file() and PIPER_CONFIG.is_file()
+def piper_installed(voice="pt_BR-faber-medium"):
+    paths = PIPER_VOICES.get(voice)
+    return bool(paths and paths[0].is_file() and paths[1].is_file())
 
 
-def synthesize_piper(text, speed=1.0):
-    if not piper_installed():
-        raise RuntimeError("A voz padrão PT-BR não está instalada.")
+def synthesize_piper(text, speed=1.0, voice="pt_BR-faber-medium"):
+    if voice not in PIPER_VOICES:
+        raise ValueError("Esta voz local não está no catálogo autorizado.")
+    if not piper_installed(voice):
+        raise ValueError(f"A voz {voice} ainda não está instalada neste servidor.")
+    model_path, config_path = PIPER_VOICES[voice]
     safe_speed = max(0.7, min(1.3, float(speed)))
     process = subprocess.run(
         [
@@ -87,9 +102,9 @@ def synthesize_piper(text, speed=1.0):
             "-m",
             "piper",
             "-m",
-            str(PIPER_MODEL),
+            str(model_path),
             "-c",
-            str(PIPER_CONFIG),
+            str(config_path),
             "--output-raw",
             "--length-scale",
             str(1 / safe_speed),
@@ -103,7 +118,7 @@ def synthesize_piper(text, speed=1.0):
     if process.returncode or not process.stdout:
         raise RuntimeError("A voz padrão PT-BR não produziu áudio.")
     try:
-        config = json.loads(PIPER_CONFIG.read_text(encoding="utf-8"))
+        config = json.loads(config_path.read_text(encoding="utf-8"))
         sample_rate = int(config.get("audio", {}).get("sample_rate", 22050))
     except (OSError, ValueError, TypeError):
         sample_rate = 22050
@@ -114,6 +129,52 @@ def synthesize_piper(text, speed=1.0):
         target.setframerate(sample_rate)
         target.writeframes(process.stdout)
     return output.getvalue()
+
+
+def transform_speech(audio, config):
+    """One FFmpeg render for pitch and tempo; pitch alone keeps duration."""
+    if not audio or len(audio) > MAX_AUDIO:
+        raise ValueError("O áudio de origem excede o limite permitido.")
+    mode = config.get("mode")
+    if mode not in {"VARISPEED", "TEMPO_ONLY", "PITCH_ONLY", "SPEED_AND_PITCH", "VARISPEED_THEN_RESTORE_TEMPO"}:
+        raise ValueError("Modo de transformação inválido.")
+    speed = float(config.get("speedMultiplier", 1))
+    pitch = float(config.get("pitchSemitones", 0))
+    if not math.isfinite(speed) or not 0.25 <= speed <= 4 or not math.isfinite(pitch) or not -12 <= pitch <= 12:
+        raise ValueError("Ajuste de velocidade ou tom fora do limite.")
+    if config.get("linkedPitchToSpeed"):
+        pitch += 12 * math.log2(speed)
+    ratio = 2 ** (pitch / 12)
+    filters = ["aresample=24000"]
+    if mode != "TEMPO_ONLY":
+        filters.extend([f"asetrate={round(24000 * ratio)}", "aresample=24000"])
+    tempo = {
+        "VARISPEED": 1,
+        "TEMPO_ONLY": speed,
+        "PITCH_ONLY": 1 / ratio,
+        "SPEED_AND_PITCH": speed / ratio,
+        "VARISPEED_THEN_RESTORE_TEMPO": 1 / ratio,
+    }[mode]
+    while tempo > 2:
+        filters.append("atempo=2")
+        tempo /= 2
+    while tempo < 0.5:
+        filters.append("atempo=0.5")
+        tempo /= 0.5
+    if abs(tempo - 1) > 0.000001:
+        filters.append(f"atempo={tempo:.8f}")
+    if config.get("normalization", {}).get("enabled", True):
+        filters.append("loudnorm=I=-18:TP=-1.5:LRA=11")
+    process = subprocess.run(
+        [os.environ.get("FFMPEG_PATH", "ffmpeg"), "-hide_banner", "-loglevel", "error",
+         "-i", "pipe:0", "-vn", "-af", ",".join(filters), "-ac", "1", "-ar", "24000",
+         "-c:a", "libmp3lame", "-q:a", "2", "-f", "mp3", "pipe:1"],
+        input=audio, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        timeout=60, check=False,
+    )
+    if process.returncode or not process.stdout or len(process.stdout) > MAX_AUDIO:
+        raise RuntimeError("Não foi possível ajustar o tom desta voz.")
+    return process.stdout
 
 
 def account_directory(user_id):
@@ -393,6 +454,8 @@ class Handler(BaseHTTPRequestHandler):
             {
                 "installed": engine_installed(),
                 "genericInstalled": piper_installed(),
+                "piperVoices": [name for name in PIPER_VOICES if piper_installed(name)],
+                "pitchTransform": True,
                 "device": "remote-cuda" if relay and not CPU.loaded else "cpu",
                 "modelLoaded": gpu_loaded or CPU.loaded,
                 "warming": WARMING.is_set(),
@@ -444,13 +507,27 @@ class Handler(BaseHTTPRequestHandler):
                     )
                     return
                 try:
-                    audio = synthesize_piper(text, body.get("speed", 1))
+                    audio = synthesize_piper(text, body.get("speed", 1), body.get("voice", "pt_BR-faber-medium"))
                 finally:
                     INFERENCE_SLOTS.release()
                 self.respond(
                     200,
                     {"audio": base64.b64encode(audio).decode("ascii"), "device": "cpu"},
                 )
+                return
+            if self.path == "/v1/voice/transform":
+                raw_audio = base64.b64decode(body.get("audio", ""), validate=True)
+                config = body.get("config")
+                if not isinstance(config, dict):
+                    raise ValueError("Configuração de tom inválida.")
+                if not INFERENCE_SLOTS.acquire(blocking=False):
+                    self.respond(429, {"detail": "A fila de vozes está cheia. Tente novamente."})
+                    return
+                try:
+                    audio = transform_speech(raw_audio, config)
+                finally:
+                    INFERENCE_SLOTS.release()
+                self.respond(200, {"audio": base64.b64encode(audio).decode("ascii"), "mime": "audio/mpeg"})
                 return
             if self.path == "/v1/voice/synthesize":
                 user_id = str(body.get("userId", ""))

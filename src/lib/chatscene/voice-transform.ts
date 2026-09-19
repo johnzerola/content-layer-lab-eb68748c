@@ -232,6 +232,23 @@ export function selectionFromTransformPreset(id: string): VoiceTransformSelectio
   return { presetId: preset.id, config: structuredClone(preset.config) };
 }
 
+/** Render explicit tone controls into the clip; legacy pitch-only presets stay compatible. */
+export function synthesisTransformForProfile(profile: {
+  pitch?: number;
+  transform?: VoiceTransformSelection | undefined;
+}): VoiceTransformSelection | undefined {
+  const pitch = Math.max(-6, Math.min(6, profile.pitch ?? 0));
+  if (!profile.transform) return undefined;
+  const selection = structuredClone(profile.transform);
+  if (pitch !== 0) {
+    selection.config.pitchSemitones = effectiveTransformPitch(selection.config) + pitch;
+    selection.config.linkedPitchToSpeed = false;
+    selection.config.mode = selection.config.speedMultiplier === 1
+      ? "PITCH_ONLY" : "SPEED_AND_PITCH";
+  }
+  return selection;
+}
+
 export function effectiveTransformPitch(configValue: VoiceTransformConfig): number {
   const linked = configValue.linkedPitchToSpeed ? ratioToSemitones(configValue.speedMultiplier) : 0;
   return linked + configValue.pitchSemitones;

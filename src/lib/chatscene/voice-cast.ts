@@ -21,6 +21,7 @@ import {
   type VoiceProfile,
   type VoiceProviderCapabilities,
 } from "./voice";
+import { synthesisTransformForProfile } from "./voice-transform";
 
 export interface VoiceClip {
   key: string;
@@ -152,7 +153,6 @@ export function clearVoiceCache() {
 
 /** Duração real da fala já com o tom aplicado, em milissegundos. */
 export function clipDurationMs(clip: VoiceClip, profile: VoiceProfile | null | undefined): number {
-  // Áudio transformado já chega renderizado; sua duração decodificada é autoritativa.
   return Math.round(
     (clip.durationSec / (profile?.transform ? 1 : pitchRate(profile?.pitch))) * 1000,
   );
@@ -245,6 +245,7 @@ export function createGatewayVoiceProvider(
       }
 
       const preset = voicePreset(profile.presetId);
+      const transform = synthesisTransformForProfile(profile);
       const { audio, mime } = await call({
         text,
         voice: profile.providerVoiceId ?? preset.providerVoice,
@@ -277,7 +278,7 @@ export function createGatewayVoiceProvider(
         ...(profile.provider === "elevenlabs" && profile.providerSettings
           ? { providerSettings: elevenLabsVoiceSettingsInput.parse(profile.providerSettings) }
           : {}),
-        ...(profile.transform ? { transform: profile.transform } : {}),
+        ...(transform ? { transform } : {}),
       });
       const bytes = Uint8Array.from(atob(audio), (c) => c.charCodeAt(0));
       const blob = new Blob([bytes], { type: mime || "audio/mpeg" });

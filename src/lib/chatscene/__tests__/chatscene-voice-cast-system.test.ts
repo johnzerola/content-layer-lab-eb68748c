@@ -218,7 +218,7 @@ describe("Voice Cast System", () => {
         duration: 0.2,
         numberOfChannels: 1,
         getChannelData: () => samples,
-      } as AudioBuffer);
+      } as unknown as AudioBuffer);
     });
     clearVoiceCache();
     try {
@@ -230,7 +230,7 @@ describe("Voice Cast System", () => {
       clearVoiceCache();
       const restored = await restoreCachedCast(project);
       expect(restored.clips.get("m1")?.durationSec).toBe(0.2);
-      expect(restored.durations.m1).toBe(generated.durations.m1);
+      expect(restored.durations["m1"]).toBe(generated.durations["m1"]);
     } finally {
       clearVoiceCache();
       vi.unstubAllGlobals();

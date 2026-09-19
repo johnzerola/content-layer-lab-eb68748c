@@ -10,6 +10,8 @@
 export interface RemoteVoiceEngineStatus {
   installed: boolean;
   genericInstalled?: boolean;
+  piperVoices?: string[];
+  pitchTransform?: boolean;
   device: string;
   modelLoaded: boolean;
   warming: boolean;
@@ -109,14 +111,38 @@ export async function synthesizeRemoteVoice(userId: string, referenceId: string,
   return result.audio;
 }
 
-export async function synthesizeRemoteGenericVoice(text: string, speed = 1) {
+export async function synthesizeRemoteGenericVoice(text: string, speed = 1, voice = "pt_BR-faber-medium") {
   const result = await remoteVoiceRequest<{ audio: string; device: string }>(
     "/generic",
     {
       method: "POST",
-      body: JSON.stringify({ text, speed }),
+      body: JSON.stringify({ text, speed, voice }),
     },
     90_000,
   );
   return result.audio;
+}
+
+let transformCapability: { value: boolean; expiresAt: number } | null = null;
+export async function remoteVoiceTransformSupported(): Promise<boolean> {
+  if (!remoteVoiceServiceConfigured()) return false;
+  if (transformCapability && transformCapability.expiresAt > Date.now()) return transformCapability.value;
+  const status = await remoteCloneEngineStatus();
+  const value = status?.pitchTransform === true;
+  transformCapability = { value, expiresAt: Date.now() + 15_000 };
+  return value;
+}
+
+export async function transformRemoteVoice(audio: string, config: {
+  mode: string;
+  speedMultiplier: number;
+  pitchSemitones: number;
+  linkedPitchToSpeed: boolean;
+  normalization: { enabled: boolean };
+}) {
+  return remoteVoiceRequest<{ audio: string; mime: string }>(
+    "/transform",
+    { method: "POST", body: JSON.stringify({ audio, config }) },
+    90_000,
+  );
 }

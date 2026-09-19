@@ -34,6 +34,7 @@ import {
   voicePreset,
   type VoiceProfile,
 } from "@/lib/chatscene/voice";
+import { getVoiceEngineStatus } from "@/lib/chatscene/voice.functions";
 import type { ChatSceneProject } from "@/lib/chatscene/types";
 import {
   VOICE_TRANSFORM_PRESETS,
@@ -84,6 +85,24 @@ export function VoicePanel(props: VoicePanelProps) {
   const connectionFn = useServerFn(getElevenLabsConnection);
   const connectFn = useServerFn(connectElevenLabs);
   const voicesFn = useServerFn(listElevenLabsVoices);
+  const engineStatusFn = useServerFn(getVoiceEngineStatus);
+  const [installedLocalVoices, setInstalledLocalVoices] = useState<string[] | null>(null);
+  const [pitchTransformAvailable, setPitchTransformAvailable] = useState<boolean | null>(null);
+  useEffect(() => {
+    let active = true;
+    void engineStatusFn().then((status) => {
+      if (active) {
+        setInstalledLocalVoices(status.piperVoices);
+        setPitchTransformAvailable(status.pitchTransform);
+      }
+    }).catch(() => {
+      if (active) {
+        setInstalledLocalVoices([]);
+        setPitchTransformAvailable(false);
+      }
+    });
+    return () => { active = false; };
+  }, [engineStatusFn]);
   const [elevenConnection, setElevenConnection] = useState<
     "checking" | "connected" | "disconnected" | "error"
   >("checking");
@@ -245,6 +264,27 @@ export function VoicePanel(props: VoicePanelProps) {
       },
     });
   };
+  const setVoicePitch = (voice: VoiceProfile, semitones: number) => {
+    if (!voice.id) return;
+    const current = voice.transform ?? selectionFromTransformPreset("adam_natural");
+    const speed = current.config.speedMultiplier;
+    updateProfile(voice.id, {
+      pitch: 0,
+      transform: semitones === 0 && (!voice.transform || voice.transform.presetId === "user-pitch")
+        ? undefined
+        : {
+            ...current,
+            presetId: "user-pitch",
+            config: {
+              ...current.config,
+              mode: speed === 1 ? "PITCH_ONLY" : "SPEED_AND_PITCH",
+              pitchSemitones: semitones,
+              linkedPitchToSpeed: false,
+              preservePitch: false,
+            },
+          },
+    });
+  };
 
   if (project.participants.length === 0) {
     return (
@@ -274,6 +314,12 @@ export function VoicePanel(props: VoicePanelProps) {
       <p className="text-xs text-muted-foreground">
         Presets prontos em português: Natural, Viral, Jovem, Grave e variações experimentais. A voz
         Faber é sintética; os estilos usam os ajustes de velocidade e tom do seu template.
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Cadu e Jeff são vozes-base distintas do{" "}
+        <a className="underline underline-offset-2 hover:text-foreground" href="https://github.com/OHF-Voice/piper1-gpl" target="_blank" rel="noopener noreferrer">Piper</a>
+        {" "}e exigem instalação no servidor. A clonagem autorizada usa o{" "}
+        <a className="underline underline-offset-2 hover:text-foreground" href="https://github.com/resemble-ai/chatterbox" target="_blank" rel="noopener noreferrer">Chatterbox Multilingual</a>.
       </p>
       <section
         className="rounded-lg border border-primary/25 bg-primary/5 p-3"
@@ -555,9 +601,14 @@ export function VoicePanel(props: VoicePanelProps) {
                   {Array.from(new Set(VOICE_PRESETS.map((p) => p.group))).map((group) => (
                     <optgroup key={group} label={group}>
                       {VOICE_PRESETS.filter((p) => p.group === group).map((preset) => (
-                        <option key={preset.id} value={preset.id}>
-                          {voiceDisplayLabel(preset)}
-                        </option>
+                          <option
+                            key={preset.id}
+                            value={preset.id}
+                            disabled={preset.provider === "piper" && preset.providerVoice !== "pt_BR-faber-medium" && !installedLocalVoices?.includes(preset.providerVoice)}
+                          >
+                            {voiceDisplayLabel(preset)}
+                            {preset.provider === "piper" && preset.providerVoice !== "pt_BR-faber-medium" && !installedLocalVoices?.includes(preset.providerVoice) ? " (instalar no servidor)" : ""}
+                          </option>
                       ))}
                     </optgroup>
                   ))}
@@ -590,6 +641,9 @@ export function VoicePanel(props: VoicePanelProps) {
                       className="h-10 w-full appearance-none rounded-md border border-border bg-background px-2 pr-8 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       aria-label={`Estilo da voz de ${participant.name}`}
                     >
+                      {voice.transform?.presetId === "user-pitch" ? (
+                        <option value="user-pitch">Tom personalizado</option>
+                      ) : null}
                       {simpleTransformIds.map((id) => {
                         const item = voiceTransformPreset(id);
                         return (
@@ -607,9 +661,48 @@ export function VoicePanel(props: VoicePanelProps) {
                   </div>
                   {voice.transform ? (
                     <p className="mt-1.5 text-[10px] text-muted-foreground">
-                      {voiceTransformPreset(voice.transform.presetId).description}
+                      {voice.transform.presetId === "user-pitch"
+                        ? "Tom ajustado para este personagem sem acelerar a fala."
+                        : voiceTransformPreset(voice.transform.presetId).description}
                     </p>
                   ) : null}
+                  <div className="mt-3" role="group" aria-label={`Altura da voz de ${participant.name}`}>
+                    <p className="mb-1.5 text-[11px] font-medium">Altura da voz</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        { label: "Grave", pitch: -4 },
+                        { label: "Original", pitch: 0 },
+                        { label: "Fina", pitch: 4 },
+                      ] as const).map(({ label, pitch }) => {
+                        const selectedPitch = voice.transform
+                          ? effectiveTransformPitch(voice.transform.config) + (voice.pitch ?? 0)
+                          : (voice.pitch ?? 0);
+                        const selected = Math.abs(selectedPitch - pitch) < 0.1;
+                        return (
+                          <Button
+                            key={label}
+                            type="button"
+                            size="sm"
+                            variant={selected ? "default" : "secondary"}
+                            className="min-h-10"
+                            disabled={pitch !== 0 && pitchTransformAvailable !== true}
+                            aria-pressed={selected}
+                            onClick={() => setVoicePitch(voice, pitch)}
+                          >
+                            {label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-1.5 text-[10px] text-muted-foreground">Muda o tom sem acelerar a fala. Clique em Ouvir para testar; a alteração gera novo áudio.</p>
+                    {pitchTransformAvailable !== true ? (
+                      <p role="status" className="mt-1 text-[10px] text-muted-foreground">
+                        {pitchTransformAvailable === null
+                          ? "Verificando o serviço de voz…"
+                          : "O ajuste fino precisa da versão nova do serviço de voz."}
+                      </p>
+                    ) : null}
+                  </div>
                   <div className="mt-2 grid grid-cols-2 gap-2 has-[details[open]]:grid-cols-1">
                     <Button
                       size="sm"
@@ -655,12 +748,14 @@ export function VoicePanel(props: VoicePanelProps) {
                         ) : null}
                         {caps?.controls.pitch ? (
                           <VoiceRange
-                            label="Tom"
-                            value={voice.pitch ?? 0}
+                            label="Tom fino ou grave"
+                            value={voice.transform ? effectiveTransformPitch(voice.transform.config) + (voice.pitch ?? 0) : (voice.pitch ?? 0)}
                             min={PITCH_MIN}
                             max={PITCH_MAX}
                             step={0.5}
-                            onChange={(pitch) => voice.id && updateProfile(voice.id, { pitch })}
+                            suffix=" st"
+                            disabled={pitchTransformAvailable !== true}
+                            onChange={(pitch) => setVoicePitch(voice, pitch)}
                           />
                         ) : null}
                         {caps?.controls.expressiveness ? (
@@ -726,21 +821,6 @@ export function VoicePanel(props: VoicePanelProps) {
                                   updateTransform(voice, { speedMultiplier })
                                 }
                               />
-                              <VoiceRange
-                                label="Ajuste de tom"
-                                value={voice.transform.config.pitchSemitones}
-                                min={-6}
-                                max={6}
-                                step={0.25}
-                                suffix=" st"
-                                onChange={(pitchSemitones) =>
-                                  updateTransform(voice, { pitchSemitones })
-                                }
-                              />
-                              <p className="text-[10px] text-muted-foreground">
-                                Tom efetivo:{" "}
-                                {formatSigned(effectiveTransformPitch(voice.transform.config))} st
-                              </p>
                               <label className="block text-[11px] text-muted-foreground">
                                 <span className="mb-1 block">Modo</span>
                                 <select
@@ -990,10 +1070,6 @@ function bestElevenLabsVoice(
   return [...voices].sort((a, b) => score(b) - score(a))[0];
 }
 
-function formatSigned(value: number): string {
-  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
-}
-
 function transformUiLabel(id: string, baseName: string): string {
   return (
     (
@@ -1035,6 +1111,7 @@ function VoiceRange({
   max,
   step,
   suffix = "",
+  disabled = false,
   onChange,
 }: {
   label: string;
@@ -1043,6 +1120,7 @@ function VoiceRange({
   max: number;
   step: number;
   suffix?: string;
+  disabled?: boolean;
   onChange: (value: number) => void;
 }) {
   return (
@@ -1061,6 +1139,7 @@ function VoiceRange({
         max={max}
         step={step}
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
       />
     </label>

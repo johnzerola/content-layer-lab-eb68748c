@@ -113,6 +113,11 @@ describe("participant preset assignment", () => {
     expect(profile).toMatchObject({ provider: "piper", providerVoiceId: "pt_BR-faber-medium", locale: "pt-BR" });
   });
 
+  it("oferece Cadu e Jeff como modelos Piper distintos", () => {
+    expect(profileFromPreset("piper-cadu-local")).toMatchObject({ provider: "piper", providerVoiceId: "pt_BR-cadu-medium" });
+    expect(profileFromPreset("piper-jeff-local")).toMatchObject({ provider: "piper", providerVoiceId: "pt_BR-jeff-medium" });
+  });
+
   it("replaces all previous sound controls while preserving user metadata", () => {
     const previous = profileFromPreset("child-boy-raspy", {
       id: "saved-pedro", name: "Minha voz", gain: 0.72, provider: "lovable-ai", language: "pt",
@@ -138,6 +143,14 @@ describe("participant preset assignment", () => {
     expect(updated.participants[1]).toBe(project.participants[1]);
     expect(project.voiceProfiles![0]).toBe(previous);
     expect(project.messages[0]!.voiceMs).toBe(900);
+  });
+
+  it("não carrega a transformação da voz anterior ao trocar o modelo", () => {
+    const previous = profileFromPreset("faber-high", { id: "voice_pedro" });
+    const pedro = createParticipant({ id: "pedro", voiceProfileId: previous.id!, voice: previous });
+    const project = createChatSceneProject({ participants: [pedro], voiceProfiles: [previous] });
+    const changed = attachPreset(project, "pedro", "piper-cadu-local");
+    expect(changed.voiceProfiles?.[0]?.transform).toBeUndefined();
   });
 
   it("copies a shared profile so only the selected participant changes", () => {
