@@ -8,6 +8,7 @@
 import type { ChatSceneProject } from "./types";
 import { effectiveVoice } from "./voice-resolution";
 import { elevenLabsVoiceSettingsInput, type VoiceSynthesisRequest } from "./voice-request";
+import { dialogueGain } from "./voice-level";
 import {
   pitchRate,
   speakableText,
@@ -131,9 +132,7 @@ export function playClip(clip: VoiceClip, profile?: VoiceProfile | null): () => 
   source.buffer = clip.buffer;
   source.playbackRate.value = profile?.transform ? 1 : pitchRate(profile?.pitch);
   const gain = ctx.createGain();
-  // Keep previews at a usable dialogue level; the final mix applies RMS
-  // normalization as well, so a quiet profile does not disappear on playback.
-  gain.gain.value = Math.max(0.55, Math.min(1.8, profile?.gain ?? 1));
+  gain.gain.value = dialogueGain(clip.buffer, profile?.gain ?? 1);
   source.connect(gain).connect(ctx.destination);
   source.start();
   return () => {

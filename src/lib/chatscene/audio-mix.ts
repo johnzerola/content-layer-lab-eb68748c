@@ -11,36 +11,9 @@ import { pitchRate, type VoiceMixSettings } from "./voice";
 import { renderSoundEffect, sfxSchedule } from "./sfx";
 import type { ChatSceneProject } from "./types";
 import { effectiveVoice } from "./voice-resolution";
+import { dialogueGain } from "./voice-level";
 
 export const MIX_SAMPLE_RATE = 48000;
-const MAX_DYNAMIC_VOICE_RATE = 2.2;
-
-function normalizedVoiceGain(clip: VoiceClip, requested: number): number {
-  const base = Math.max(0.55, Math.min(1.8, requested));
-  try {
-    const channels = Math.max(1, clip.buffer.numberOfChannels);
-    let sum = 0;
-    let count = 0;
-    for (let channel = 0; channel < channels; channel += 1) {
-      const data = clip.buffer.getChannelData(channel);
-      // Sampling keeps long ElevenLabs clips cheap to inspect during every mix.
-      const step = Math.max(1, Math.floor(data.length / 4_000));
-      for (let i = 0; i < data.length; i += step) {
-        const sample = data[i] ?? 0;
-        sum += sample * sample;
-        count += 1;
-      }
-    }
-    const rms = count ? Math.sqrt(sum / count) : 0;
-    if (!Number.isFinite(rms) || rms < 0.001) return base;
-    // About -18 dBFS RMS is a useful dialogue target before the master limiter.
-    const correction = Math.max(0.65, Math.min(2.4, 0.126 / rms));
-    return Math.max(0.55, Math.min(2.2, base * correction));
-  } catch {
-    // Tests and legacy cached clips can carry a lightweight buffer stub.
-    return base;
-  }
-}
 
 export interface MixInput {
   project: ChatSceneProject;
@@ -74,19 +47,15 @@ export function voiceSchedule(
     const entry = plan.byId[message.id];
     if (!clip || !entry) continue;
     const voice = effectiveVoice(project, message);
-    const pitch = pitchRate(voice?.profile.pitch);
-    const targetSec = entry.timing.readingMs / 1000;
-    const preservesPitch = voice?.profile.transform?.config.preservePitch === true;
-    const fitRate = project.timing.fitVoiceToTiming && targetSec > 0 && !preservesPitch
-      ? Math.max(1, Math.min(MAX_DYNAMIC_VOICE_RATE, clip.durationSec / targetSec))
-      : 1;
-    const rate = pitch * fitRate;
+    // A server-transformed clip already includes its selected pitch and tempo.
+    // Never varispeed a clip to fit an editorial window: it changes the timbre.
+    const rate = voice?.profile.transform ? 1 : pitchRate(voice?.profile.pitch);
     out.push({
       id: message.id,
       startSec: entry.appearFrame / plan.fps,
       clip,
-      gain: normalizedVoiceGain(
-        clip,
+      gain: dialogueGain(
+        clip.buffer,
         (voice?.profile.gain ?? 1) * (voice?.direction.energyMultiplier ?? 1),
       ),
       rate,

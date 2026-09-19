@@ -212,10 +212,9 @@ export function computeMessageTimings(project: ChatSceneProject): MessageTiming[
     const hesitation = initial ? null : typingHesitation(message, author, typing);
     // a leitura só termina depois da fala, quando houver áudio
     const audioDriven = t.audioDriven === true && voice > 0;
-    const fitVoice = t.fitVoiceToTiming === true && voice > 0;
-    const hold = initial ? 0 : fitVoice ? reading : audioDriven ? voice : Math.max(reading, voice);
+    const hold = initial ? 0 : audioDriven ? voice : Math.max(reading, voice);
     // Audio is scheduled at appearFrame, concurrently with entrance (not after it).
-    const contentMs = audioDriven && !fitVoice ? Math.max(entrance, hold) : entrance + hold;
+    const contentMs = audioDriven ? Math.max(entrance, hold) : entrance + hold;
     const endMs = initial ? cursor : appearMs + contentMs + pauseAfter;
 
     out.push({

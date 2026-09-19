@@ -18,8 +18,12 @@ function referenceScene(count = 46) {
   return createChatSceneProject({ participants: [me, other], messages });
 }
 
+function sampleClip(durationSec = 3) {
+  return { key: "sample", blob: new Blob(), durationSec, buffer: {} as AudioBuffer };
+}
+
 describe("ritmo dinamico de referencia", () => {
-  it("mantem 46 falas curtas mesmo quando o provedor devolve audios longos", () => {
+  it("respeita as 46 duracoes reais sem sobrepor falas", () => {
     const dynamic = applyConversationTimingPreset(referenceScene(), "dynamic-fast");
     const withLongAudio = {
       ...dynamic,
@@ -27,60 +31,48 @@ describe("ritmo dinamico de referencia", () => {
     };
     const timings = computeMessageTimings(withLongAudio);
 
-    expect(withLongAudio.timing.fitVoiceToTiming).toBe(true);
-    expect(timings.every((item) => item.readingMs < 6_000)).toBe(true);
-    expect(buildPlan(withLongAudio).durationMs).toBeLessThan(120_000);
+    expect(timings.every((item) => item.readingMs === 6_000)).toBe(true);
+    expect(buildPlan(withLongAudio).durationMs).toBeGreaterThanOrEqual(46 * 6_000);
+    expect(timings.slice(1).every((item, index) => item.appearMs >= timings[index]!.endMs)).toBe(true);
   });
 
-  it("acelera apenas o clip que nao cabe na janela de texto", () => {
+  it("nao muda o tom para encaixar o clip no tempo estimado do texto", () => {
     const dynamic = applyConversationTimingPreset(referenceScene(1), "dynamic-fast");
     const message = dynamic.messages[0]!;
-    const project = {
-      ...dynamic,
-      messages: [{ ...message, voiceMs: 900 }],
-    };
-    const plan = buildPlan(project);
-    const schedule = voiceSchedule(project, plan, new Map([[message.id, {
-      key: message.id,
-      blob: new Blob(),
-      durationSec: 3,
-      buffer: {} as AudioBuffer,
-    }]]));
+    const project = { ...dynamic, messages: [{ ...message, voiceMs: 3_000 }] };
+    const schedule = voiceSchedule(project, buildPlan(project), new Map([[message.id, sampleClip()]]));
 
-    expect(schedule[0]!.rate).toBeGreaterThan(1);
-    expect(schedule[0]!.durationSec).toBeLessThan(schedule[0]!.clip.durationSec);
+    expect(schedule[0]!.rate).toBe(1);
+    expect(schedule[0]!.durationSec).toBe(3);
   });
 
-  it("nao aplica um segundo playbackRate quando o transform ja preserva o tom", () => {
+  it("nao reaplica pitch em um clip transformado no servidor", () => {
     const dynamic = applyConversationTimingPreset(referenceScene(1), "dynamic-fast");
     const message = dynamic.messages[0]!;
-    const profile = profileFromPreset("adult-male-casual", { id: "test-profile" });
+    const profile = profileFromPreset("adult-male-casual", {
+      pitch: 2,
+      transform: {
+        presetId: "dialogue_fast",
+        config: {
+          mode: "TEMPO_ONLY",
+          speedMultiplier: 1.3,
+          pitchSemitones: 0,
+          linkedPitchToSpeed: false,
+          preservePitch: true,
+          preserveFormants: false,
+          normalization: { enabled: true, integratedLufs: -18, truePeakDb: -1.5, loudnessRange: 11 },
+          outputCodec: "mp3",
+        },
+      },
+    });
     const project = {
       ...dynamic,
-      participants: dynamic.participants.map((participant) => participant.id === message.participantId
-        ? { ...participant, voice: { ...participant.voice, transform: {
-            presetId: "dialogue_fast",
-            config: {
-              mode: "TEMPO_ONLY" as const,
-              speedMultiplier: 1.3,
-              pitchSemitones: 0,
-              linkedPitchToSpeed: false,
-              preservePitch: true,
-              preserveFormants: false,
-              normalization: { enabled: true, integratedLufs: -18, truePeakDb: -1.5, loudnessRange: 11 },
-              outputCodec: "mp3" as const,
-            },
-          } } }
-        : participant),
-      messages: [{ ...message, voiceMs: 900 }],
+      participants: dynamic.participants.map((participant) =>
+        participant.id === message.participantId ? { ...participant, voice: profile } : participant,
+      ),
+      messages: [{ ...message, voiceMs: 3_000 }],
     };
-    const plan = buildPlan(project);
-    const schedule = voiceSchedule(project, plan, new Map([[message.id, {
-      key: message.id,
-      blob: new Blob(),
-      durationSec: 3,
-      buffer: {} as AudioBuffer,
-    }]]));
+    const schedule = voiceSchedule(project, buildPlan(project), new Map([[message.id, sampleClip()]]));
 
     expect(schedule[0]!.rate).toBe(1);
   });

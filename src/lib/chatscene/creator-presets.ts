@@ -56,7 +56,6 @@ export function applyCreatorFormat(
       speed: 1,
       audioDriven: true,
       mode: "dynamic-fast",
-      fitVoiceToTiming: true,
       msPerWord: 214,
       cardReadMs: 900,
       msPerChar: 28,

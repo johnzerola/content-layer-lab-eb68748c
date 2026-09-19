@@ -15,7 +15,7 @@ export const CONVERSATION_TIMING_PRESETS: ConversationTimingPreset[] = [
   {
     id: "dynamic-fast",
     label: "Din\u00e2mico \u00b7 refer\u00eancia",
-    description: "Texto marca o ritmo (~280 palavras/min); vozes longas s\u00e3o encaixadas sem esticar a cena.",
+    description: "Texto sem voz segue ~280 palavras/min; com voz, respeita a dura\u00e7\u00e3o real para preservar o tom.",
   },
   {
     id: "long-2m",
@@ -39,7 +39,6 @@ export function applyConversationTimingPreset(
         mode,
         speed: 1,
         audioDriven: true,
-        fitVoiceToTiming: true,
         msPerWord: 214,
         msPerChar: 24,
         minReadMs: 620,
@@ -64,7 +63,6 @@ export function applyConversationTimingPreset(
         minimumDurationMs: 120_000,
         speed: 1,
         audioDriven: true,
-        fitVoiceToTiming: false,
         gapMs: 260,
         senderSwitchMs: 180,
         threadSwitchMs: 820,

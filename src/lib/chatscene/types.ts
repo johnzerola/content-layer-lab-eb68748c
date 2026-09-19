@@ -483,8 +483,6 @@ export interface ChatSceneTiming {
   minimumDurationMs?: number;
   /** Narrated Shorts: measured audio starts at bubble arrival; no estimated reading tail. */
   audioDriven?: boolean;
-  /** Fit generated voice clips into the text window instead of extending it. */
-  fitVoiceToTiming?: boolean;
   /** Optional duration for editorial time cards; legacy documents keep 1500+ ms. */
   cardReadMs?: number;
   /** multiplicador global de velocidade: 0.5 = metade da velocidade */
