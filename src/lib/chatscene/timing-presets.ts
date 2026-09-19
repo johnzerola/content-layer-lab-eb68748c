@@ -14,8 +14,8 @@ export const CONVERSATION_TIMING_PRESETS: ConversationTimingPreset[] = [
   },
   {
     id: "dynamic-fast",
-    label: "Dinamico - referencia",
-    description: "Texto marca o ritmo (~280 palavras/min); vozes longas sao encaixadas sem esticar a cena.",
+    label: "Din\u00e2mico \u00b7 refer\u00eancia",
+    description: "Texto marca o ritmo (~280 palavras/min); vozes longas s\u00e3o encaixadas sem esticar a cena.",
   },
   {
     id: "long-2m",

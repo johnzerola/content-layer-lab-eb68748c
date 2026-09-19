@@ -477,7 +477,7 @@ export const CREATOR_LAYOUTS: {
 export type ChatSceneTimingMode = "standard" | "dynamic-fast" | "long-2m";
 
 export interface ChatSceneTiming {
-  /** Preset editorial de ritmo. O modo longo garante pelo menos dois minutos. */
+  /** Preset editorial de ritmo; o modo longo garante pelo menos dois minutos. */
   mode?: ChatSceneTimingMode;
   /** Duração mínima renderizada, em ms, usada pelo modo longo. */
   minimumDurationMs?: number;
