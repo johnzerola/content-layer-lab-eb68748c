@@ -1,9 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { computeMessageTimings } from "../timing";
+import { applyConversationTimingPreset } from "../timing-presets";
 import { planScroll } from "../scroll-planner";
 import { attachPreset, effectiveVoice } from "../voice-resolution";
 import { DEFAULT_VOICE, voiceKey } from "../voice";
-import { applyVoiceDurations, createGatewayVoiceProvider, generateCast } from "../voice-cast";
+import {
+  applyVoiceDurations,
+  clearVoiceCache,
+  createGatewayVoiceProvider,
+  generateCast,
+  projectWithAvailableVoiceClips,
+  restoreCachedCast,
+  type VoiceClip,
+} from "../voice-cast";
 import { deserializeChatSceneProject, serializeChatSceneProject } from "../serialize";
 import {
   createChatSceneProject,
@@ -179,6 +188,69 @@ describe("Voice Cast System", () => {
     const result = await generateCast(project, provider, { maxAttempts: 1 });
     expect(calls).toBe(1);
     expect(result.failures).toHaveLength(1);
+  });
+
+  it("restaura uma fala do IndexedDB depois que a memória é limpa", async () => {
+    const stored = new Map<string, Blob>();
+    const request = <T,>(result: T) => {
+      const pending: { result: T; onsuccess?: () => void; onerror?: () => void } = { result };
+      queueMicrotask(() => pending.onsuccess?.());
+      return pending;
+    };
+    vi.stubGlobal("indexedDB", {
+      open: () => request({
+        transaction: () => ({
+          objectStore: () => ({
+            get: (key: string) => request(stored.get(key)),
+            put: (blob: Blob, key: string) => {
+              stored.set(key, blob);
+              return request(undefined);
+            },
+          }),
+        }),
+      }),
+    });
+    const samples = new Float32Array(200).fill(0.2);
+    vi.stubGlobal("AudioContext", class {
+      decodeAudioData = async () => ({
+        sampleRate: 1_000,
+        length: samples.length,
+        duration: 0.2,
+        numberOfChannels: 1,
+        getChannelData: () => samples,
+      } as AudioBuffer);
+    });
+    clearVoiceCache();
+    try {
+      const project = projectWithCast();
+      const provider = createGatewayVoiceProvider(async () => ({ audio: "AA==", mime: "audio/mpeg" }));
+      const generated = await generateCast(project, provider);
+      expect(generated.clips.size).toBe(1);
+      expect(stored.size).toBe(1);
+      clearVoiceCache();
+      const restored = await restoreCachedCast(project);
+      expect(restored.clips.get("m1")?.durationSec).toBe(0.2);
+      expect(restored.durations.m1).toBe(generated.durations.m1);
+    } finally {
+      clearVoiceCache();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("não usa duração de uma fala quando o áudio não está disponível", () => {
+    const project = applyConversationTimingPreset(
+      applyVoiceDurations(projectWithCast(), { m1: 20_000 }),
+      "dynamic-fast",
+    );
+    const silent = projectWithAvailableVoiceClips(project, new Map());
+    expect(silent.messages[0]?.voiceMs).toBeNull();
+    expect(computeMessageTimings(silent)[0]!.voiceMs).toBe(0);
+    const available = projectWithAvailableVoiceClips(
+      project,
+      new Map([["m1", {} as VoiceClip]]),
+    );
+    expect(available).toBe(project);
+    expect(computeMessageTimings(available)[0]!.voiceMs).toBe(20_000);
   });
 });
 

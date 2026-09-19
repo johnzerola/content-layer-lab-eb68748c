@@ -107,6 +107,37 @@ export function cachedClip(key: string): VoiceClip | undefined {
   return cache.get(key);
 }
 
+/** Reabre falas já geradas neste navegador sem chamar o provedor de voz. */
+export async function restoreCachedCast(
+  project: ChatSceneProject,
+  signal?: AbortSignal,
+): Promise<Pick<CastResult, "clips" | "durations">> {
+  const clips = new Map<string, VoiceClip>();
+  const durations: Record<string, number> = {};
+  for (const { message, text } of speakingMessages(project)) {
+    if (signal?.aborted) break;
+    const resolved = effectiveVoice(project, message);
+    if (!resolved) continue;
+    const key = voiceKey(text, resolved.profile, resolved.direction);
+    let clip = cache.get(key);
+    if (!clip) {
+      const stored = await persistedBlob(key);
+      if (!stored || signal?.aborted) continue;
+      try {
+        clip = await decodeClip(key, stored, true);
+        cache.set(key, clip);
+      } catch {
+        // A damaged browser cache must not block the editor or trigger billing.
+        continue;
+      }
+    }
+    if (signal?.aborted) break;
+    clips.set(message.id, clip);
+    durations[message.id] = clipDurationMs(clip, resolved.profile);
+  }
+  return { clips, durations };
+}
+
 export function cacheSize(): number {
   return cache.size;
 }
@@ -252,7 +283,7 @@ export function createGatewayVoiceProvider(
       const blob = new Blob([bytes], { type: mime || "audio/mpeg" });
       const clip = await decodeClip(key, blob, true);
       cache.set(key, clip);
-      void persistBlob(key, blob);
+      await persistBlob(key, blob);
       return clip;
     },
   };
@@ -288,6 +319,20 @@ export function missingSpeakingMessages(project: ChatSceneProject) {
     const resolved = effectiveVoice(project, message);
     return resolved ? !hasCachedClip(voiceKey(text, resolved.profile, resolved.direction)) : false;
   });
+}
+
+/** Never time a preview/export against voice audio that is not available. */
+export function projectWithAvailableVoiceClips(
+  project: ChatSceneProject,
+  clips: ReadonlyMap<string, VoiceClip>,
+): ChatSceneProject {
+  if (project.messages.every((message) => !message.voiceMs || clips.has(message.id))) return project;
+  return {
+    ...project,
+    messages: project.messages.map((message) =>
+      message.voiceMs && !clips.has(message.id) ? { ...message, voiceMs: null } : message,
+    ),
+  };
 }
 
 /**

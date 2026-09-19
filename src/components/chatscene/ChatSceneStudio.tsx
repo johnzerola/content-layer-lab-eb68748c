@@ -68,6 +68,8 @@ import {
   generateCast,
   playClip,
   previewVoice,
+  projectWithAvailableVoiceClips,
+  restoreCachedCast,
   speakingMessages,
   type VoiceClip,
 } from "@/lib/chatscene/voice-cast";
@@ -176,6 +178,11 @@ export function ChatSceneStudio() {
   const [library, setLibrary] = useState<LibraryAsset[]>([]);
   /** falas geradas, por mensagem */
   const [clips, setClips] = useState<Map<string, VoiceClip>>(new Map());
+  const clipsRef = useRef(clips);
+  useEffect(() => {
+    clipsRef.current = clips;
+  }, [clips]);
+  const [restoringClips, setRestoringClips] = useState(false);
   const [castState, setCastState] = useState<"idle" | "running">("idle");
   const [castProgress, setCastProgress] = useState({ done: 0, total: 0 });
   const [castFailures, setCastFailures] = useState<{ id: string; reason: string }[]>([]);
@@ -191,7 +198,28 @@ export function ChatSceneStudio() {
   const [exportUrl, setExportUrl] = useState<string | null>(null);
   const [exportName, setExportName] = useState("chatscene.mp4");
 
-  const plan = useMemo(() => buildPlan(project), [project]);
+  const effectiveClips = useMemo(() => {
+    const next = new Map<string, VoiceClip>();
+    for (const message of project.messages) {
+      const clip = clips.get(message.id);
+      if (!clip) continue;
+      if (clip.key.startsWith("upload:")) {
+        next.set(message.id, clip);
+        continue;
+      }
+      const voice = effectiveVoice(project, message);
+      const text = speakableText(message.kind, message.text);
+      if (voice && clip.key === voiceKey(text, voice.profile, voice.direction))
+        next.set(message.id, clip);
+    }
+    return next;
+  }, [clips, project]);
+  // A saved voice duration without its audio must not stretch a silent preview.
+  const timedProject = useMemo(
+    () => projectWithAvailableVoiceClips(project, effectiveClips),
+    [project, effectiveClips],
+  );
+  const plan = useMemo(() => buildPlan(timedProject), [timedProject]);
   const isGroup = (project.chatKind ?? "direct") === "group";
 
   // rascunho no próprio navegador: atualizar a página não perde o trabalho
@@ -210,6 +238,67 @@ export function ChatSceneStudio() {
     const id = setTimeout(() => saveLocalDraft(project, recordId), 600);
     return () => clearTimeout(id);
   }, [project, recordId]);
+
+  // The document stores measured durations, while the actual generated audio
+  // lives in IndexedDB. Rehydrate it after a reload so preview and export are
+  // not silently muted. Only voice identity/text changes restart the scan.
+  const voiceCacheSignature = speakingMessages(project)
+    .map(({ message, text }) => {
+      const resolved = effectiveVoice(project, message);
+      return `${message.id}:${resolved ? voiceKey(text, resolved.profile, resolved.direction) : ""}`;
+    })
+    .join("|");
+  const restoreProjectRef = useRef(project);
+  useEffect(() => {
+    restoreProjectRef.current = project;
+  }, [project]);
+  useEffect(() => {
+    const controller = new AbortController();
+    const snapshot = restoreProjectRef.current;
+    if (!speakingMessages(snapshot).length) return () => controller.abort();
+    setRestoringClips(true);
+    void restoreCachedCast(snapshot, controller.signal)
+      .then(({ clips: restoredClips, durations }) => {
+        if (controller.signal.aborted || !restoredClips.size) return;
+        setClips((previous) => {
+          const next = new Map(previous);
+          for (const [id, clip] of restoredClips) {
+            const existing = next.get(id);
+            if (!existing || (!existing.key.startsWith("upload:") && existing.key !== clip.key)) {
+              next.set(id, clip);
+            }
+          }
+          return next;
+        });
+        setProject((current) => {
+          let changed = false;
+          const messages = current.messages.map((message) => {
+            const clip = restoredClips.get(message.id);
+            const resolved = clip ? effectiveVoice(current, message) : null;
+            const text = speakableText(message.kind, message.text);
+            const duration = durations[message.id];
+            if (
+              !clip ||
+              !resolved ||
+              clipsRef.current.get(message.id)?.key.startsWith("upload:") ||
+              clip.key !== voiceKey(text, resolved.profile, resolved.direction) ||
+              !duration ||
+              Math.abs((message.voiceMs ?? 0) - duration) < 30
+            ) return message;
+            changed = true;
+            return { ...message, voiceMs: duration };
+          });
+          return changed ? { ...current, messages } : current;
+        });
+      })
+      .catch(() => {
+        // Cache access is optional; generation remains available when blocked.
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setRestoringClips(false);
+      });
+    return () => controller.abort();
+  }, [voiceCacheSignature]);
 
   useEffect(() => {
     if (frame > plan.totalFrames - 1) setFrame(plan.totalFrames - 1);
@@ -631,23 +720,6 @@ export function ChatSceneStudio() {
     },
     [project, storyFn, voiceProvider],
   );
-  const effectiveClips = useMemo(() => {
-    const next = new Map<string, VoiceClip>();
-    for (const message of project.messages) {
-      const clip = clips.get(message.id);
-      if (!clip) continue;
-      if (clip.key.startsWith("upload:")) {
-        next.set(message.id, clip);
-        continue;
-      }
-      const voice = effectiveVoice(project, message);
-      const text = speakableText(message.kind, message.text);
-      if (voice && clip.key === voiceKey(text, voice.profile, voice.direction))
-        next.set(message.id, clip);
-    }
-    return next;
-  }, [clips, project]);
-
   /** Ouve uma frase curta com a voz, o jeito de falar e o tom escolhidos. */
   const stopPreviewRef = useRef<(() => void) | null>(null);
   const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
@@ -2111,7 +2183,8 @@ export function ChatSceneStudio() {
               <Button
                 size="sm"
                 variant="secondary"
-                disabled={!effectiveClips.size}
+                disabled={!effectiveClips.size || restoringClips}
+                aria-busy={restoringClips}
                 onClick={() => {
                   if (playing) setPlaying(false);
                   else {
@@ -2119,10 +2192,22 @@ export function ChatSceneStudio() {
                     setPlaying(true);
                   }
                 }}
-                title={effectiveClips.size ? "Escutar a cena sem exportar o vídeo" : "Gere as vozes para escutar a cena"}
+                title={
+                  restoringClips
+                    ? "Carregando as vozes salvas"
+                    : effectiveClips.size
+                      ? "Escutar a cena sem exportar o vídeo"
+                      : "Gere as vozes para escutar a cena"
+                }
               >
-                {playing ? <Pause className="size-4" aria-hidden="true" /> : <Volume2 className="size-4" aria-hidden="true" />}
-                {playing ? "Pausar" : "Ouvir cena"}
+                {restoringClips ? (
+                  <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden="true" />
+                ) : playing ? (
+                  <Pause className="size-4" aria-hidden="true" />
+                ) : (
+                  <Volume2 className="size-4" aria-hidden="true" />
+                )}
+                {restoringClips ? "Carregando vozes" : playing ? "Pausar" : "Ouvir cena"}
               </Button>
               <span className="rounded-md border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground">
                 {project.render.fps} FPS
@@ -2156,13 +2241,15 @@ export function ChatSceneStudio() {
           </div>
           {!effectiveClips.size && (
             <p className="mt-3 rounded-lg bg-secondary/50 p-3 text-xs leading-relaxed text-muted-foreground">
-              Prévia visual. Gere as vozes para ouvir a atuação e conferir o ritmo real.
+              {restoringClips
+                ? "Carregando as falas salvas neste navegador."
+                : "Prévia visual. Gere as vozes para ouvir a atuação e conferir o ritmo real."}
             </p>
           )}
           <div className="mt-3 flex gap-2">
             <Button className="flex-1" size="sm" variant="outline" onClick={() => setTab("vozes")}>
               <Mic className="size-3.5" />
-              Escolher vozes
+              Escolher e gerar vozes
             </Button>
             <Button className="flex-1" size="sm" variant="outline" onClick={() => setTab("fundo")}>
               <ImageIcon className="size-3.5" />
