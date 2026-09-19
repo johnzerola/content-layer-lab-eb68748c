@@ -12,7 +12,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/base";
 import { DEFAULT_BRIEF, STORY_TONES, type StoryBrief } from "@/lib/chatscene/story";
-import { STORY_TOPIC_MAX_CHARS, type StoryNarrativeStyle } from "@/lib/chatscene/story-style";
+import {
+  STORY_TOPIC_MAX_CHARS,
+  type StoryNarrativeStyle,
+  type StorySourceTreatment,
+} from "@/lib/chatscene/story-style";
 import type { CreatorFormat } from "@/lib/chatscene/creator-presets";
 import { RedditStoryPanel } from "./RedditStoryPanel";
 import type { RedditStoryDraft } from "@/lib/chatscene/reddit-story";
@@ -144,6 +148,30 @@ export function StoryPanel({
               </ol>
             </details>
           )}
+        </section>
+        <section aria-label="Originalidade da referência" className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label htmlFor="story-source-treatment" className="text-sm font-semibold">
+              O que fazer com uma transcrição?
+            </label>
+            <select
+              id="story-source-treatment"
+              value={brief.sourceTreatment ?? "reinvent"}
+              onChange={(event) =>
+                set({ sourceTreatment: event.target.value as StorySourceTreatment })
+              }
+              disabled={busy}
+              className="min-h-12 max-w-full rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+            >
+              <option value="reinvent">Reinventar tudo · recomendado</option>
+              <option value="preserve-premise">Preservar só a premissa</option>
+            </select>
+          </div>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {brief.sourceTreatment === "preserve-premise"
+              ? "Mantém apenas a ideia central ou os personagens indicados. A sequência, as falas, as pistas e a virada são novas."
+              : "Usa a transcrição apenas para entender o DNA do gancho e do ritmo. Troca conflito, acontecimentos, personagens, pistas, falas e final para criar outra história."}
+          </p>
         </section>
         <div className="overflow-hidden rounded-xl border border-border bg-background/60 focus-within:border-primary">
           <label

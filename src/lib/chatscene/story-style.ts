@@ -4,6 +4,10 @@ export const STORY_NARRATIVE_STYLES = ["animated-chat", "free"] as const;
 export type StoryNarrativeStyle = (typeof STORY_NARRATIVE_STYLES)[number];
 export const DEFAULT_STORY_NARRATIVE_STYLE: StoryNarrativeStyle = "animated-chat";
 
+export const STORY_SOURCE_TREATMENTS = ["reinvent", "preserve-premise"] as const;
+export type StorySourceTreatment = (typeof STORY_SOURCE_TREATMENTS)[number];
+export const DEFAULT_STORY_SOURCE_TREATMENT: StorySourceTreatment = "reinvent";
+
 /** Craft rules calibrated from the user's three reference videos, not their scripts. */
 export const ANIMATED_CHAT_DIRECTION = [
   "DIREÇÃO NARRATIVA: CONVERSA ANIMADA.",

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { buildStoryPrompt, normalizeStoryScript, parseGeneratedStory, STORY_LIMITS, storyBriefSchema } from "../story-generation";
+import {
+  buildStoryPrompt,
+  normalizeStoryScript,
+  parseGeneratedStory,
+  referenceOverlapRatio,
+  STORY_LIMITS,
+  storyBriefSchema,
+  storyUsesReferenceTooClosely,
+} from "../story-generation";
 import type { StoryScript } from "../story";
 import { STORY_TOPIC_MAX_CHARS } from "../story-style";
 
@@ -151,5 +159,22 @@ describe("story generation contract", () => {
     expect(prompt[0]!.content).not.toContain(brief.topic);
     expect(JSON.parse(prompt[1]!.content)).toMatchObject({ tema: brief.topic, direcaoNarrativa: "free" });
     expect(() => storyBriefSchema.parse({ topic: "Uma conversa", narrativeStyle: "unknown" })).toThrow();
+  });
+
+  it("usa reinvenção como padrão para transcrições e explicita a decisão no prompt", () => {
+    const brief = storyBriefSchema.parse({ topic: "A transcrição de uma conversa inteira" });
+    const prompt = buildStoryPrompt(brief);
+
+    expect(brief.sourceTreatment).toBe("reinvent");
+    expect(prompt[0]!.content).toContain("TRANSFORMACAO OBRIGATORIA");
+    expect(JSON.parse(prompt[1]!.content).tratamentoDaReferencia).toBe("reinvent");
+  });
+
+  it("detecta blocos copiados e não bloqueia a adaptação de premissa", () => {
+    const source = story();
+    const sourceText = source.lines.map((line) => line.text).join(" ");
+    expect(referenceOverlapRatio(sourceText, source)).toBe(1);
+    expect(storyUsesReferenceTooClosely({ topic: sourceText, sourceTreatment: "reinvent", tone: "comedia", durationSec: 60, characters: 2 }, source)).toBe(true);
+    expect(storyUsesReferenceTooClosely({ topic: sourceText, sourceTreatment: "preserve-premise", tone: "comedia", durationSec: 60, characters: 2 }, source)).toBe(false);
   });
 });

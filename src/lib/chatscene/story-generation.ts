@@ -2,7 +2,9 @@ import { z } from "zod";
 import type { StoryBrief, StoryScript, StoryTone } from "./story";
 import {
   ANIMATED_CHAT_DIRECTION,
+  DEFAULT_STORY_SOURCE_TREATMENT,
   DEFAULT_STORY_NARRATIVE_STYLE,
+  STORY_SOURCE_TREATMENTS,
   STORY_NARRATIVE_STYLES,
   STORY_TOPIC_MAX_CHARS,
 } from "./story-style";
@@ -25,6 +27,7 @@ export const storyBriefSchema = z.object({
   durationSec: z.number().min(20).max(300).default(60),
   characters: z.number().int().min(2).max(STORY_LIMITS.characters).default(3),
   narrativeStyle: z.enum(STORY_NARRATIVE_STYLES).default(DEFAULT_STORY_NARRATIVE_STYLE),
+  sourceTreatment: z.enum(STORY_SOURCE_TREATMENTS).default(DEFAULT_STORY_SOURCE_TREATMENT),
 });
 
 export const storyNameKey = (value: string) => value.normalize("NFD")
@@ -97,6 +100,40 @@ export function parseGeneratedStory(raw: string, expectedCharacters?: number): S
   return normalizeStoryScript(parsed, expectedCharacters);
 }
 
+function normalizedWords(text: string): string[] {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function shingles(words: string[], size: number): Set<string> {
+  const result = new Set<string>();
+  for (let index = 0; index <= words.length - size; index += 1) {
+    result.add(words.slice(index, index + size).join(" "));
+  }
+  return result;
+}
+
+/** Fraction of generated six-word phrases that were copied from the input. */
+export function referenceOverlapRatio(reference: string, script: StoryScript): number {
+  const source = shingles(normalizedWords(reference), 6);
+  const generated = normalizedWords(script.lines.map((line) => line.text).join(" "));
+  const output = Array.from(shingles(generated, 6));
+  if (source.size === 0 || output.length === 0) return 0;
+  let matches = 0;
+  for (const phrase of output) if (source.has(phrase)) matches += 1;
+  return matches / output.length;
+}
+
+export function storyUsesReferenceTooClosely(brief: StoryBrief, script: StoryScript): boolean {
+  if ((brief.sourceTreatment ?? DEFAULT_STORY_SOURCE_TREATMENT) !== "reinvent") return false;
+  return referenceOverlapRatio(brief.topic, script) >= 0.08;
+}
+
 const TONE_HINT: Record<StoryTone, string> = {
   comedia: "comédia de situação; uma consequência engraçada e plausível, sem piada aleatória",
   drama: "conflito pessoal concreto, escolhas difíceis e consequência emocional",
@@ -107,6 +144,7 @@ const TONE_HINT: Record<StoryTone, string> = {
 
 export function buildStoryPrompt(brief: StoryBrief) {
   const narrativeStyle = brief.narrativeStyle ?? DEFAULT_STORY_NARRATIVE_STYLE;
+  const sourceTreatment = brief.sourceTreatment ?? DEFAULT_STORY_SOURCE_TREATMENT;
   // Local reference ASR: 266–280 words/video-minute. Budget slightly below
   // that range for breathing, time cards and variation between TTS providers.
   const lineCount = Math.max(10, Math.min(80, Math.round(brief.durationSec / 1.5)));
@@ -115,6 +153,9 @@ export function buildStoryPrompt(brief: StoryBrief) {
     {
       role: "system" as const,
       content: [
+        sourceTreatment === "reinvent"
+          ? "TRANSFORMACAO OBRIGATORIA: trate o texto do usuario como material de referencia, nao como roteiro para parafrasear. Extraia em silencio apenas o DNA abstrato (tipo de gancho, relacao, ritmo, humor e funcao da virada). Depois descarte nomes, frases, cenario, objeto central, ordem dos acontecimentos, motivacoes, pistas e desfecho. Crie uma historia autentica com pelo menos quatro mudancas grandes entre esses elementos. Nao reutilize sequencia de mensagens, bordoes ou qualquer trecho de seis palavras consecutivas; nao faca uma troca de sinonimos linha a linha. Se a entrada for uma transcricao, ela e apenas inspiracao estrutural e nao deve ser reconhecivel como a mesma historia."
+          : "ADAPTACAO DE PREMISSA: preserve somente a premissa central ou os personagens que o usuario indicar explicitamente, mas reescreva a cadeia de acontecimentos, as pistas, as falas e a virada. Nunca copie frases, bordoes ou qualquer trecho de seis palavras consecutivas da referencia.",
         "Escreva uma história original de ficção em português do Brasil para um vídeo vertical de conversa estilo WhatsApp.",
         "A história acontece nas mensagens entre personagens. Não escreva um relato de narrador, post de Reddit, rubricas de roteiro ou nomes antes das falas.",
         "Planeje em silêncio o que cada pessoa quer, o que sabe naquele momento e o detalhe que preparará a virada. Não inclua esse planejamento no JSON.",
@@ -146,6 +187,7 @@ export function buildStoryPrompt(brief: StoryBrief) {
         mensagensAproximadas: lineCount,
         palavrasAproximadas: wordCount,
         direcaoNarrativa: narrativeStyle,
+        tratamentoDaReferencia: sourceTreatment,
       }),
     },
   ];
