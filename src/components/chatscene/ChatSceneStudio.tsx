@@ -76,6 +76,11 @@ import {
 } from "@/lib/chatscene/voice-resolution";
 
 import { loadMusic, mixConversationAudio } from "@/lib/chatscene/audio-mix";
+import {
+  applyConversationTimingPreset,
+  CONVERSATION_TIMING_PRESETS,
+} from "@/lib/chatscene/timing-presets";
+import { timeLabel } from "@/lib/chatscene/rhythm";
 import { CAMERA_MODES, DEFAULT_CAMERA } from "@/lib/chatscene/camera";
 import {
   DEFAULT_VOICE,
@@ -1032,6 +1037,39 @@ export function ChatSceneStudio() {
 
               <div className="flex flex-col gap-3 text-xs">
                 <p className="mono-label text-muted-foreground">Ritmo da conversa</p>
+                <div className="rounded-lg border border-border bg-background/35 p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold">Modo de duração</p>
+                      <p className="mt-1 text-muted-foreground">
+                        Escolha o ritmo sem alterar suas falas ou o áudio já gerado.
+                      </p>
+                    </div>
+                    <span className="mono-label text-muted-foreground">
+                      {project.messages.length} falas · {timeLabel(plan.durationMs / 1000)}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2" role="group" aria-label="Modo de duração">
+                    {CONVERSATION_TIMING_PRESETS.map((preset) => {
+                      const active = (project.timing.mode ?? "standard") === preset.id;
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          aria-pressed={active}
+                          title={preset.description}
+                          onClick={() => setProject((prev) => applyConversationTimingPreset(prev, preset.id))}
+                          className={`min-h-12 rounded-md border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:bg-accent"}`}
+                        >
+                          <span className="block text-xs font-semibold">{preset.label}</span>
+                          <span className="mt-0.5 block text-[11px] leading-4 text-muted-foreground">
+                            {preset.description}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
                 <div>
                   <label className="mb-1 flex items-center justify-between text-muted-foreground">
                     Velocidade

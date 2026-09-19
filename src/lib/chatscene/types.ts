@@ -474,7 +474,13 @@ export const CREATOR_LAYOUTS: {
   },
 ];
 
+export type ChatSceneTimingMode = "standard" | "long-2m";
+
 export interface ChatSceneTiming {
+  /** Preset editorial de ritmo. O modo longo garante pelo menos dois minutos. */
+  mode?: ChatSceneTimingMode;
+  /** Duração mínima renderizada, em ms, usada pelo modo longo. */
+  minimumDurationMs?: number;
   /** Narrated Shorts: measured audio starts at bubble arrival; no estimated reading tail. */
   audioDriven?: boolean;
   /** Optional duration for editorial time cards; legacy documents keep 1500+ ms. */
@@ -562,6 +568,7 @@ export interface ChatSceneProject {
 }
 
 export const DEFAULT_TIMING: ChatSceneTiming = {
+  mode: "standard",
   speed: 1,
   gapMs: 450,
   msPerChar: 42,

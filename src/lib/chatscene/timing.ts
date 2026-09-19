@@ -245,5 +245,16 @@ export function computeMessageTimings(project: ChatSceneProject): MessageTiming[
 /** Duração total da cena em ms, já com o respiro final. */
 export function totalDurationMs(project: ChatSceneProject, timings: MessageTiming[]): number {
   const last = timings[timings.length - 1];
-  return (last?.endMs ?? 0) + Math.max(0, project.timing.tailMs);
+  const naturalDuration = (last?.endMs ?? 0) + Math.max(0, project.timing.tailMs);
+  const speed = project.timing.speed > 0 ? project.timing.speed : 1;
+  const requestedMinimum = Number.isFinite(project.timing.minimumDurationMs)
+    ? Math.max(0, project.timing.minimumDurationMs ?? 0)
+    : project.timing.mode === "long-2m"
+      ? 120_000
+      : 0;
+  // `naturalDuration` is expressed before the global speed multiplier. Scale the
+  // floor so the rendered timeline still remains at least the requested length
+  // when a user intentionally changes the speed slider.
+  const minimumBeforeSpeed = requestedMinimum * speed;
+  return Math.max(naturalDuration, minimumBeforeSpeed);
 }

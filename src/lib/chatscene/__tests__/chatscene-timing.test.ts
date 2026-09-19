@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildPlan } from "../clock";
 import { chatRect, entranceTransform, sceneExitAt } from "../draw";
-import { computeMessageTimings, entranceMsOf, humanTypingMs, DEFAULT_TYPING_PROFILE } from "../timing";
+import { computeMessageTimings, entranceMsOf, humanTypingMs, DEFAULT_TYPING_PROFILE, totalDurationMs } from "../timing";
+import { applyConversationTimingPreset } from "../timing-presets";
 import {
   createChatSceneProject,
   createMessage,
@@ -78,6 +79,31 @@ describe("ritmo humano", () => {
     const timing = computeMessageTimings(audio)[1]!;
     expect(timing.readingMs).toBe(2400);
     expect(timing.endMs - timing.appearMs).toBe(2400 + timing.pauseAfterMs);
+  });
+
+  it("oferece o modo longo para 46 falas e garante pelo menos dois minutos", () => {
+    const base = scene(46);
+    const long = applyConversationTimingPreset(base, "long-2m");
+    const timings = computeMessageTimings(long);
+
+    expect(long.timing.mode).toBe("long-2m");
+    expect(long.timing.audioDriven).toBe(true);
+    expect(long.messages).toHaveLength(46);
+    expect(totalDurationMs(long, timings)).toBeGreaterThanOrEqual(120_000);
+    expect(buildPlan(long).durationMs).toBeGreaterThanOrEqual(120_000);
+  });
+
+  it("voltar ao padrão remove a duração mínima sem tocar no conteúdo", () => {
+    const base = scene(3);
+    const long = applyConversationTimingPreset(base, "long-2m");
+    const standard = applyConversationTimingPreset(long, "standard");
+
+    expect(standard.timing.mode).toBe("standard");
+    expect(standard.timing.minimumDurationMs).toBeUndefined();
+    expect(standard.messages.map((message) => message.text)).toEqual(
+      base.messages.map((message) => message.text),
+    );
+    expect(buildPlan(standard).durationMs).toBeLessThan(120_000);
   });
 });
 
