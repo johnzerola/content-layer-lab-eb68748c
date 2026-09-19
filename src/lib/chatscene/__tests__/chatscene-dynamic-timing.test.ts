@@ -46,6 +46,32 @@ describe("ritmo dinamico de referencia", () => {
     expect(schedule[0]!.durationSec).toBe(3);
   });
 
+  it("mantem voz e bolha sincronizadas quando o usuario acelera as falas", () => {
+    const dynamic = applyConversationTimingPreset(referenceScene(2), "dynamic-fast");
+    const project = {
+      ...dynamic,
+      timing: { ...dynamic.timing, speed: 2, voicePlaybackRate: 1.25 },
+      messages: dynamic.messages.map((message) => ({ ...message, voiceMs: 4_000 })),
+    };
+    const plan = buildPlan(project);
+    const clips = new Map(project.messages.map((message) => [message.id, sampleClip(4)]));
+    const schedule = voiceSchedule(project, plan, clips);
+    expect(schedule.map((item) => item.rate)).toEqual([1.25, 1.25]);
+    expect(schedule.map((item) => item.durationSec)).toEqual([3.2, 3.2]);
+    expect(schedule[1]!.startSec).toBeGreaterThanOrEqual(schedule[0]!.startSec + 3.2 - 1 / plan.fps);
+    expect(plan.durationMs).toBeGreaterThanOrEqual(6_400);
+  });
+
+  it("permite comparar ate 2x sem mudar o padrao dos projetos existentes", () => {
+    const dynamic = applyConversationTimingPreset(referenceScene(1), "dynamic-fast");
+    const message = dynamic.messages[0]!;
+    const original = { ...dynamic, messages: [{ ...message, voiceMs: 4_000 }] };
+    const fast = { ...original, timing: { ...original.timing, voicePlaybackRate: 2 } };
+    expect(voiceSchedule(original, buildPlan(original), new Map([[message.id, sampleClip(4)]]))[0]!.rate).toBe(1);
+    expect(voiceSchedule(fast, buildPlan(fast), new Map([[message.id, sampleClip(4)]]))[0]!.durationSec).toBe(2);
+    expect(buildPlan(fast).durationMs).toBeLessThan(buildPlan(original).durationMs);
+  });
+
   it("nao reaplica pitch em um clip transformado no servidor", () => {
     const dynamic = applyConversationTimingPreset(referenceScene(1), "dynamic-fast");
     const message = dynamic.messages[0]!;

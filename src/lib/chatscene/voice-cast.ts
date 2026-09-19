@@ -8,7 +8,8 @@
 import type { ChatSceneProject } from "./types";
 import { effectiveVoice } from "./voice-resolution";
 import { elevenLabsVoiceSettingsInput, type VoiceSynthesisRequest } from "./voice-request";
-import { dialogueGain } from "./voice-level";
+import { connectDialogue, dialogueGain } from "./voice-level";
+import { compactGeneratedSpeech } from "./voice-pauses";
 import {
   pitchRate,
   speakableText,
@@ -91,9 +92,14 @@ function context(): AudioContext {
   return audioCtx;
 }
 
-export async function decodeClip(key: string, blob: Blob): Promise<VoiceClip> {
+export async function decodeClip(key: string, blob: Blob, generated = false): Promise<VoiceClip> {
   const data = await blob.arrayBuffer();
-  const buffer = await context().decodeAudioData(data.slice(0));
+  const audio = context();
+  const decoded = await audio.decodeAudioData(data.slice(0));
+  const buffer = generated
+    ? compactGeneratedSpeech(decoded, (channels, length, sampleRate) =>
+        audio.createBuffer(channels, length, sampleRate))
+    : decoded;
   return { key, blob, durationSec: buffer.duration, buffer };
 }
 
@@ -131,9 +137,7 @@ export function playClip(clip: VoiceClip, profile?: VoiceProfile | null): () => 
   const source = ctx.createBufferSource();
   source.buffer = clip.buffer;
   source.playbackRate.value = profile?.transform ? 1 : pitchRate(profile?.pitch);
-  const gain = ctx.createGain();
-  gain.gain.value = dialogueGain(clip.buffer, profile?.gain ?? 1);
-  source.connect(gain).connect(ctx.destination);
+  connectDialogue(ctx, source, ctx.destination, dialogueGain(clip.buffer, profile?.gain ?? 1));
   source.start();
   return () => {
     try {
@@ -204,7 +208,7 @@ export function createGatewayVoiceProvider(
       if (hit) return hit;
       const stored = await persistedBlob(key);
       if (stored) {
-        const clip = await decodeClip(key, stored);
+        const clip = await decodeClip(key, stored, true);
         cache.set(key, clip);
         return clip;
       }
@@ -246,7 +250,7 @@ export function createGatewayVoiceProvider(
       });
       const bytes = Uint8Array.from(atob(audio), (c) => c.charCodeAt(0));
       const blob = new Blob([bytes], { type: mime || "audio/mpeg" });
-      const clip = await decodeClip(key, blob);
+      const clip = await decodeClip(key, blob, true);
       cache.set(key, clip);
       void persistBlob(key, blob);
       return clip;

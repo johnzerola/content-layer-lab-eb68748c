@@ -63,7 +63,7 @@ export function applyCreatorFormat(
       typing: false,
       humanTyping: false,
       typingMs: 0,
-      gapMs: 80,
+      gapMs: 0,
       senderSwitchMs: 0,
       threadSwitchMs: 180,
       tailMs: 500,

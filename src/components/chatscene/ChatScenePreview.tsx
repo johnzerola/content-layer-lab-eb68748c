@@ -10,6 +10,7 @@ import { duckingCurve, voiceSchedule } from "@/lib/chatscene/audio-mix";
 import { DEFAULT_VOICE_MIX } from "@/lib/chatscene/voice";
 import { renderSoundEffect, sfxSchedule } from "@/lib/chatscene/sfx";
 import type { VoiceClip } from "@/lib/chatscene/voice-cast";
+import { connectDialogue } from "@/lib/chatscene/voice-level";
 
 interface Props {
   project: ChatSceneProject;
@@ -150,9 +151,7 @@ export function ChatScenePreview({
         const source = ctx.createBufferSource();
         source.buffer = item.clip.buffer;
         source.playbackRate.value = item.rate;
-        const gain = ctx.createGain();
-        gain.gain.value = item.gain;
-        source.connect(gain).connect(ctx.destination);
+        connectDialogue(ctx, source, ctx.destination, item.gain);
         if (delay >= 0) source.start(ctx.currentTime + delay);
         else source.start(ctx.currentTime, -delay * item.rate);
         sources.push(source);

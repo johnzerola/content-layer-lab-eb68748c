@@ -14,6 +14,7 @@ import {
   Mic,
   Mic2,
   MessageSquare,
+  Pause,
   Palette,
   Download,
   Image as ImageIcon,
@@ -22,6 +23,7 @@ import {
   Save,
   Undo2,
   Users,
+  Volume2,
   Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -1072,7 +1074,7 @@ export function ChatSceneStudio() {
                 </div>
                 <div>
                   <label className="mb-1 flex items-center justify-between text-muted-foreground">
-                    Velocidade
+                    Ritmo visual
                     <span className="mono-label">{project.timing.speed.toFixed(1)}×</span>
                   </label>
                   <input
@@ -1085,8 +1087,28 @@ export function ChatSceneStudio() {
                       patch({ timing: { ...project.timing, speed: Number(e.target.value) } })
                     }
                     className="h-1.5 w-full accent-primary"
-                    aria-label="Velocidade da conversa"
+                    aria-label="Ritmo visual da conversa"
                   />
+                  <p className="mt-1 text-muted-foreground">
+                    Ajusta intervalos e mensagens sem acelerar as vozes geradas.
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border bg-background/35 p-3">
+                  <Range
+                    label="Velocidade final das falas"
+                    value={project.timing.voicePlaybackRate ?? 1}
+                    min={0.8}
+                    max={2}
+                    step={0.05}
+                    suffix="×"
+                    onChange={(voicePlaybackRate) =>
+                      patch({ timing: { ...project.timing, audioDriven: true, voicePlaybackRate } })
+                    }
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Ajuste sem gerar de novo e ouça na prévia. Acima de 1×, a fala fica mais curta e o tom sobe;
+                    abaixo de 1×, o tom desce. Velocidades muito altas podem soar artificiais.
+                  </p>
                 </div>
                 <Range
                   label="Pausa entre mensagens"
@@ -2085,9 +2107,27 @@ export function ChatSceneStudio() {
                 {project.render.aspect}
               </p>
             </div>
-            <span className="rounded-md border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground">
-              {project.render.fps} FPS
-            </span>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={!effectiveClips.size}
+                onClick={() => {
+                  if (playing) setPlaying(false);
+                  else {
+                    if (frame >= plan.totalFrames - 1) setFrame(0);
+                    setPlaying(true);
+                  }
+                }}
+                title={effectiveClips.size ? "Escutar a cena sem exportar o vídeo" : "Gere as vozes para escutar a cena"}
+              >
+                {playing ? <Pause className="size-4" aria-hidden="true" /> : <Volume2 className="size-4" aria-hidden="true" />}
+                {playing ? "Pausar" : "Ouvir cena"}
+              </Button>
+              <span className="rounded-md border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground">
+                {project.render.fps} FPS
+              </span>
+            </div>
           </div>
           <ChatScenePreview
             project={project}

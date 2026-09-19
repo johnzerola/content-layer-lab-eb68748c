@@ -41,7 +41,7 @@ export function readMs(message: ChatMessage, project: ChatSceneProject): number 
 /** Constrói a tabela de tempo do projeto inteiro. */
 export function buildPlan(project: ChatSceneProject): ConversationPlan {
   const fps = Math.max(1, Math.round(project.render.fps));
-  const speed = project.timing.speed > 0 ? project.timing.speed : 1;
+  const speed = project.timing.audioDriven ? 1 : project.timing.speed > 0 ? project.timing.speed : 1;
   const toFrame = (ms: number) => Math.round((ms / speed / 1000) * fps);
 
   const timings = computeMessageTimings(project);
@@ -83,7 +83,7 @@ export function typingAt(
       // hesitação: o "digitando…" some por um instante e volta
       const gapMs = entry.timing.typingGapMs;
       if (gapMs > 0) {
-        const speed = project.timing.speed > 0 ? project.timing.speed : 1;
+        const speed = project.timing.audioDriven ? 1 : project.timing.speed > 0 ? project.timing.speed : 1;
         const toFrames = (ms: number) => Math.round((ms / speed / 1000) * plan.fps);
         const gapStart = entry.typingFrame + toFrames(entry.timing.typingGapStartMs);
         const gapEnd = gapStart + toFrames(gapMs);

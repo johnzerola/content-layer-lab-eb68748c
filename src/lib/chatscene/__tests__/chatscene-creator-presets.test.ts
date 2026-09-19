@@ -56,7 +56,7 @@ describe("creator format selection", () => {
 
   it("presets only new casting with one fast server-side transform", () => {
     const project = createCreatorExample("whatsapp");
-    expect(project.timing).toMatchObject({ audioDriven: true, speed: 1, gapMs: 80 });
+    expect(project.timing).toMatchObject({ audioDriven: true, speed: 1, gapMs: 0 });
     expect(project.sound).toMatchObject({ mode: "transitions", volume: 0.2 });
     for (const voice of project.voiceProfiles ?? []) {
       expect(voice).toMatchObject({ speed: 1, pitch: 0, transform: { presetId: "dialogue_fast", config: { speedMultiplier: 1.3 } } });

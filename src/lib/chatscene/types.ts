@@ -487,6 +487,8 @@ export interface ChatSceneTiming {
   cardReadMs?: number;
   /** multiplicador global de velocidade: 0.5 = metade da velocidade */
   speed: number;
+  /** Optional playback speed for already generated dialogue; deliberately changes pitch. */
+  voicePlaybackRate?: number;
   /** pausa base entre mensagens (ms) */
   gapMs: number;
   /** tempo de leitura por caractere (ms) */

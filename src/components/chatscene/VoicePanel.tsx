@@ -635,7 +635,7 @@ export function VoicePanel(props: VoicePanelProps) {
                       </summary>
                       <div className="mt-2 space-y-2 border-t border-border pt-2">
                         <VoiceRange
-                          label="Velocidade"
+                          label="Velocidade na geração"
                           value={voice.speed}
                           min={0.7}
                           max={voice.provider === "elevenlabs" ? 1.2 : 1.3}

@@ -8,6 +8,7 @@
  */
 import { participantOf, threadIdOf, type ChatMessage, type ChatParticipant, type ChatSceneProject } from "./types";
 import { personalityOf, stableChance } from "./personality";
+import { dialoguePlaybackRate } from "./voice-level";
 
 /** Jeito de digitar de uma pessoa (ritmo, pausas e variação). */
 export interface HumanTypingProfile {
@@ -181,6 +182,9 @@ export function entranceMsOf(project: ChatSceneProject): number {
 /** Tabela completa de tempos, mensagem a mensagem. */
 export function computeMessageTimings(project: ChatSceneProject): MessageTiming[] {
   const t = project.timing;
+  // With measured voice, only visual pauses/read time use the global rhythm.
+  const visualSpeed = t.audioDriven ? Math.max(0.5, Math.min(2, t.speed || 1)) : 1;
+  const voiceRate = t.audioDriven ? dialoguePlaybackRate(t.voicePlaybackRate) : 1;
   const out: MessageTiming[] = [];
   let cursor = 0;
   let previousAuthor = "";
@@ -192,19 +196,19 @@ export function computeMessageTimings(project: ChatSceneProject): MessageTiming[
     // corte para outra conversa: um respiro maior, como quem sai de um chat e abre outro
     const threadSwitched = previousThread !== "" && previousThread !== thread;
     const switched = !threadSwitched && previousAuthor && previousAuthor !== author.id;
-    const leadIn =
+    const leadIn = (
       Math.max(0, message.delayMs ?? 0) +
       Math.max(0, message.voiceDirection?.pauseBeforeMs ?? 0) +
       (threadSwitched ? Math.max(0, t.threadSwitchMs ?? 820) : 0) +
-      (switched ? Math.max(0, t.senderSwitchMs ?? 180) : 0);
-    const typing = threadSwitched ? 0 : typingMsOf(message, project);
-    const entrance = entranceMsOf(project);
-    const reading = readingMs(message, project);
-    const voice = Number.isFinite(message.voiceMs) ? Math.max(0, message.voiceMs ?? 0) : 0;
+      (switched ? Math.max(0, t.senderSwitchMs ?? 180) : 0)) / visualSpeed;
+    const typing = (threadSwitched ? 0 : typingMsOf(message, project)) / visualSpeed;
+    const entrance = entranceMsOf(project) / visualSpeed;
+    const reading = readingMs(message, project) / visualSpeed;
+    const voice = Number.isFinite(message.voiceMs) ? Math.max(0, message.voiceMs ?? 0) / voiceRate : 0;
     const pauseAfter = Math.max(
       0,
       (message.pauseAfterMs ?? t.gapMs) + Math.max(0, message.voiceDirection?.pauseAfterMs ?? 0),
-    );
+    ) / visualSpeed;
 
     const initial = message.initial === true;
     const typingStartMs = initial ? 0 : cursor + leadIn;
@@ -245,7 +249,10 @@ export function computeMessageTimings(project: ChatSceneProject): MessageTiming[
 /** Duração total da cena em ms, já com o respiro final. */
 export function totalDurationMs(project: ChatSceneProject, timings: MessageTiming[]): number {
   const last = timings[timings.length - 1];
-  const naturalDuration = (last?.endMs ?? 0) + Math.max(0, project.timing.tailMs);
+  const visualSpeed = project.timing.audioDriven
+    ? Math.max(0.5, Math.min(2, project.timing.speed || 1))
+    : 1;
+  const naturalDuration = (last?.endMs ?? 0) + Math.max(0, project.timing.tailMs) / visualSpeed;
   const speed = project.timing.speed > 0 ? project.timing.speed : 1;
   const requestedMinimum = Number.isFinite(project.timing.minimumDurationMs)
     ? Math.max(0, project.timing.minimumDurationMs ?? 0)
@@ -255,6 +262,6 @@ export function totalDurationMs(project: ChatSceneProject, timings: MessageTimin
   // `naturalDuration` is expressed before the global speed multiplier. Scale the
   // floor so the rendered timeline still remains at least the requested length
   // when a user intentionally changes the speed slider.
-  const minimumBeforeSpeed = requestedMinimum * speed;
+  const minimumBeforeSpeed = requestedMinimum * (project.timing.audioDriven ? 1 : speed);
   return Math.max(naturalDuration, minimumBeforeSpeed);
 }

@@ -1,4 +1,10 @@
 /** Consistent dialogue loudness for individual previews and the final mix. */
+export function dialoguePlaybackRate(value: number | undefined): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0.8, Math.min(2, value))
+    : 1;
+}
+
 export function dialogueGain(buffer: AudioBuffer, requested = 1): number {
   const base = Math.max(0.2, Math.min(1.8, requested));
   if (!Number.isFinite(base)) return 1;
@@ -35,4 +41,22 @@ export function dialogueGain(buffer: AudioBuffer, requested = 1): number {
     // A legacy/test clip may carry no decoded PCM data.
     return base;
   }
+}
+
+/** The same gentle per-voice dynamics in sample playback, scene preview and export. */
+export function connectDialogue(
+  context: BaseAudioContext,
+  source: AudioBufferSourceNode,
+  destination: AudioNode,
+  gainValue: number,
+): void {
+  const gain = context.createGain();
+  gain.gain.value = gainValue;
+  const compressor = context.createDynamicsCompressor();
+  compressor.threshold.value = -20;
+  compressor.knee.value = 12;
+  compressor.ratio.value = 3;
+  compressor.attack.value = 0.003;
+  compressor.release.value = 0.12;
+  source.connect(gain).connect(compressor).connect(destination);
 }

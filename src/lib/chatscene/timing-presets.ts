@@ -46,10 +46,10 @@ export function applyConversationTimingPreset(
         typing: false,
         humanTyping: false,
         typingMs: 0,
-        gapMs: 80,
+        gapMs: 0,
         senderSwitchMs: 0,
         threadSwitchMs: 220,
-        tailMs: 500,
+        tailMs: 250,
       },
     };
   }

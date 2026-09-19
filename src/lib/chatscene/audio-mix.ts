@@ -11,7 +11,7 @@ import { pitchRate, type VoiceMixSettings } from "./voice";
 import { renderSoundEffect, sfxSchedule } from "./sfx";
 import type { ChatSceneProject } from "./types";
 import { effectiveVoice } from "./voice-resolution";
-import { dialogueGain } from "./voice-level";
+import { connectDialogue, dialogueGain, dialoguePlaybackRate } from "./voice-level";
 
 export const MIX_SAMPLE_RATE = 48000;
 
@@ -49,7 +49,11 @@ export function voiceSchedule(
     const voice = effectiveVoice(project, message);
     // A server-transformed clip already includes its selected pitch and tempo.
     // Never varispeed a clip to fit an editorial window: it changes the timbre.
-    const rate = voice?.profile.transform ? 1 : pitchRate(voice?.profile.pitch);
+    const baseRate = voice?.profile.transform ? 1 : pitchRate(voice?.profile.pitch);
+    const manualRate = project.timing.audioDriven
+      ? dialoguePlaybackRate(project.timing.voicePlaybackRate)
+      : 1;
+    const rate = baseRate * manualRate;
     out.push({
       id: message.id,
       startSec: entry.appearFrame / plan.fps,
@@ -110,9 +114,7 @@ export async function mixConversationAudio(input: MixInput): Promise<AudioBuffer
     const source = ctx.createBufferSource();
     source.buffer = item.clip.buffer;
     source.playbackRate.value = item.rate;
-    const gain = ctx.createGain();
-    gain.gain.value = item.gain;
-    source.connect(gain).connect(master);
+    connectDialogue(ctx, source, master, item.gain);
     source.start(Math.min(item.startSec, Math.max(0, seconds - 0.05)));
   }
 
