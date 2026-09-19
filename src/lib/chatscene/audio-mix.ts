@@ -13,6 +13,7 @@ import type { ChatSceneProject } from "./types";
 import { effectiveVoice } from "./voice-resolution";
 
 export const MIX_SAMPLE_RATE = 48000;
+const MAX_DYNAMIC_VOICE_RATE = 2.2;
 
 export interface MixInput {
   project: ChatSceneProject;
@@ -46,7 +47,12 @@ export function voiceSchedule(
     const entry = plan.byId[message.id];
     if (!clip || !entry) continue;
     const voice = effectiveVoice(project, message);
-    const rate = pitchRate(voice?.profile.pitch);
+    const pitch = pitchRate(voice?.profile.pitch);
+    const targetSec = entry.timing.readingMs / 1000;
+    const fitRate = project.timing.fitVoiceToTiming && targetSec > 0
+      ? Math.max(1, Math.min(MAX_DYNAMIC_VOICE_RATE, clip.durationSec / targetSec))
+      : 1;
+    const rate = pitch * fitRate;
     out.push({
       id: message.id,
       startSec: entry.appearFrame / plan.fps,

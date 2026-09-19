@@ -474,7 +474,7 @@ export const CREATOR_LAYOUTS: {
   },
 ];
 
-export type ChatSceneTimingMode = "standard" | "long-2m";
+export type ChatSceneTimingMode = "standard" | "dynamic-fast" | "long-2m";
 
 export interface ChatSceneTiming {
   /** Preset editorial de ritmo. O modo longo garante pelo menos dois minutos. */
@@ -483,6 +483,8 @@ export interface ChatSceneTiming {
   minimumDurationMs?: number;
   /** Narrated Shorts: measured audio starts at bubble arrival; no estimated reading tail. */
   audioDriven?: boolean;
+  /** Fit generated voice clips into the text window instead of extending it. */
+  fitVoiceToTiming?: boolean;
   /** Optional duration for editorial time cards; legacy documents keep 1500+ ms. */
   cardReadMs?: number;
   /** multiplicador global de velocidade: 0.5 = metade da velocidade */
@@ -491,6 +493,8 @@ export interface ChatSceneTiming {
   gapMs: number;
   /** tempo de leitura por caractere (ms) */
   msPerChar: number;
+  /** Editorial reading pace in milliseconds per word. */
+  msPerWord?: number;
   /** leitura mínima e máxima por mensagem (ms) */
   minReadMs: number;
   maxReadMs: number;
@@ -572,6 +576,7 @@ export const DEFAULT_TIMING: ChatSceneTiming = {
   speed: 1,
   gapMs: 450,
   msPerChar: 42,
+  msPerWord: 220,
   minReadMs: 900,
   maxReadMs: 4200,
   typing: true,

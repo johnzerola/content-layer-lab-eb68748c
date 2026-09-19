@@ -132,7 +132,7 @@ export function typingHesitation(
 export function readingMs(message: ChatMessage, project: ChatSceneProject): number {
   const t = project.timing;
   const words = message.text.trim() ? message.text.trim().split(/\s+/).length : 0;
-  const base = Math.max(message.text.length * t.msPerChar, words * 220);
+  const base = Math.max(message.text.length * t.msPerChar, words * (t.msPerWord ?? 220));
   // cartão de cena (“Momentos antes”): fica mais tempo na tela, é um corte
   if (message.kind === "card") return t.cardReadMs != null && Number.isFinite(t.cardReadMs)
     ? Math.round(clamp(t.cardReadMs, 600, 6000))
@@ -212,9 +212,10 @@ export function computeMessageTimings(project: ChatSceneProject): MessageTiming[
     const hesitation = initial ? null : typingHesitation(message, author, typing);
     // a leitura só termina depois da fala, quando houver áudio
     const audioDriven = t.audioDriven === true && voice > 0;
-    const hold = initial ? 0 : audioDriven ? voice : Math.max(reading, voice);
+    const fitVoice = t.fitVoiceToTiming === true && voice > 0;
+    const hold = initial ? 0 : fitVoice ? reading : audioDriven ? voice : Math.max(reading, voice);
     // Audio is scheduled at appearFrame, concurrently with entrance (not after it).
-    const contentMs = audioDriven ? Math.max(entrance, hold) : entrance + hold;
+    const contentMs = audioDriven && !fitVoice ? Math.max(entrance, hold) : entrance + hold;
     const endMs = initial ? cursor : appearMs + contentMs + pauseAfter;
 
     out.push({
