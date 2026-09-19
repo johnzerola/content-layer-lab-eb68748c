@@ -131,7 +131,9 @@ export function playClip(clip: VoiceClip, profile?: VoiceProfile | null): () => 
   source.buffer = clip.buffer;
   source.playbackRate.value = profile?.transform ? 1 : pitchRate(profile?.pitch);
   const gain = ctx.createGain();
-  gain.gain.value = Math.max(0.2, Math.min(1.5, profile?.gain ?? 1));
+  // Keep previews at a usable dialogue level; the final mix applies RMS
+  // normalization as well, so a quiet profile does not disappear on playback.
+  gain.gain.value = Math.max(0.55, Math.min(1.8, profile?.gain ?? 1));
   source.connect(gain).connect(ctx.destination);
   source.start();
   return () => {
