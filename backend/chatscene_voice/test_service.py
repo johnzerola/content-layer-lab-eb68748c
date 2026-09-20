@@ -45,6 +45,21 @@ def metrics(audio):
 
 
 class VoiceServiceTests(unittest.TestCase):
+    def test_reference_metadata_is_bounded_and_uses_safe_defaults(self):
+        metadata = service.reference_metadata({
+            "name": "  Narrador grave ",
+            "category": "terror",
+            "gender": "masculina",
+            "style": "jornalística",
+        }, "12345678", 5.2)
+        self.assertEqual(metadata["name"], "Narrador grave")
+        self.assertEqual(metadata["category"], "terror")
+        self.assertEqual(metadata["gender"], "masculina")
+        self.assertEqual(metadata["durationSec"], 5.2)
+        fallback = service.reference_metadata({}, "abcdef12", 3.1)
+        self.assertEqual(fallback["name"], "Voz abcdef12")
+        self.assertEqual(fallback["gender"], "neutra")
+
     def test_kokoro_reports_only_smoke_approved_installed_voices(self):
         with tempfile.TemporaryDirectory() as root:
             root = Path(root)

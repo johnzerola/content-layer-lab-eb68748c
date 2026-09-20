@@ -21,6 +21,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import parse_qs, urlparse
 import uuid
 import wave
 
@@ -247,6 +248,22 @@ def account_directory(user_id):
 def reference_path(user_id, reference_id):
     uuid.UUID(reference_id)
     return account_directory(user_id) / f"{reference_id}.wav"
+
+
+def reference_metadata(raw, reference_id, duration):
+    raw = raw if isinstance(raw, dict) else {}
+    allowed_gender = {"feminina", "masculina", "neutra"}
+    name = str(raw.get("name", "")).strip()[:100] or f"Voz {reference_id[:8]}"
+    category = str(raw.get("category", "conversacional")).strip()[:40] or "conversacional"
+    gender = str(raw.get("gender", "neutra")).strip()
+    style = str(raw.get("style", "natural")).strip()[:40] or "natural"
+    return {
+        "name": name,
+        "category": category,
+        "gender": gender if gender in allowed_gender else "neutra",
+        "style": style,
+        "durationSec": duration,
+    }
 
 
 def decode_reference(audio):
@@ -611,7 +628,35 @@ class Handler(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(length))
 
     def do_GET(self):
-        if self.path != "/v1/voice/health" or not self.authorized():
+        parsed = urlparse(self.path)
+        if parsed.path == "/v1/voice/references" and self.authorized():
+            user_id = parse_qs(parsed.query).get("userId", [""])[0]
+            if not user_id:
+                self.respond(400, {"detail": "Conta de voz inválida."})
+                return
+            directory = account_directory(user_id)
+            references = []
+            for metadata_path in sorted(directory.glob("*.json")):
+                try:
+                    reference_id = metadata_path.stem
+                    uuid.UUID(reference_id)
+                    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                    wav_path = directory / f"{reference_id}.wav"
+                    if not wav_path.is_file():
+                        continue
+                    references.append({
+                        "id": reference_id,
+                        "name": metadata.get("name", f"Voz {reference_id[:8]}"),
+                        "durationSec": float(metadata.get("durationSec", 0)),
+                        "category": metadata.get("category", "conversacional"),
+                        "gender": metadata.get("gender", "neutra"),
+                        "style": metadata.get("style", "natural"),
+                    })
+                except (OSError, ValueError, TypeError, KeyError):
+                    continue
+            self.respond(200, {"references": references})
+            return
+        if parsed.path != "/v1/voice/health" or not self.authorized():
             self.respond(404, {"detail": "not found"})
             return
         relay = relay_health()
@@ -647,6 +692,7 @@ class Handler(BaseHTTPRequestHandler):
                 audio = base64.b64decode(body.get("audio", ""), validate=True)
                 wav, duration = decode_reference(audio)
                 reference_id = str(uuid.uuid4())
+                metadata_value = reference_metadata(body.get("metadata"), reference_id, duration)
                 directory = account_directory(user_id)
                 path = directory / f"{reference_id}.wav"
                 path.write_bytes(wav)
@@ -658,14 +704,14 @@ class Handler(BaseHTTPRequestHandler):
                             "authorized": True,
                             "authorizationVersion": "adult-own-or-written-1",
                             "createdAt": int(time.time()),
-                            "durationSec": duration,
+                            **metadata_value,
                         }
                     ),
                     encoding="utf-8",
                 )
                 os.chmod(metadata, 0o600)
                 request_warm()
-                self.respond(201, {"id": reference_id, "durationSec": duration})
+                self.respond(201, {"id": reference_id, **metadata_value})
                 return
             if self.path == "/v1/voice/generic":
                 text = body.get("text")

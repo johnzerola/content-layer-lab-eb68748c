@@ -12,7 +12,12 @@ describe.runIf(process.env["CHATSCENE_TEST_CLONE"] === "1")("real local referenc
     expect(cloneEngineStatus().installed).toBe(true);
     const owner = `voice-test-${crypto.randomUUID()}`;
     const wav = await synthesizePiperWav("Olá, tudo bem? Hoje vamos contar uma história divertida. Eu sou um personagem sintético e esta é uma amostra de teste.");
-    const reference = await saveVoiceReference(owner, wav.toString("base64"));
+    const reference = await saveVoiceReference(owner, wav.toString("base64"), {
+      name: "Teste autorizado",
+      category: "conversacional",
+      gender: "neutra",
+      style: "natural",
+    });
     try {
       expect(reference.durationSec).toBeGreaterThanOrEqual(3);
       expect(referencePath(owner, reference.id)).not.toBe(referencePath("another-account", reference.id));

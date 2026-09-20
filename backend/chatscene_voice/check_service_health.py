@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 import urllib.request
 import wave
+import uuid
 
 
 def main() -> None:
@@ -34,6 +35,13 @@ def main() -> None:
         "installed", "modelVariant", "genericInstalled", "piperVoices", "kokoroVoices",
         "catalogVoices", "device", "modelLoaded", "warming"
     )}))
+    if "--list-empty" in sys.argv[3:]:
+        list_request = urllib.request.Request(
+            url.replace("/health", f"/references?userId={uuid.uuid4()}"),
+            headers={"Authorization": f"Bearer {secret}"},
+        )
+        with urllib.request.urlopen(list_request, timeout=10) as response:
+            print(json.dumps(json.load(response)))
     if "--smoke-kokoro" in sys.argv[3:]:
         for voice in body.get("kokoroVoices", []):
             synth_request = urllib.request.Request(

@@ -21,7 +21,14 @@ export interface MessageVoiceDirection {
 }
 
 export interface VoiceProfile {
-  reference?: { id: string; name: string; durationSec: number };
+  reference?: {
+    id: string;
+    name: string;
+    durationSec: number;
+    category?: string;
+    gender?: VoiceGender;
+    style?: string;
+  };
   id?: string;
   name?: string;
   presetId: string;

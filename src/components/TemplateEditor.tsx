@@ -805,7 +805,7 @@ export function TemplateEditor({
                     .map((k) => (
                       <li key={k.id} className="flex items-center gap-2 text-xs">
                         <button className="flex-1 text-left hover:text-primary" onClick={() => setTime(k.t)}>
-                          {k.t.toFixed(1)}s — {Math.round(k.w)}×{Math.round(k.h)}
+                          {k.t.toFixed(1)}s — {Math.round(k.w ?? 0)}×{Math.round(k.h ?? 0)}
                         </button>
                         <button
                           aria-label={`Remover keyframe em ${k.t.toFixed(1)} segundos`}

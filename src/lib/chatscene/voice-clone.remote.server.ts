@@ -92,11 +92,28 @@ export async function warmRemoteCloneEngine() {
   );
 }
 
-export async function saveRemoteVoiceReference(userId: string, audioBase64: string) {
-  return await remoteVoiceRequest<{ id: string; durationSec: number }>("/references", {
+export interface RemoteVoiceReference {
+  id: string;
+  name: string;
+  durationSec: number;
+  category?: string;
+  gender?: "feminina" | "masculina" | "neutra";
+  style?: string;
+}
+
+export async function saveRemoteVoiceReference(userId: string, audioBase64: string, metadata: Omit<RemoteVoiceReference, "id" | "durationSec">) {
+  return await remoteVoiceRequest<RemoteVoiceReference>("/references", {
     method: "POST",
-    body: JSON.stringify({ userId, audio: audioBase64 }),
+    body: JSON.stringify({ userId, audio: audioBase64, metadata }),
   });
+}
+
+export async function listRemoteVoiceReferences(userId: string) {
+  return await remoteVoiceRequest<{ references: RemoteVoiceReference[] }>(
+    `/references?userId=${encodeURIComponent(userId)}`,
+    {},
+    10_000,
+  );
 }
 
 export async function deleteRemoteVoiceReference(userId: string, id: string) {

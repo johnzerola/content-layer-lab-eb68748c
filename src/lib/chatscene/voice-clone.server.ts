@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { createInterface } from "node:readline";
 import ffmpegStaticPath from "ffmpeg-static";
@@ -159,11 +159,15 @@ export function referencePath(userId: string, id: string) {
   return join(referenceDirectory(userId), `${id}.wav`);
 }
 
-export async function saveVoiceReference(userId: string, audioBase64: string) {
+export async function saveVoiceReference(
+  userId: string,
+  audioBase64: string,
+  metadata: { name: string; category: string; gender: "feminina" | "masculina" | "neutra"; style: string },
+) {
   if (remoteVoiceServiceConfig()) {
     return await remoteVoiceRequest<{ id: string; durationSec: number }>("/references", {
       method: "POST",
-      body: JSON.stringify({ userId, audio: audioBase64 }),
+      body: JSON.stringify({ userId, audio: audioBase64, metadata }),
     });
   }
   if (!cloneEngineStatus().installed)
@@ -259,6 +263,7 @@ export async function saveVoiceReference(userId: string, audioBase64: string) {
         authorizationVersion: "adult-own-or-written-1",
         createdAt: new Date().toISOString(),
         durationSec,
+        ...metadata,
       }),
       { flag: "wx", mode: 0o600 },
     );
@@ -266,7 +271,32 @@ export async function saveVoiceReference(userId: string, audioBase64: string) {
     await rm(referencePath(userId, id), { force: true });
     throw error;
   }
-  return { id, durationSec };
+  return { id, durationSec, ...metadata };
+}
+
+export async function listVoiceReferences(userId: string) {
+  if (remoteVoiceServiceConfig()) {
+    return await remoteVoiceRequest<{ references: Array<Record<string, unknown>> }>(
+      `/references?userId=${encodeURIComponent(userId)}`,
+      {},
+      10_000,
+    );
+  }
+  const directory = referenceDirectory(userId);
+  const entries = await readdir(directory, { withFileTypes: true }).catch(() => []);
+  const references = [];
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+    try {
+      const id = entry.name.slice(0, -5);
+      if (!/^[0-9a-f-]{36}$/.test(id) || !(await stat(referencePath(userId, id))).isFile()) continue;
+      const metadata = JSON.parse(await readFile(join(directory, entry.name), "utf8"));
+      references.push({ id, ...metadata });
+    } catch {
+      // Ignore incomplete private entries.
+    }
+  }
+  return { references };
 }
 export async function deleteVoiceReference(userId: string, id: string) {
   if (remoteVoiceServiceConfig()) {

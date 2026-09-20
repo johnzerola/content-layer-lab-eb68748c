@@ -14,6 +14,7 @@ import { z } from "zod";
 
 import {
   deleteRemoteVoiceReference,
+  listRemoteVoiceReferences,
   remoteCloneEngineStatus,
   remoteVoiceServiceConfigured,
   remoteVoiceTransformSupported,
@@ -77,15 +78,29 @@ export const uploadVoiceReference = createServerFn({ method: "POST" })
           .min(1)
           .max(16 * 1024 * 1024),
         authorized: z.literal(true),
+        metadata: z.object({
+          name: z.string().trim().min(1).max(100),
+          category: z.string().trim().min(1).max(40),
+          gender: z.enum(["feminina", "masculina", "neutra"]),
+          style: z.string().trim().min(1).max(40),
+        }),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     if (remoteVoiceServiceConfigured()) {
-      return saveRemoteVoiceReference(context.userId, data.audio);
+      return saveRemoteVoiceReference(context.userId, data.audio, data.metadata);
     }
     const { saveVoiceReference } = await import("./voice-clone.server");
-    return saveVoiceReference(context.userId, data.audio);
+    return saveVoiceReference(context.userId, data.audio, data.metadata);
+  });
+
+export const listVoiceReferences = createServerFn({ method: "GET" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    if (remoteVoiceServiceConfigured()) return listRemoteVoiceReferences(context.userId);
+    const { listVoiceReferences: listLocalVoiceReferences } = await import("./voice-clone.server");
+    return { references: await listLocalVoiceReferences(context.userId) };
   });
 
 export const prepareVoiceEngine = createServerFn({ method: "POST" })
