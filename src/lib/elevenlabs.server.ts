@@ -10,6 +10,7 @@ export interface ElevenLabsVoice {
   category: string;
   description: string;
   labels: Record<string, string>;
+  previewUrl?: string;
 }
 
 export class ElevenLabsError extends Error {
@@ -111,6 +112,16 @@ function asLabels(value: unknown): Record<string, string> {
   );
 }
 
+function safePreviewUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function fetchElevenLabsVoices(
   apiKey: string,
   request: typeof fetch = fetch,
@@ -144,12 +155,14 @@ export async function fetchElevenLabsVoices(
         if (!item || typeof item !== "object") continue;
         const row = item as Record<string, unknown>;
         if (typeof row["voice_id"] !== "string" || typeof row["name"] !== "string") continue;
+        const previewUrl = safePreviewUrl(row["preview_url"]);
         voices.set(row["voice_id"], {
           id: row["voice_id"],
           name: row["name"],
           category: typeof row["category"] === "string" ? row["category"] : "voice",
           description: typeof row["description"] === "string" ? row["description"] : "",
           labels: asLabels(row["labels"]),
+          ...(previewUrl ? { previewUrl } : {}),
         });
       }
       if (payload.has_more !== true) return [...voices.values()];

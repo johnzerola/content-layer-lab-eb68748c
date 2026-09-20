@@ -11,6 +11,9 @@ export interface RemoteVoiceEngineStatus {
   installed: boolean;
   genericInstalled?: boolean;
   piperVoices?: string[];
+  kokoroVoices?: string[];
+  catalogVoices?: string[];
+  catalogLicenseApproved?: boolean;
   pitchTransform?: boolean;
   device: string;
   modelLoaded: boolean;
@@ -23,12 +26,15 @@ interface RemoteVoiceServiceConfig {
 }
 
 function remoteVoiceServiceConfig(): RemoteVoiceServiceConfig | null {
-  const configuredUrl =
-    process.env["CHATSCENE_VOICE_SERVICE_URL"] ??
-    process.env["CLEANER_WORKER_PUBLIC_URL"] ??
-    process.env["CLEANER_WORKER_URL"];
-  const secret =
-    process.env["CHATSCENE_VOICE_SERVICE_SECRET"] ?? process.env["CLEANER_WORKER_SECRET"];
+  const configuredUrl = [
+    process.env["CHATSCENE_VOICE_SERVICE_URL"],
+    process.env["CLEANER_WORKER_PUBLIC_URL"],
+    process.env["CLEANER_WORKER_URL"],
+  ].map((value) => value?.trim()).find(Boolean);
+  const secret = [
+    process.env["CHATSCENE_VOICE_SERVICE_SECRET"],
+    process.env["CLEANER_WORKER_SECRET"],
+  ].map((value) => value?.trim()).find(Boolean);
   if (!configuredUrl || !secret || secret.length < 32) return null;
   const baseUrl = configuredUrl.replace(/\/+$/, "");
   if (!/^https:\/\//i.test(baseUrl) && process.env["NODE_ENV"] === "production") return null;
@@ -48,6 +54,7 @@ async function remoteVoiceRequest<T>(
   if (!config) throw new Error("O serviço seguro de clonagem não está configurado.");
   const response = await fetch(`${config.baseUrl}${path}`, {
     ...init,
+    cache: "no-store",
     headers: {
       Authorization: `Bearer ${config.secret}`,
       ...(init.body ? { "Content-Type": "application/json" } : {}),
@@ -119,6 +126,15 @@ export async function synthesizeRemoteGenericVoice(text: string, speed = 1, voic
       body: JSON.stringify({ text, speed, voice }),
     },
     90_000,
+  );
+  return result.audio;
+}
+
+export async function synthesizeRemoteKokoroVoice(text: string, voice: string, speed = 1) {
+  const result = await remoteVoiceRequest<{ audio: string; device: string }>(
+    "/kokoro/synthesize",
+    { method: "POST", body: JSON.stringify({ text, voice, speed }) },
+    180_000,
   );
   return result.audio;
 }

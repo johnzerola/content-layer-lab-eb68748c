@@ -1,0 +1,8 @@
+{
+  "pythonPath": "/opt/chatscene-voice/.venv/bin/python",
+  "modelPath": "/opt/chatscene-voice/models-ptbr-v3",
+  "modelVariant": "ptbr-v3",
+  "storagePath": "/opt/chatscene-voice/references",
+  "device": "cpu",
+  "ready": true
+}

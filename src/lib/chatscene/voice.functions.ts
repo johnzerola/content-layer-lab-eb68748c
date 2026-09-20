@@ -19,6 +19,7 @@ import {
   remoteVoiceTransformSupported,
   saveRemoteVoiceReference,
   synthesizeRemoteGenericVoice,
+  synthesizeRemoteKokoroVoice,
   synthesizeRemoteVoice,
   transformRemoteVoice,
   warmRemoteCloneEngine,
@@ -32,6 +33,9 @@ export const getVoiceEngineStatus = createServerFn({ method: "GET" })
       clone: remote,
       piper: Boolean(remote.genericInstalled),
       piperVoices: remote.piperVoices ?? (remote.genericInstalled ? ["pt_BR-faber-medium"] : []),
+      kokoroVoices: remote.kokoroVoices ?? [],
+      catalogVoices: remote.catalogVoices ?? [],
+      catalogLicenseApproved: remote.catalogLicenseApproved === true,
       pitchTransform: remote.pitchTransform === true,
     };
     // Do not import the Node-only worker in an edge deployment unless the
@@ -47,12 +51,18 @@ export const getVoiceEngineStatus = createServerFn({ method: "GET" })
       return {
         clone: await verifiedCloneEngineStatus(), piper,
         piperVoices: piper ? ["pt_BR-faber-medium"] : [], pitchTransform: true,
+        kokoroVoices: [],
+        catalogVoices: [],
+        catalogLicenseApproved: false,
       };
     }
     return {
       clone: { installed: false, device: "not-configured", modelLoaded: false, warming: false },
       piper: false,
       piperVoices: [],
+      kokoroVoices: [],
+      catalogVoices: [],
+      catalogLicenseApproved: false,
       pitchTransform: false,
     };
   });
@@ -139,8 +149,9 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
     if (data.provider === "chatterbox" && !data.referenceId)
       throw new Error("Envie a referência de voz deste personagem.");
     const isClone = data.provider === "chatterbox";
+    const isKokoro = data.provider === "kokoro";
     const isElevenLabs = data.provider === "elevenlabs";
-    const localRequested = data.provider === "piper" || isClone;
+    const localRequested = data.provider === "piper" || isClone || isKokoro;
     const provider =
       localRequested || isElevenLabs ? null : resolveVoiceProviderConfig(process.env);
     let buffer: Buffer;
@@ -203,6 +214,13 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
         modelId: settings?.modelId ?? "eleven_flash_v2_5",
       });
       providerName = "elevenlabs";
+    } else if (isKokoro) {
+      if (!remoteVoiceServiceConfigured()) {
+        throw new Error("As vozes Kokoro PT-BR ainda não estão instaladas neste servidor.");
+      }
+      buffer = Buffer.from(await synthesizeRemoteKokoroVoice(data.text, data.voice, data.speed ?? 1), "base64");
+      mime = "audio/wav";
+      providerName = "kokoro";
     } else if (isClone) {
       if (remoteVoiceServiceConfigured()) {
         buffer = Buffer.from(

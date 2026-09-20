@@ -50,6 +50,7 @@ import {
   listElevenLabsVoices,
 } from "@/lib/elevenlabs.functions";
 import type { ElevenLabsVoice } from "@/lib/elevenlabs.server";
+import { ElevenLabsVoiceCatalog } from "@/components/chatscene/ElevenLabsVoiceCatalog";
 
 export interface VoicePanelProps {
   project: ChatSceneProject;
@@ -87,22 +88,38 @@ export function VoicePanel(props: VoicePanelProps) {
   const voicesFn = useServerFn(listElevenLabsVoices);
   const engineStatusFn = useServerFn(getVoiceEngineStatus);
   const [installedLocalVoices, setInstalledLocalVoices] = useState<string[] | null>(null);
+  const [installedKokoroVoices, setInstalledKokoroVoices] = useState<string[] | null>(null);
   const [pitchTransformAvailable, setPitchTransformAvailable] = useState<boolean | null>(null);
-  useEffect(() => {
-    let active = true;
-    void engineStatusFn().then((status) => {
-      if (active) {
+  const [voiceStatusError, setVoiceStatusError] = useState(false);
+  const [voiceStatusLoading, setVoiceStatusLoading] = useState(false);
+  const voiceStatusRequest = useRef(0);
+  const refreshVoiceStatus = useCallback(async () => {
+    const request = ++voiceStatusRequest.current;
+    setVoiceStatusLoading(true);
+    setVoiceStatusError(false);
+    try {
+      const status = await engineStatusFn();
+      if (request === voiceStatusRequest.current) {
         setInstalledLocalVoices(status.piperVoices);
+        setInstalledKokoroVoices(status.kokoroVoices);
         setPitchTransformAvailable(status.pitchTransform);
+        setVoiceStatusError(status.clone.device === "remote-unavailable");
       }
-    }).catch(() => {
-      if (active) {
+    } catch {
+      if (request === voiceStatusRequest.current) {
         setInstalledLocalVoices([]);
+        setInstalledKokoroVoices([]);
         setPitchTransformAvailable(false);
+        setVoiceStatusError(true);
       }
-    });
-    return () => { active = false; };
+    } finally {
+      if (request === voiceStatusRequest.current) setVoiceStatusLoading(false);
+    }
   }, [engineStatusFn]);
+  useEffect(() => {
+    void refreshVoiceStatus();
+    return () => { voiceStatusRequest.current += 1; };
+  }, [refreshVoiceStatus]);
   const [elevenConnection, setElevenConnection] = useState<
     "checking" | "connected" | "disconnected" | "error"
   >("checking");
@@ -468,16 +485,6 @@ export function VoicePanel(props: VoicePanelProps) {
             </Button>
           </form>
         ) : null}
-        {elevenConnection === "connected" && elevenCatalogLoaded && !elevenVoices.length ? (
-          <a
-            href="https://elevenlabs.io/app/voice-library"
-            target="_blank"
-            rel="noreferrer"
-            className="mt-2 inline-flex min-h-11 items-center rounded-sm text-xs underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            Abrir biblioteca da ElevenLabs (nova aba)
-          </a>
-        ) : null}
         {elevenVoices.length ? (
           <div className="mt-3 border-t border-primary/15 pt-3">
             <Button
@@ -493,6 +500,46 @@ export function VoicePanel(props: VoicePanelProps) {
               identidade vocal de canal ou pessoa real.
             </p>
           </div>
+        ) : null}
+        {elevenConnection === "connected" ? (
+          <ElevenLabsVoiceCatalog
+            voices={elevenVoices}
+            participants={project.participants}
+            loaded={elevenCatalogLoaded}
+            loading={elevenLoading}
+            onAssign={(participantId, voice) =>
+              setProject(attachElevenLabsVoice(latestProject.current, participantId, voice))
+            }
+          />
+        ) : null}
+      </section>
+      <section className="space-y-2" aria-label="Vozes locais PT-BR">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold">Vozes locais · PT-BR</p>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground tabular-nums" role="status" aria-live="polite">
+              {voiceStatusLoading || installedKokoroVoices === null || installedLocalVoices === null
+                ? "Verificando…"
+                : voiceStatusError
+                  ? "Verificação indisponível"
+                  : `${installedLocalVoices.length + installedKokoroVoices.length} vozes prontas`}
+            </span>
+            <Button type="button" size="sm" variant="secondary" className="min-h-12" onClick={() => void refreshVoiceStatus()} disabled={voiceStatusLoading}>
+              <RotateCcw className="size-3.5" aria-hidden /> Atualizar
+            </Button>
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          São seis identidades locais instaladas no servidor (Piper e Kokoro), além das vozes da ElevenLabs e do clonador autorizado. Escolha em “Voz base” e use “Ouvir” para testar.
+        </p>
+        {voiceStatusError ? (
+          <p className="text-sm text-muted-foreground" role="alert">
+            Não foi possível verificar o servidor de voz. As novas vozes permanecem indisponíveis.
+          </p>
+        ) : installedKokoroVoices?.length === 0 && installedLocalVoices?.length === 0 && !voiceStatusLoading ? (
+          <p className="text-sm text-muted-foreground" role="status">
+            Nenhuma voz local foi encontrada. O clonador e a ElevenLabs continuam disponíveis quando configurados.
+          </p>
         ) : null}
       </section>
       <Button
@@ -604,10 +651,14 @@ export function VoicePanel(props: VoicePanelProps) {
                           <option
                             key={preset.id}
                             value={preset.id}
-                            disabled={preset.provider === "piper" && preset.providerVoice !== "pt_BR-faber-medium" && !installedLocalVoices?.includes(preset.providerVoice)}
+                            disabled={
+                              (preset.provider === "piper" && preset.providerVoice !== "pt_BR-faber-medium" && !installedLocalVoices?.includes(preset.providerVoice)) ||
+                              (preset.provider === "kokoro" && !installedKokoroVoices?.includes(preset.providerVoice))
+                            }
                           >
                             {voiceDisplayLabel(preset)}
                             {preset.provider === "piper" && preset.providerVoice !== "pt_BR-faber-medium" && !installedLocalVoices?.includes(preset.providerVoice) ? " (instalar no servidor)" : ""}
+                            {preset.provider === "kokoro" && !installedKokoroVoices?.includes(preset.providerVoice) ? " (instalar no servidor)" : ""}
                           </option>
                       ))}
                     </optgroup>

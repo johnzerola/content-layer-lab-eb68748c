@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "referenceText": "Oi, eu tenho uma novidade para contar. Preste atenção no que aconteceu hoje!",
+  "voices": [
+    { "id": "omni-bia", "label": "Bia", "group": "Crianças", "instruct": "female, child, high pitch" },
+    { "id": "omni-sofia", "label": "Sofia", "group": "Crianças", "instruct": "female, child, very high pitch" },
+    { "id": "omni-lucas", "label": "Lucas", "group": "Crianças", "instruct": "male, child, high pitch" },
+    { "id": "omni-theo", "label": "Theo", "group": "Crianças", "instruct": "male, child, moderate pitch" },
+    { "id": "omni-julia", "label": "Júlia", "group": "Adolescentes", "instruct": "female, teenager, high pitch" },
+    { "id": "omni-carol", "label": "Carol", "group": "Adolescentes", "instruct": "female, teenager, moderate pitch" },
+    { "id": "omni-gabriel", "label": "Gabriel", "group": "Adolescentes", "instruct": "male, teenager, moderate pitch" },
+    { "id": "omni-caio", "label": "Caio", "group": "Adolescentes", "instruct": "male, teenager, low pitch" },
+    { "id": "omni-ana", "label": "Ana", "group": "Adultos", "instruct": "female, young adult, moderate pitch" },
+    { "id": "omni-camila", "label": "Camila", "group": "Adultos", "instruct": "female, young adult, low pitch" },
+    { "id": "omni-rafael", "label": "Rafael", "group": "Adultos", "instruct": "male, middle-aged, low pitch" },
+    { "id": "omni-marcos", "label": "Marcos", "group": "Adultos", "instruct": "male, middle-aged, moderate pitch" },
+    { "id": "omni-maria", "label": "Maria", "group": "Idosos", "instruct": "female, elderly, moderate pitch" },
+    { "id": "omni-rosa", "label": "Rosa", "group": "Idosos", "instruct": "female, elderly, low pitch" },
+    { "id": "omni-antonio", "label": "Antônio", "group": "Idosos", "instruct": "male, elderly, low pitch" },
+    { "id": "omni-jose", "label": "José", "group": "Idosos", "instruct": "male, elderly, very low pitch" },
+    { "id": "omni-narrador", "label": "Narrador", "group": "Narração", "instruct": "male, middle-aged, very low pitch" },
+    { "id": "omni-narradora", "label": "Narradora", "group": "Narração", "instruct": "female, middle-aged, moderate pitch" }
+  ]
+}
