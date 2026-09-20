@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 from backend.chatscene_voice import service
 from backend.chatscene_voice.omnivoice_catalog import approved_voice_ids, definitions, load_model, write_wave
-from backend.chatscene_voice.service import PIPER_VOICES, synthesize_piper, transform_speech
+from backend.chatscene_voice.service import PIPER_VOICES, compact_speech_audio, synthesize_piper, transform_speech
 
 
 def tone_wav(frequency=220, seconds=1.2, sample_rate=24000):
@@ -59,6 +59,26 @@ class VoiceServiceTests(unittest.TestCase):
         fallback = service.reference_metadata({}, "abcdef12", 3.1)
         self.assertEqual(fallback["name"], "Voz abcdef12")
         self.assertEqual(fallback["gender"], "neutra")
+
+    def test_generated_audio_compacts_long_gaps_but_keeps_a_short_pause(self):
+        sample_rate = 24000
+        samples = []
+        for seconds, amplitude in ((0.35, 8000), (0.55, 0), (0.35, 8000)):
+            for index in range(round(seconds * sample_rate)):
+                samples.append(
+                    int(amplitude * math.sin(2 * math.pi * 220 * index / sample_rate))
+                )
+        source = io.BytesIO()
+        with wave.open(source, "wb") as target:
+            target.setnchannels(1)
+            target.setsampwidth(2)
+            target.setframerate(sample_rate)
+            target.writeframes(b"".join(struct.pack("<h", sample) for sample in samples))
+
+        compact = compact_speech_audio(source.getvalue())
+        duration, _ = metrics(compact)
+        self.assertLess(duration, 1.0)
+        self.assertGreater(duration, 0.7)
 
     def test_kokoro_reports_only_smoke_approved_installed_voices(self):
         with tempfile.TemporaryDirectory() as root:

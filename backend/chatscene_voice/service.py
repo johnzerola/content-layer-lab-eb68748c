@@ -191,6 +191,77 @@ def synthesize_piper(text, speed=1.0, voice="pt_BR-faber-medium"):
     return output.getvalue()
 
 
+def compact_speech_audio(audio):
+    """Remove long generated-speech gaps while keeping a short natural pause.
+
+    The browser also compacts decoded clips, but doing this at the service
+    boundary keeps the returned audio and its measured duration consistent for
+    every local provider (Piper, Kokoro and Chatterbox). The 60 ms remainder
+    avoids concatenating phonemes unnaturally.
+    """
+    if not audio or len(audio) > MAX_AUDIO:
+        return audio
+    detected = subprocess.run(
+        [
+            os.environ.get("FFMPEG_PATH", "ffmpeg"),
+            "-hide_banner",
+            "-loglevel",
+            "info",
+            "-i",
+            "pipe:0",
+            "-af",
+            "silencedetect=n=-45dB:d=0.18",
+            "-f",
+            "null",
+            "-",
+        ],
+        input=audio,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        timeout=60,
+        check=False,
+    )
+    if b"silence_duration" not in detected.stderr:
+        return audio
+    process = subprocess.run(
+        [
+            os.environ.get("FFMPEG_PATH", "ffmpeg"),
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            "pipe:0",
+            "-af",
+            (
+                "silenceremove=start_periods=1:start_duration=0.03:"
+                "start_threshold=-45dB:stop_periods=-1:stop_duration=0.18:"
+                "stop_threshold=-45dB:stop_silence=0.06"
+            ),
+            "-ac",
+            "1",
+            "-ar",
+            "24000",
+            "-f",
+            "s16le",
+            "pipe:1",
+        ],
+        input=audio,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        timeout=60,
+        check=False,
+    )
+    if process.returncode or not process.stdout:
+        return audio
+    output = io.BytesIO()
+    with wave.open(output, "wb") as target:
+        target.setnchannels(1)
+        target.setsampwidth(2)
+        target.setframerate(24000)
+        target.writeframes(process.stdout)
+    return output.getvalue()
+
+
 def transform_speech(audio, config):
     """One FFmpeg render for pitch and tempo; pitch alone keeps duration."""
     if not audio or len(audio) > MAX_AUDIO:
@@ -234,7 +305,7 @@ def transform_speech(audio, config):
     )
     if process.returncode or not process.stdout or len(process.stdout) > MAX_AUDIO:
         raise RuntimeError("Não foi possível ajustar o tom desta voz.")
-    return process.stdout
+    return compact_speech_audio(process.stdout)
 
 
 def account_directory(user_id):
@@ -727,6 +798,7 @@ class Handler(BaseHTTPRequestHandler):
                     audio = synthesize_piper(text, body.get("speed", 1), body.get("voice", "pt_BR-faber-medium"))
                 finally:
                     INFERENCE_SLOTS.release()
+                audio = compact_speech_audio(audio)
                 self.respond(
                     200,
                     {"audio": base64.b64encode(audio).decode("ascii"), "device": "cpu"},
@@ -754,6 +826,7 @@ class Handler(BaseHTTPRequestHandler):
                     INFERENCE_SLOTS.release()
                 if not audio or len(audio) > MAX_AUDIO:
                     raise RuntimeError("O áudio do catálogo excedeu o limite permitido.")
+                audio = compact_speech_audio(audio)
                 self.respond(200, {"audio": base64.b64encode(audio).decode("ascii"), "device": "cpu-or-cuda"})
                 return
             if self.path == "/v1/voice/kokoro/synthesize":
@@ -778,6 +851,7 @@ class Handler(BaseHTTPRequestHandler):
                     INFERENCE_SLOTS.release()
                 if not audio or len(audio) > MAX_AUDIO:
                     raise RuntimeError("O áudio Kokoro excedeu o limite permitido.")
+                audio = compact_speech_audio(audio)
                 self.respond(200, {"audio": base64.b64encode(audio).decode("ascii"), "device": "cpu"})
                 return
             if self.path == "/v1/voice/transform":
@@ -821,6 +895,7 @@ class Handler(BaseHTTPRequestHandler):
                             audio, device = CPU.synthesize(text, path), "cpu"
                 finally:
                     INFERENCE_SLOTS.release()
+                audio = compact_speech_audio(audio)
                 self.respond(
                     200,
                     {"audio": base64.b64encode(audio).decode("ascii"), "device": device},
