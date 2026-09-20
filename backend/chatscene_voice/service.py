@@ -294,6 +294,19 @@ def transform_speech(audio, config):
         tempo /= 0.5
     if abs(tempo - 1) > 0.000001:
         filters.append(f"atempo={tempo:.8f}")
+    effect = config.get("effect", "none")
+    effect_filters = {
+        "none": [],
+        "radio": ["highpass=f=220", "lowpass=f=3800", "acompressor=threshold=-18dB:ratio=4:attack=5:release=80"],
+        "telephone": ["highpass=f=450", "lowpass=f=3200", "acompressor=threshold=-20dB:ratio=6:attack=3:release=60"],
+        "megaphone": ["highpass=f=500", "lowpass=f=5200", "acompressor=threshold=-16dB:ratio=5:attack=3:release=80", "volume=1.35"],
+        "robot": ["aecho=0.8:0.88:40:0.4"],
+        "cave": ["aecho=0.8:0.9:90:0.35"],
+        "horror": ["highpass=f=70", "lowpass=f=8500", "aecho=0.8:0.88:70:0.4"],
+    }
+    if effect not in effect_filters:
+        raise ValueError("Efeito de voz inválido.")
+    filters.extend(effect_filters[effect])
     if config.get("normalization", {}).get("enabled", True):
         filters.append("loudnorm=I=-18:TP=-1.5:LRA=11")
     process = subprocess.run(

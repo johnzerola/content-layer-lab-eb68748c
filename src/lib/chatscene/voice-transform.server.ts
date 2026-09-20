@@ -124,6 +124,26 @@ function atempoFilters(multiplier: number): string[] {
   return buildAtempoChain(multiplier).map((stage) => `atempo=${stage}`);
 }
 
+function effectFilters(effect: VoiceTransformConfig["effect"]): string[] {
+  switch (effect) {
+    case "radio":
+      return ["highpass=f=220", "lowpass=f=3800", "acompressor=threshold=-18dB:ratio=4:attack=5:release=80"];
+    case "telephone":
+      return ["highpass=f=450", "lowpass=f=3200", "acompressor=threshold=-20dB:ratio=6:attack=3:release=60"];
+    case "megaphone":
+      return ["highpass=f=500", "lowpass=f=5200", "acompressor=threshold=-16dB:ratio=5:attack=3:release=80", "volume=1.35"];
+    case "robot":
+      return ["aecho=0.8:0.88:40:0.4"];
+    case "cave":
+      return ["aecho=0.8:0.9:90:0.35"];
+    case "horror":
+      return ["highpass=f=70", "lowpass=f=8500", "aecho=0.8:0.88:70:0.4"];
+    case "none":
+    default:
+      return [];
+  }
+}
+
 /** Build a single decode → PCM filters → final encode graph. */
 export function buildVoiceTransformFilters(configInput: VoiceTransformConfig, sampleRate: number): string[] {
   if (!Number.isFinite(sampleRate) || sampleRate <= 0) throw new Error("A taxa de amostragem da origem é inválida.");
@@ -157,6 +177,7 @@ export function buildVoiceTransformFilters(configInput: VoiceTransformConfig, sa
       break;
   }
 
+  filters.push(...effectFilters(config.effect));
   if (config.normalization.enabled) {
     filters.push(
       `loudnorm=I=${config.normalization.integratedLufs}:TP=${config.normalization.truePeakDb}:LRA=${config.normalization.loudnessRange}`,
@@ -176,6 +197,7 @@ function cacheKey(sourceAudioHash: string, presetId: string, config: VoiceTransf
     linkedPitch: config.linkedPitchToSpeed,
     preservePitch: config.preservePitch,
     preserveFormants: config.preserveFormants,
+    effect: config.effect,
     normalizationConfig,
     mode: config.mode,
     outputCodec: config.outputCodec,

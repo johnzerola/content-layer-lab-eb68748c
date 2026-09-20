@@ -261,6 +261,16 @@ export function VoicePanel(props: VoicePanelProps) {
     "adam_child_male",
     "adam_deep",
     "adam_mature_character",
+    "child_bright",
+    "teen_energetic",
+    "elderly_warm",
+    "narrator_deep",
+    "news_radio",
+    "telephone",
+    "megaphone",
+    "robot",
+    "cave_echo",
+    "horror",
   ];
   const labTransformIds = [
     "dialogue_fast",
@@ -855,12 +865,33 @@ export function VoicePanel(props: VoicePanelProps) {
                             }
                           />
                         ) : null}
-                        {voice.transform ? (
+        {voice.transform ? (
                           <details className="rounded-md border border-border bg-background/40 p-2">
                             <summary className="cursor-pointer rounded-sm text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                               Transformação avançada
                             </summary>
                             <div className="mt-2 space-y-2 border-t border-border pt-2">
+                              <label className="block text-[11px] text-muted-foreground">
+                                <span className="mb-1 block">Modificador de áudio</span>
+                                <select
+                                  className="h-10 w-full rounded-md border border-border bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                  value={voice.transform.config.effect ?? "none"}
+                                  onChange={(event) =>
+                                    updateTransform(voice, {
+                                      effect: event.target.value as VoiceTransformConfig["effect"],
+                                    })
+                                  }
+                                  aria-label={`Modificador de áudio de ${participant.name}`}
+                                >
+                                  <option value="none">Nenhum</option>
+                                  <option value="radio">Rádio / notícias</option>
+                                  <option value="telephone">Telefone</option>
+                                  <option value="megaphone">Megafone</option>
+                                  <option value="robot">Robô</option>
+                                  <option value="cave">Caverna / eco</option>
+                                  <option value="horror">Terror / suspense</option>
+                                </select>
+                              </label>
                               <VoiceRange
                                 label="Velocidade transformada"
                                 value={voice.transform.config.speedMultiplier}
@@ -1134,6 +1165,16 @@ function transformUiLabel(id: string, baseName: string): string {
         adam_deep: `${baseName} · Adulto grave`,
         adam_mature_character: `${baseName} · Personagem maduro`,
         adam_child_pitch_only: `${baseName} · Tom agudo em velocidade normal`,
+        child_bright: `${baseName} · Criança brilhante`,
+        teen_energetic: `${baseName} · Adolescente energético`,
+        elderly_warm: `${baseName} · Idoso caloroso`,
+        narrator_deep: `${baseName} · Narrador grave`,
+        news_radio: `${baseName} · Notícias / rádio`,
+        telephone: `${baseName} · Telefone`,
+        megaphone: `${baseName} · Megafone`,
+        robot: `${baseName} · Robô`,
+        cave_echo: `${baseName} · Caverna / eco`,
+        horror: `${baseName} · Terror`,
       } as Record<string, string>
     )[id] ?? id
   );
@@ -1150,6 +1191,16 @@ function simpleTransformUiLabel(id: string): string {
         adam_child_male: "Masculino infantilizado",
         adam_deep: "Grave",
         adam_mature_character: "Personagem maduro",
+        child_bright: "Criança brilhante",
+        teen_energetic: "Adolescente energético",
+        elderly_warm: "Idoso caloroso",
+        narrator_deep: "Narrador grave",
+        news_radio: "Notícias / rádio",
+        telephone: "Telefone",
+        megaphone: "Megafone",
+        robot: "Robô",
+        cave_echo: "Caverna / eco",
+        horror: "Terror / suspense",
       } as Record<string, string>
     )[id] ?? id
   );
