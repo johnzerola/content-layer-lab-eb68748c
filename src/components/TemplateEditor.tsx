@@ -23,6 +23,7 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
+  Diamond,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -50,7 +51,7 @@ const AUTO_FULL_ID = "auto-fullscreen";
 import { TemplateTimeline } from "./TemplateTimeline";
 import { uploadFileOrInline } from "@/lib/media-store";
 import { useMediaUrl } from "@/hooks/useMediaUrl";
-import { patchVideoAtTime, upsertVideoKeyframe, videoBoxAt } from "@/lib/template-timeline";
+import { patchVideoAtTime, upsertVideoKeyframe, upsertVideoPropertyKeyframe, videoBoxAt, type VideoKeyframeProperty } from "@/lib/template-timeline";
 
 const KEY_OF: Record<LayerId, keyof Template> = {
   video: "video",
@@ -81,6 +82,7 @@ function Slider({
   max,
   step = 1,
   onChange,
+  action,
 }: {
   label: string;
   value: number;
@@ -88,12 +90,14 @@ function Slider({
   max: number;
   step?: number;
   onChange: (v: number) => void;
+  action?: React.ReactNode;
 }) {
   return (
     <div className="space-y-1">
-      <div className="flex justify-between text-xs text-muted-foreground">
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>{label}</span>
-        <span className="font-mono text-foreground">{value}</span>
+        <span className="ml-auto font-mono text-foreground">{value}</span>
+        {action}
       </div>
       <input
         type="range"
@@ -394,6 +398,8 @@ export function TemplateEditor({
 
   /** Marca a posição/tamanho atual do vídeo como keyframe no tempo da linha do tempo. */
   const addVideoKey = () => setT(upsertVideoKeyframe(t, time));
+  const addVideoPropertyKey = (property: VideoKeyframeProperty) =>
+    setT(upsertVideoPropertyKeyframe(t, time, property, videoAtTime[property]));
 
   /** Trecho final em que tudo some e o vídeo ocupa o 9:16 inteiro. */
   const autoFull = (t.fullscreenClips ?? []).find((c) => c.id === AUTO_FULL_ID) ?? null;
@@ -747,16 +753,17 @@ export function TemplateEditor({
       <div className="space-y-3">
         {id === "video" && (
           <>
-            <Slider label="X" value={videoAtTime.x} min={-200} max={1080} onChange={(v) => patch(id, { x: v })} />
-            <Slider label="Y" value={videoAtTime.y} min={-200} max={1920} onChange={(v) => patch(id, { y: v })} />
-            <Slider label="Largura" value={videoAtTime.w} min={200} max={1080} onChange={(v) => patch(id, { w: v })} />
-            <Slider label="Altura" value={videoAtTime.h} min={200} max={1920} onChange={(v) => patch(id, { h: v })} />
+            <Slider label="X" value={videoAtTime.x} min={-200} max={1080} onChange={(v) => patch(id, { x: v })} action={<Button type="button" variant="ghost" size="icon" className="size-6" title="Criar keyframe de X" aria-label="Criar keyframe de X" onClick={() => addVideoPropertyKey("x")}><Diamond className="size-3.5" /></Button>} />
+            <Slider label="Y" value={videoAtTime.y} min={-200} max={1920} onChange={(v) => patch(id, { y: v })} action={<Button type="button" variant="ghost" size="icon" className="size-6" title="Criar keyframe de Y" aria-label="Criar keyframe de Y" onClick={() => addVideoPropertyKey("y")}><Diamond className="size-3.5" /></Button>} />
+            <Slider label="Largura" value={videoAtTime.w} min={200} max={1080} onChange={(v) => patch(id, { w: v })} action={<Button type="button" variant="ghost" size="icon" className="size-6" title="Criar keyframe de Largura" aria-label="Criar keyframe de Largura" onClick={() => addVideoPropertyKey("w")}><Diamond className="size-3.5" /></Button>} />
+            <Slider label="Altura" value={videoAtTime.h} min={200} max={1920} onChange={(v) => patch(id, { h: v })} action={<Button type="button" variant="ghost" size="icon" className="size-6" title="Criar keyframe de Altura" aria-label="Criar keyframe de Altura" onClick={() => addVideoPropertyKey("h")}><Diamond className="size-3.5" /></Button>} />
             <Slider
               label="Cantos arredondados"
               value={videoAtTime.radius}
               min={0}
               max={240}
               onChange={(v) => patch(id, { radius: v })}
+              action={<Button type="button" variant="ghost" size="icon" className="size-6" title="Criar keyframe de Cantos" aria-label="Criar keyframe de Cantos" onClick={() => addVideoPropertyKey("radius")}><Diamond className="size-3.5" /></Button>}
             />
             <div className="flex gap-2">
               {[

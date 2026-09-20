@@ -1,6 +1,7 @@
 import type { Template, VideoLayer } from './template';
 
 export type VideoKeyframeBox = Pick<VideoLayer, 'x' | 'y' | 'w' | 'h' | 'radius'>;
+export type VideoKeyframeProperty = keyof VideoKeyframeBox;
 
 const KEY_EPSILON = 0.05;
 
@@ -32,14 +33,46 @@ export function upsertVideoKeyframe(t: Template, time: number, patch: Partial<Vi
   };
 }
 
+/** Cria ou atualiza somente uma propriedade, sem prender os outros controles ao mesmo instante. */
+export function upsertVideoPropertyKeyframe(
+  t: Template,
+  time: number,
+  property: VideoKeyframeProperty,
+  value = videoBoxAt(t, time)[property],
+): Template {
+  const at = Number(Math.max(0, time).toFixed(2));
+  const existing = (t.videoKeyframes ?? []).find(
+    (key) => Math.abs(key.t - at) <= KEY_EPSILON && key[property] !== undefined,
+  );
+  const next = { id: existing?.id ?? crypto.randomUUID(), t: at, [property]: value };
+  return {
+    ...t,
+    videoKeyframes: [
+      ...(t.videoKeyframes ?? []).filter((key) => key.id !== existing?.id),
+      next,
+    ].sort((a, b) => a.t - b.t),
+  };
+}
+
+export function removeVideoKeyframe(t: Template, id: string): Template {
+  return { ...t, videoKeyframes: (t.videoKeyframes ?? []).filter((key) => key.id !== id) };
+}
+
 /**
  * Ajusta a caixa base ou, quando a agulha está sobre um keyframe, o próprio
  * keyframe. Assim a sequência "marcar keyframe -> mover/redimensionar" funciona.
  */
 export function patchVideoAtTime(t: Template, time: number, patch: Partial<VideoKeyframeBox>): Template {
-  const hasKey = (t.videoKeyframes ?? []).some((key) => Math.abs(key.t - time) <= KEY_EPSILON);
-  if (hasKey) return upsertVideoKeyframe(t, time, patch);
-  return { ...t, video: { ...t.video, ...patch } };
+  let next = t;
+  const basePatch: Partial<VideoKeyframeBox> = {};
+  for (const [property, value] of Object.entries(patch) as [VideoKeyframeProperty, number][]) {
+    const hasPropertyKey = (next.videoKeyframes ?? []).some(
+      (key) => Math.abs(key.t - time) <= KEY_EPSILON && key[property] !== undefined,
+    );
+    if (hasPropertyKey) next = upsertVideoPropertyKeyframe(next, time, property, value);
+    else basePatch[property] = value;
+  }
+  return Object.keys(basePatch).length ? { ...next, video: { ...next.video, ...basePatch } } : next;
 }
 
 /** Cria uma animação real da caixa atual até o quadro 9:16 inteiro. */
@@ -77,18 +110,25 @@ export function fullscreenAt(t: Template, time: number) {
 export function videoBoxAt(t: Template, time: number) {
   const keys = [...(t.videoKeyframes ?? [])].sort((a, b) => a.t - b.t);
   if (!keys.length) return t.video;
-  const before = keys.filter((k) => k.t <= time).at(-1);
-  const after = keys.find((k) => k.t > time);
-  const box = (k: (typeof keys)[number]) => ({ ...t.video, x: k.x, y: k.y, w: k.w, h: k.h, radius: k.radius });
-  if (!before) return box(keys[0]!);
-  if (!after) return box(before);
-  const raw = (time - before.t) / Math.max(0.001, after.t - before.t);
-  const p = raw * raw * (3 - 2 * raw);
-  const mix = (a: number, b: number) => a + (b - a) * p;
-  return {
-    ...t.video,
-    x: mix(before.x, after.x), y: mix(before.y, after.y),
-    w: mix(before.w, after.w), h: mix(before.h, after.h),
-    radius: mix(before.radius, after.radius),
-  };
+  const resolved = { ...t.video };
+  for (const property of ['x', 'y', 'w', 'h', 'radius'] as VideoKeyframeProperty[]) {
+    const propertyKeys = keys.filter((key) => key[property] !== undefined);
+    if (!propertyKeys.length) continue;
+    const before = propertyKeys.filter((key) => key.t <= time).at(-1);
+    const after = propertyKeys.find((key) => key.t > time);
+    if (!before) {
+      resolved[property] = propertyKeys[0]?.[property] ?? resolved[property];
+      continue;
+    }
+    if (!after) {
+      resolved[property] = before[property] ?? resolved[property];
+      continue;
+    }
+    const raw = (time - before.t) / Math.max(0.001, after.t - before.t);
+    const p = raw * raw * (3 - 2 * raw);
+    const from = before[property] ?? resolved[property];
+    const to = after[property] ?? resolved[property];
+    resolved[property] = from + (to - from) * p;
+  }
+  return resolved;
 }
