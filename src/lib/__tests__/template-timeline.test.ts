@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createTemplate } from '../template';
-import { expandVideoFrom, fullscreenAt, patchVideoAtTime, upsertVideoKeyframe, videoBoxAt } from '../template-timeline';
+import { expandVideoFrom, fullscreenAt, patchVideoAtTime, removeVideoKeyframe, upsertVideoKeyframe, upsertVideoPropertyKeyframe, videoBoxAt } from '../template-timeline';
 import { subtractRanges } from '../editor/transcript';
 import { outputTimeAtSrc, segmentsDuration, srcTimeAt } from '../preedit';
 
@@ -55,6 +55,39 @@ describe('keyframes de vídeo do template', () => {
     });
     expect(videoBoxAt(expanded, 10.4).w).toBeGreaterThan(base.video.w);
     expect(videoBoxAt(expanded, 10.8)).toMatchObject({ x: 0, y: 0, w: 1080, h: 1920, radius: 0 });
+  });
+
+  it('cria e ajusta X, Y, largura e altura em tempos independentes', () => {
+    const base = createTemplate();
+    let keyed = upsertVideoPropertyKeyframe(base, 0, 'x', 60);
+    keyed = upsertVideoPropertyKeyframe(keyed, 2, 'x', 460);
+    keyed = upsertVideoPropertyKeyframe(keyed, 0, 'y', 620);
+    keyed = upsertVideoPropertyKeyframe(keyed, 4, 'y', 1020);
+    keyed = upsertVideoPropertyKeyframe(keyed, 0, 'w', 600);
+    keyed = upsertVideoPropertyKeyframe(keyed, 4, 'w', 1000);
+    keyed = upsertVideoPropertyKeyframe(keyed, 0, 'h', 800);
+    keyed = upsertVideoPropertyKeyframe(keyed, 4, 'h', 1600);
+    const changed = patchVideoAtTime(keyed, 4, { y: 1120, w: 1080, h: 1700 });
+    expect(videoBoxAt(changed, 3)).toMatchObject({ x: 460, y: 957.5, w: 937.5, h: 1475 });
+    expect(videoBoxAt(changed, 4)).toMatchObject({ x: 460, y: 1120, w: 1080, h: 1700 });
+  });
+
+  it('exclui somente o keyframe selecionado sem apagar os demais', () => {
+    const base = createTemplate();
+    const withX = upsertVideoPropertyKeyframe(base, 2, 'x', 400);
+    const withY = upsertVideoPropertyKeyframe(withX, 2, 'y', 900);
+    const xKey = withY.videoKeyframes?.find((key) => key.x !== undefined);
+    expect(xKey).toBeDefined();
+    const removed = removeVideoKeyframe(withY, xKey?.id ?? 'missing');
+    expect(removed.videoKeyframes).toHaveLength(1);
+    expect(removed.videoKeyframes?.[0]).toMatchObject({ t: 2, y: 900 });
+    expect(videoBoxAt(removed, 2)).toMatchObject({ x: base.video.x, y: 900 });
+  });
+
+  it('mantém compatibilidade com keyframes antigos completos', () => {
+    const base = createTemplate();
+    const legacy = upsertVideoKeyframe(upsertVideoKeyframe(base, 0), 4, { x: 460, y: 1020, w: 1080, h: 1600, radius: 0 });
+    expect(videoBoxAt(legacy, 2)).toMatchObject({ x: 260, y: 820, w: 1020, h: 1340, radius: 12 });
   });
 });
 
