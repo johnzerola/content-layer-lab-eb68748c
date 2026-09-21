@@ -75,6 +75,15 @@ describe("VoiceTransform math", () => {
     expect(fast.config.pitchSemitones).toBe(0);
     expect(synthesisTransformForProfile({ pitch: 2 })).toBeUndefined();
   });
+
+  it("expõe modificadores de rádio e personagem sem quebrar configs antigas", () => {
+    const radio = selectionFromTransformPreset("news_radio");
+    expect(radio.config.effect).toBe("radio");
+    const legacy = { ...selectionFromTransformPreset("adam_natural").config };
+    delete legacy.effect;
+    expect(synthesisTransformForProfile({ transform: { presetId: "legacy", config: legacy } })?.config.effect)
+      .toBeUndefined();
+  });
 });
 
 describe("VoiceTransform FFmpeg baseline", () => {

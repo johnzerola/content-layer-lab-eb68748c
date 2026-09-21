@@ -138,6 +138,7 @@ export async function transformRemoteVoice(audio: string, config: {
   speedMultiplier: number;
   pitchSemitones: number;
   linkedPitchToSpeed: boolean;
+  effect?: "none" | "radio" | "telephone" | "megaphone" | "robot" | "cave" | "horror";
   normalization: { enabled: boolean };
 }) {
   return remoteVoiceRequest<{ audio: string; mime: string }>(
