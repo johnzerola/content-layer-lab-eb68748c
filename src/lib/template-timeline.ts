@@ -44,7 +44,7 @@ export function upsertVideoPropertyKeyframe(
   const existing = (t.videoKeyframes ?? []).find(
     (key) => Math.abs(key.t - at) <= KEY_EPSILON && key[property] !== undefined,
   );
-  const next = { id: existing?.id ?? crypto.randomUUID(), t: at, [property]: value };
+  const next = { ...existing, id: existing?.id ?? crypto.randomUUID(), t: at, [property]: value };
   return {
     ...t,
     videoKeyframes: [

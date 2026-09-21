@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pause, Play, Plus, Scissors, Maximize, Trash2, Diamond, ZoomIn, LogIn, LogOut, EyeOff } from 'lucide-react';
 import type { BoxLayer, LayerAnim, SelId, Template, TextLayer } from '@/lib/template';
 import { layerOf, LAYER_LABELS, selectableIds } from './TemplateCanvas';
-import { expandVideoFrom, upsertVideoKeyframe } from '@/lib/template-timeline';
+import { expandVideoFrom, removeVideoKeyframe, upsertVideoKeyframe, type VideoKeyframeProperty } from '@/lib/template-timeline';
 
 const PALETTE = ['#ffffff', '#000000', '#ffd166', '#ff5c8a', '#7c5cff', '#38bdf8', '#34d399', '#f97316'];
 const ANIMS: { id: LayerAnim; label: string }[] = [
@@ -13,6 +13,13 @@ const ANIMS: { id: LayerAnim; label: string }[] = [
   { id: 'right', label: 'Pela direita' },
   { id: 'zoom', label: 'Zoom' },
   { id: 'pop', label: 'Pop' },
+];
+const VIDEO_KEY_TRACKS: { property: VideoKeyframeProperty; label: string }[] = [
+  { property: 'x', label: 'X' },
+  { property: 'y', label: 'Y' },
+  { property: 'w', label: 'Largura' },
+  { property: 'h', label: 'Altura' },
+  { property: 'radius', label: 'Cantos' },
 ];
 
 const keys: Record<string, string> = { name: 'name_' };
@@ -28,11 +35,13 @@ export function TemplateTimeline({ template: t, onChange, selected, onSelect, ti
   time: number; onSeek: (n: number) => void; playing: boolean; onPlay: () => void; duration: number; onDuration: (n: number) => void;
 }) {
   const [fullId, setFullId] = useState<string | null>(null);
+  const [selectedKeyId, setSelectedKeyId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const layer = selected ? layerOf(t, selected) as BoxLayer | null : null;
   const full = t.fullscreenClips?.find(c => c.id === fullId);
   const changeLayer = (patch: Partial<BoxLayer>) => selected && onChange(patchLayer(t, selected, patch));
   const videoKeys = [...(t.videoKeyframes ?? [])].sort((a, b) => a.t - b.t);
+  const selectedKey = videoKeys.find((key) => key.id === selectedKeyId) ?? null;
   const addVideoKey = () => onChange(upsertVideoKeyframe(t, time));
   const presetFade = (dir: 'in' | 'out') => {
     if (!layer) return;
