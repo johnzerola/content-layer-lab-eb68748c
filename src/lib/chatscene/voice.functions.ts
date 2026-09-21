@@ -14,13 +14,11 @@ import { z } from "zod";
 
 import {
   deleteRemoteVoiceReference,
-  listRemoteVoiceReferences,
   remoteCloneEngineStatus,
   remoteVoiceServiceConfigured,
   remoteVoiceTransformSupported,
   saveRemoteVoiceReference,
   synthesizeRemoteGenericVoice,
-  synthesizeRemoteKokoroVoice,
   synthesizeRemoteVoice,
   transformRemoteVoice,
   warmRemoteCloneEngine,
@@ -34,9 +32,6 @@ export const getVoiceEngineStatus = createServerFn({ method: "GET" })
       clone: remote,
       piper: Boolean(remote.genericInstalled),
       piperVoices: remote.piperVoices ?? (remote.genericInstalled ? ["pt_BR-faber-medium"] : []),
-      kokoroVoices: remote.kokoroVoices ?? [],
-      catalogVoices: remote.catalogVoices ?? [],
-      catalogLicenseApproved: remote.catalogLicenseApproved === true,
       pitchTransform: remote.pitchTransform === true,
     };
     // Do not import the Node-only worker in an edge deployment unless the
@@ -52,18 +47,12 @@ export const getVoiceEngineStatus = createServerFn({ method: "GET" })
       return {
         clone: await verifiedCloneEngineStatus(), piper,
         piperVoices: piper ? ["pt_BR-faber-medium"] : [], pitchTransform: true,
-        kokoroVoices: [],
-        catalogVoices: [],
-        catalogLicenseApproved: false,
       };
     }
     return {
       clone: { installed: false, device: "not-configured", modelLoaded: false, warming: false },
       piper: false,
       piperVoices: [],
-      kokoroVoices: [],
-      catalogVoices: [],
-      catalogLicenseApproved: false,
       pitchTransform: false,
     };
   });
@@ -78,29 +67,15 @@ export const uploadVoiceReference = createServerFn({ method: "POST" })
           .min(1)
           .max(16 * 1024 * 1024),
         authorized: z.literal(true),
-        metadata: z.object({
-          name: z.string().trim().min(1).max(100),
-          category: z.string().trim().min(1).max(40),
-          gender: z.enum(["feminina", "masculina", "neutra"]),
-          style: z.string().trim().min(1).max(40),
-        }),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     if (remoteVoiceServiceConfigured()) {
-      return saveRemoteVoiceReference(context.userId, data.audio, data.metadata);
+      return saveRemoteVoiceReference(context.userId, data.audio);
     }
     const { saveVoiceReference } = await import("./voice-clone.server");
-    return saveVoiceReference(context.userId, data.audio, data.metadata);
-  });
-
-export const listVoiceReferences = createServerFn({ method: "GET" })
-  .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    if (remoteVoiceServiceConfigured()) return listRemoteVoiceReferences(context.userId);
-    const { listVoiceReferences: listLocalVoiceReferences } = await import("./voice-clone.server");
-    return { references: await listLocalVoiceReferences(context.userId) };
+    return saveVoiceReference(context.userId, data.audio);
   });
 
 export const prepareVoiceEngine = createServerFn({ method: "POST" })
@@ -164,9 +139,8 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
     if (data.provider === "chatterbox" && !data.referenceId)
       throw new Error("Envie a referência de voz deste personagem.");
     const isClone = data.provider === "chatterbox";
-    const isKokoro = data.provider === "kokoro";
     const isElevenLabs = data.provider === "elevenlabs";
-    const localRequested = data.provider === "piper" || isClone || isKokoro;
+    const localRequested = data.provider === "piper" || isClone;
     const provider =
       localRequested || isElevenLabs ? null : resolveVoiceProviderConfig(process.env);
     let buffer: Buffer;
@@ -229,13 +203,6 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
         modelId: settings?.modelId ?? "eleven_flash_v2_5",
       });
       providerName = "elevenlabs";
-    } else if (isKokoro) {
-      if (!remoteVoiceServiceConfigured()) {
-        throw new Error("As vozes Kokoro PT-BR ainda não estão instaladas neste servidor.");
-      }
-      buffer = Buffer.from(await synthesizeRemoteKokoroVoice(data.text, data.voice, data.speed ?? 1), "base64");
-      mime = "audio/wav";
-      providerName = "kokoro";
     } else if (isClone) {
       if (remoteVoiceServiceConfigured()) {
         buffer = Buffer.from(

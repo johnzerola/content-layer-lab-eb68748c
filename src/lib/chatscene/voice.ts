@@ -2,7 +2,7 @@ import { selectionFromTransformPreset, type VoiceTransformSelection } from "./vo
 
 /** Identidades vocais sintéticas do ChatScene. Nenhum preset representa pessoa real. */
 export type VoiceGender = "feminina" | "masculina" | "neutra";
-export type VoiceAge = "juvenil" | "teen" | "adulta" | "madura" | "não declarada";
+export type VoiceAge = "juvenil" | "teen" | "adulta" | "madura";
 export type VoiceStyle =
   | "natural" | "animada" | "calma" | "seria" | "sussurro" | "nervosa"
   | "sarcastica" | "assustada" | "brava" | "autoritaria" | "dramatic" | "comedy";
@@ -21,14 +21,7 @@ export interface MessageVoiceDirection {
 }
 
 export interface VoiceProfile {
-  reference?: {
-    id: string;
-    name: string;
-    durationSec: number;
-    category?: string;
-    gender?: VoiceGender;
-    style?: string;
-  };
+  reference?: { id: string; name: string; durationSec: number };
   id?: string;
   name?: string;
   presetId: string;
@@ -94,9 +87,6 @@ const preset = (
 ): VoicePreset => ({ id, label, group, description, gender, age, providerVoice, profile, ...(provider ? { provider } : {}) });
 
 export const VOICE_PRESETS: VoicePreset[] = [
-  preset("kokoro-dora", "Dora · feminina PT-BR", "Voz local gratuita", "Locutora oficial Kokoro PT-BR · idade não declarada", "feminina", "não declarada", "pf_dora", { style:"natural",speed:1,energy:.55,expressiveness:.5,roughness:.1,warmth:.5,brightness:.5,pitch:0 }, "kokoro"),
-  preset("kokoro-alex", "Alex · masculina PT-BR", "Voz local gratuita", "Locutor oficial Kokoro PT-BR · idade não declarada", "masculina", "não declarada", "pm_alex", { style:"natural",speed:1,energy:.55,expressiveness:.5,roughness:.1,warmth:.5,brightness:.5,pitch:0 }, "kokoro"),
-  preset("kokoro-santa", "Santa · masculina PT-BR", "Voz local gratuita", "Locutor oficial Kokoro PT-BR · idade não declarada", "masculina", "não declarada", "pm_santa", { style:"natural",speed:1,energy:.55,expressiveness:.5,roughness:.1,warmth:.5,brightness:.5,pitch:0 }, "kokoro"),
   preset("piper-cadu-local", "Cadu local · PT-BR", "Voz local gratuita", "Voz-base PT-BR distinta · Piper open source", "neutra", "adulta", "pt_BR-cadu-medium", { style:"natural",speed:1,energy:.55,expressiveness:.5,roughness:.1,warmth:.5,brightness:.5,pitch:0 }, "piper"),
   preset("piper-jeff-local", "Jeff local · PT-BR", "Voz local gratuita", "Voz-base PT-BR distinta · Piper open source", "neutra", "adulta", "pt_BR-jeff-medium", { style:"natural",speed:1,energy:.55,expressiveness:.5,roughness:.1,warmth:.5,brightness:.5,pitch:0 }, "piper"),
   ...[

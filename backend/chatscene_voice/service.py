@@ -12,7 +12,6 @@ import io
 import json
 import math
 import os
-import select
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import subprocess
@@ -21,7 +20,6 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from urllib.parse import parse_qs, urlparse
 import uuid
 import wave
 
@@ -53,39 +51,15 @@ PIPER_VOICES = {
         ROOT / "piper" / "pt_BR-jeff-medium.onnx.json",
     ),
 }
-# Kokoro has its own pinned environment. Do not inherit the generic service
-# interpreter here: it does not contain the model runtime dependencies.
-KOKORO_PYTHON = Path(str(ROOT / "kokoro-venv" / "bin" / "python-native")).resolve()
-KOKORO_MODEL_DIR = Path(os.environ.get("CHATSCENE_KOKORO_MODEL_DIR", str(ROOT / "kokoro"))).resolve()
-KOKORO_WORKER = Path(os.environ.get("CHATSCENE_KOKORO_WORKER", str(ROOT / "kokoro_worker.py"))).resolve()
-KOKORO_READY = KOKORO_MODEL_DIR / "runtime-ready"
-KOKORO_VOICES = ("pf_dora", "pm_alex", "pm_santa")
-OMNI_PYTHON = Path(os.environ.get("CHATSCENE_OMNIVOICE_PYTHON_PATH", str(ROOT / "omnivoice-venv" / "bin" / "python"))).resolve()
-OMNI_MODEL = Path(os.environ.get("CHATSCENE_OMNIVOICE_MODEL_PATH", str(ROOT / "omnivoice" / "model"))).resolve()
-OMNI_CATALOG_DIR = Path(os.environ.get("CHATSCENE_OMNIVOICE_CATALOG_DIR", str(ROOT / "omnivoice" / "catalog"))).resolve()
-OMNI_WORKER = Path(os.environ.get("CHATSCENE_OMNIVOICE_WORKER", str(ROOT / "omnivoice_worker.py"))).resolve()
-OMNI_CATALOG = Path(os.environ.get("CHATSCENE_OMNIVOICE_CATALOG_FILE", str(ROOT / "omnivoice_catalog.json"))).resolve()
-OMNI_READY = Path(os.environ.get("CHATSCENE_OMNIVOICE_READY_FILE", str(ROOT / "omnivoice" / "runtime-ready"))).resolve()
-OMNI_LICENSE_APPROVED = os.environ.get("CHATSCENE_OMNIVOICE_LICENSE_APPROVED") == "1"
-OMNI_STARTUP_TIMEOUT = 75
-OMNI_SYNTH_TIMEOUT = 200
-KOKORO_STARTUP_TIMEOUT = 180
 MAX_BODY = 16 * 1024 * 1024
 MAX_AUDIO = 12 * 1024 * 1024
 IDLE_SECONDS = int(os.environ.get("CHATSCENE_VOICE_IDLE_SECONDS", "120"))
-V2_MODEL_FILES = (
+MODEL_FILES = (
     "ve.pt",
     "s3gen.pt",
     "t3_mtl23ls_v2.safetensors",
     "grapheme_mtl_merged_expanded_v1.json",
 )
-PTBR_V3_MODEL_FILES = (
-    "ve.pt",
-    "s3gen_v3.safetensors",
-    "t3_pt_br.safetensors",
-    "grapheme_mtl_merged_expanded_v1.json",
-)
-MODEL_FILES = V2_MODEL_FILES
 
 
 def runtime_config():
@@ -94,7 +68,6 @@ def runtime_config():
         {
             "pythonPath": os.environ.get("CHATSCENE_VOICE_PYTHON_PATH", value.get("pythonPath")),
             "modelPath": os.environ.get("CHATSCENE_VOICE_MODEL_PATH", value.get("modelPath")),
-            "modelVariant": os.environ.get("CHATSCENE_VOICE_MODEL_VARIANT", value.get("modelVariant", "multilingual-v2")),
             "storagePath": os.environ.get("CHATSCENE_VOICE_STORAGE_PATH", value.get("storagePath")),
             "device": os.environ.get("CHATSCENE_VOICE_DEVICE", value.get("device", "cpu")),
         }
@@ -106,11 +79,7 @@ def engine_installed():
     try:
         config = runtime_config()
         model = Path(config["modelPath"])
-        required = {
-            "multilingual-v2": V2_MODEL_FILES,
-            "ptbr-v3": PTBR_V3_MODEL_FILES,
-        }.get(config.get("modelVariant"))
-        return bool(config.get("ready")) and bool(required) and all((model / name).is_file() for name in required)
+        return bool(config.get("ready")) and all((model / name).is_file() for name in MODEL_FILES)
     except (OSError, KeyError, ValueError, TypeError):
         return False
 
@@ -118,35 +87,6 @@ def engine_installed():
 def piper_installed(voice="pt_BR-faber-medium"):
     paths = PIPER_VOICES.get(voice)
     return bool(paths and paths[0].is_file() and paths[1].is_file())
-
-
-def kokoro_installed_ids():
-    required = (KOKORO_MODEL_DIR / "config.json", KOKORO_MODEL_DIR / "kokoro-v1_0.pth")
-    if not (KOKORO_READY.is_file() and KOKORO_PYTHON.is_file() and KOKORO_WORKER.is_file() and all(path.is_file() for path in required)):
-        return []
-    return [voice for voice in KOKORO_VOICES if (KOKORO_MODEL_DIR / "voices" / f"{voice}.pt").is_file()]
-
-
-def omnivoice_catalog_ids():
-    """Only hand-reviewed voice prompts are advertised or allowed for synthesis."""
-    if not (
-        OMNI_LICENSE_APPROVED and OMNI_READY.is_file() and OMNI_PYTHON.is_file()
-        and OMNI_WORKER.is_file() and OMNI_MODEL.is_dir()
-    ):
-        return []
-    try:
-        allowed = {item["id"] for item in json.loads(OMNI_CATALOG.read_text(encoding="utf-8"))["voices"]}
-        approved = json.loads((OMNI_CATALOG_DIR / "approved.json").read_text(encoding="utf-8"))["voiceIds"]
-        if not isinstance(approved, list):
-            return []
-        return sorted(
-            voice for voice in set(voice for voice in approved if isinstance(voice, str))
-            if voice in allowed
-            and (OMNI_CATALOG_DIR / f"{voice}.pt").is_file()
-            and (OMNI_CATALOG_DIR / f"{voice}.wav").is_file()
-        )
-    except (OSError, ValueError, KeyError, TypeError):
-        return []
 
 
 def synthesize_piper(text, speed=1.0, voice="pt_BR-faber-medium"):
@@ -191,77 +131,6 @@ def synthesize_piper(text, speed=1.0, voice="pt_BR-faber-medium"):
     return output.getvalue()
 
 
-def compact_speech_audio(audio):
-    """Remove long generated-speech gaps while keeping a short natural pause.
-
-    The browser also compacts decoded clips, but doing this at the service
-    boundary keeps the returned audio and its measured duration consistent for
-    every local provider (Piper, Kokoro and Chatterbox). The 60 ms remainder
-    avoids concatenating phonemes unnaturally.
-    """
-    if not audio or len(audio) > MAX_AUDIO:
-        return audio
-    detected = subprocess.run(
-        [
-            os.environ.get("FFMPEG_PATH", "ffmpeg"),
-            "-hide_banner",
-            "-loglevel",
-            "info",
-            "-i",
-            "pipe:0",
-            "-af",
-            "silencedetect=n=-45dB:d=0.18",
-            "-f",
-            "null",
-            "-",
-        ],
-        input=audio,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        timeout=60,
-        check=False,
-    )
-    if b"silence_duration" not in detected.stderr:
-        return audio
-    process = subprocess.run(
-        [
-            os.environ.get("FFMPEG_PATH", "ffmpeg"),
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-i",
-            "pipe:0",
-            "-af",
-            (
-                "silenceremove=start_periods=1:start_duration=0.03:"
-                "start_threshold=-45dB:stop_periods=-1:stop_duration=0.18:"
-                "stop_threshold=-45dB:stop_silence=0.06"
-            ),
-            "-ac",
-            "1",
-            "-ar",
-            "24000",
-            "-f",
-            "s16le",
-            "pipe:1",
-        ],
-        input=audio,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        timeout=60,
-        check=False,
-    )
-    if process.returncode or not process.stdout:
-        return audio
-    output = io.BytesIO()
-    with wave.open(output, "wb") as target:
-        target.setnchannels(1)
-        target.setsampwidth(2)
-        target.setframerate(24000)
-        target.writeframes(process.stdout)
-    return output.getvalue()
-
-
 def transform_speech(audio, config):
     """One FFmpeg render for pitch and tempo; pitch alone keeps duration."""
     if not audio or len(audio) > MAX_AUDIO:
@@ -294,19 +163,6 @@ def transform_speech(audio, config):
         tempo /= 0.5
     if abs(tempo - 1) > 0.000001:
         filters.append(f"atempo={tempo:.8f}")
-    effect = config.get("effect", "none")
-    effect_filters = {
-        "none": [],
-        "radio": ["highpass=f=220", "lowpass=f=3800", "acompressor=threshold=-18dB:ratio=4:attack=5:release=80"],
-        "telephone": ["highpass=f=450", "lowpass=f=3200", "acompressor=threshold=-20dB:ratio=6:attack=3:release=60"],
-        "megaphone": ["highpass=f=500", "lowpass=f=5200", "acompressor=threshold=-16dB:ratio=5:attack=3:release=80", "volume=1.35"],
-        "robot": ["aecho=0.8:0.88:40:0.4"],
-        "cave": ["aecho=0.8:0.9:90:0.35"],
-        "horror": ["highpass=f=70", "lowpass=f=8500", "aecho=0.8:0.88:70:0.4"],
-    }
-    if effect not in effect_filters:
-        raise ValueError("Efeito de voz inválido.")
-    filters.extend(effect_filters[effect])
     if config.get("normalization", {}).get("enabled", True):
         filters.append("loudnorm=I=-18:TP=-1.5:LRA=11")
     process = subprocess.run(
@@ -318,7 +174,7 @@ def transform_speech(audio, config):
     )
     if process.returncode or not process.stdout or len(process.stdout) > MAX_AUDIO:
         raise RuntimeError("Não foi possível ajustar o tom desta voz.")
-    return compact_speech_audio(process.stdout)
+    return process.stdout
 
 
 def account_directory(user_id):
@@ -332,22 +188,6 @@ def account_directory(user_id):
 def reference_path(user_id, reference_id):
     uuid.UUID(reference_id)
     return account_directory(user_id) / f"{reference_id}.wav"
-
-
-def reference_metadata(raw, reference_id, duration):
-    raw = raw if isinstance(raw, dict) else {}
-    allowed_gender = {"feminina", "masculina", "neutra"}
-    name = str(raw.get("name", "")).strip()[:100] or f"Voz {reference_id[:8]}"
-    category = str(raw.get("category", "conversacional")).strip()[:40] or "conversacional"
-    gender = str(raw.get("gender", "neutra")).strip()
-    style = str(raw.get("style", "natural")).strip()[:40] or "natural"
-    return {
-        "name": name,
-        "category": category,
-        "gender": gender if gender in allowed_gender else "neutra",
-        "style": style,
-        "durationSec": duration,
-    }
 
 
 def decode_reference(audio):
@@ -547,112 +387,7 @@ class CpuWorkerManager:
             self.close_locked()
 
 
-class OmniWorker:
-    def __init__(self):
-        env = os.environ.copy()
-        env["CHATSCENE_OMNIVOICE_MODEL_PATH"] = str(OMNI_MODEL)
-        env["CHATSCENE_OMNIVOICE_CATALOG_DIR"] = str(OMNI_CATALOG_DIR)
-        self.process = subprocess.Popen(
-            [str(OMNI_PYTHON), "-u", str(OMNI_WORKER)],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            text=True, env=env,
-        )
-        try:
-            ready_line = self.read_line(OMNI_STARTUP_TIMEOUT)
-            ready = json.loads(ready_line) if ready_line else {}
-        except (TimeoutError, ValueError):
-            ready = {}
-        if not ready.get("ready"):
-            self.close()
-            raise RuntimeError("O motor do catálogo não iniciou.")
-
-    def read_line(self, timeout):
-        if not select.select([self.process.stdout], [], [], timeout)[0]:
-            raise TimeoutError("Tempo esgotado no motor do catálogo.")
-        return self.process.stdout.readline()
-
-    def synthesize(self, text, voice, speed):
-        if self.process.poll() is not None:
-            raise RuntimeError("O motor do catálogo parou.")
-        request_id = str(uuid.uuid4())
-        self.process.stdin.write(json.dumps({
-            "id": request_id, "text": text, "voiceId": voice, "speed": speed,
-        }, ensure_ascii=False) + "\n")
-        self.process.stdin.flush()
-        result = json.loads(self.read_line(OMNI_SYNTH_TIMEOUT))
-        if result.get("id") != request_id or result.get("error") or not result.get("audio"):
-            raise RuntimeError("O motor do catálogo não produziu áudio.")
-        return base64.b64decode(result["audio"], validate=True)
-
-    def close(self):
-        if self.process.poll() is None:
-            self.process.terminate()
-            try:
-                self.process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                self.process.kill()
-
-
-class KokoroWorker(OmniWorker):
-    def __init__(self):
-        env = os.environ.copy()
-        env["CHATSCENE_KOKORO_MODEL_DIR"] = str(KOKORO_MODEL_DIR)
-        env["HF_HUB_OFFLINE"] = "1"
-        print(f"starting kokoro worker python={KOKORO_PYTHON}", file=sys.stderr, flush=True)
-        self.process = subprocess.Popen(
-            [str(KOKORO_PYTHON), "-u", str(KOKORO_WORKER)],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=sys.stderr,
-            text=True, env=env,
-        )
-        try:
-            ready_line = self.read_line(KOKORO_STARTUP_TIMEOUT)
-            ready = json.loads(ready_line) if ready_line else {}
-        except (TimeoutError, ValueError):
-            ready = {}
-        if not ready.get("ready"):
-            self.close()
-            raise RuntimeError("O motor Kokoro PT-BR não iniciou.")
-
-
-class OmniWorkerManager:
-    def __init__(self, worker_type=OmniWorker):
-        self.lock = threading.RLock()
-        self.worker = None
-        self.timer = None
-        self.worker_type = worker_type
-
-    def close(self):
-        with self.lock:
-            if self.timer:
-                self.timer.cancel()
-                self.timer = None
-            if self.worker:
-                self.worker.close()
-                self.worker = None
-
-    def synthesize(self, text, voice, speed):
-        with self.lock:
-            if self.timer:
-                self.timer.cancel()
-                self.timer = None
-            if self.worker is None or self.worker.process.poll() is not None:
-                self.worker = self.worker_type()
-            try:
-                return self.worker.synthesize(text, voice, speed)
-            except Exception:
-                self.close()
-                raise
-            finally:
-                if self.worker:
-                    self.timer = threading.Timer(IDLE_SECONDS, self.close)
-                    self.timer.daemon = True
-                    self.timer.start()
-
-
 CPU = CpuWorkerManager()
-OMNI = OmniWorkerManager()
-KOKORO = OmniWorkerManager(KokoroWorker)
-MODEL_SWITCH_LOCK = threading.Lock()
 INFERENCE_SLOTS = threading.BoundedSemaphore(8)
 WARMING = threading.Event()
 WARMING_LOCK = threading.Lock()
@@ -663,10 +398,7 @@ def warm_engine():
         try:
             gpu_warm()
         except Exception:
-            with MODEL_SWITCH_LOCK:
-                OMNI.close()
-                KOKORO.close()
-                CPU.warm()
+            CPU.warm()
     finally:
         WARMING.clear()
 
@@ -712,35 +444,7 @@ class Handler(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(length))
 
     def do_GET(self):
-        parsed = urlparse(self.path)
-        if parsed.path == "/v1/voice/references" and self.authorized():
-            user_id = parse_qs(parsed.query).get("userId", [""])[0]
-            if not user_id:
-                self.respond(400, {"detail": "Conta de voz inválida."})
-                return
-            directory = account_directory(user_id)
-            references = []
-            for metadata_path in sorted(directory.glob("*.json")):
-                try:
-                    reference_id = metadata_path.stem
-                    uuid.UUID(reference_id)
-                    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-                    wav_path = directory / f"{reference_id}.wav"
-                    if not wav_path.is_file():
-                        continue
-                    references.append({
-                        "id": reference_id,
-                        "name": metadata.get("name", f"Voz {reference_id[:8]}"),
-                        "durationSec": float(metadata.get("durationSec", 0)),
-                        "category": metadata.get("category", "conversacional"),
-                        "gender": metadata.get("gender", "neutra"),
-                        "style": metadata.get("style", "natural"),
-                    })
-                except (OSError, ValueError, TypeError, KeyError):
-                    continue
-            self.respond(200, {"references": references})
-            return
-        if parsed.path != "/v1/voice/health" or not self.authorized():
+        if self.path != "/v1/voice/health" or not self.authorized():
             self.respond(404, {"detail": "not found"})
             return
         relay = relay_health()
@@ -749,12 +453,8 @@ class Handler(BaseHTTPRequestHandler):
             200,
             {
                 "installed": engine_installed(),
-                "modelVariant": runtime_config().get("modelVariant", "multilingual-v2"),
                 "genericInstalled": piper_installed(),
                 "piperVoices": [name for name in PIPER_VOICES if piper_installed(name)],
-                "kokoroVoices": kokoro_installed_ids(),
-                "catalogLicenseApproved": OMNI_LICENSE_APPROVED,
-                "catalogVoices": omnivoice_catalog_ids(),
                 "pitchTransform": True,
                 "device": "remote-cuda" if relay and not CPU.loaded else "cpu",
                 "modelLoaded": gpu_loaded or CPU.loaded,
@@ -776,7 +476,6 @@ class Handler(BaseHTTPRequestHandler):
                 audio = base64.b64decode(body.get("audio", ""), validate=True)
                 wav, duration = decode_reference(audio)
                 reference_id = str(uuid.uuid4())
-                metadata_value = reference_metadata(body.get("metadata"), reference_id, duration)
                 directory = account_directory(user_id)
                 path = directory / f"{reference_id}.wav"
                 path.write_bytes(wav)
@@ -788,14 +487,14 @@ class Handler(BaseHTTPRequestHandler):
                             "authorized": True,
                             "authorizationVersion": "adult-own-or-written-1",
                             "createdAt": int(time.time()),
-                            **metadata_value,
+                            "durationSec": duration,
                         }
                     ),
                     encoding="utf-8",
                 )
                 os.chmod(metadata, 0o600)
                 request_warm()
-                self.respond(201, {"id": reference_id, **metadata_value})
+                self.respond(201, {"id": reference_id, "durationSec": duration})
                 return
             if self.path == "/v1/voice/generic":
                 text = body.get("text")
@@ -811,61 +510,10 @@ class Handler(BaseHTTPRequestHandler):
                     audio = synthesize_piper(text, body.get("speed", 1), body.get("voice", "pt_BR-faber-medium"))
                 finally:
                     INFERENCE_SLOTS.release()
-                audio = compact_speech_audio(audio)
                 self.respond(
                     200,
                     {"audio": base64.b64encode(audio).decode("ascii"), "device": "cpu"},
                 )
-                return
-            if self.path == "/v1/voice/catalog/synthesize":
-                text = body.get("text")
-                voice = body.get("voice")
-                speed = float(body.get("speed", 1))
-                if not isinstance(text, str) or not 1 <= len(text) <= 600:
-                    raise ValueError("Texto deve ter entre 1 e 600 caracteres.")
-                if not isinstance(voice, str) or voice not in omnivoice_catalog_ids():
-                    raise ValueError("Esta voz do catálogo ainda não está instalada e aprovada.")
-                if not math.isfinite(speed) or not 0.7 <= speed <= 1.3:
-                    raise ValueError("Velocidade fora do limite.")
-                if not INFERENCE_SLOTS.acquire(blocking=False):
-                    self.respond(429, {"detail": "A fila de vozes está cheia. Tente novamente."})
-                    return
-                try:
-                    with MODEL_SWITCH_LOCK:
-                        CPU.close()
-                        KOKORO.close()
-                        audio = OMNI.synthesize(text, voice, speed)
-                finally:
-                    INFERENCE_SLOTS.release()
-                if not audio or len(audio) > MAX_AUDIO:
-                    raise RuntimeError("O áudio do catálogo excedeu o limite permitido.")
-                audio = compact_speech_audio(audio)
-                self.respond(200, {"audio": base64.b64encode(audio).decode("ascii"), "device": "cpu-or-cuda"})
-                return
-            if self.path == "/v1/voice/kokoro/synthesize":
-                text = body.get("text")
-                voice = body.get("voice")
-                speed = float(body.get("speed", 1))
-                if not isinstance(text, str) or not 1 <= len(text.strip()) <= 600:
-                    raise ValueError("Texto deve ter entre 1 e 600 caracteres.")
-                if not isinstance(voice, str) or voice not in kokoro_installed_ids():
-                    raise ValueError("Esta voz Kokoro PT-BR ainda não está instalada.")
-                if not math.isfinite(speed) or not 0.7 <= speed <= 1.3:
-                    raise ValueError("Velocidade fora do limite.")
-                if not INFERENCE_SLOTS.acquire(blocking=False):
-                    self.respond(429, {"detail": "A fila de vozes está cheia. Tente novamente."})
-                    return
-                try:
-                    with MODEL_SWITCH_LOCK:
-                        CPU.close()
-                        OMNI.close()
-                        audio = KOKORO.synthesize(text, voice, speed)
-                finally:
-                    INFERENCE_SLOTS.release()
-                if not audio or len(audio) > MAX_AUDIO:
-                    raise RuntimeError("O áudio Kokoro excedeu o limite permitido.")
-                audio = compact_speech_audio(audio)
-                self.respond(200, {"audio": base64.b64encode(audio).decode("ascii"), "device": "cpu"})
                 return
             if self.path == "/v1/voice/transform":
                 raw_audio = base64.b64decode(body.get("audio", ""), validate=True)
@@ -902,13 +550,9 @@ class Handler(BaseHTTPRequestHandler):
                     try:
                         audio, device = gpu_synthesize(text, reference)
                     except Exception:
-                        with MODEL_SWITCH_LOCK:
-                            OMNI.close()
-                            KOKORO.close()
-                            audio, device = CPU.synthesize(text, path), "cpu"
+                        audio, device = CPU.synthesize(text, path), "cpu"
                 finally:
                     INFERENCE_SLOTS.release()
-                audio = compact_speech_audio(audio)
                 self.respond(
                     200,
                     {"audio": base64.b64encode(audio).decode("ascii"), "device": device},
@@ -917,12 +561,7 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(404, {"detail": "not found"})
         except (ValueError, TypeError, KeyError, subprocess.TimeoutExpired) as error:
             self.respond(400, {"detail": str(error) or "Requisição de voz inválida."})
-        except Exception as error:
-            print(
-                f"voice request failed path={self.path} error={type(error).__name__}: {error}",
-                file=sys.stderr,
-                flush=True,
-            )
+        except Exception:
             self.respond(502, {"detail": "O motor de voz não conseguiu concluir esta operação."})
 
     def do_DELETE(self):
@@ -953,8 +592,6 @@ def main():
         pass
     finally:
         CPU.close()
-        OMNI.close()
-        KOKORO.close()
         server.server_close()
 
 

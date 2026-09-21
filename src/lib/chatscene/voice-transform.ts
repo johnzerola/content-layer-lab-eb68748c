@@ -2,17 +2,7 @@
  * Post-processing contract for synthetic/licensed TTS audio.
  * This is intentionally separate from VoiceProfile identity and provider choice.
  */
-export const VOICE_TRANSFORM_ENGINE_VERSION = "ffmpeg-baseline-2-effects";
-
-/** Post-processing effects implemented by the local/remote FFmpeg worker. */
-export type VoiceEffect =
-  | "none"
-  | "radio"
-  | "telephone"
-  | "megaphone"
-  | "robot"
-  | "cave"
-  | "horror";
+export const VOICE_TRANSFORM_ENGINE_VERSION = "ffmpeg-baseline-1";
 
 export type VoiceTransformMode =
   | "VARISPEED"
@@ -43,8 +33,6 @@ export interface VoiceTransformConfig {
   linkedPitchToSpeed: boolean;
   preservePitch: boolean;
   preserveFormants: boolean;
-  /** Optional for projects saved before the modifier catalog was added. */
-  effect?: VoiceEffect;
   normalization: VoiceNormalizationConfig;
   outputCodec: "mp3";
 }
@@ -57,7 +45,7 @@ export interface VoiceTransformSelection {
 export interface VoiceTransformPreset {
   id: string;
   displayName: string;
-  simpleLabel: "Natural" | "Young" | "Teen / Viral" | "Child-like" | "Deep" | "Mature Character" | "Normal speed high pitch" | "Fast dialogue" | "Radio" | "Telephone" | "Megaphone" | "Robot" | "Cave" | "Horror";
+  simpleLabel: "Natural" | "Young" | "Teen / Viral" | "Child-like" | "Deep" | "Mature Character" | "Normal speed high pitch" | "Fast dialogue";
   sourceCompatibility: string[];
   baseVoiceHint?: string;
   config: VoiceTransformConfig;
@@ -109,7 +97,6 @@ const config = (
   pitchSemitones: number,
   linkedPitchToSpeed: boolean,
   preservePitch: boolean,
-  effect: VoiceEffect = "none",
 ): VoiceTransformConfig => ({
   mode,
   speedMultiplier,
@@ -117,7 +104,6 @@ const config = (
   linkedPitchToSpeed,
   preservePitch,
   preserveFormants: false,
-  effect,
   normalization: { ...DEFAULT_VOICE_NORMALIZATION },
   outputCodec: "mp3",
 });
@@ -232,112 +218,6 @@ export const VOICE_TRANSFORM_PRESETS: VoiceTransformPreset[] = [
     description: "Eleva o tom por varispeed e restaura aproximadamente a duração original.",
     effectivePitchSemitones: linkedPitch(1.3),
   },
-  {
-    id: "child_bright",
-    displayName: "Personagem — Criança brilhante",
-    simpleLabel: "Child-like",
-    sourceCompatibility: ["synthetic-voice", "licensed-voice"],
-    config: config("SPEED_AND_PITCH", 1.12, 4.5, false, false),
-    evidenceLevel: "EXPERIMENTAL",
-    description: "Efeito infantil agudo e claro; não representa uma criança real nem cria nova identidade vocal.",
-    effectivePitchSemitones: 4.5,
-    safeSpeedRange: [1.05, 1.18],
-    safePitchRange: [3.5, 5.5],
-  },
-  {
-    id: "teen_energetic",
-    displayName: "Personagem — Adolescente energético",
-    simpleLabel: "Teen / Viral",
-    sourceCompatibility: ["synthetic-voice", "licensed-voice"],
-    config: config("SPEED_AND_PITCH", 1.18, 2.5, false, false),
-    evidenceLevel: "EXPERIMENTAL",
-    description: "Efeito jovem, rápido e brilhante para vídeos curtos; não é uma voz adolescente autêntica.",
-    effectivePitchSemitones: 2.5,
-    safeSpeedRange: [1.1, 1.25],
-    safePitchRange: [1.5, 3.5],
-  },
-  {
-    id: "elderly_warm",
-    displayName: "Personagem — Idoso caloroso",
-    simpleLabel: "Mature Character",
-    sourceCompatibility: ["synthetic-voice", "licensed-voice"],
-    config: config("SPEED_AND_PITCH", 0.9, -2.5, false, false),
-    evidenceLevel: "EXPERIMENTAL",
-    description: "Efeito mais grave e lento para personagem maduro; não é uma voz idosa autêntica.",
-    effectivePitchSemitones: -2.5,
-    safeSpeedRange: [0.85, 0.98],
-    safePitchRange: [-4, -1.5],
-  },
-  {
-    id: "narrator_deep",
-    displayName: "Locução — Narrador grave",
-    simpleLabel: "Deep",
-    sourceCompatibility: ["synthetic-voice", "licensed-voice"],
-    config: config("SPEED_AND_PITCH", 0.96, -1.5, false, false),
-    evidenceLevel: "BASELINE",
-    description: "Locução encorpada com ritmo controlado e normalização de volume.",
-    effectivePitchSemitones: -1.5,
-  },
-  {
-    id: "news_radio",
-    displayName: "Locução — Notícias / rádio",
-    simpleLabel: "Radio",
-    sourceCompatibility: ["synthetic-voice", "licensed-voice"],
-    config: config("TEMPO_ONLY", 1, 0, false, true, "radio"),
-    evidenceLevel: "BASELINE",
-    description: "Faixa de rádio com compressão e corte de graves/agudos extremos.",
-    effectivePitchSemitones: 0,
-  },
-  {
-    id: "telephone",
-    displayName: "Efeito — Telefone",
-    simpleLabel: "Telephone",
-    sourceCompatibility: ["synthetic-voice", "licensed-voice"],
-    config: config("TEMPO_ONLY", 1, 0, false, true, "telephone"),
-    evidenceLevel: "BASELINE",
-    description: "Banda estreita de telefone para mensagens, chamadas e diálogos.",
-    effectivePitchSemitones: 0,
-  },
-  {
-    id: "megaphone",
-    displayName: "Efeito — Megafone",
-    simpleLabel: "Megaphone",
-    sourceCompatibility: ["synthetic-voice", "licensed-voice"],
-    config: config("TEMPO_ONLY", 1, 0, false, true, "megaphone"),
-    evidenceLevel: "BASELINE",
-    description: "Médio-agudos destacados e compressão para efeito de megafone.",
-    effectivePitchSemitones: 0,
-  },
-  {
-    id: "robot",
-    displayName: "Efeito — Robô",
-    simpleLabel: "Robot",
-    sourceCompatibility: ["synthetic-voice", "licensed-voice"],
-    config: config("TEMPO_ONLY", 1, 0, false, true, "robot"),
-    evidenceLevel: "EXPERIMENTAL",
-    description: "Modulação e eco curtos para personagem robótico; não é conversão neural.",
-    effectivePitchSemitones: 0,
-  },
-  {
-    id: "cave_echo",
-    displayName: "Efeito — Caverna / eco",
-    simpleLabel: "Cave",
-    sourceCompatibility: ["synthetic-voice", "licensed-voice"],
-    config: config("TEMPO_ONLY", 1, 0, false, true, "cave"),
-    evidenceLevel: "BASELINE",
-    description: "Eco curto para ambientes, cavernas e transições dramáticas.",
-    effectivePitchSemitones: 0,
-  },
-  {
-    id: "horror",
-    displayName: "Efeito — Terror",
-    simpleLabel: "Horror",
-    sourceCompatibility: ["synthetic-voice", "licensed-voice"],
-    config: config("SPEED_AND_PITCH", 0.94, -1, false, false, "horror"),
-    evidenceLevel: "EXPERIMENTAL",
-    description: "Tom levemente grave com ambiência curta para suspense e terror.",
-    effectivePitchSemitones: -1,
-  },
 ];
 
 export const DEFAULT_VOICE_TRANSFORM_PRESET_ID = "adam_natural";
@@ -382,8 +262,6 @@ export function validateVoiceTransformConfig(value: VoiceTransformConfig): Voice
     speedMultiplier,
     pitchSemitones,
     preserveFormants: false,
-    effect: value.effect ?? "none",
-    effect: value.effect ?? "none",
     outputCodec: "mp3",
     normalization: {
       enabled: Boolean(value.normalization?.enabled),

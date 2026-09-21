@@ -40,7 +40,6 @@ describe("ElevenLabs server adapter", () => {
               category: "premade",
               description: "Conversational",
               labels: { gender: "male", accent: "american" },
-              preview_url: "https://audio.elevenlabs.io/voice-1.mp3",
               secret_internal_field: "never-return-this",
             },
           ],
@@ -58,23 +57,12 @@ describe("ElevenLabs server adapter", () => {
         category: "premade",
         description: "Conversational",
         labels: { gender: "male", accent: "american" },
-        previewUrl: "https://audio.elevenlabs.io/voice-1.mp3",
       },
     ]);
     const [, init] = request.mock.calls[0]!;
     expect(new Headers(init.headers).get("xi-api-key")).toBe("private-api-key");
     expect(String(request.mock.calls[0]![0])).not.toContain("private-api-key");
     expect(JSON.stringify(voices)).not.toContain("private-api-key");
-  });
-
-  it("does not expose unsafe preview URLs to the browser", async () => {
-    const request = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({
-        voices: [{ voice_id: "voice-1", name: "Teste", preview_url: "javascript:alert(1)" }],
-      })),
-    );
-    const voices = await fetchElevenLabsVoices("private-api-key", request);
-    expect(voices[0]).not.toHaveProperty("previewUrl");
   });
 
   it("maps an invalid key to an actionable error without leaking provider response", async () => {

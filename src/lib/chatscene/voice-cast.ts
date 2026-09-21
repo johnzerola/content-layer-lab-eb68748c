@@ -47,8 +47,7 @@ export interface VoiceProvider {
 
 const cache = new Map<string, VoiceClip>();
 let audioCtx: AudioContext | null = null;
-// v2 invalidates clips generated before the server-side silence compaction.
-const CACHE_DB = "chatscene-voice-cache-v2";
+const CACHE_DB = "chatscene-voice-cache-v1";
 
 function openCacheDb(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === "undefined") return Promise.resolve(null);

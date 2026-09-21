@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Check, Loader2, Mic2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/base";
-import { getVoiceEngineStatus, listVoiceReferences, prepareVoiceEngine } from "@/lib/chatscene/voice.functions";
+import { getVoiceEngineStatus, prepareVoiceEngine } from "@/lib/chatscene/voice.functions";
 import { VoiceReferenceControl } from "./VoiceReferenceControl";
 import {
   attachPreset,
@@ -11,7 +11,6 @@ import {
 } from "@/lib/chatscene/voice-resolution";
 import { missingSpeakingMessages } from "@/lib/chatscene/voice-cast";
 import type { ChatSceneProject } from "@/lib/chatscene/types";
-import type { RemoteVoiceReference } from "@/lib/chatscene/voice-clone.remote.server";
 
 export function VoiceClonePanel({
   project,
@@ -26,7 +25,6 @@ export function VoiceClonePanel({
 }) {
   const statusFn = useServerFn(getVoiceEngineStatus);
   const prepareFn = useServerFn(prepareVoiceEngine);
-  const listReferencesFn = useServerFn(listVoiceReferences);
   const latestProject = useRef(project);
   latestProject.current = project;
   const [targetId, setTargetId] = useState<string | null>(project.participants[0]?.id ?? null);
@@ -34,25 +32,6 @@ export function VoiceClonePanel({
   const [modelReady, setModelReady] = useState<boolean | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
-  const [library, setLibrary] = useState<RemoteVoiceReference[]>([]);
-  const [libraryError, setLibraryError] = useState<string | null>(null);
-
-  const refreshLibrary = useCallback(async () => {
-    if (available !== true) return;
-    try {
-      const result = await listReferencesFn();
-      const value = result as unknown as { references?: unknown } | unknown[];
-      const references = Array.isArray(value)
-        ? value
-        : Array.isArray(value.references)
-          ? value.references
-          : [];
-      setLibrary(references as RemoteVoiceReference[]);
-      setLibraryError(null);
-    } catch {
-      setLibraryError("Não foi possível carregar sua biblioteca de vozes.");
-    }
-  }, [available, listReferencesFn]);
 
   useEffect(() => {
     if (!targetId || !project.participants.some((participant) => participant.id === targetId)) {
@@ -79,9 +58,6 @@ export function VoiceClonePanel({
   useEffect(() => {
     void checkStatus();
   }, [checkStatus]);
-  useEffect(() => {
-    void refreshLibrary();
-  }, [refreshLibrary]);
 
   const target =
     project.participants.find((participant) => participant.id === targetId) ??
@@ -145,7 +121,6 @@ export function VoiceClonePanel({
   ).length;
   const attach = (nextReference: NonNullable<typeof reference>) => {
     patch(attachVoiceReference(latestProject.current, target.id, nextReference));
-    setLibrary((current) => [nextReference, ...current.filter((item) => item.id !== nextReference.id)]);
   };
   const remove = () => {
     const current = latestProject.current;
@@ -159,7 +134,6 @@ export function VoiceClonePanel({
         current,
       ),
     );
-    setLibrary((current) => current.filter((item) => item.id !== reference.id));
   };
 
   return (
@@ -175,30 +149,6 @@ export function VoiceClonePanel({
           voz do personagem.
         </p>
       </div>
-
-      {library.length ? (
-        <section className="rounded-xl border border-border bg-background/45 p-4" aria-labelledby="voice-library-title">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 id="voice-library-title" className="text-sm font-semibold">Minha biblioteca de vozes</h3>
-              <p className="mt-1 text-xs text-muted-foreground">Referências privadas reutilizáveis nesta conta.</p>
-            </div>
-            <Button type="button" variant="secondary" size="sm" onClick={() => void refreshLibrary()}>Atualizar</Button>
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {library.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{item.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">{item.category} · {item.gender ?? "perfil não definido"} · {item.style ?? "natural"}</p>
-                </div>
-                <Button type="button" size="sm" variant="outline" onClick={() => attach(item)}>Usar</Button>
-              </div>
-            ))}
-          </div>
-          {libraryError ? <p className="mt-2 text-xs text-destructive" role="alert">{libraryError}</p> : null}
-        </section>
-      ) : null}
 
       <section
         className="rounded-xl border border-primary/45 bg-primary/5 p-4"

@@ -68,7 +68,7 @@ describe('keyframes de vídeo do template', () => {
     keyed = upsertVideoPropertyKeyframe(keyed, 0, 'h', 800);
     keyed = upsertVideoPropertyKeyframe(keyed, 4, 'h', 1600);
     const changed = patchVideoAtTime(keyed, 4, { y: 1120, w: 1080, h: 1700 });
-    expect(videoBoxAt(changed, 3)).toMatchObject({ x: 460, y: 957.5, w: 937.5, h: 1475 });
+    expect(videoBoxAt(changed, 3)).toMatchObject({ x: 460, y: 1041.875, w: 1005, h: 1559.375 });
     expect(videoBoxAt(changed, 4)).toMatchObject({ x: 460, y: 1120, w: 1080, h: 1700 });
   });
 

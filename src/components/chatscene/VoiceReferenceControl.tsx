@@ -28,10 +28,6 @@ export function VoiceReferenceControl({
   const upload = useServerFn(uploadVoiceReference);
   const remove = useServerFn(removeVoiceReference);
   const [authorized, setAuthorized] = useState(false);
-  const [voiceName, setVoiceName] = useState(participantName);
-  const [category, setCategory] = useState("conversacional");
-  const [gender, setGender] = useState<"feminina" | "masculina" | "neutra">("neutra");
-  const [style, setStyle] = useState("natural");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const send = async (file: File) => {
@@ -49,14 +45,8 @@ export function VoiceReferenceControl({
         reader.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
         reader.readAsDataURL(file);
       });
-      const metadata = {
-        name: voiceName.trim() || file.name.slice(0, 100),
-        category,
-        gender,
-        style,
-      } as const;
-      const result = await upload({ data: { audio, authorized: true, metadata } });
-      onAttach({ ...result, ...metadata });
+      const result = await upload({ data: { audio, authorized: true } });
+      onAttach({ ...result, name: file.name.slice(0, 100) });
     } catch (cause) {
       setError(chatSceneClientError(cause, "Falha ao enviar a referência."));
     } finally {
@@ -119,50 +109,6 @@ export function VoiceReferenceControl({
             <label htmlFor={inputId} className="block text-xs font-medium">
               Áudio de referência de {participantName}
             </label>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-xs font-medium">
-                Nome da voz
-                <input
-                  value={voiceName}
-                  onChange={(event) => setVoiceName(event.target.value)}
-                  maxLength={100}
-                  className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Ex.: Narrador grave"
-                />
-              </label>
-              <label className="text-xs font-medium">
-                Categoria
-                <select
-                  value={category}
-                  onChange={(event) => setCategory(event.target.value)}
-                  className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {['energética', 'locução', 'narração', 'conto de histórias', 'notícias', 'terror', 'conversacional'].map((item) => <option key={item}>{item}</option>)}
-                </select>
-              </label>
-              <label className="text-xs font-medium">
-                Perfil
-                <select
-                  value={gender}
-                  onChange={(event) => setGender(event.target.value as typeof gender)}
-                  className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <option value="neutra">Não definido</option>
-                  <option value="feminina">Feminina</option>
-                  <option value="masculina">Masculina</option>
-                </select>
-              </label>
-              <label className="text-xs font-medium">
-                Entrega
-                <select
-                  value={style}
-                  onChange={(event) => setStyle(event.target.value)}
-                  className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {['natural', 'energética', 'grave', 'suave', 'dramática', 'jornalística'].map((item) => <option key={item}>{item}</option>)}
-                </select>
-              </label>
-            </div>
             <input
               id={inputId}
               type="file"

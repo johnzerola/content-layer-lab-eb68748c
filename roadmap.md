@@ -41,7 +41,7 @@
 - [x] Banco: índices e listagens leves em projetos, transcrições e lotes
 
 ## Lançamento
-- [ ] Editor: keyframes individuais de X, Y, largura e altura com exclusão explícita na timeline
+- [x] Editor: keyframes individuais de X, Y, largura e altura com exclusão explícita na timeline
 - [x] Biblioteca: botão Baixar para os vídeos guardados na conta (link temporário)
 - [x] TikTok real na Biblioteca e Agenda via API oficial, com OAuth, renovação e link da publicação
 - [x] Tela inicial: estúdios carregam sob demanda

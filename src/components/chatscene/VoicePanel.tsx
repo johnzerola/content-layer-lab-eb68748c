@@ -50,7 +50,6 @@ import {
   listElevenLabsVoices,
 } from "@/lib/elevenlabs.functions";
 import type { ElevenLabsVoice } from "@/lib/elevenlabs.server";
-import { ElevenLabsVoiceCatalog } from "@/components/chatscene/ElevenLabsVoiceCatalog";
 
 export interface VoicePanelProps {
   project: ChatSceneProject;
@@ -88,38 +87,22 @@ export function VoicePanel(props: VoicePanelProps) {
   const voicesFn = useServerFn(listElevenLabsVoices);
   const engineStatusFn = useServerFn(getVoiceEngineStatus);
   const [installedLocalVoices, setInstalledLocalVoices] = useState<string[] | null>(null);
-  const [installedKokoroVoices, setInstalledKokoroVoices] = useState<string[] | null>(null);
   const [pitchTransformAvailable, setPitchTransformAvailable] = useState<boolean | null>(null);
-  const [voiceStatusError, setVoiceStatusError] = useState(false);
-  const [voiceStatusLoading, setVoiceStatusLoading] = useState(false);
-  const voiceStatusRequest = useRef(0);
-  const refreshVoiceStatus = useCallback(async () => {
-    const request = ++voiceStatusRequest.current;
-    setVoiceStatusLoading(true);
-    setVoiceStatusError(false);
-    try {
-      const status = await engineStatusFn();
-      if (request === voiceStatusRequest.current) {
-        setInstalledLocalVoices(status.piperVoices);
-        setInstalledKokoroVoices(status.kokoroVoices);
-        setPitchTransformAvailable(status.pitchTransform);
-        setVoiceStatusError(status.clone.device === "remote-unavailable");
-      }
-    } catch {
-      if (request === voiceStatusRequest.current) {
-        setInstalledLocalVoices([]);
-        setInstalledKokoroVoices([]);
-        setPitchTransformAvailable(false);
-        setVoiceStatusError(true);
-      }
-    } finally {
-      if (request === voiceStatusRequest.current) setVoiceStatusLoading(false);
-    }
-  }, [engineStatusFn]);
   useEffect(() => {
-    void refreshVoiceStatus();
-    return () => { voiceStatusRequest.current += 1; };
-  }, [refreshVoiceStatus]);
+    let active = true;
+    void engineStatusFn().then((status) => {
+      if (active) {
+        setInstalledLocalVoices(status.piperVoices);
+        setPitchTransformAvailable(status.pitchTransform);
+      }
+    }).catch(() => {
+      if (active) {
+        setInstalledLocalVoices([]);
+        setPitchTransformAvailable(false);
+      }
+    });
+    return () => { active = false; };
+  }, [engineStatusFn]);
   const [elevenConnection, setElevenConnection] = useState<
     "checking" | "connected" | "disconnected" | "error"
   >("checking");
@@ -261,16 +244,6 @@ export function VoicePanel(props: VoicePanelProps) {
     "adam_child_male",
     "adam_deep",
     "adam_mature_character",
-    "child_bright",
-    "teen_energetic",
-    "elderly_warm",
-    "narrator_deep",
-    "news_radio",
-    "telephone",
-    "megaphone",
-    "robot",
-    "cave_echo",
-    "horror",
   ];
   const labTransformIds = [
     "dialogue_fast",
@@ -495,6 +468,16 @@ export function VoicePanel(props: VoicePanelProps) {
             </Button>
           </form>
         ) : null}
+        {elevenConnection === "connected" && elevenCatalogLoaded && !elevenVoices.length ? (
+          <a
+            href="https://elevenlabs.io/app/voice-library"
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-flex min-h-11 items-center rounded-sm text-xs underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Abrir biblioteca da ElevenLabs (nova aba)
+          </a>
+        ) : null}
         {elevenVoices.length ? (
           <div className="mt-3 border-t border-primary/15 pt-3">
             <Button
@@ -510,46 +493,6 @@ export function VoicePanel(props: VoicePanelProps) {
               identidade vocal de canal ou pessoa real.
             </p>
           </div>
-        ) : null}
-        {elevenConnection === "connected" ? (
-          <ElevenLabsVoiceCatalog
-            voices={elevenVoices}
-            participants={project.participants}
-            loaded={elevenCatalogLoaded}
-            loading={elevenLoading}
-            onAssign={(participantId, voice) =>
-              setProject(attachElevenLabsVoice(latestProject.current, participantId, voice))
-            }
-          />
-        ) : null}
-      </section>
-      <section className="space-y-2" aria-label="Vozes locais PT-BR">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-semibold">Vozes locais · PT-BR</p>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground tabular-nums" role="status" aria-live="polite">
-              {voiceStatusLoading || installedKokoroVoices === null || installedLocalVoices === null
-                ? "Verificando…"
-                : voiceStatusError
-                  ? "Verificação indisponível"
-                  : `${installedLocalVoices.length + installedKokoroVoices.length} vozes prontas`}
-            </span>
-            <Button type="button" size="sm" variant="secondary" className="min-h-12" onClick={() => void refreshVoiceStatus()} disabled={voiceStatusLoading}>
-              <RotateCcw className="size-3.5" aria-hidden /> Atualizar
-            </Button>
-          </div>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          São seis identidades locais instaladas no servidor (Piper e Kokoro), além das vozes da ElevenLabs e do clonador autorizado. Escolha em “Voz base” e use “Ouvir” para testar.
-        </p>
-        {voiceStatusError ? (
-          <p className="text-sm text-muted-foreground" role="alert">
-            Não foi possível verificar o servidor de voz. As novas vozes permanecem indisponíveis.
-          </p>
-        ) : installedKokoroVoices?.length === 0 && installedLocalVoices?.length === 0 && !voiceStatusLoading ? (
-          <p className="text-sm text-muted-foreground" role="status">
-            Nenhuma voz local foi encontrada. O clonador e a ElevenLabs continuam disponíveis quando configurados.
-          </p>
         ) : null}
       </section>
       <Button
@@ -661,14 +604,10 @@ export function VoicePanel(props: VoicePanelProps) {
                           <option
                             key={preset.id}
                             value={preset.id}
-                            disabled={
-                              (preset.provider === "piper" && preset.providerVoice !== "pt_BR-faber-medium" && !installedLocalVoices?.includes(preset.providerVoice)) ||
-                              (preset.provider === "kokoro" && !installedKokoroVoices?.includes(preset.providerVoice))
-                            }
+                            disabled={preset.provider === "piper" && preset.providerVoice !== "pt_BR-faber-medium" && !installedLocalVoices?.includes(preset.providerVoice)}
                           >
                             {voiceDisplayLabel(preset)}
                             {preset.provider === "piper" && preset.providerVoice !== "pt_BR-faber-medium" && !installedLocalVoices?.includes(preset.providerVoice) ? " (instalar no servidor)" : ""}
-                            {preset.provider === "kokoro" && !installedKokoroVoices?.includes(preset.providerVoice) ? " (instalar no servidor)" : ""}
                           </option>
                       ))}
                     </optgroup>
@@ -865,33 +804,12 @@ export function VoicePanel(props: VoicePanelProps) {
                             }
                           />
                         ) : null}
-        {voice.transform ? (
+                        {voice.transform ? (
                           <details className="rounded-md border border-border bg-background/40 p-2">
                             <summary className="cursor-pointer rounded-sm text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                               Transformação avançada
                             </summary>
                             <div className="mt-2 space-y-2 border-t border-border pt-2">
-                              <label className="block text-[11px] text-muted-foreground">
-                                <span className="mb-1 block">Modificador de áudio</span>
-                                <select
-                                  className="h-10 w-full rounded-md border border-border bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                  value={voice.transform.config.effect ?? "none"}
-                                  onChange={(event) =>
-                                    updateTransform(voice, {
-                                      effect: event.target.value as VoiceTransformConfig["effect"],
-                                    })
-                                  }
-                                  aria-label={`Modificador de áudio de ${participant.name}`}
-                                >
-                                  <option value="none">Nenhum</option>
-                                  <option value="radio">Rádio / notícias</option>
-                                  <option value="telephone">Telefone</option>
-                                  <option value="megaphone">Megafone</option>
-                                  <option value="robot">Robô</option>
-                                  <option value="cave">Caverna / eco</option>
-                                  <option value="horror">Terror / suspense</option>
-                                </select>
-                              </label>
                               <VoiceRange
                                 label="Velocidade transformada"
                                 value={voice.transform.config.speedMultiplier}
@@ -1165,16 +1083,6 @@ function transformUiLabel(id: string, baseName: string): string {
         adam_deep: `${baseName} · Adulto grave`,
         adam_mature_character: `${baseName} · Personagem maduro`,
         adam_child_pitch_only: `${baseName} · Tom agudo em velocidade normal`,
-        child_bright: `${baseName} · Criança brilhante`,
-        teen_energetic: `${baseName} · Adolescente energético`,
-        elderly_warm: `${baseName} · Idoso caloroso`,
-        narrator_deep: `${baseName} · Narrador grave`,
-        news_radio: `${baseName} · Notícias / rádio`,
-        telephone: `${baseName} · Telefone`,
-        megaphone: `${baseName} · Megafone`,
-        robot: `${baseName} · Robô`,
-        cave_echo: `${baseName} · Caverna / eco`,
-        horror: `${baseName} · Terror`,
       } as Record<string, string>
     )[id] ?? id
   );
@@ -1191,16 +1099,6 @@ function simpleTransformUiLabel(id: string): string {
         adam_child_male: "Masculino infantilizado",
         adam_deep: "Grave",
         adam_mature_character: "Personagem maduro",
-        child_bright: "Criança brilhante",
-        teen_energetic: "Adolescente energético",
-        elderly_warm: "Idoso caloroso",
-        narrator_deep: "Narrador grave",
-        news_radio: "Notícias / rádio",
-        telephone: "Telefone",
-        megaphone: "Megafone",
-        robot: "Robô",
-        cave_echo: "Caverna / eco",
-        horror: "Terror / suspense",
       } as Record<string, string>
     )[id] ?? id
   );

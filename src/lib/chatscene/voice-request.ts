@@ -14,7 +14,6 @@ const voiceTransformConfigInput = z.object({
   linkedPitchToSpeed: z.boolean(),
   preservePitch: z.boolean(),
   preserveFormants: z.boolean(),
-  effect: z.enum(["none", "radio", "telephone", "megaphone", "robot", "cave", "horror"]).optional().default("none"),
   normalization: z.object({
     enabled: z.boolean(),
     integratedLufs: z.number().min(-30).max(-12),
