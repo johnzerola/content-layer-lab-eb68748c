@@ -66,6 +66,23 @@ export interface VoicePanelProps {
   onChangeVoice: () => void;
 }
 
+const CHARACTER_MODIFIER_PRESET_IDS = [
+  "child_bright",
+  "teen_energetic",
+  "narrator_deep",
+  "elderly_warm",
+] as const;
+
+const AUDIO_MODIFIER_PRESET_IDS = new Set([
+  ...CHARACTER_MODIFIER_PRESET_IDS,
+  "news_radio",
+  "telephone",
+  "megaphone",
+  "robot",
+  "cave_echo",
+  "horror",
+]);
+
 export function VoicePanel(props: VoicePanelProps) {
   const {
     project,
@@ -271,6 +288,39 @@ export function VoicePanel(props: VoicePanelProps) {
         ...current,
         presetId: current.presetId,
         config: { ...current.config, ...changes },
+      },
+    });
+  };
+  const voiceModifierValue = (voice: VoiceProfile) => {
+    const presetId = voice.transform?.presetId;
+    if (presetId && CHARACTER_MODIFIER_PRESET_IDS.some((id) => id === presetId)) {
+      return `preset:${presetId}`;
+    }
+    const effect = voice.transform?.config.effect ?? "none";
+    return effect === "none" ? "none" : `effect:${effect}`;
+  };
+  const setVoiceModifier = (voice: VoiceProfile, value: string) => {
+    if (!voice.id) return;
+    if (value.startsWith("preset:")) {
+      updateProfile(voice.id, {
+        pitch: 0,
+        transform: selectionFromTransformPreset(value.slice("preset:".length)),
+      });
+      return;
+    }
+
+    const current = voice.transform ?? selectionFromTransformPreset("adam_natural");
+    const base = AUDIO_MODIFIER_PRESET_IDS.has(current.presetId)
+      ? selectionFromTransformPreset("adam_natural")
+      : current;
+    const effect = value === "none"
+      ? "none"
+      : value.slice("effect:".length) as NonNullable<VoiceTransformConfig["effect"]>;
+    updateProfile(voice.id, {
+      pitch: 0,
+      transform: {
+        ...base,
+        config: { ...base.config, effect },
       },
     });
   };
@@ -750,19 +800,28 @@ export function VoicePanel(props: VoicePanelProps) {
                           <span className="mb-1 block">Modificador de áudio</span>
                           <select
                             className="h-10 w-full rounded-md border border-border bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            value={voice.transform?.config.effect ?? "none"}
-                            onChange={(event) => updateTransform(voice, {
-                              effect: event.target.value as NonNullable<VoiceTransformConfig["effect"]>,
-                            })}
+                            value={voiceModifierValue(voice)}
+                            onChange={(event) => setVoiceModifier(voice, event.target.value)}
                           >
                             <option value="none">Nenhum</option>
-                            <option value="radio">Rádio / notícias</option>
-                            <option value="telephone">Telefone</option>
-                            <option value="megaphone">Megafone</option>
-                            <option value="robot">Robô</option>
-                            <option value="cave">Caverna / eco</option>
-                            <option value="horror">Terror / suspense</option>
+                            <optgroup label="Voz e idade">
+                              <option value="preset:child_bright">Criança brilhante</option>
+                              <option value="preset:teen_energetic">Adolescente energético</option>
+                              <option value="preset:narrator_deep">Adulto / narrador grave</option>
+                              <option value="preset:elderly_warm">Idoso caloroso</option>
+                            </optgroup>
+                            <optgroup label="Ambiente e transmissão">
+                              <option value="effect:radio">Rádio / notícias</option>
+                              <option value="effect:telephone">Telefone</option>
+                              <option value="effect:megaphone">Megafone</option>
+                              <option value="effect:robot">Robô</option>
+                              <option value="effect:cave">Caverna / eco</option>
+                              <option value="effect:horror">Terror / suspense</option>
+                            </optgroup>
                           </select>
+                          <span className="mt-1 block text-[10px] font-normal text-muted-foreground">
+                            Os perfis de idade alteram tom e ritmo; são efeitos de personagem, não identidades etárias reais.
+                          </span>
                         </label>
                         {caps?.controls.energy ? (
                           <VoiceRange
