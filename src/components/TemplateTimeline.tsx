@@ -100,18 +100,20 @@ export function TemplateTimeline({ template: t, onChange, selected, onSelect, ti
     <div className="max-h-64 overflow-auto rounded-lg border border-border">
       <div style={{ minWidth: `${zoom * 100}%` }}>
         <div className="flex h-9 items-center border-b border-border"><span className="w-28 shrink-0 px-2 text-xs">Camadas</span><div className="relative mx-2 flex-1"><input aria-label="Posição na timeline" type="range" min={0} max={duration} step={0.01} value={time} onChange={e => onSeek(Number(e.target.value))} className="w-full accent-[var(--primary)]" /><div className="flex justify-between font-mono text-[10px] text-muted-foreground">{[0, 1, 2, 3, 4].map(n => <span key={n}>{(duration * n / 4).toFixed(1)}s</span>)}</div></div></div>
-        <div className="flex h-10 items-center border-b border-border/50">
-          <span className="w-28 shrink-0 truncate px-2 text-left text-xs">Keyframes vídeo</span>
-          <div className="relative mx-2 h-7 flex-1 rounded bg-background/50" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); onSeek(Math.max(0, Math.min(duration, (e.clientX - r.left) / r.width * duration))); }}>
-            {videoKeys.length === 0 && <span className="pointer-events-none absolute inset-0 flex items-center pl-2 text-[10px] text-muted-foreground">Ajuste o vídeo e clique em “Keyframe” para animar tamanho e posição</span>}
-            {videoKeys.map(k => <button key={k.id} type="button" aria-label={`Keyframe em ${k.t.toFixed(1)} segundos — clique para ir, duplo clique remove`} title={`${k.t.toFixed(1)}s · clique para ir · duplo clique remove`}
-              onClick={e => { e.stopPropagation(); onSeek(k.t); }}
-              onDoubleClick={e => { e.stopPropagation(); onChange({ ...t, videoKeyframes: videoKeys.filter(o => o.id !== k.id) }); }}
-              className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[2px] border border-amber-200 bg-amber-400 transition hover:scale-125"
-              style={{ left: `${Math.min(100, k.t / duration * 100)}%` }} />)}
-            <div className="pointer-events-none absolute inset-y-0 w-px bg-white" style={{ left: `${time / duration * 100}%` }} />
-          </div>
-        </div>
+        {VIDEO_KEY_TRACKS.map(({ property, label }) => {
+          const propertyKeys = videoKeys.filter((key) => key[property] !== undefined);
+          return <div key={property} className="flex h-9 items-center border-b border-border/50">
+            <span className="w-28 shrink-0 truncate px-2 text-left text-xs">{label}</span>
+            <div className="relative mx-2 h-6 flex-1 rounded bg-background/50" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); onSeek(Math.max(0, Math.min(duration, (e.clientX - r.left) / r.width * duration))); }}>
+              {propertyKeys.length === 0 && property === 'x' && <span className="pointer-events-none absolute inset-0 flex items-center pl-2 text-[10px] text-muted-foreground">Use o losango ao lado de cada ajuste</span>}
+              {propertyKeys.map(k => <button key={`${property}:${k.id}`} type="button" aria-pressed={selectedKeyId === k.id} aria-label={`Selecionar keyframe de ${label} em ${k.t.toFixed(1)} segundos`} title={`${label} · ${k.t.toFixed(1)}s`}
+                onClick={e => { e.stopPropagation(); setSelectedKeyId(k.id); setFullId(null); onSelect('video'); onSeek(k.t); }}
+                className={`absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border transition hover:scale-125 ${selectedKeyId === k.id ? 'border-primary bg-primary ring-2 ring-primary/40' : 'border-primary/70 bg-primary/50'}`}
+                style={{ left: `${Math.min(100, k.t / duration * 100)}%` }} />)}
+              <div className="pointer-events-none absolute inset-y-0 w-px bg-foreground" style={{ left: `${time / duration * 100}%` }} />
+            </div>
+          </div>;
+        })}
         {rows.map(row => <div key={row.id} className="flex h-10 items-center border-b border-border/50"><button className="w-28 shrink-0 truncate px-2 text-left text-xs" onClick={() => { setFullId(row.full ? row.id : null); if (!row.full) onSelect(row.id); }}>{row.label}</button><div className="relative mx-2 h-7 flex-1 bg-background/50" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); onSeek(Math.max(0, Math.min(duration, (e.clientX - r.left) / r.width * duration))); }}>
           <button title="Arraste para mover o intervalo; ajuste início e fim abaixo" aria-label={`Mover ${row.label}`} className={`absolute top-0 h-full touch-none truncate rounded border px-2 text-left text-[10px] ${row.full ? 'bg-sky-500/25 border-sky-400' : 'bg-primary/25 border-primary/60'} ${(row.full ? fullId === row.id : !fullId && selected === row.id) ? 'ring-2 ring-primary' : ''}`} style={{ left: `${Math.min(100, row.start / duration * 100)}%`, width: `${Math.max(0, Math.min(duration, row.end) - row.start) / duration * 100}%` }} onClick={e => e.stopPropagation()} onPointerDown={e => {
             e.stopPropagation(); setFullId(row.full ? row.id : null); if (!row.full) onSelect(row.id);
@@ -141,7 +143,10 @@ export function TemplateTimeline({ template: t, onChange, selected, onSelect, ti
         </div></div>)}
       </div>
     </div>
-    {full ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    {selectedKey ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/40 bg-primary/10 p-3">
+      <div><p className="text-xs font-medium text-foreground">Keyframe selecionado · {selectedKey.t.toFixed(1)}s</p><p className="text-[11px] text-muted-foreground">{VIDEO_KEY_TRACKS.filter(({ property }) => selectedKey[property] !== undefined).map(({ label }) => label).join(', ')}</p></div>
+      <button className="btn-ghost text-xs text-destructive" onClick={() => { onChange(removeVideoKeyframe(t, selectedKey.id)); setSelectedKeyId(null); }}><Trash2 size={14} /> Excluir keyframe</button>
+    </div> : full ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       {number('Início (s)', full.start, full.end - 0.1, n => changeFull({ start: n }))}
       {number('Fim (s)', full.end, duration, n => changeFull({ end: n }), full.start + 0.1)}
       {number('Transição suave (s)', full.fade, (full.end - full.start) / 2, n => changeFull({ fade: n }))}
