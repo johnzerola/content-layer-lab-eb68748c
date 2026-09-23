@@ -1,0 +1,5 @@
+# Isolated, one-shot catalog generator. Do not install into the live Chatterbox environment.
+qwen-tts==0.1.1
+transformers==4.57.3
+accelerate==1.12.0
+soundfile==0.14.0

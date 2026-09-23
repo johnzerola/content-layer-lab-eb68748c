@@ -11,6 +11,8 @@ export interface RemoteVoiceEngineStatus {
   installed: boolean;
   genericInstalled?: boolean;
   piperVoices?: string[];
+  catalogLicenseApproved?: boolean;
+  catalogVoices?: Array<string | { id: string; name?: string }>;
   pitchTransform?: boolean;
   device: string;
   modelLoaded: boolean;
@@ -119,6 +121,18 @@ export async function synthesizeRemoteGenericVoice(text: string, speed = 1, voic
       body: JSON.stringify({ text, speed, voice }),
     },
     90_000,
+  );
+  return result.audio;
+}
+
+export async function synthesizeRemoteCatalogVoice(text: string, speed = 1, voice: string) {
+  const result = await remoteVoiceRequest<{ audio: string; device: string }>(
+    "/catalog/synthesize",
+    {
+      method: "POST",
+      body: JSON.stringify({ text, speed, voice }),
+    },
+    300_000,
   );
   return result.audio;
 }

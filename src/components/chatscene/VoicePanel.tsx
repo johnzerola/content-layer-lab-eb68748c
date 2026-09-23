@@ -104,17 +104,20 @@ export function VoicePanel(props: VoicePanelProps) {
   const voicesFn = useServerFn(listElevenLabsVoices);
   const engineStatusFn = useServerFn(getVoiceEngineStatus);
   const [installedLocalVoices, setInstalledLocalVoices] = useState<string[] | null>(null);
+  const [installedCatalogVoices, setInstalledCatalogVoices] = useState<string[] | null>(null);
   const [pitchTransformAvailable, setPitchTransformAvailable] = useState<boolean | null>(null);
   useEffect(() => {
     let active = true;
     void engineStatusFn().then((status) => {
       if (active) {
         setInstalledLocalVoices(status.piperVoices);
+        setInstalledCatalogVoices(status.catalogVoices);
         setPitchTransformAvailable(status.pitchTransform);
       }
     }).catch(() => {
       if (active) {
         setInstalledLocalVoices([]);
+        setInstalledCatalogVoices([]);
         setPitchTransformAvailable(false);
       }
     });
@@ -664,10 +667,14 @@ export function VoicePanel(props: VoicePanelProps) {
                           <option
                             key={preset.id}
                             value={preset.id}
-                            disabled={preset.provider === "piper" && preset.providerVoice !== "pt_BR-faber-medium" && !installedLocalVoices?.includes(preset.providerVoice)}
+                            disabled={
+                              (preset.provider === "piper" && preset.providerVoice !== "pt_BR-faber-medium" && !installedLocalVoices?.includes(preset.providerVoice)) ||
+                              (preset.provider === "chatterbox-catalog" && !installedCatalogVoices?.includes(preset.providerVoice))
+                            }
                           >
                             {voiceDisplayLabel(preset)}
                             {preset.provider === "piper" && preset.providerVoice !== "pt_BR-faber-medium" && !installedLocalVoices?.includes(preset.providerVoice) ? " (instalar no servidor)" : ""}
+                            {preset.provider === "chatterbox-catalog" && !installedCatalogVoices?.includes(preset.providerVoice) ? " (preparando catálogo)" : ""}
                           </option>
                       ))}
                     </optgroup>

@@ -39,7 +39,7 @@ export const voiceSynthesisInput = z.object({
     .min(1)
     .transform((text) => text.slice(0, 600)),
   voice: z.string().min(1).max(100),
-  provider: z.enum(["lovable-ai", "kokoro", "elevenlabs", "piper", "chatterbox"]).optional(),
+  provider: z.enum(["lovable-ai", "kokoro", "elevenlabs", "piper", "chatterbox", "chatterbox-catalog"]).optional(),
   referenceId: z.string().uuid().optional(),
   direction: z
     .string()

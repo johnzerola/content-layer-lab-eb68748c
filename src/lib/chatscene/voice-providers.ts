@@ -6,6 +6,7 @@ export const PROVIDER_CAPABILITIES: Record<string, VoiceProviderCapabilities> = 
   elevenlabs: { languages:["pt-BR"],maxCharacters:600,controls:{speed:true,pitch:true,energy:false,expressiveness:false,roughness:false,warmth:false,brightness:false,emotion:false},costEstimate:false,local:false },
   piper: { languages:["pt-BR"],maxCharacters:600,controls:{speed:true,pitch:true,energy:false,expressiveness:false,roughness:false,warmth:false,brightness:false,emotion:false},costEstimate:false,local:true },
   chatterbox: { languages:["pt-BR"],maxCharacters:600,controls:{speed:true,pitch:true,energy:false,expressiveness:false,roughness:false,warmth:false,brightness:false,emotion:false},costEstimate:false,local:true },
+  "chatterbox-catalog": { languages:["pt-BR"],maxCharacters:600,controls:{speed:true,pitch:true,energy:false,expressiveness:false,roughness:false,warmth:false,brightness:false,emotion:false},costEstimate:false,local:true },
 };
 
 export class VoiceProviderRegistry {

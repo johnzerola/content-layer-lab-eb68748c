@@ -23,6 +23,11 @@ import urllib.request
 import uuid
 import wave
 
+try:
+    from .catalog import catalog_license_approved, catalog_reference_path, load_catalog
+except ImportError:  # standalone systemd entry point
+    from catalog import catalog_license_approved, catalog_reference_path, load_catalog
+
 
 ROOT = Path(os.environ.get("CHATSCENE_VOICE_ROOT", "/opt/chatscene-voice")).resolve()
 CONFIG = Path(os.environ.get("CHATSCENE_VOICE_CONFIG", str(ROOT / "runtime.json"))).resolve()
@@ -285,6 +290,9 @@ def gpu_warm():
 def gpu_synthesize(text, reference):
     if not GPU_RELAY_TOKEN:
         raise RuntimeError("GPU relay unavailable")
+    relay = gpu_health()
+    if not relay or not relay.get("installed"):
+        raise RuntimeError("GPU relay is not ready")
     request = urllib.request.Request(
         f"{GPU_RELAY_URL}/synthesize",
         data=json.dumps(
@@ -468,6 +476,8 @@ class Handler(BaseHTTPRequestHandler):
                 "installed": engine_installed(),
                 "genericInstalled": piper_installed(),
                 "piperVoices": [name for name in PIPER_VOICES if piper_installed(name)],
+                "catalogLicenseApproved": catalog_license_approved(),
+                "catalogVoices": load_catalog(ROOT),
                 "pitchTransform": True,
                 "device": "remote-cuda" if relay and not CPU.loaded else "cpu",
                 "modelLoaded": gpu_loaded or CPU.loaded,
@@ -526,6 +536,28 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(
                     200,
                     {"audio": base64.b64encode(audio).decode("ascii"), "device": "cpu"},
+                )
+                return
+            if self.path == "/v1/voice/catalog/synthesize":
+                text = body.get("text")
+                voice = str(body.get("voice", ""))
+                if not isinstance(text, str) or not 1 <= len(text) <= 600:
+                    raise ValueError("Texto deve ter entre 1 e 600 caracteres.")
+                path = catalog_reference_path(ROOT, voice)
+                if not INFERENCE_SLOTS.acquire(blocking=False):
+                    self.respond(429, {"detail": "A fila de vozes está cheia. Tente novamente."})
+                    return
+                try:
+                    reference = path.read_bytes()
+                    try:
+                        audio, device = gpu_synthesize(text, reference)
+                    except Exception:
+                        audio, device = CPU.synthesize(text, path), "cpu"
+                finally:
+                    INFERENCE_SLOTS.release()
+                self.respond(
+                    200,
+                    {"audio": base64.b64encode(audio).decode("ascii"), "device": device},
                 )
                 return
             if self.path == "/v1/voice/transform":

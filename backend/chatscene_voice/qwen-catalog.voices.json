@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "model": "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+  "modelRevision": "5ecdb67327fd37bb2e042aab12ff7391903235d3",
+  "license": "Apache-2.0",
+  "language": "Portuguese",
+  "referenceText": "Hoje eu trouxe uma história especial para contar, com emoção, clareza e um ritmo natural.",
+  "voices": [
+    {"id":"bia-child-bright","name":"Bia","gender":"feminina","age":"juvenil","style":"alegre","description":"Criança sintética, clara e espontânea","seed":1101,"instruct":"Voz brasileira sintética de menina criança, brilhante, alegre e espontânea. Dicção clara, timbre leve, sem caricatura, falando português brasileiro natural."},
+    {"id":"lucas-child-playful","name":"Lucas","gender":"masculina","age":"juvenil","style":"divertida","description":"Criança sintética, brincalhona e expressiva","seed":1102,"instruct":"Voz brasileira sintética de menino criança, brincalhona, curiosa e expressiva. Timbre leve, ritmo vivo, sem caricatura, falando português brasileiro natural."},
+    {"id":"julia-teen-confident","name":"Júlia","gender":"feminina","age":"teen","style":"confiante","description":"Adolescente sintética, confiante e moderna","seed":1201,"instruct":"Voz brasileira sintética feminina adolescente, confiante, moderna e conversacional. Entonação jovem, dicção natural e energia moderada."},
+    {"id":"carol-teen-casual","name":"Carol","gender":"feminina","age":"teen","style":"casual","description":"Adolescente sintética, casual e acolhedora","seed":1202,"instruct":"Voz brasileira sintética feminina adolescente, casual, acolhedora e descontraída. Fala natural, macia e próxima, sem exagero."},
+    {"id":"gabriel-teen-energetic","name":"Gabriel","gender":"masculina","age":"teen","style":"energética","description":"Adolescente sintético, rápido e energético","seed":1203,"instruct":"Voz brasileira sintética masculina adolescente, energética, ágil e entusiasmada. Pronúncia clara e ritmo dinâmico, sem gritar."},
+    {"id":"ana-adult-natural","name":"Ana","gender":"feminina","age":"adulta","style":"natural","description":"Adulta jovem, natural e conversacional","seed":1301,"instruct":"Voz brasileira sintética feminina adulta jovem, natural, conversacional e próxima. Timbre equilibrado e dicção espontânea."},
+    {"id":"camila-adult-warm","name":"Camila","gender":"feminina","age":"adulta","style":"acolhedora","description":"Adulta, quente e acolhedora","seed":1302,"instruct":"Voz brasileira sintética feminina adulta, quente, acolhedora e segura. Ritmo calmo, sorriso discreto e dicção clara."},
+    {"id":"rafael-adult-natural","name":"Rafael","gender":"masculina","age":"adulta","style":"natural","description":"Adulto, natural e conversacional","seed":1303,"instruct":"Voz brasileira sintética masculina adulta, natural, conversacional e próxima. Timbre médio, firme e sem pose de locutor."},
+    {"id":"marcos-adult-energetic","name":"Marcos","gender":"masculina","age":"adulta","style":"energética","description":"Adulto, energético e carismático","seed":1304,"instruct":"Voz brasileira sintética masculina adulta, energética, carismática e otimista. Ritmo vivo, articulação clara e energia controlada."},
+    {"id":"helena-storyteller","name":"Helena","gender":"feminina","age":"adulta","style":"narração","description":"Narradora de histórias, íntima e expressiva","seed":1401,"instruct":"Voz brasileira sintética feminina para contar histórias, íntima, expressiva e envolvente. Boa dinâmica, pausas naturais e timbre quente."},
+    {"id":"augusto-deep-narrator","name":"Augusto","gender":"masculina","age":"adulta","style":"narração grave","description":"Narrador grave, cinematográfico e controlado","seed":1402,"instruct":"Voz brasileira sintética masculina de narrador, grave, ressonante e cinematográfica. Ritmo controlado, autoridade serena e excelente dicção."},
+    {"id":"maria-elderly-warm","name":"Maria","gender":"feminina","age":"madura","style":"acolhedora","description":"Senhora sintética, calorosa e serena","seed":1501,"instruct":"Voz brasileira sintética feminina idosa, calorosa, serena e afetuosa. Timbre maduro, ritmo natural e delicado, sem caricatura."},
+    {"id":"antonio-elderly-story","name":"Antônio","gender":"masculina","age":"madura","style":"contador de histórias","description":"Senhor sintético, maduro e contador de histórias","seed":1502,"instruct":"Voz brasileira sintética masculina idosa, madura, simpática e boa contadora de histórias. Timbre encorpado, pausas naturais, sem caricatura."},
+    {"id":"clara-news","name":"Clara","gender":"feminina","age":"adulta","style":"notícias","description":"Locutora de notícias, clara e objetiva","seed":1601,"instruct":"Voz brasileira sintética feminina de notícias, clara, objetiva e profissional. Dicção precisa, ritmo seguro e neutralidade editorial."},
+    {"id":"dante-suspense","name":"Dante","gender":"masculina","age":"adulta","style":"terror","description":"Narrador de suspense, áspero e contido","seed":1602,"instruct":"Voz brasileira sintética masculina para suspense e terror, baixa, levemente áspera e contida. Tensão crescente, pausas dramáticas e dicção inteligível."}
+  ]
+}

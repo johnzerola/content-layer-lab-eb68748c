@@ -6,7 +6,7 @@ export type VoiceAge = "juvenil" | "teen" | "adulta" | "madura";
 export type VoiceStyle =
   | "natural" | "animada" | "calma" | "seria" | "sussurro" | "nervosa"
   | "sarcastica" | "assustada" | "brava" | "autoritaria" | "dramatic" | "comedy";
-export type VoiceProviderId = "lovable-ai" | "kokoro" | "elevenlabs" | "piper" | "chatterbox";
+export type VoiceProviderId = "lovable-ai" | "kokoro" | "elevenlabs" | "piper" | "chatterbox" | "chatterbox-catalog";
 export type VoiceProviderMode = "auto" | "local" | "premium";
 export type VoiceEmotion =
   | "neutral" | "happy" | "excited" | "serious" | "nervous" | "annoyed"
@@ -71,7 +71,7 @@ export function pitchRate(pitch: number | undefined): number {
 export interface VoicePreset {
   id: string;
   label: string;
-  group: "Voz local gratuita" | "Presets de atuação" | "Juvenil sintética" | "Teen" | "Adulto masculino" | "Adulto feminino" | "Família" | "Personagens";
+  group: "Catálogo PT-BR · 15 locutores" | "Voz local gratuita" | "Presets de atuação" | "Juvenil sintética" | "Teen" | "Adulto masculino" | "Adulto feminino" | "Família" | "Personagens";
   description: string;
   gender: VoiceGender;
   age: VoiceAge;
@@ -87,6 +87,33 @@ const preset = (
 ): VoicePreset => ({ id, label, group, description, gender, age, providerVoice, profile, ...(provider ? { provider } : {}) });
 
 export const VOICE_PRESETS: VoicePreset[] = [
+  ...[
+    ["bia-child-bright", "Bia · criança alegre", "Criança sintética, clara e espontânea", "feminina", "juvenil", "animada", 1.05, .75, .78, .72, .82, 1],
+    ["lucas-child-playful", "Lucas · criança divertida", "Criança sintética, brincalhona e expressiva", "masculina", "juvenil", "comedy", 1.06, .8, .82, .58, .78, 1],
+    ["julia-teen-confident", "Júlia · adolescente confiante", "Adolescente sintética, confiante e moderna", "feminina", "teen", "natural", 1.03, .68, .7, .55, .7, .5],
+    ["carol-teen-casual", "Carol · adolescente casual", "Adolescente sintética, casual e acolhedora", "feminina", "teen", "calma", .98, .5, .58, .72, .65, .5],
+    ["gabriel-teen-energetic", "Gabriel · adolescente energético", "Adolescente sintético, rápido e energético", "masculina", "teen", "animada", 1.08, .82, .8, .5, .72, .5],
+    ["ana-adult-natural", "Ana · conversa natural", "Adulta jovem, natural e conversacional", "feminina", "adulta", "natural", 1, .56, .56, .6, .62, 0],
+    ["camila-adult-warm", "Camila · acolhedora", "Adulta, quente e acolhedora", "feminina", "adulta", "calma", .96, .45, .58, .85, .52, 0],
+    ["rafael-adult-natural", "Rafael · conversa natural", "Adulto, natural e conversacional", "masculina", "adulta", "natural", 1, .56, .54, .55, .48, 0],
+    ["marcos-adult-energetic", "Marcos · energético", "Adulto, energético e carismático", "masculina", "adulta", "animada", 1.07, .82, .78, .52, .58, 0],
+    ["helena-storyteller", "Helena · contadora de histórias", "Narradora íntima e expressiva", "feminina", "adulta", "dramatic", .95, .58, .84, .78, .5, 0],
+    ["augusto-deep-narrator", "Augusto · narrador grave", "Narrador cinematográfico e controlado", "masculina", "adulta", "dramatic", .92, .58, .76, .62, .32, -1],
+    ["maria-elderly-warm", "Maria · senhora acolhedora", "Senhora sintética, calorosa e serena", "feminina", "madura", "calma", .9, .42, .62, .88, .42, -.5],
+    ["antonio-elderly-story", "Antônio · contador de histórias", "Senhor sintético, maduro e narrativo", "masculina", "madura", "dramatic", .9, .52, .76, .76, .36, -1],
+    ["clara-news", "Clara · notícias", "Locutora clara, objetiva e profissional", "feminina", "adulta", "seria", 1, .58, .48, .52, .62, 0],
+    ["dante-suspense", "Dante · suspense", "Narrador áspero, baixo e contido", "masculina", "adulta", "dramatic", .88, .5, .82, .4, .28, -1.5],
+  ].map((v) => preset(
+    `catalog-${v[0]}`,
+    v[1] as string,
+    "Catálogo PT-BR · 15 locutores",
+    v[2] as string,
+    v[3] as VoiceGender,
+    v[4] as VoiceAge,
+    v[0] as string,
+    { style: v[5] as VoiceStyle, speed: v[6] as number, energy: v[7] as number, expressiveness: v[8] as number, roughness: .1, warmth: v[9] as number, brightness: v[10] as number, pitch: v[11] as number },
+    "chatterbox-catalog",
+  )),
   preset("piper-cadu-local", "Cadu local · PT-BR", "Voz local gratuita", "Voz-base PT-BR distinta · Piper open source", "neutra", "adulta", "pt_BR-cadu-medium", { style:"natural",speed:1,energy:.55,expressiveness:.5,roughness:.1,warmth:.5,brightness:.5,pitch:0 }, "piper"),
   preset("piper-jeff-local", "Jeff local · PT-BR", "Voz local gratuita", "Voz-base PT-BR distinta · Piper open source", "neutra", "adulta", "pt_BR-jeff-medium", { style:"natural",speed:1,energy:.55,expressiveness:.5,roughness:.1,warmth:.5,brightness:.5,pitch:0 }, "piper"),
   ...[

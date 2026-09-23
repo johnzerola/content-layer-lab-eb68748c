@@ -4,8 +4,14 @@ import subprocess
 import struct
 import unittest
 import wave
+import json
+import os
+from pathlib import Path
+import tempfile
+from unittest.mock import patch
 
 from backend.chatscene_voice.service import PIPER_VOICES, synthesize_piper, transform_speech
+from backend.chatscene_voice.catalog import catalog_reference_path, load_catalog
 
 
 def tone_wav(frequency=220, seconds=1.2, sample_rate=24000):
@@ -52,6 +58,26 @@ class VoiceServiceTests(unittest.TestCase):
         self.assertEqual(set(PIPER_VOICES), {"pt_BR-faber-medium", "pt_BR-cadu-medium", "pt_BR-jeff-medium"})
         with self.assertRaises(ValueError):
             synthesize_piper("Oi", voice="../../other-model")
+
+    def test_catalog_only_resolves_installed_allowlisted_wav(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            catalog = root / "catalog"
+            catalog.mkdir()
+            (catalog / "catalog.json").write_text(json.dumps({
+                "schemaVersion": 1,
+                "license": "Apache-2.0",
+                "voices": [{"id": "ana-natural", "name": "Ana"}, {"id": "../escape"}],
+            }), encoding="utf-8")
+            (catalog / "ana-natural.wav").write_bytes(tone_wav(seconds=0.1))
+            with patch.dict(os.environ, {
+                "CHATSCENE_QWEN_CATALOG_LICENSE_APPROVED": "1",
+                "CHATSCENE_SYNTHETIC_CATALOG_DIR": str(catalog),
+            }):
+                self.assertEqual([voice["id"] for voice in load_catalog(root)], ["ana-natural"])
+                self.assertEqual(catalog_reference_path(root, "ana-natural"), catalog / "ana-natural.wav")
+                with self.assertRaises(ValueError):
+                    catalog_reference_path(root, "../escape")
 
 
 if __name__ == "__main__":

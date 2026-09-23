@@ -19,6 +19,7 @@ import {
   remoteVoiceTransformSupported,
   saveRemoteVoiceReference,
   synthesizeRemoteGenericVoice,
+  synthesizeRemoteCatalogVoice,
   synthesizeRemoteVoice,
   transformRemoteVoice,
   warmRemoteCloneEngine,
@@ -32,6 +33,7 @@ export const getVoiceEngineStatus = createServerFn({ method: "GET" })
       clone: remote,
       piper: Boolean(remote.genericInstalled),
       piperVoices: remote.piperVoices ?? (remote.genericInstalled ? ["pt_BR-faber-medium"] : []),
+      catalogVoices: (remote.catalogVoices ?? []).map((voice) => typeof voice === "string" ? voice : voice.id),
       pitchTransform: remote.pitchTransform === true,
     };
     // Do not import the Node-only worker in an edge deployment unless the
@@ -47,12 +49,14 @@ export const getVoiceEngineStatus = createServerFn({ method: "GET" })
       return {
         clone: await verifiedCloneEngineStatus(), piper,
         piperVoices: piper ? ["pt_BR-faber-medium"] : [], pitchTransform: true,
+        catalogVoices: [],
       };
     }
     return {
       clone: { installed: false, device: "not-configured", modelLoaded: false, warming: false },
       piper: false,
       piperVoices: [],
+      catalogVoices: [],
       pitchTransform: false,
     };
   });
@@ -139,8 +143,9 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
     if (data.provider === "chatterbox" && !data.referenceId)
       throw new Error("Envie a referência de voz deste personagem.");
     const isClone = data.provider === "chatterbox";
+    const isCatalog = data.provider === "chatterbox-catalog";
     const isElevenLabs = data.provider === "elevenlabs";
-    const localRequested = data.provider === "piper" || isClone;
+    const localRequested = data.provider === "piper" || isClone || isCatalog;
     const provider =
       localRequested || isElevenLabs ? null : resolveVoiceProviderConfig(process.env);
     let buffer: Buffer;
@@ -203,6 +208,15 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
         modelId: settings?.modelId ?? "eleven_flash_v2_5",
       });
       providerName = "elevenlabs";
+    } else if (isCatalog) {
+      if (!remoteVoiceServiceConfigured())
+        throw new Error("O catálogo de locutores ainda não está instalado neste servidor.");
+      buffer = Buffer.from(
+        await synthesizeRemoteCatalogVoice(data.text, data.speed ?? 1, data.voice),
+        "base64",
+      );
+      mime = "audio/wav";
+      providerName = "chatterbox-catalog";
     } else if (isClone) {
       if (remoteVoiceServiceConfigured()) {
         buffer = Buffer.from(
