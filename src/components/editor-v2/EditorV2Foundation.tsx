@@ -1304,10 +1304,11 @@ export function EditorV2Foundation() {
         <div className="hidden h-5 w-px bg-white/8 sm:block" />
         <button type="button" className="flex min-w-0 max-w-48 items-center gap-1 rounded-md px-2 py-1 text-left text-xs font-medium hover:bg-white/5"><span className="truncate">{project.name}</span><ChevronDown className="size-3 text-muted-foreground" /></button>
         <div className="ml-auto flex items-center gap-1">
-          <label className="editor-tool-button editor-action-button gap-1" title="Proporção do vídeo">
+          <label className="editor-tool-button editor-action-button relative gap-1 focus-within:ring-2 focus-within:ring-primary" title="Proporção do vídeo">
             <Ratio className="size-3.5" />
             <span className="sr-only">Proporção do vídeo</span>
-            <select aria-label="Proporção do vídeo" value={project.settings.aspectRatio} onChange={(event) => run(new SetProjectAspectRatioCommand(event.target.value as EditorProjectV2["settings"]["aspectRatio"]), `Formato alterado para ${event.target.value}.`)} className="cursor-pointer appearance-none rounded bg-transparent pr-1 text-[10px] font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary">
+            <span className="min-w-7 text-[10px] font-semibold text-foreground">{project.settings.aspectRatio}</span><ChevronDown className="size-3 text-muted-foreground" />
+            <select aria-label="Proporção do vídeo" value={project.settings.aspectRatio} onChange={(event) => run(new SetProjectAspectRatioCommand(event.target.value as EditorProjectV2["settings"]["aspectRatio"]), `Formato alterado para ${event.target.value}.`)} className="absolute inset-0 size-full cursor-pointer opacity-0">
               <option value="9:16">9:16</option>
               <option value="16:9">16:9</option>
               <option value="1:1">1:1</option>
