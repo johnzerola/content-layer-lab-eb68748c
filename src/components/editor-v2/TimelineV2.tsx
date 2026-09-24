@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Captions, ChevronDown, Copy, Eye, EyeOff, Film, FlipHorizontal2, FlipVertical2, Gauge, Group, Headphones, Image, Layers3, Lock, Magnet, Maximize2, Music2, Pause, Play, Rewind, RotateCcw, Scissors, Sparkles, Timer, Trash2, Ungroup, Unlock, Volume2, VolumeX, Waves, ZoomIn, ZoomOut } from "lucide-react";
-import { formatProjectTime, isTrackCompatible, snapProjectTime, visibleTimelineRange, type AnimatableProperty, type Clip, type EditorProjectV2, type Track, type TrackKind } from "@/lib/editor-v2";
+import { formatProjectTime, isTrackCompatible, resolveAutoSplitSelection, snapProjectTime, visibleTimelineRange, type AnimatableProperty, type AutoSplitSelectionMode, type Clip, type EditorProjectV2, type Track, type TrackKind } from "@/lib/editor-v2";
 
 interface TimelineProps {
   project: EditorProjectV2;
@@ -26,6 +26,7 @@ interface TimelineProps {
   onBatchSpeed: (speed: number) => void;
   onBatchToggleReverse: () => void;
   onBatchToggleFlip: (axis: "horizontal" | "vertical") => void;
+  onSelectAutoSplitParts: (mode: AutoSplitSelectionMode) => void;
   onCreateCompound: () => void;
   onDissolveCompound: () => void;
   onAddTrack: (kind: Exclude<TrackKind, "video" | "captions">) => void;
@@ -46,7 +47,7 @@ const TRACK_HEIGHT = 48;
 const RULER_HEIGHT = 28;
 
 export function TimelineV2(props: TimelineProps) {
-  const { project, currentTime, playing, zoom, assetThumbnails, assetWaveforms, onZoom, onSeek, onSelect, onMove, onTrim, onMoveKeyframe, onSplit, onAutoSplit, onRemoveSilence, removingSilence, onDuplicate, onDelete, onTogglePlayback, onSkip, onBatchSpeed, onBatchToggleReverse, onBatchToggleFlip, onCreateCompound, onDissolveCompound, onAddTrack, onToggleSnap, onToggleRipple, onTrackPatch, onDropLibraryItem, onDropMediaAsset, onImportFiles, onSelectTransition, onResizeTransition, onEditEffectRange } = props;
+  const { project, currentTime, playing, zoom, assetThumbnails, assetWaveforms, onZoom, onSeek, onSelect, onMove, onTrim, onMoveKeyframe, onSplit, onAutoSplit, onRemoveSilence, removingSilence, onDuplicate, onDelete, onTogglePlayback, onSkip, onBatchSpeed, onBatchToggleReverse, onBatchToggleFlip, onSelectAutoSplitParts, onCreateCompound, onDissolveCompound, onAddTrack, onToggleSnap, onToggleRipple, onTrackPatch, onDropLibraryItem, onDropMediaAsset, onImportFiles, onSelectTransition, onResizeTransition, onEditEffectRange } = props;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [autoCutOpen, setAutoCutOpen] = useState(false);
@@ -64,6 +65,12 @@ export function TimelineV2(props: TimelineProps) {
   const ticks = useMemo(() => Array.from({ length: Math.ceil(project.settings.duration) + 1 }, (_, index) => index), [project.settings.duration]).filter((tick) => tick >= visible.start - 1 && tick <= visible.end + 1);
   const selectedClips = project.tracks.flatMap((track) => track.clips).filter((clip) => project.selection.itemIds.includes(clip.id));
   const selectedCompoundIds = [...new Set(selectedClips.map((clip) => clip.metadata?.["compoundGroupId"]).filter((id): id is string => typeof id === "string"))];
+  const automaticCutCounts = useMemo(() => {
+    const ids = resolveAutoSplitSelection(project, project.selection.itemIds, "all");
+    const byId = new Map(project.tracks.flatMap((track) => track.clips).map((clip) => [clip.id, clip]));
+    const parts = ids.map((id) => Number(byId.get(id)?.metadata?.["autoSplitPart"]));
+    return { all: ids.length, odd: parts.filter((part) => Number.isInteger(part) && part % 2 === 1).length, even: parts.filter((part) => Number.isInteger(part) && part % 2 === 0).length };
+  }, [project]);
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -254,13 +261,22 @@ export function TimelineV2(props: TimelineProps) {
           {batchOpen && <div className="editor-auto-cut-popover absolute left-0 top-9 z-50 w-72 rounded-xl border border-white/10 p-3 shadow-2xl">
             <p className="text-[11px] font-semibold text-foreground">Editar {project.selection.itemIds.length} itens</p>
             <p className="mt-1 text-[9px] leading-relaxed text-muted-foreground">Ctrl+clique adiciona ou remove trechos. Cada ação abaixo usa um único Ctrl+Z.</p>
+            <div className="mt-3 border-t border-white/8 pt-2">
+              <p className="text-[9px] font-semibold text-foreground">Selecionar cortes automáticos</p>
+              <p className="mt-0.5 text-[8px] leading-relaxed text-muted-foreground">Escolha todos ou as posições ímpares/pares da sequência.</p>
+              <div className="mt-2 grid grid-cols-3 gap-1" role="group" aria-label="Selecionar cortes automáticos por posição">
+                {([['all', 'Todos'], ['odd', 'Ímpares'], ['even', 'Pares']] as const).map(([mode, label]) => <button key={mode} type="button" disabled={!automaticCutCounts[mode]} onClick={() => onSelectAutoSplitParts(mode)} className="h-8 rounded-lg bg-white/5 px-1 text-[9px] font-semibold text-muted-foreground hover:bg-primary/15 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-35">{label} <span className="tabular-nums">{automaticCutCounts[mode]}</span></button>)}
+              </div>
+              {!automaticCutCounts.all && <p className="mt-1.5 text-[8px] text-amber-200/80">Selecione um trecho criado por Cortes automáticos.</p>}
+            </div>
             <p className="mt-3 text-[9px] font-semibold text-foreground">Velocidade dos vídeos</p>
             <div className="mt-1 grid grid-cols-4 gap-1">{[.5, .75, 1, 1.5].map((speed) => <button key={speed} type="button" onClick={() => { onBatchSpeed(speed); setBatchOpen(false); }} className="h-8 rounded-lg bg-white/5 text-[9px] font-semibold text-muted-foreground hover:bg-primary/15 hover:text-primary">{speed}×</button>)}</div>
             <div className="mt-2 grid grid-cols-3 gap-1">
-              <button type="button" onClick={() => { onBatchToggleReverse(); setBatchOpen(false); }} className="editor-tool-button justify-center"><Rewind className="size-3.5" />Inverter</button>
-              <button type="button" onClick={() => { onBatchToggleFlip("horizontal"); setBatchOpen(false); }} className="editor-tool-button justify-center"><FlipHorizontal2 className="size-3.5" />Horizontal</button>
-              <button type="button" onClick={() => { onBatchToggleFlip("vertical"); setBatchOpen(false); }} className="editor-tool-button justify-center"><FlipVertical2 className="size-3.5" />Vertical</button>
+              <button type="button" title="Reproduzir os vídeos selecionados de trás para frente" onClick={() => { onBatchToggleReverse(); setBatchOpen(false); }} className="editor-tool-button justify-center"><Rewind className="size-3.5" />Inverter</button>
+              <button type="button" title="Espelhar horizontalmente" onClick={() => { onBatchToggleFlip("horizontal"); setBatchOpen(false); }} className="editor-tool-button justify-center"><FlipHorizontal2 className="size-3.5" />Horizontal</button>
+              <button type="button" title="Espelhar verticalmente" onClick={() => { onBatchToggleFlip("vertical"); setBatchOpen(false); }} className="editor-tool-button justify-center"><FlipVertical2 className="size-3.5" />Vertical</button>
             </div>
+            <button type="button" onClick={() => { onDelete(); setBatchOpen(false); }} className="editor-tool-button mt-2 w-full justify-center text-red-300 hover:bg-red-500/10 hover:text-red-200"><Trash2 className="size-3.5" />Excluir selecionados</button>
             <div className="mt-2 grid grid-cols-2 gap-1 border-t border-white/8 pt-2">
               <button type="button" disabled={selectedClips.length < 2} onClick={() => { onCreateCompound(); setBatchOpen(false); }} className="editor-tool-button justify-center disabled:cursor-not-allowed disabled:opacity-35"><Group className="size-3.5" />Criar composto</button>
               <button type="button" disabled={selectedCompoundIds.length !== 1} onClick={() => { onDissolveCompound(); setBatchOpen(false); }} className="editor-tool-button justify-center disabled:cursor-not-allowed disabled:opacity-35"><Ungroup className="size-3.5" />Desagrupar</button>

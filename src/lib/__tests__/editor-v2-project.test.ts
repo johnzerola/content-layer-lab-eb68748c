@@ -1,7 +1,7 @@
 ﻿import { describe, expect, it } from "vitest";
 import { AddCaptionBatchCommand, AddCaptionCueCommand, AddClipCommand, AddMediaClipCommand, ApplyCaptionPresetCommand, ApplySeparatedAudioCommand, ApplyTemplateCommand, ApplyTransitionCommand, CompositionClock, DeleteAudioEnvelopePointCommand, DeleteClipCommand, DeleteClipsCommand, DeleteKeyframeCommand, DuplicateClipsCommand, EditorCommandBus, MoveClipCommand, MoveKeyframeCommand, RegisterExtractedAudioCommand, RemoveMediaAssetFromLibraryCommand, RestoreOriginalAudioCommand, SelectItemCommand, SetAudioRepresentationCommand, SplitClipCommand, TrimClipCommand, UpdateClipCommand, UpdateProjectSettingsCommand, UpdateTrackCommand, UpdateTransformAtTimeCommand, UpsertAudioEnvelopePointCommand, UpsertKeyframeCommand, adaptEditorProjectV1, asProjectTime, buildExtractedAudioMedia, buildSeparatedAudioMedia, clampTransitionDuration, clipAudioGainAt, createCaptionBatch, createCaptionBatchFromTimedWords, createEditorProjectV2, createEditorRenderManifest, createPlaybackSurfaceKeys, createStemAsset, editorProjectFromManifest, findTransitionTarget, interpolateKeyframes, isEditorV2Enabled, isTrackCompatible, parseTimedText, projectToSourceTime, resolveAnimatedTransform, resolveAudioMixFrame, resolveAudioRenderFrameFromManifest, resolveCaptionInsertion, resolveClipPresentation, resolveCompositionFrame, resolveCompositionFrameFromManifest, resolveLibraryInsertion, resolveTemplateApplication, snapProjectTime, sourceToProjectTime, summarizeWaveform, visibleTimelineRange, type AudioSourceGroup, type Clip, type MediaAsset } from "@/lib/editor-v2";
 import { BUILT_IN_LIBRARY_ITEMS, type CaptionPresetDefinition, type LibraryItem, type TemplateDefinition } from "@/lib/editor-v2/library";
-import { AddTrackCommand, AutoSplitClipsCommand, CreateCompoundClipCommand, DissolveCompoundClipCommand, InsertMediaClipCommand, MoveCompoundClipCommand, RemoveSilenceCommand, UpdateClipsCommand, createMediaClipFromAsset } from "@/lib/editor-v2";
+import { AddTrackCommand, AutoSplitClipsCommand, CreateCompoundClipCommand, DissolveCompoundClipCommand, InsertMediaClipCommand, MoveCompoundClipCommand, RemoveSilenceCommand, SelectAutoSplitPartsCommand, SetProjectAspectRatioCommand, UpdateClipsCommand, createMediaClipFromAsset } from "@/lib/editor-v2";
 import { createEditorProject } from "@/lib/editor/project";
 
 function clip(): Clip {
@@ -63,6 +63,7 @@ describe("Command bus", () => {
       [0, 2, 0, 2], [2, 4, 2, 4], [4, 6, 4, 6], [6, 6.5, 6, 6.5],
     ]);
     expect(bus.getState().selection.itemIds).toHaveLength(4);
+    expect(bus.getState().tracks[0]!.clips.map((item) => item.metadata?.["autoSplitPart"])).toEqual([1, 2, 3, 4]);
     expect(command.serialize()).toMatchObject({ type: "autoSplitClips", payload: { interval: 2 } });
     bus.undo();
     expect(bus.getState().tracks[0]!.clips).toHaveLength(1);
@@ -306,6 +307,26 @@ describe("Command bus", () => {
     bus.undo();
     expect(bus.getState().assets).toHaveLength(1);
     expect(bus.getState().tracks[0]!.clips).toHaveLength(1);
+  });
+
+  it("seleciona posições ímpares e pares do mesmo corte automático", () => {
+    const source = { ...clip(), projectStart: asProjectTime(0), projectEnd: asProjectTime(12), sourceIn: 0, sourceOut: 12 };
+    const bus = new EditorCommandBus(createEditorProjectV2({ duration: 12 }));
+    bus.execute(new AddClipCommand(source));
+    bus.execute(new AutoSplitClipsCommand([source.id], 2, "alternating"));
+    bus.execute(new SelectAutoSplitPartsCommand(bus.getState().selection.itemIds, "even"));
+    expect(bus.getState().selection.itemIds.map((id) => bus.getState().tracks[0]!.clips.find((item) => item.id === id)?.metadata?.["autoSplitPart"])).toEqual([2, 4, 6]);
+    bus.execute(new SelectAutoSplitPartsCommand(bus.getState().selection.itemIds, "odd"));
+    expect(bus.getState().selection.itemIds.map((id) => bus.getState().tracks[0]!.clips.find((item) => item.id === id)?.metadata?.["autoSplitPart"])).toEqual([1, 3, 5]);
+  });
+
+  it("altera proporção, dimensões de exportação e desfaz em conjunto", () => {
+    const bus = new EditorCommandBus(createEditorProjectV2({ duration: 12 }));
+    bus.execute(new SetProjectAspectRatioCommand("16:9"));
+    expect(bus.getState().settings).toMatchObject({ aspectRatio: "16:9", width: 1920, height: 1080 });
+    expect(createEditorRenderManifest(bus.getState()).settings).toMatchObject({ aspectRatio: "16:9", width: 1920, height: 1080 });
+    bus.undo();
+    expect(bus.getState().settings).toMatchObject({ aspectRatio: "9:16", width: 1080, height: 1920 });
   });
 
   it("remove da biblioteca sem apagar clipes que ainda usam a mídia", () => {

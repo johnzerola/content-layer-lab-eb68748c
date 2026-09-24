@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Captions, Check, ChevronDown, Download, Film, FolderOpen, Import, Library, PanelRight, Pause, Play, Redo2, Undo2 } from "lucide-react";
+import { ArrowLeft, Captions, Check, ChevronDown, Download, Film, FolderOpen, Import, Library, PanelRight, Pause, Play, Ratio, Redo2, Undo2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
@@ -30,6 +30,8 @@ import {
   RemoveMediaAssetFromLibraryCommand,
   RestoreOriginalAudioCommand,
   SelectItemCommand,
+  SelectAutoSplitPartsCommand,
+  SetProjectAspectRatioCommand,
   SetAudioRepresentationCommand,
   SplitClipCommand,
   TrimClipCommand,
@@ -73,6 +75,7 @@ import {
   type AudioSeparationJobRecord,
   type Clip,
   type AnimatableProperty,
+  type AutoSplitSelectionMode,
   type ClipTransform,
   type EditorCommand,
   type EditorProjectV2,
@@ -457,7 +460,7 @@ export function EditorV2Foundation() {
     const state = busRef.current.getState();
     const ids = state.selection.itemIds.filter((id) => findClip(state, id)?.kind === "video");
     if (!ids.length) return setMessage("Selecione um ou mais vídeos antes de aplicar os cortes automáticos.");
-    run(new AutoSplitClipsCommand(ids, interval, String(state.revisions.document + 1)), `Vídeos divididos a cada ${interval.toLocaleString("pt-BR")}s. Ctrl+Z desfaz todos os cortes.`);
+    run(new AutoSplitClipsCommand(ids, interval, String(state.revisions.document + 1)), `Vídeos divididos a cada ${interval.toLocaleString("pt-BR")}s. Em Ações, escolha Todos, Ímpares ou Pares.`);
   }, [run]);
 
   const removeSilence = useCallback(async (options: { threshold: number; minSilence: number; padding: number }) => {
@@ -1229,6 +1232,10 @@ export function EditorV2Foundation() {
     onBatchSpeed: setSelectedSpeed,
     onBatchToggleReverse: toggleSelectedReverse,
     onBatchToggleFlip: toggleSelectedFlip,
+    onSelectAutoSplitParts: (mode: AutoSplitSelectionMode) => {
+      const state = busRef.current.getState();
+      run(new SelectAutoSplitPartsCommand(state.selection.itemIds, mode), `${mode === "all" ? "Todos os" : mode === "odd" ? "Cortes ímpares" : "Cortes pares"} selecionados.`);
+    },
     onCreateCompound: createCompound,
     onDissolveCompound: dissolveCompound,
     onAddTrack: addTrack,
@@ -1297,6 +1304,16 @@ export function EditorV2Foundation() {
         <div className="hidden h-5 w-px bg-white/8 sm:block" />
         <button type="button" className="flex min-w-0 max-w-48 items-center gap-1 rounded-md px-2 py-1 text-left text-xs font-medium hover:bg-white/5"><span className="truncate">{project.name}</span><ChevronDown className="size-3 text-muted-foreground" /></button>
         <div className="ml-auto flex items-center gap-1">
+          <label className="editor-tool-button editor-action-button gap-1" title="Proporção do vídeo">
+            <Ratio className="size-3.5" />
+            <span className="sr-only">Proporção do vídeo</span>
+            <select aria-label="Proporção do vídeo" value={project.settings.aspectRatio} onChange={(event) => run(new SetProjectAspectRatioCommand(event.target.value as EditorProjectV2["settings"]["aspectRatio"]), `Formato alterado para ${event.target.value}.`)} className="cursor-pointer appearance-none rounded bg-transparent pr-1 text-[10px] font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary">
+              <option value="9:16">9:16</option>
+              <option value="16:9">16:9</option>
+              <option value="1:1">1:1</option>
+              <option value="4:5">4:5</option>
+            </select>
+          </label>
           <input ref={fileInputRef} type="file" accept="video/*,audio/*,image/*,.srt,.vtt,text/vtt" multiple className="sr-only" aria-label="Selecionar mídias locais" onChange={(event) => void importFiles(event.target.files)} />
           <input ref={relinkInputRef} type="file" accept="video/*,audio/*,image/*" className="sr-only" aria-label="Religar arquivo de mídia" onChange={(event) => void relinkMedia(event.target.files)} />
           <button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing} className="editor-tool-button editor-action-button"><Import className="size-3.5" /><span className="hidden md:inline">{importing ? "Importando…" : "Importar"}</span></button>

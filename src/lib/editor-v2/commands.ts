@@ -1,4 +1,4 @@
-import type { Easing } from "@/lib/video-template/types";
+import { ASPECT_SIZES, type AspectRatio, type Easing } from "@/lib/video-template/types";
 import { asProjectTime, type AnimatableProperty, type AudioRepresentation, type AudioSourceGroup, type CaptionCue, type Clip, type ClipStyle, type ClipTransform, type EditorProjectV2, type MediaAsset, type ProjectSettings, type RenderImpact, type SelectionState, type TemplateInstance, type Track, type Transition } from "./types";
 import { cloneProject, normalizeProject } from "./project";
 import { isTrackCompatible } from "./interactions";
@@ -464,6 +464,42 @@ export class UpdateMediaAssetCommand extends SnapshotCommand {
   serialize() { return { type: this.type, payload: { assetId: this.assetId, patch: this.patch } }; }
 }
 
+export type AutoSplitSelectionMode = "all" | "odd" | "even";
+
+export function resolveAutoSplitSelection(project: EditorProjectV2, referenceIds: string[], mode: AutoSplitSelectionMode) {
+  const clips = project.tracks.flatMap((owner) => owner.clips);
+  const clipById = new Map(clips.map((clip) => [clip.id, clip]));
+  const groupIds = new Set(
+    referenceIds
+      .map((id) => clipById.get(id)?.metadata?.["autoSplitGroupId"])
+      .filter((id): id is string => typeof id === "string"),
+  );
+  if (!groupIds.size) return [];
+  return clips
+    .filter((clip) => clip.kind === "video" && groupIds.has(String(clip.metadata?.["autoSplitGroupId"] ?? "")))
+    .filter((clip) => {
+      if (mode === "all") return true;
+      const part = Number(clip.metadata?.["autoSplitPart"]);
+      return Number.isInteger(part) && (mode === "odd" ? part % 2 === 1 : part % 2 === 0);
+    })
+    .sort((left, right) => Number(left.projectStart) - Number(right.projectStart) || Number(left.metadata?.["autoSplitPart"] ?? 0) - Number(right.metadata?.["autoSplitPart"] ?? 0))
+    .map((clip) => clip.id);
+}
+
+/** Selects positions inside the automatic-cut group without creating an undo entry. */
+export class SelectAutoSplitPartsCommand extends SnapshotCommand {
+  readonly type = "selectAutoSplitParts";
+  readonly renderImpact = "none" as const;
+  constructor(private readonly referenceIds: string[], private readonly mode: AutoSplitSelectionMode) { super(); }
+  protected apply(project: EditorProjectV2) {
+    const ids = resolveAutoSplitSelection(project, this.referenceIds, this.mode);
+    if (!ids.length) throw new Error("Selecione um trecho criado pelos cortes automáticos.");
+    project.selection = { itemIds: ids, primaryId: ids.at(-1) ?? null, surface: "timeline" };
+    return project;
+  }
+  serialize() { return { type: this.type, payload: { referenceIds: this.referenceIds, mode: this.mode } }; }
+}
+
 /** Removes an unused source, or only hides a source that still feeds timeline clips. */
 export class RemoveMediaAssetFromLibraryCommand extends SnapshotCommand {
   readonly type = "removeMediaAssetFromLibrary";
@@ -699,6 +735,8 @@ export class AutoSplitClipsCommand extends SnapshotCommand {
       if (duration <= interval + 0.04) continue;
       const sourceAudioGroup = project.audioGroups.find((group) => group.sourceVideoClipId === clip.id || group.id === clip.audioGroupId);
       const segments: Clip[] = [];
+      const groupId = `${clip.id}-auto-${this.suffix}`;
+      const partCount = Math.ceil(duration / interval);
       for (let localStart = 0, part = 1; localStart < duration - 0.001; localStart += interval, part += 1) {
         const localEnd = Math.min(duration, localStart + interval);
         const segmentStart = start + localStart;
@@ -711,6 +749,7 @@ export class AutoSplitClipsCommand extends SnapshotCommand {
         segment.projectEnd = asProjectTime(segmentEnd);
         segment.sourceIn = range.sourceIn;
         segment.sourceOut = range.sourceOut;
+        segment.metadata = { ...segment.metadata, autoSplitGroupId: groupId, autoSplitPart: part, autoSplitPartCount: partCount, autoSplitSourceId: clip.id };
         if (sourceAudioGroup) segment.audioGroupId = sourceAudioGroup.id;
         segment.animations = animationsForRange(clip, localStart, localEnd);
         segments.push(segment);
@@ -999,6 +1038,20 @@ export class UpdateProjectSettingsCommand extends SnapshotCommand {
     return project;
   }
   serialize() { return { type: this.type, payload: { patch: this.patch } }; }
+}
+
+/** Changes canvas and export dimensions atomically for a supported aspect ratio. */
+export class SetProjectAspectRatioCommand extends SnapshotCommand {
+  readonly type = "setProjectAspectRatio";
+  readonly renderImpact = "full" as const;
+  constructor(private readonly aspectRatio: AspectRatio) { super(); }
+  protected apply(project: EditorProjectV2) {
+    const size = ASPECT_SIZES[this.aspectRatio];
+    if (!size) throw new Error("Proporção de vídeo inválida.");
+    project.settings = { ...project.settings, aspectRatio: this.aspectRatio, ...size };
+    return project;
+  }
+  serialize() { return { type: this.type, payload: { aspectRatio: this.aspectRatio } }; }
 }
 
 export class EditorCommandBus {
