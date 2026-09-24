@@ -7,7 +7,7 @@ numpy==1.26.4
 # safetensors-only where supported, and the production container runs HF offline.
 torch==2.3.1
 torchvision==0.18.1
-torchaudio==2.3.1
+torchaudio==2.11.0+cpu
 celery==5.3.4
 redis==5.0.1
 minio==7.2.12
