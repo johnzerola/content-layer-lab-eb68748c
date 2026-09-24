@@ -96,12 +96,25 @@ import { analyzeAudio, findSilences, keepRanges } from "@/lib/editor/silence";
 import type { Easing } from "@/lib/video-template/types";
 import { BUILT_IN_LIBRARY_ITEMS, LibraryRegistry, TRANSITION_DEFINITIONS, userTemplateLibraryItem, type CaptionPresetDefinition, type CreativeEffectDefinition, type FilterPresetDefinition, type LibraryItem, type MotionDefinition, type SoundEffectDefinition, type TemplateDefinition } from "@/lib/editor-v2/library";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { EditorCanvasV2 } from "./EditorCanvasV2";
 import { InspectorV2 } from "./InspectorV2";
 import { LibraryPanel } from "./LibraryPanel";
 import { TimelineV2 } from "./TimelineV2";
 
 type MobileSurface = "library" | "canvas" | "inspector" | "timeline";
+
+const ASPECT_RATIO_OPTIONS = [
+  { value: "9:16", label: "Vertical", resolution: "1080 × 1920", frameClass: "h-7 w-4" },
+  { value: "16:9", label: "Horizontal", resolution: "1920 × 1080", frameClass: "h-4 w-7" },
+  { value: "1:1", label: "Quadrado", resolution: "1080 × 1080", frameClass: "size-6" },
+  { value: "4:5", label: "Retrato", resolution: "1080 × 1350", frameClass: "h-7 w-[22px]" },
+] satisfies ReadonlyArray<{
+  value: EditorProjectV2["settings"]["aspectRatio"];
+  label: string;
+  resolution: string;
+  frameClass: string;
+}>;
 
 function audioFileExtension(type: string) {
   if (type.includes("mpeg") || type.includes("mp3")) return "mp3";
@@ -148,6 +161,7 @@ export function EditorV2Foundation() {
   const [timelineZoom, setTimelineZoom] = useState(1);
   const [libraryRevision, setLibraryRevision] = useState(0);
   const [mobileSurface, setMobileSurface] = useState<MobileSurface>("canvas");
+  const [aspectRatioOpen, setAspectRatioOpen] = useState(false);
   const [message, setMessage] = useState("Editor V2 pronto para criar.");
   const [assetSources, setAssetSources] = useState<Record<string, string>>({});
   const [assetThumbnails, setAssetThumbnails] = useState<Record<string, string>>({});
@@ -1304,17 +1318,62 @@ export function EditorV2Foundation() {
         <div className="hidden h-5 w-px bg-white/8 sm:block" />
         <button type="button" className="flex min-w-0 max-w-48 items-center gap-1 rounded-md px-2 py-1 text-left text-xs font-medium hover:bg-white/5"><span className="truncate">{project.name}</span><ChevronDown className="size-3 text-muted-foreground" /></button>
         <div className="ml-auto flex items-center gap-1">
-          <label className="editor-tool-button editor-action-button relative gap-1 focus-within:ring-2 focus-within:ring-primary" title="Proporção do vídeo">
-            <Ratio className="size-3.5" />
-            <span className="sr-only">Proporção do vídeo</span>
-            <span className="min-w-7 text-[10px] font-semibold text-foreground">{project.settings.aspectRatio}</span><ChevronDown className="size-3 text-muted-foreground" />
-            <select aria-label="Proporção do vídeo" value={project.settings.aspectRatio} onChange={(event) => run(new SetProjectAspectRatioCommand(event.target.value as EditorProjectV2["settings"]["aspectRatio"]), `Formato alterado para ${event.target.value}.`)} className="absolute inset-0 size-full cursor-pointer opacity-0">
-              <option value="9:16">9:16</option>
-              <option value="16:9">16:9</option>
-              <option value="1:1">1:1</option>
-              <option value="4:5">4:5</option>
-            </select>
-          </label>
+          <Popover open={aspectRatioOpen} onOpenChange={setAspectRatioOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="editor-tool-button editor-action-button gap-1.5"
+                aria-label={`Formato do vídeo: ${project.settings.aspectRatio}`}
+                aria-expanded={aspectRatioOpen}
+                title="Alterar formato do vídeo"
+              >
+                <Ratio className="size-3.5" />
+                <span className="hidden xl:inline">Formato</span>
+                <span className="min-w-7 text-[10px] font-bold tabular-nums text-foreground">{project.settings.aspectRatio}</span>
+                <ChevronDown className={`size-3 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none ${aspectRatioOpen ? "rotate-180" : ""}`} />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              side="bottom"
+              sideOffset={7}
+              collisionPadding={8}
+              className="editor-auto-cut-popover z-50 w-[min(22rem,calc(100vw-1rem))] rounded-xl border-white/10 p-3 text-foreground"
+            >
+              <div className="px-1 pb-2">
+                <p className="text-xs font-semibold text-white">Formato do vídeo</p>
+                <p className="mt-0.5 text-[10px] leading-4 text-muted-foreground">Escolha o tamanho da prévia e da exportação.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2" role="group" aria-label="Formatos disponíveis">
+                {ASPECT_RATIO_OPTIONS.map((option) => {
+                  const selected = project.settings.aspectRatio === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => {
+                        if (!selected) run(new SetProjectAspectRatioCommand(option.value), `Formato alterado para ${option.value}.`);
+                        setAspectRatioOpen(false);
+                      }}
+                      className={`group flex min-h-16 items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-[border-color,background-color,box-shadow,transform] duration-150 motion-reduce:transition-none active:scale-[0.97] motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:ring-offset-background ${selected ? "border-primary/60 bg-primary/15 shadow-[inset_0_1px_rgba(255,255,255,0.08)]" : "border-white/8 bg-white/[0.025] hover:border-white/20 hover:bg-white/[0.06]"}`}
+                    >
+                      <span className={`grid size-10 shrink-0 place-items-center rounded-lg border ${selected ? "border-primary/30 bg-primary/10" : "border-white/8 bg-black/20"}`} aria-hidden="true">
+                        <span className={`${option.frameClass} rounded-[3px] border ${selected ? "border-primary bg-primary/20" : "border-white/45 bg-white/5 group-hover:border-white/70"}`} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1.5 text-[11px] font-semibold text-white">
+                          {option.label}
+                          {selected ? <Check className="size-3.5 text-primary" aria-hidden="true" /> : null}
+                        </span>
+                        <span className="mt-0.5 block text-[10px] font-medium tabular-nums text-muted-foreground">{option.value} · {option.resolution}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
           <input ref={fileInputRef} type="file" accept="video/*,audio/*,image/*,.srt,.vtt,text/vtt" multiple className="sr-only" aria-label="Selecionar mídias locais" onChange={(event) => void importFiles(event.target.files)} />
           <input ref={relinkInputRef} type="file" accept="video/*,audio/*,image/*" className="sr-only" aria-label="Religar arquivo de mídia" onChange={(event) => void relinkMedia(event.target.files)} />
           <button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing} className="editor-tool-button editor-action-button"><Import className="size-3.5" /><span className="hidden md:inline">{importing ? "Importando…" : "Importar"}</span></button>
