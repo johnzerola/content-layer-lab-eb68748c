@@ -17,5 +17,6 @@ export * from "./feature-flags";
 export * from "./project";
 export * from "./render-manifest";
 export * from "./sound-effects";
+export * from "./timeline-zoom";
 export * from "./types";
 export * from "./transitions";

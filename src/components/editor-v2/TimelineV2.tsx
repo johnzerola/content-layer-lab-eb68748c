@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Captions, ChevronDown, Copy, Eye, EyeOff, Film, FlipHorizontal2, FlipVertical2, Gauge, Group, Headphones, Image, Layers3, Lock, Magnet, Maximize2, Music2, Pause, Play, Rewind, RotateCcw, Scissors, Sparkles, Timer, Trash2, Ungroup, Unlock, Volume2, VolumeX, Waves, ZoomIn, ZoomOut } from "lucide-react";
-import { formatProjectTime, isTrackCompatible, resolveAutoSplitSelection, snapProjectTime, visibleTimelineRange, type AnimatableProperty, type AutoSplitSelectionMode, type Clip, type EditorProjectV2, type Track, type TrackKind } from "@/lib/editor-v2";
+import { Captions, ChevronDown, Copy, Eye, EyeOff, Film, FlipHorizontal2, FlipVertical2, Gauge, Group, Headphones, Image, Layers3, LocateFixed, Lock, Magnet, Maximize2, Music2, Pause, Play, Rewind, RotateCcw, Scissors, Sparkles, Timer, Trash2, Ungroup, Unlock, Volume2, VolumeX, Waves, ZoomIn, ZoomOut } from "lucide-react";
+import { MAX_TIMELINE_ZOOM, MIN_TIMELINE_ZOOM, TIMELINE_BASE_PX_PER_SECOND, clampTimelineZoom, fitTimelineZoom, formatProjectTime, isTrackCompatible, resolveAutoSplitSelection, snapProjectTime, timelineSliderToZoom, timelineTickStep, timelineZoomToSlider, visibleTimelineRange, type AnimatableProperty, type AutoSplitSelectionMode, type Clip, type EditorProjectV2, type Track, type TrackKind } from "@/lib/editor-v2";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface TimelineProps {
@@ -59,11 +59,19 @@ export function TimelineV2(props: TimelineProps) {
   const [autoCutInterval, setAutoCutInterval] = useState(2);
   const [autoCutMode, setAutoCutMode] = useState<"interval" | "silence">("interval");
   const [silencePreset, setSilencePreset] = useState<"natural" | "tight">("natural");
+  const [followPlayhead, setFollowPlayhead] = useState(true);
   const [viewport, setViewport] = useState({ scrollLeft: 0, width: 1200 });
-  const pxPerSecond = 52 * zoom;
-  const width = Math.max(900, project.settings.duration * pxPerSecond + 120);
+  const pxPerSecond = TIMELINE_BASE_PX_PER_SECOND * zoom;
+  const width = Math.max(Math.max(320, viewport.width - TRACK_LABEL_WIDTH), project.settings.duration * pxPerSecond + 120);
   const visible = visibleTimelineRange(viewport.scrollLeft, viewport.width, TRACK_LABEL_WIDTH, pxPerSecond);
-  const ticks = useMemo(() => Array.from({ length: Math.ceil(project.settings.duration) + 1 }, (_, index) => index), [project.settings.duration]).filter((tick) => tick >= visible.start - 1 && tick <= visible.end + 1);
+  const tickStep = timelineTickStep(pxPerSecond);
+  const ticks = useMemo(() => {
+    const first = Math.max(0, Math.floor(visible.start / tickStep) * tickStep);
+    const last = Math.min(project.settings.duration, visible.end + tickStep);
+    const values: number[] = [];
+    for (let tick = first; tick <= last; tick += tickStep) values.push(tick);
+    return values;
+  }, [project.settings.duration, tickStep, visible.end, visible.start]);
   const selectedClips = project.tracks.flatMap((track) => track.clips).filter((clip) => project.selection.itemIds.includes(clip.id));
   const selectedCompoundIds = [...new Set(selectedClips.map((clip) => clip.metadata?.["compoundGroupId"]).filter((id): id is string => typeof id === "string"))];
   const automaticCutSelection = useMemo(() => {
@@ -95,14 +103,15 @@ export function TimelineV2(props: TimelineProps) {
 
   useEffect(() => {
     const element = scrollRef.current;
-    if (!element || !playing) return;
+    if (!element || !playing || !followPlayhead) return;
     const playheadX = TRACK_LABEL_WIDTH + currentTime * pxPerSecond;
-    const safeLeft = element.scrollLeft + TRACK_LABEL_WIDTH + 16;
-    const safeRight = element.scrollLeft + element.clientWidth - 72;
+    const usableWidth = Math.max(160, element.clientWidth - TRACK_LABEL_WIDTH);
+    const safeLeft = element.scrollLeft + TRACK_LABEL_WIDTH + usableWidth * .2;
+    const safeRight = element.scrollLeft + TRACK_LABEL_WIDTH + usableWidth * .78;
     if (playheadX < safeLeft || playheadX > safeRight) {
-      element.scrollTo({ left: Math.max(0, playheadX - element.clientWidth * 0.32), behavior: "auto" });
+      element.scrollLeft = Math.max(0, playheadX - TRACK_LABEL_WIDTH - usableWidth * .28);
     }
-  }, [currentTime, playing, pxPerSecond]);
+  }, [currentTime, followPlayhead, playing, pxPerSecond]);
 
   const timeFromPointer = (clientX: number) => {
     const rect = scrollRef.current?.getBoundingClientRect();
@@ -117,23 +126,27 @@ export function TimelineV2(props: TimelineProps) {
   };
 
   const changeZoom = (value: number) => {
-    const next = Math.max(.35, Math.min(8, value));
+    const next = clampTimelineZoom(value);
     const element = scrollRef.current;
     const playheadViewportX = element ? TRACK_LABEL_WIDTH + currentTime * pxPerSecond - element.scrollLeft : 0;
     onZoom(next);
     if (element) requestAnimationFrame(() => {
-      element.scrollLeft = Math.max(0, TRACK_LABEL_WIDTH + currentTime * 52 * next - playheadViewportX);
+      element.scrollLeft = Math.max(0, TRACK_LABEL_WIDTH + currentTime * TIMELINE_BASE_PX_PER_SECOND * next - playheadViewportX);
     });
   };
 
   const fitTimeline = () => {
-    const available = Math.max(240, (scrollRef.current?.clientWidth ?? 900) - TRACK_LABEL_WIDTH - 40);
-    changeZoom(available / Math.max(1, project.settings.duration * 52));
+    const next = fitTimelineZoom(project.settings.duration, scrollRef.current?.clientWidth ?? 900, TRACK_LABEL_WIDTH);
+    onZoom(next);
+    requestAnimationFrame(() => {
+      if (scrollRef.current) scrollRef.current.scrollLeft = 0;
+    });
   };
 
   const beginPlayheadGesture = (event: React.PointerEvent) => {
     event.preventDefault();
     event.stopPropagation();
+    if (playing) onTogglePlayback();
     const update = (clientX: number) => onSeek(timeFromPointer(clientX));
     update(event.clientX);
     const move = (next: PointerEvent) => update(next.clientX);
@@ -143,6 +156,19 @@ export function TimelineV2(props: TimelineProps) {
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up, { once: true });
+  };
+
+  const movePlayheadWithKeyboard = (event: React.KeyboardEvent) => {
+    const step = event.shiftKey ? 1 : 1 / 30;
+    let next: number | null = null;
+    if (event.key === "ArrowLeft") next = currentTime - step;
+    else if (event.key === "ArrowRight") next = currentTime + step;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = project.settings.duration;
+    if (next === null) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onSeek(Math.max(0, Math.min(project.settings.duration, next)));
   };
 
   const beginClipGesture = (event: React.PointerEvent, clip: Clip, mode: Draft["mode"]) => {
@@ -256,7 +282,7 @@ export function TimelineV2(props: TimelineProps) {
           <button type="button" onClick={onTogglePlayback} className="editor-icon-button size-7 bg-primary/18 text-primary" aria-label={playing ? "Pausar" : "Reproduzir"}>{playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}</button>
           <button type="button" onClick={() => onSkip(5)} className="editor-icon-button size-7" aria-label="Avançar 5 segundos"><RotateCcw className="size-3.5 scale-x-[-1]" /></button>
         </div>
-        <button type="button" onClick={onSplit} className="editor-tool-button"><Scissors className="size-3.5" /><span className="hidden sm:inline">Dividir</span></button>
+        <button type="button" onClick={onSplit} className="editor-tool-button" title="Dividir na posição da agulha (S)" aria-label="Dividir na posição da agulha"><Scissors className="size-3.5" /><span className="hidden sm:inline">Dividir</span></button>
         <Popover open={autoCutOpen} onOpenChange={setAutoCutOpen}>
           <PopoverTrigger asChild><button type="button" aria-label="Cortes automáticos" title="Cortar seleção por intervalo" aria-expanded={autoCutOpen} className={`editor-tool-button ${autoCutOpen ? "text-primary" : ""}`}><Timer className="size-3.5" /><span className="hidden xl:inline">Cortes automáticos</span></button></PopoverTrigger>
           <PopoverContent side="bottom" align="start" sideOffset={4} collisionPadding={8} asChild><form onSubmit={(event) => { event.preventDefault(); if (autoCutMode === "interval") onAutoSplit(autoCutInterval); else onRemoveSilence(silencePreset === "natural" ? { threshold: .06, minSilence: .35, padding: .1 } : { threshold: .11, minSilence: .22, padding: .06 }); if (!removingSilence) setAutoCutOpen(false); }} className="editor-auto-cut-popover z-50 w-72 rounded-xl border border-white/10 p-3 shadow-2xl">
@@ -307,14 +333,22 @@ export function TimelineV2(props: TimelineProps) {
           <PopoverContent side="bottom" align="end" sideOffset={4} collisionPadding={8} className="editor-auto-cut-popover z-50 w-56 rounded-xl border border-white/10 p-2 shadow-2xl"><p className="px-2 pb-1 text-[9px] font-semibold text-foreground">Adicionar camada</p>{([['overlay','Sobreposição'],['voice','Voz'],['music','Música'],['sfx','Efeito sonoro']] as const).map(([kind, label]) => <button key={kind} type="button" onClick={() => { onAddTrack(kind); setLayerOpen(false); }} className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-[9px] text-muted-foreground hover:bg-primary/12 hover:text-primary"><TrackIcon kind={kind} />{label}</button>)}</PopoverContent>
         </Popover>
         </div>
-        <div className="flex shrink-0 items-center gap-1 rounded-lg border border-white/8 bg-black/35 p-0.5 shadow-[-10px_0_18px_rgba(4,5,10,.72)]" role="group" aria-label="Zoom da timeline"><button type="button" onClick={() => changeZoom(zoom / 1.25)} className="editor-icon-button size-7" aria-label="Diminuir zoom"><ZoomOut className="size-3.5" /></button><input id="timeline-zoom" aria-label="Zoom da timeline" type="range" min="0.35" max="8" step="0.05" value={zoom} onChange={(event) => changeZoom(Number(event.target.value))} className="w-16 accent-violet-500 sm:w-28" /><button type="button" onClick={() => changeZoom(zoom * 1.25)} className="editor-icon-button size-7" aria-label="Aumentar zoom"><ZoomIn className="size-3.5" /></button><button type="button" onClick={fitTimeline} className="editor-icon-button size-7" aria-label="Ajustar projeto inteiro à timeline" title="Mostrar projeto inteiro"><Maximize2 className="size-3.5" /></button><output htmlFor="timeline-zoom" className="hidden w-9 text-right text-[9px] tabular-nums text-muted-foreground sm:block">{Math.round(zoom * 100)}%</output></div>
+        <div className="flex shrink-0 items-center gap-0.5 rounded-lg border border-white/10 bg-black/40 p-0.5 shadow-[-10px_0_18px_rgba(4,5,10,.72)]" role="group" aria-label="Visualização da timeline">
+          <button type="button" onClick={() => setFollowPlayhead((value) => !value)} aria-pressed={followPlayhead} className={`editor-icon-button size-7 ${followPlayhead ? "bg-primary/15 text-primary" : ""}`} aria-label={followPlayhead ? "Parar de seguir a agulha durante a reprodução" : "Seguir a agulha durante a reprodução"} title="Seguir agulha durante o play"><LocateFixed className="size-3.5" /></button>
+          <span className="mx-0.5 h-4 w-px bg-white/10" aria-hidden />
+          <button type="button" onClick={() => changeZoom(zoom / 1.25)} disabled={zoom <= MIN_TIMELINE_ZOOM} className="editor-icon-button size-7 disabled:opacity-30" aria-label="Diminuir zoom da timeline"><ZoomOut className="size-3.5" /></button>
+          <input id="timeline-zoom" aria-label="Zoom da timeline" type="range" min={timelineZoomToSlider(MIN_TIMELINE_ZOOM)} max={timelineZoomToSlider(MAX_TIMELINE_ZOOM)} step="0.01" value={timelineZoomToSlider(zoom)} onChange={(event) => changeZoom(timelineSliderToZoom(Number(event.target.value)))} className="w-20 accent-violet-500 sm:w-28" />
+          <button type="button" onClick={() => changeZoom(zoom * 1.25)} disabled={zoom >= MAX_TIMELINE_ZOOM} className="editor-icon-button size-7 disabled:opacity-30" aria-label="Aumentar zoom da timeline"><ZoomIn className="size-3.5" /></button>
+          <button type="button" onClick={fitTimeline} className="editor-tool-button h-7 gap-1 px-1.5" aria-label="Ajustar projeto inteiro à timeline" title="Mostrar projeto inteiro"><Maximize2 className="size-3.5" /><span className="hidden 2xl:inline">Projeto</span></button>
+          <output htmlFor="timeline-zoom" className="w-9 pr-1 text-right text-[9px] font-medium tabular-nums text-muted-foreground">{Math.max(1, Math.round(zoom * 100))}%</output>
+        </div>
       </header>
 
       <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-auto vaiviral-scrollbar" onScroll={(event) => setViewport({ scrollLeft: event.currentTarget.scrollLeft, width: event.currentTarget.clientWidth })} onWheel={(event) => { if (!event.ctrlKey && !event.metaKey) return; event.preventDefault(); changeZoom(zoom * (event.deltaY > 0 ? .88 : 1.12)); }} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; }} onDrop={(event) => { event.preventDefault(); const at = timeFromPointer(event.clientX); if (event.dataTransfer.files.length) { onImportFiles(event.dataTransfer.files, at); return; } const mediaId = event.dataTransfer.getData("application/x-vaiviral-media-asset"); if (mediaId) { onDropMediaAsset(mediaId, at); return; } const id = event.dataTransfer.getData("application/x-vaiviral-library-item"); if (id) onDropLibraryItem(id, at); }}>
         <div className="relative min-h-full" style={{ width: width + TRACK_LABEL_WIDTH }}>
           <div className="editor-v2-ruler sticky top-0 z-30 flex h-7 backdrop-blur">
-            <div className="sticky left-0 z-40 flex shrink-0 items-center border-r border-white/8 bg-[oklch(0.105_0.012_270)] px-3 text-[9px] font-medium text-muted-foreground" style={{ width: TRACK_LABEL_WIDTH }}>{formatProjectTime(currentTime)}</div>
-            <div className="relative cursor-ew-resize touch-none" style={{ width }} onPointerDown={beginPlayheadGesture}>{ticks.map((tick) => <span key={tick} className="pointer-events-none absolute bottom-0 h-2 border-l border-white/18 text-[8px] tabular-nums text-muted-foreground" style={{ left: tick * pxPerSecond }}><span className="absolute left-1 top-[-10px]">{tick % 5 === 0 ? formatProjectTime(tick).slice(0, 5) : ""}</span></span>)}</div>
+            <div className="sticky left-0 z-40 flex shrink-0 items-center border-r border-white/8 bg-[oklch(0.105_0.012_270)] px-2 text-[9px] font-medium tabular-nums text-muted-foreground" style={{ width: TRACK_LABEL_WIDTH }}><span className="text-foreground">{formatProjectTime(currentTime)}</span><span className="mx-1 text-white/20">/</span><span>{formatProjectTime(project.settings.duration)}</span></div>
+            <div className="relative cursor-ew-resize touch-none" style={{ width }} onPointerDown={beginPlayheadGesture}>{ticks.map((tick) => <span key={tick} className="pointer-events-none absolute bottom-0 h-2 border-l border-white/18 text-[8px] tabular-nums text-muted-foreground" style={{ left: tick * pxPerSecond }}><span className="absolute left-1 top-[-10px]">{formatProjectTime(tick).slice(0, 5)}</span></span>)}</div>
           </div>
           {project.tracks.map((track) => {
             const target = draft?.targetTrackId === track.id;
@@ -354,7 +388,7 @@ export function TimelineV2(props: TimelineProps) {
               </div>
             </div>;
           })}
-          <button type="button" aria-label={`Mover agulha, posição ${formatProjectTime(currentTime)}`} onPointerDown={beginPlayheadGesture} className="absolute bottom-0 top-0 z-40 w-3 -translate-x-1/2 cursor-ew-resize touch-none bg-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary" style={{ left: TRACK_LABEL_WIDTH + currentTime * pxPerSecond }}><span className="pointer-events-none absolute bottom-0 left-1/2 top-0 w-px -translate-x-1/2 bg-white shadow-[0_0_0_1px_rgba(124,92,255,.9)]" /><span className="pointer-events-none absolute -top-0.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 rounded-[2px] bg-primary shadow-[0_0_12px_rgba(124,92,255,.8)]" /></button>
+          <button type="button" aria-label={`Mover agulha, posição ${formatProjectTime(currentTime)} de ${formatProjectTime(project.settings.duration)}`} title="Arraste a agulha ou use ← → (Shift: 1 segundo)" onPointerDown={beginPlayheadGesture} onKeyDown={movePlayheadWithKeyboard} className="absolute bottom-0 top-0 z-40 w-4 -translate-x-1/2 cursor-ew-resize touch-none bg-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary" style={{ left: TRACK_LABEL_WIDTH + currentTime * pxPerSecond }}><span className={`pointer-events-none absolute bottom-0 left-1/2 top-0 w-px -translate-x-1/2 ${playing ? "bg-primary shadow-[0_0_8px_rgba(124,92,255,.9)]" : "bg-white shadow-[0_0_0_1px_rgba(124,92,255,.9)]"}`} /><span className="pointer-events-none absolute -top-0.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 rounded-[2px] bg-primary shadow-[0_0_12px_rgba(124,92,255,.8)]" /></button>
         </div>
       </div>
     </section>
