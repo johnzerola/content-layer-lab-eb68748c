@@ -66,12 +66,22 @@ export function TimelineV2(props: TimelineProps) {
   const ticks = useMemo(() => Array.from({ length: Math.ceil(project.settings.duration) + 1 }, (_, index) => index), [project.settings.duration]).filter((tick) => tick >= visible.start - 1 && tick <= visible.end + 1);
   const selectedClips = project.tracks.flatMap((track) => track.clips).filter((clip) => project.selection.itemIds.includes(clip.id));
   const selectedCompoundIds = [...new Set(selectedClips.map((clip) => clip.metadata?.["compoundGroupId"]).filter((id): id is string => typeof id === "string"))];
-  const automaticCutCounts = useMemo(() => {
-    const ids = resolveAutoSplitSelection(project, project.selection.itemIds, "all");
-    const byId = new Map(project.tracks.flatMap((track) => track.clips).map((clip) => [clip.id, clip]));
-    const parts = ids.map((id) => Number(byId.get(id)?.metadata?.["autoSplitPart"]));
-    return { all: ids.length, odd: parts.filter((part) => Number.isInteger(part) && part % 2 === 1).length, even: parts.filter((part) => Number.isInteger(part) && part % 2 === 0).length };
+  const automaticCutSelection = useMemo(() => {
+    const ids = {
+      all: resolveAutoSplitSelection(project, project.selection.itemIds, "all"),
+      odd: resolveAutoSplitSelection(project, project.selection.itemIds, "odd"),
+      even: resolveAutoSplitSelection(project, project.selection.itemIds, "even"),
+    };
+    const selected = new Set(project.selection.itemIds);
+    const matches = (candidateIds: string[]) => candidateIds.length > 0 && candidateIds.length === selected.size && candidateIds.every((id) => selected.has(id));
+    const activeMode: AutoSplitSelectionMode | null = matches(ids.all) ? "all" : matches(ids.odd) ? "odd" : matches(ids.even) ? "even" : null;
+    return { ids, counts: { all: ids.all.length, odd: ids.odd.length, even: ids.even.length }, activeMode };
   }, [project]);
+  const automaticCutCounts = automaticCutSelection.counts;
+  const selectAutomaticCuts = (mode: AutoSplitSelectionMode) => {
+    onSelectAutoSplitParts(mode);
+    setBatchOpen(false);
+  };
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -257,16 +267,20 @@ export function TimelineV2(props: TimelineProps) {
           </form></PopoverContent>
         </Popover>
         <button type="button" onClick={onDuplicate} className="editor-tool-button"><Copy className="size-3.5" /><span className="hidden sm:inline">Duplicar</span></button>
+        {automaticCutCounts.all > 1 && <div className="flex h-8 shrink-0 items-center gap-0.5 rounded-lg border border-white/10 bg-black/25 p-0.5" role="group" aria-label="Selecionar cortes por posição">
+          <span className="hidden px-1.5 text-[8px] font-semibold text-muted-foreground 2xl:inline">Selecionar</span>
+          {([['all', 'Todos'], ['odd', 'Ímpares'], ['even', 'Pares']] as const).map(([mode, label]) => <button key={mode} type="button" aria-pressed={automaticCutSelection.activeMode === mode} onClick={() => selectAutomaticCuts(mode)} title={`Selecionar ${label.toLowerCase()} os cortes`} className={`h-6 rounded-md px-2 text-[8px] font-semibold tabular-nums transition-[background-color,color,box-shadow,transform] duration-150 motion-reduce:transition-none active:scale-[0.97] motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${automaticCutSelection.activeMode === mode ? "bg-primary/22 text-primary shadow-[inset_0_1px_rgba(255,255,255,0.08)]" : "text-muted-foreground hover:bg-white/7 hover:text-white"}`}>{label} <span className="opacity-75">{automaticCutCounts[mode]}</span></button>)}
+        </div>}
         <Popover open={batchOpen} onOpenChange={setBatchOpen}>
-          <PopoverTrigger asChild><button type="button" disabled={!project.selection.itemIds.length} aria-expanded={batchOpen} className={`editor-tool-button disabled:cursor-not-allowed disabled:opacity-35 ${batchOpen ? "text-primary" : ""}`}><Gauge className="size-3.5" /><span className="hidden xl:inline">Ações</span>{project.selection.itemIds.length > 0 && <span className="rounded bg-primary/18 px-1.5 py-0.5 text-[8px] font-bold text-primary">{project.selection.itemIds.length}</span>}<ChevronDown className="size-3" /></button></PopoverTrigger>
-          <PopoverContent side="bottom" align="start" sideOffset={4} collisionPadding={8} className="editor-auto-cut-popover z-50 w-72 rounded-xl border border-white/10 p-3 shadow-2xl">
+          <PopoverTrigger asChild><button type="button" disabled={!project.selection.itemIds.length} aria-label={`Ações para ${project.selection.itemIds.length} itens selecionados`} aria-expanded={batchOpen} className={`editor-tool-button disabled:cursor-not-allowed disabled:opacity-35 ${batchOpen ? "text-primary" : ""}`}><Gauge className="size-3.5" /><span className="hidden xl:inline">Ações</span>{project.selection.itemIds.length > 0 && <span className="rounded bg-primary/18 px-1.5 py-0.5 text-[8px] font-bold text-primary">{project.selection.itemIds.length}</span>}<ChevronDown className={`size-3 transition-transform duration-150 motion-reduce:transition-none ${batchOpen ? "rotate-180" : ""}`} /></button></PopoverTrigger>
+          <PopoverContent side="top" align="start" sideOffset={7} collisionPadding={8} className="editor-auto-cut-popover z-[100] w-72 rounded-xl border border-white/10 p-3 shadow-2xl">
             <p className="text-[11px] font-semibold text-foreground">Editar {project.selection.itemIds.length} itens</p>
             <p className="mt-1 text-[9px] leading-relaxed text-muted-foreground">Ctrl+clique adiciona ou remove trechos. Cada ação abaixo usa um único Ctrl+Z.</p>
             <div className="mt-3 border-t border-white/8 pt-2">
               <p className="text-[9px] font-semibold text-foreground">Selecionar cortes automáticos</p>
               <p className="mt-0.5 text-[8px] leading-relaxed text-muted-foreground">Escolha todos ou as posições ímpares/pares da sequência.</p>
               <div className="mt-2 grid grid-cols-3 gap-1" role="group" aria-label="Selecionar cortes automáticos por posição">
-                {([['all', 'Todos'], ['odd', 'Ímpares'], ['even', 'Pares']] as const).map(([mode, label]) => <button key={mode} type="button" disabled={!automaticCutCounts[mode]} onClick={() => onSelectAutoSplitParts(mode)} className="h-8 rounded-lg bg-white/5 px-1 text-[9px] font-semibold text-muted-foreground hover:bg-primary/15 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-35">{label} <span className="tabular-nums">{automaticCutCounts[mode]}</span></button>)}
+                {([['all', 'Todos'], ['odd', 'Ímpares'], ['even', 'Pares']] as const).map(([mode, label]) => <button key={mode} type="button" disabled={!automaticCutCounts[mode]} aria-pressed={automaticCutSelection.activeMode === mode} onClick={() => selectAutomaticCuts(mode)} className={`h-8 rounded-lg px-1 text-[9px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-35 ${automaticCutSelection.activeMode === mode ? "bg-primary/20 text-primary" : "bg-white/5 text-muted-foreground hover:bg-primary/15 hover:text-primary"}`}>{label} <span className="tabular-nums">{automaticCutCounts[mode]}</span></button>)}
               </div>
               {!automaticCutCounts.all && <p className="mt-1.5 text-[8px] text-amber-200/80">Selecione um trecho criado por Cortes automáticos.</p>}
             </div>

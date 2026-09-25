@@ -469,17 +469,22 @@ export type AutoSplitSelectionMode = "all" | "odd" | "even";
 export function resolveAutoSplitSelection(project: EditorProjectV2, referenceIds: string[], mode: AutoSplitSelectionMode) {
   const clips = project.tracks.flatMap((owner) => owner.clips);
   const clipById = new Map(clips.map((clip) => [clip.id, clip]));
+  const referenceClips = referenceIds
+    .map((id) => clipById.get(id))
+    .filter((clip): clip is Clip => clip?.kind === "video")
+    .sort((left, right) => Number(left.projectStart) - Number(right.projectStart));
   const groupIds = new Set(
-    referenceIds
-      .map((id) => clipById.get(id)?.metadata?.["autoSplitGroupId"])
+    referenceClips
+      .map((clip) => clip.metadata?.["autoSplitGroupId"])
       .filter((id): id is string => typeof id === "string"),
   );
-  if (!groupIds.size) return [];
-  return clips
-    .filter((clip) => clip.kind === "video" && groupIds.has(String(clip.metadata?.["autoSplitGroupId"] ?? "")))
+  const candidates = groupIds.size
+    ? clips.filter((clip) => clip.kind === "video" && groupIds.has(String(clip.metadata?.["autoSplitGroupId"] ?? "")))
+    : referenceClips;
+  return candidates
     .filter((clip) => {
       if (mode === "all") return true;
-      const part = Number(clip.metadata?.["autoSplitPart"]);
+      const part = Number(clip.metadata?.["autoSplitPart"] ?? candidates.indexOf(clip) + 1);
       return Number.isInteger(part) && (mode === "odd" ? part % 2 === 1 : part % 2 === 0);
     })
     .sort((left, right) => Number(left.projectStart) - Number(right.projectStart) || Number(left.metadata?.["autoSplitPart"] ?? 0) - Number(right.metadata?.["autoSplitPart"] ?? 0))
@@ -492,6 +497,22 @@ export class SelectAutoSplitPartsCommand extends SnapshotCommand {
   readonly renderImpact = "none" as const;
   constructor(private readonly referenceIds: string[], private readonly mode: AutoSplitSelectionMode) { super(); }
   protected apply(project: EditorProjectV2) {
+    const referenced = this.referenceIds
+      .map((id) => project.tracks.flatMap((owner) => owner.clips).find((clip) => clip.id === id))
+      .filter((clip): clip is Clip => clip?.kind === "video")
+      .sort((left, right) => Number(left.projectStart) - Number(right.projectStart));
+    if (referenced.length > 1 && !referenced.some((clip) => typeof clip.metadata?.["autoSplitGroupId"] === "string")) {
+      const groupId = `${referenced[0]!.id}-alternating-selection`;
+      referenced.forEach((clip, index) => {
+        clip.metadata = {
+          ...clip.metadata,
+          autoSplitGroupId: groupId,
+          autoSplitPart: index + 1,
+          autoSplitPartCount: referenced.length,
+          autoSplitSourceId: referenced[0]!.id,
+        };
+      });
+    }
     const ids = resolveAutoSplitSelection(project, this.referenceIds, this.mode);
     if (!ids.length) throw new Error("Selecione um trecho criado pelos cortes automáticos.");
     project.selection = { itemIds: ids, primaryId: ids.at(-1) ?? null, surface: "timeline" };

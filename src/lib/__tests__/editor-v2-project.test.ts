@@ -320,6 +320,26 @@ describe("Command bus", () => {
     expect(bus.getState().selection.itemIds.map((id) => bus.getState().tracks[0]!.clips.find((item) => item.id === id)?.metadata?.["autoSplitPart"])).toEqual([1, 3, 5]);
   });
 
+  it("seleciona pares e ímpares em cortes antigos sem metadados", () => {
+    const project = createEditorProjectV2({ duration: 12 });
+    project.tracks[0]!.clips = Array.from({ length: 6 }, (_, index) => ({
+      ...clip(),
+      id: `legacy-${index + 1}`,
+      projectStart: asProjectTime(index * 2),
+      projectEnd: asProjectTime((index + 1) * 2),
+      sourceIn: index * 2,
+      sourceOut: (index + 1) * 2,
+      metadata: {},
+    }));
+    project.selection = { surface: "timeline", itemIds: project.tracks[0]!.clips.map((item) => item.id), primaryId: "legacy-6" };
+    const bus = new EditorCommandBus(project);
+
+    bus.execute(new SelectAutoSplitPartsCommand(bus.getState().selection.itemIds, "even"));
+    expect(bus.getState().selection.itemIds).toEqual(["legacy-2", "legacy-4", "legacy-6"]);
+    bus.execute(new SelectAutoSplitPartsCommand(bus.getState().selection.itemIds, "odd"));
+    expect(bus.getState().selection.itemIds).toEqual(["legacy-1", "legacy-3", "legacy-5"]);
+  });
+
   it("altera proporção, dimensões de exportação e desfaz em conjunto", () => {
     const bus = new EditorCommandBus(createEditorProjectV2({ duration: 12 }));
     bus.execute(new SetProjectAspectRatioCommand("16:9"));
