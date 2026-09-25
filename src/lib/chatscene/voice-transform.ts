@@ -357,16 +357,8 @@ export function synthesisTransformForProfile(profile: {
   pitch?: number;
   transform?: VoiceTransformSelection | undefined;
 }): VoiceTransformSelection | undefined {
-  const pitch = Math.max(-6, Math.min(6, profile.pitch ?? 0));
   if (!profile.transform) return undefined;
-  const selection = structuredClone(profile.transform);
-  if (pitch !== 0) {
-    selection.config.pitchSemitones = effectiveTransformPitch(selection.config) + pitch;
-    selection.config.linkedPitchToSpeed = false;
-    selection.config.mode = selection.config.speedMultiplier === 1
-      ? "PITCH_ONLY" : "SPEED_AND_PITCH";
-  }
-  return selection;
+  return structuredClone(profile.transform);
 }
 
 export function effectiveTransformPitch(configValue: VoiceTransformConfig): number {

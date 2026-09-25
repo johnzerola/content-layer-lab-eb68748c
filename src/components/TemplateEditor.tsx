@@ -510,10 +510,9 @@ export function TemplateEditor({
 
   const videoAtTime = videoBoxAt(t, time);
 
-  /** Mantém o arraste do canvas sincronizado com o keyframe sob a agulha. */
+  /** Mantém o arraste do canvas sincronizado com as propriedades animadas. */
   const changeFromCanvas = (next: Template) => {
-    const currentKey = (t.videoKeyframes ?? []).some((key) => Math.abs(key.t - time) <= 0.05);
-    if (!currentKey || next.video === t.video) {
+    if (next.video === t.video) {
       setT(next);
       return;
     }

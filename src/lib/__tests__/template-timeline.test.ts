@@ -46,6 +46,22 @@ describe('keyframes de vídeo do template', () => {
     expect(changed.videoKeyframes ?? []).toHaveLength(0);
   });
 
+  it('cria um novo ponto ao editar uma propriedade já animada fora de um keyframe', () => {
+    const base = createTemplate();
+    const keyed = upsertVideoPropertyKeyframe(base, 2, 'x', 320);
+    const changed = patchVideoAtTime(keyed, 6, { x: 780, y: 940, w: 920, h: 1500, radius: 24 });
+    expect(changed.video).toMatchObject({
+      x: base.video.x,
+      y: 940,
+      w: 920,
+      h: 1500,
+      radius: 24,
+    });
+    expect(changed.videoKeyframes).toHaveLength(2);
+    expect(changed.videoKeyframes?.find((key) => key.t === 6)).toMatchObject({ x: 780 });
+    expect(videoBoxAt(changed, 6)).toMatchObject({ x: 780, y: 940, w: 920, h: 1500, radius: 24 });
+  });
+
   it('Expandir cria um movimento suave a partir do segundo escolhido', () => {
     const base = createTemplate();
     const expanded = expandVideoFrom(base, 10, 30, 0.8);

@@ -124,30 +124,38 @@ async function insertTemplateVersions(
   label: string,
 ) {
   if (!items.length) return;
-  const { data: latestRows } = await supabase
-    .from("template_versions")
-    .select("id,template_id,data,format,base_id,patch,created_at")
-    .in(
-      "template_id",
-      items.map((i) => i.templateId),
-    )
-    .order("created_at", { ascending: false })
-    .limit(500);
-  // por template: última versão COMPLETA e quantos diffs já pendurados nela
-  const fullByTemplate = new Map<string, VersionRow>();
-  const diffCountByTemplate = new Map<string, number>();
-  const rowsDesc = (latestRows ?? []) as unknown as (VersionRow & { created_at: string })[];
-  for (const row of rowsDesc) {
-    if (row.format === "full") {
-      if (!fullByTemplate.has(row.template_id)) fullByTemplate.set(row.template_id, row);
-    }
-  }
-  for (const [templateId, full] of fullByTemplate) {
-    const count = rowsDesc.filter(
-      (r) => r.template_id === templateId && r.format === "diff" && r.base_id === full.id,
-    ).length;
-    diffCountByTemplate.set(templateId, count);
-  }
+  // Busca somente a base completa mais recente de cada template. O histórico
+  // inteiro contém JSONs grandes e não deve ser descompactado a cada salvamento.
+  const histories = await Promise.all(items.map(async (item) => {
+    const { data: full, error: fullError } = await supabase
+      .from("template_versions")
+      .select("id,template_id,data,format,base_id,patch")
+      .eq("template_id", item.templateId)
+      .eq("format", "full")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (fullError) throw fullError;
+    if (!full) return { templateId: item.templateId, full: null, diffCount: 0 };
+    const { count, error: countError } = await supabase
+      .from("template_versions")
+      .select("id", { count: "exact", head: true })
+      .eq("template_id", item.templateId)
+      .eq("format", "diff")
+      .eq("base_id", full.id);
+    if (countError) throw countError;
+    return {
+      templateId: item.templateId,
+      full: full as unknown as VersionRow,
+      diffCount: count ?? 0,
+    };
+  }));
+  const fullByTemplate = new Map(
+    histories.filter((history) => history.full).map((history) => [history.templateId, history.full as VersionRow]),
+  );
+  const diffCountByTemplate = new Map(
+    histories.map((history) => [history.templateId, history.diffCount]),
+  );
 
   const rows = items.map((item) => {
     const base = fullByTemplate.get(item.templateId);
@@ -176,7 +184,8 @@ async function insertTemplateVersions(
       patch: null,
     };
   });
-  await supabase.from("template_versions").insert(rows);
+  const { error } = await supabase.from("template_versions").insert(rows);
+  if (error) throw error;
 }
 
 /** Traz os templates da nuvem e mescla com os locais (a nuvem vence por id). */

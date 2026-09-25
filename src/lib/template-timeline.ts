@@ -59,17 +59,16 @@ export function removeVideoKeyframe(t: Template, id: string): Template {
 }
 
 /**
- * Ajusta a caixa base ou, quando a agulha está sobre um keyframe, o próprio
- * keyframe. Assim a sequência "marcar keyframe -> mover/redimensionar" funciona.
+ * Ajusta a caixa base enquanto a propriedade ainda é estática. Depois do
+ * primeiro keyframe daquela propriedade, qualquer ajuste cria/atualiza o ponto
+ * sob a agulha para não deslocar nem perder a animação existente.
  */
 export function patchVideoAtTime(t: Template, time: number, patch: Partial<VideoKeyframeBox>): Template {
   let next = t;
   const basePatch: Partial<VideoKeyframeBox> = {};
   for (const [property, value] of Object.entries(patch) as [VideoKeyframeProperty, number][]) {
-    const hasPropertyKey = (next.videoKeyframes ?? []).some(
-      (key) => Math.abs(key.t - time) <= KEY_EPSILON && key[property] !== undefined,
-    );
-    if (hasPropertyKey) next = upsertVideoPropertyKeyframe(next, time, property, value);
+    const propertyIsAnimated = (next.videoKeyframes ?? []).some((key) => key[property] !== undefined);
+    if (propertyIsAnimated) next = upsertVideoPropertyKeyframe(next, time, property, value);
     else basePatch[property] = value;
   }
   return Object.keys(basePatch).length ? { ...next, video: { ...next.video, ...basePatch } } : next;

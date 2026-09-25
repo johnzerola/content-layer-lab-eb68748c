@@ -1,6 +1,5 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import ffmpegStaticPath from "ffmpeg-static";
 import {
   VOICE_TRANSFORM_ENGINE_VERSION,
   buildAtempoChain,
@@ -48,9 +47,7 @@ let capabilitiesPromise: Promise<VoiceTransformCapabilities> | null = null;
 
 function ffmpegPath(): string {
   const configured = process.env["FFMPEG_PATH"]?.trim();
-  const resolved = configured || ffmpegStaticPath;
-  if (!resolved) throw new Error("FFmpeg não está disponível no servidor. Configure FFMPEG_PATH.");
-  return resolved;
+  return configured || "ffmpeg";
 }
 
 function runFfmpeg(args: string[], input?: Buffer): Promise<ProcessResult> {
@@ -267,7 +264,10 @@ export class VoiceTransformEngine {
       output,
       effectivePitchSemitones: effectiveTransformPitch(config),
     };
-    if (transformCache.size >= MAX_CACHE_ENTRIES) transformCache.delete(transformCache.keys().next().value!);
+    if (transformCache.size >= MAX_CACHE_ENTRIES) {
+      const oldestKey = transformCache.keys().next().value;
+      if (oldestKey) transformCache.delete(oldestKey);
+    }
     transformCache.set(key, stable);
     const processingMs = Math.round(performance.now() - startedAt);
     console.info("voice_transform", {

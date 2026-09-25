@@ -393,6 +393,11 @@ export function TemplateCanvas({
     return rectOf({ ...template, video: videoBoxAt(template, timelineTime) }, id);
   }, [template, timelineTime]);
 
+  const templateAtPlayhead = useCallback((id: SelId) => {
+    if (id !== "video" || timelineTime === undefined) return template;
+    return { ...template, video: videoBoxAt(template, timelineTime) };
+  }, [template, timelineTime]);
+
   const drag = (id: SelId, mode: DragMode) => (e: React.PointerEvent) => {
     if (!interactive || !onChange) return;
     e.preventDefault();
@@ -440,7 +445,7 @@ export function TemplateCanvas({
         }
         const r = { x, y, w: start.w, h: start.h };
         setLive({ id, r });
-        onChange(applyRect(template, id, { x, y }));
+        onChange(applyRect(templateAtPlayhead(id), id, { x, y }));
       } else {
         // redimensiona apenas pelo lado da alça: as bordas opostas ficam ancoradas
         const west = mode.includes("w");
@@ -488,7 +493,7 @@ export function TemplateCanvas({
         const y = Math.round(north ? bottom - h : top);
         const r = { x, y, w, h };
         setLive({ id, r });
-        onChange(applyRect(template, id, r));
+        onChange(applyRect(templateAtPlayhead(id), id, r));
       }
       setGuides(g);
     };
@@ -521,11 +526,11 @@ export function TemplateCanvas({
       const r = rectAtPlayhead(selected);
       if (!r) return;
       ev.preventDefault();
-      onChange(applyRect(template, selected, { x: Math.round(r.x + mv[0]), y: Math.round(r.y + mv[1]) }));
+      onChange(applyRect(templateAtPlayhead(selected), selected, { x: Math.round(r.x + mv[0]), y: Math.round(r.y + mv[1]) }));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [interactive, onChange, selected, template, rectAtPlayhead]);
+  }, [interactive, onChange, selected, templateAtPlayhead, rectAtPlayhead]);
 
   const ids = selectableIds(template);
 
