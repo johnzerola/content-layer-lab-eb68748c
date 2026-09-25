@@ -47,9 +47,9 @@ export function voiceSchedule(
     const entry = plan.byId[message.id];
     if (!clip || !entry) continue;
     const voice = effectiveVoice(project, message);
-    // A server-transformed clip already includes its selected pitch and tempo.
-    // Never varispeed a clip to fit an editorial window: it changes the timbre.
-    const baseRate = voice?.profile.transform ? 1 : pitchRate(voice?.profile.pitch);
+    // O preset do servidor e o ajuste manual são independentes. O tom manual
+    // usa Web Audio para continuar disponível sem o serviço FFmpeg.
+    const baseRate = pitchRate(voice?.profile.pitch);
     const manualRate = project.timing.audioDriven
       ? dialoguePlaybackRate(project.timing.voicePlaybackRate)
       : 1;

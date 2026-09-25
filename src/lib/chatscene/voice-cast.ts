@@ -153,9 +153,7 @@ export function clearVoiceCache() {
 
 /** Duração real da fala já com o tom aplicado, em milissegundos. */
 export function clipDurationMs(clip: VoiceClip, profile: VoiceProfile | null | undefined): number {
-  return Math.round(
-    (clip.durationSec / (profile?.transform ? 1 : pitchRate(profile?.pitch))) * 1000,
-  );
+  return Math.round((clip.durationSec / pitchRate(profile?.pitch)) * 1000);
 }
 
 /**
@@ -167,7 +165,7 @@ export function playClip(clip: VoiceClip, profile?: VoiceProfile | null): () => 
   void ctx.resume().catch(() => {});
   const source = ctx.createBufferSource();
   source.buffer = clip.buffer;
-  source.playbackRate.value = profile?.transform ? 1 : pitchRate(profile?.pitch);
+  source.playbackRate.value = pitchRate(profile?.pitch);
   connectDialogue(ctx, source, ctx.destination, dialogueGain(clip.buffer, profile?.gain ?? 1));
   source.start();
   return () => {

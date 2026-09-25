@@ -69,9 +69,9 @@ describe("VoiceTransform math", () => {
     }
     const fast = selectionFromTransformPreset("dialogue_fast");
     const tuned = synthesisTransformForProfile({ pitch: -4, transform: fast });
-    expect(tuned?.config.mode).toBe("SPEED_AND_PITCH");
+    expect(tuned?.config.mode).toBe("TEMPO_ONLY");
     expect(tuned?.config.speedMultiplier).toBe(1.3);
-    expect(tuned?.config.pitchSemitones).toBe(-4);
+    expect(tuned?.config.pitchSemitones).toBe(0);
     expect(fast.config.pitchSemitones).toBe(0);
     expect(synthesisTransformForProfile({ pitch: 2 })).toBeUndefined();
   });

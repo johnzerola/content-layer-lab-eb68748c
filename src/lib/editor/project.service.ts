@@ -41,13 +41,13 @@ export interface EditorProjectSummary {
 }
 
 /**
- * Listagem leve: lê só nome, data e dois campos do documento. O projeto
+ * Listagem leve: lê só nome, data e dois resumos separados. O projeto
  * inteiro (que pode ter megabytes de timeline) só é carregado ao reabrir.
  */
 export async function listEditorProjects(limit = 30): Promise<EditorProjectSummary[]> {
   const { data, error } = await supabase
     .from("projects")
-    .select("id,name,updated_at,videoId:data->>videoId,duration:data->media->>duration")
+    .select("id,name,updated_at,video_id,media_duration")
     .eq("mode", EDITOR_PROJECT_MODE)
     .order("updated_at", { ascending: false })
     .limit(limit);
@@ -58,8 +58,8 @@ export async function listEditorProjects(limit = 30): Promise<EditorProjectSumma
       id: r["id"] as string,
       name: (r["name"] as string) ?? "Projeto",
       updated_at: (r["updated_at"] as string) ?? new Date().toISOString(),
-      videoId: (r["videoId"] as string) ?? "",
-      duration: r["duration"] == null ? null : Number(r["duration"]),
+      videoId: (r["video_id"] as string) ?? "",
+      duration: r["media_duration"] == null ? null : Number(r["media_duration"]),
     };
   });
 }

@@ -4,7 +4,6 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { createInterface } from "node:readline";
-import ffmpegStaticPath from "ffmpeg-static";
 
 export interface VoiceRuntimeConfig {
   pythonPath: string;
@@ -173,11 +172,7 @@ export async function saveVoiceReference(userId: string, audioBase64: string) {
     throw new Error("Envie um áudio de até 12 MB.");
   // Decode only local bytes. Playlists and remote protocols are not accepted.
   const pcm = await new Promise<Buffer>((accept, reject) => {
-    const ffmpeg = process.env["FFMPEG_PATH"] || ffmpegStaticPath;
-    if (!ffmpeg) {
-      reject(new Error("FFmpeg indisponível."));
-      return;
-    }
+    const ffmpeg = process.env["FFMPEG_PATH"]?.trim() || "ffmpeg";
     const child = spawn(
       ffmpeg,
       [

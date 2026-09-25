@@ -105,20 +105,17 @@ export function VoicePanel(props: VoicePanelProps) {
   const engineStatusFn = useServerFn(getVoiceEngineStatus);
   const [installedLocalVoices, setInstalledLocalVoices] = useState<string[] | null>(null);
   const [installedCatalogVoices, setInstalledCatalogVoices] = useState<string[] | null>(null);
-  const [pitchTransformAvailable, setPitchTransformAvailable] = useState<boolean | null>(null);
   useEffect(() => {
     let active = true;
     void engineStatusFn().then((status) => {
       if (active) {
         setInstalledLocalVoices(status.piperVoices);
         setInstalledCatalogVoices(status.catalogVoices);
-        setPitchTransformAvailable(status.pitchTransform);
       }
     }).catch(() => {
       if (active) {
         setInstalledLocalVoices([]);
         setInstalledCatalogVoices([]);
-        setPitchTransformAvailable(false);
       }
     });
     return () => { active = false; };
@@ -329,23 +326,11 @@ export function VoicePanel(props: VoicePanelProps) {
   };
   const setVoicePitch = (voice: VoiceProfile, semitones: number) => {
     if (!voice.id) return;
-    const current = voice.transform ?? selectionFromTransformPreset("adam_natural");
-    const speed = current.config.speedMultiplier;
+    const transformedPitch = voice.transform ? effectiveTransformPitch(voice.transform.config) : 0;
     updateProfile(voice.id, {
-      pitch: 0,
-      transform: semitones === 0 && (!voice.transform || voice.transform.presetId === "user-pitch")
-        ? undefined
-        : {
-            ...current,
-            presetId: "user-pitch",
-            config: {
-              ...current.config,
-              mode: speed === 1 ? "PITCH_ONLY" : "SPEED_AND_PITCH",
-              pitchSemitones: semitones,
-              linkedPitchToSpeed: false,
-              preservePitch: false,
-            },
-          },
+      // O ajuste manual continua no Web Audio, inclusive sem o serviço FFmpeg.
+      // Presets de transformação permanecem independentes e não recebem tom em dobro.
+      pitch: Math.max(PITCH_MIN, Math.min(PITCH_MAX, semitones - transformedPitch)),
     });
   };
 
@@ -752,7 +737,6 @@ export function VoicePanel(props: VoicePanelProps) {
                             size="sm"
                             variant={selected ? "default" : "secondary"}
                             className="min-h-10"
-                            disabled={pitch !== 0 && pitchTransformAvailable !== true}
                             aria-pressed={selected}
                             onClick={() => setVoicePitch(voice, pitch)}
                           >
@@ -762,13 +746,6 @@ export function VoicePanel(props: VoicePanelProps) {
                       })}
                     </div>
                     <p className="mt-1.5 text-[10px] text-muted-foreground">Muda o tom sem acelerar a fala. Clique em Ouvir para testar; a alteração gera novo áudio.</p>
-                    {pitchTransformAvailable !== true ? (
-                      <p role="status" className="mt-1 text-[10px] text-muted-foreground">
-                        {pitchTransformAvailable === null
-                          ? "Verificando o serviço de voz…"
-                          : "O ajuste fino precisa da versão nova do serviço de voz."}
-                      </p>
-                    ) : null}
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-2 has-[details[open]]:grid-cols-1">
                     <Button
@@ -848,7 +825,6 @@ export function VoicePanel(props: VoicePanelProps) {
                             max={PITCH_MAX}
                             step={0.5}
                             suffix=" st"
-                            disabled={pitchTransformAvailable !== true}
                             onChange={(pitch) => setVoicePitch(voice, pitch)}
                           />
                         ) : null}
