@@ -6,12 +6,12 @@ The existing voice provider call, audio cache, final-duration measurement and co
 
 Official repositories reviewed:
 
-| Candidate | Source | Assessment |
-| --- | --- | --- |
-| Chatterbox | https://github.com/resemble-ai/chatterbox | Selected: MIT runtime and weights, Portuguese, reference-based synthesis, 500M multilingual backbone. Pinned stable Python release 0.1.6; inference retains PerTh watermarking. |
-| Qwen3-TTS 0.6B Base | https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base | Apache-2.0, Portuguese, reference-based synthesis. Candidate for a later measured comparison; not installed alongside the selected engine. |
-| VoxCPM2 | https://github.com/OpenBMB/VoxCPM | Apache-2.0, multilingual. Larger 2B backbone is less attractive for this machine's 6 GB GPU; no performance claim without benchmark. |
-| Chatterbox dedicated PT-BR V3 | https://huggingface.co/ResembleAI/Chatterbox-Multilingual-pt-br | MIT, promising specialized model. Requires a different loader/checkpoint set from the pinned 0.1.6 release; not mixed into this runtime. |
+| Candidate                     | Source                                                          | Assessment                                                                                                                                                                      |
+| ----------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chatterbox                    | https://github.com/resemble-ai/chatterbox                       | Selected: MIT runtime and weights, Portuguese, reference-based synthesis, 500M multilingual backbone. Pinned stable Python release 0.1.6; inference retains PerTh watermarking. |
+| Qwen3-TTS 0.6B Base           | https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base            | Apache-2.0, Portuguese, reference-based synthesis. Candidate for a later measured comparison; not installed alongside the selected engine.                                      |
+| VoxCPM2                       | https://github.com/OpenBMB/VoxCPM                               | Apache-2.0, multilingual. Larger 2B backbone is less attractive for this machine's 6 GB GPU; no performance claim without benchmark.                                            |
+| Chatterbox dedicated PT-BR V3 | https://huggingface.co/ResembleAI/Chatterbox-Multilingual-pt-br | MIT, promising specialized model. Requires a different loader/checkpoint set from the pinned 0.1.6 release; not mixed into this runtime.                                        |
 
 This is an engineering choice for the available hardware, not a claim of matching ElevenLabs quality or reproducing Adam's identity.
 
@@ -85,9 +85,11 @@ them. The browser never calls this endpoint directly.
 After import validation, set `ready: true` in the runtime JSON. The UI keeps uploads disabled until that flag and the required assets are present. `scripts/install-chatscene-voice-cpu.sh` prepares the CPU environment; it does not change the live web service or open an inference port.
 
 - A character has one profile. A reference is `{ id, name, durationSec }`; raw media and filesystem paths never go into the project.
+- Authorized uploads are also recorded in `voice_reference_profiles` so the owner can reuse them under **Minhas vozes**. This table stores only account-scoped metadata; raw audio remains in the private voice service. Row-level security prevents one account from listing another account's voices.
 - Uploads require the existing verified Supabase session and an explicit authorization declaration. Samples are capped at 12 MB / 3–30 seconds, decoded by FFmpeg with only the pipe protocol, converted to mono 24 kHz PCM, and checked for silence.
 - Reference files are under a SHA-256 account directory with random UUID names. Other accounts cannot resolve them. The folder must not be publicly served. On Windows/exFAT deploy under a single trusted OS user; use an access-controlled persistent filesystem for multiuser production hosting.
 - Deletion removes the reference; previously generated project audio is retained. Backup and retention policies for a production host must include this private directory.
+- The one-time importer `scripts/import-private-voice-library.mjs` resolves exact account emails with the Supabase service role, uploads each sample separately for each account, and never commits the source recordings. It is idempotent by voice name for the selected accounts.
 - A private Python subprocess uses stdio, not a public HTTP endpoint. It serializes requests, retains one model, clears voice conditioning after each request and releases the process after 120 idle seconds. The queue is capped at eight requests; loading and synthesis have timeouts.
 - Each synthesis supplies its own reference. No fallback to a different voice if reference synthesis fails. Errors are visible to the user.
 - Cache identity includes the reference identifier. Replacing a reference invalidates generated voice durations. The existing decoder measures the final transformed audio before feeding the timeline.

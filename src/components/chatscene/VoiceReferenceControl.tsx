@@ -1,8 +1,13 @@
-import { useId, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/base";
-import { uploadVoiceReference, removeVoiceReference } from "@/lib/chatscene/voice.functions";
+import {
+  listVoiceReferences,
+  uploadVoiceReference,
+  removeVoiceReference,
+  type SavedVoiceReference,
+} from "@/lib/chatscene/voice.functions";
 import type { VoiceProfile } from "@/lib/chatscene/voice";
 import { chatSceneClientError } from "@/lib/chatscene/client-error";
 
@@ -27,9 +32,24 @@ export function VoiceReferenceControl({
   const inputId = useId();
   const upload = useServerFn(uploadVoiceReference);
   const remove = useServerFn(removeVoiceReference);
+  const list = useServerFn(listVoiceReferences);
   const [authorized, setAuthorized] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState<SavedVoiceReference[]>([]);
+  const [loadingSaved, setLoadingSaved] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const loadSaved = useCallback(async () => {
+    try {
+      setSaved(await list());
+    } catch (cause) {
+      setError(chatSceneClientError(cause, "Não foi possível carregar suas vozes privadas."));
+    } finally {
+      setLoadingSaved(false);
+    }
+  }, [list]);
+  useEffect(() => {
+    void loadSaved();
+  }, [loadSaved]);
   const send = async (file: File) => {
     if (!authorized || busy) return;
     setError(null);
@@ -45,8 +65,11 @@ export function VoiceReferenceControl({
         reader.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
         reader.readAsDataURL(file);
       });
-      const result = await upload({ data: { audio, authorized: true } });
+      const result = await upload({
+        data: { audio, authorized: true, name: file.name.slice(0, 100) },
+      });
       onAttach({ ...result, name: file.name.slice(0, 100) });
+      await loadSaved();
     } catch (cause) {
       setError(chatSceneClientError(cause, "Falha ao enviar a referência."));
     } finally {
@@ -60,6 +83,7 @@ export function VoiceReferenceControl({
     try {
       await remove({ data: { id: reference.id } });
       onRemove();
+      await loadSaved();
     } catch (cause) {
       setError(chatSceneClientError(cause, "Falha ao excluir a referência."));
     } finally {
@@ -76,6 +100,36 @@ export function VoiceReferenceControl({
           Envie 3 a 30 segundos de uma pessoa falando em português, sem música. A referência será
           usada para gerar novas falas de {participantName} a partir dos textos.
         </p>
+        {loadingSaved ? (
+          <p role="status" className="text-xs text-muted-foreground">
+            Carregando suas vozes…
+          </p>
+        ) : saved.length ? (
+          <div className="space-y-2 rounded-lg border border-border bg-secondary/30 p-3">
+            <p className="text-xs font-semibold">Minhas vozes</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {saved.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  disabled={busy || available !== true}
+                  aria-pressed={reference?.id === item.id}
+                  onClick={() =>
+                    onAttach({ id: item.id, name: item.name, durationSec: item.durationSec })
+                  }
+                  className={`min-h-11 rounded-lg border px-3 py-2 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${
+                    reference?.id === item.id
+                      ? "border-primary bg-primary/10"
+                      : "border-border bg-background hover:border-primary/50"
+                  }`}
+                >
+                  <span className="block truncate font-medium">{item.name}</span>
+                  <span className="text-muted-foreground">{item.durationSec.toFixed(1)} s</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {reference ? (
           <div className="space-y-2">
             <p className="break-words text-xs" role="status">
