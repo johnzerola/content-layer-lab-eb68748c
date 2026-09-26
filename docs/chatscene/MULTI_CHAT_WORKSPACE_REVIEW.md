@@ -72,3 +72,18 @@ integral do visual ou funcionamento 100% em produção.
 Direção visual aprovada pelo usuário em 26/09/2026. Integração autorizada.
 Após a publicação, realizar smoke test no ambiente autenticado e no export.
 Os arquivos de mídia originais precisam acompanhar a publicação do frontend.
+
+### Integração em 26/09/2026
+
+Aplicado sobre `origin/main` em `6c3a2242`, preservando as mudanças recentes de voz
+e editor. TypeScript e build passaram. A suíte atual teve 307 testes aprovados,
+4 falhas e 2 ignorados. As mesmas quatro falhas foram reproduzidas em uma worktree
+isolada de `6c3a2242`, sem esta implementação:
+
+- teste de pitch após transformação do servidor (1 falha);
+- versão esperada do FFmpeg 6.1.1 versus instalada 8.1.1 (1 falha);
+- tolerância de duração de dois áudios MP3 (2 falhas).
+
+Não alteramos o processamento de áudio para mascarar essas falhas. Os seis testes
+de múltiplos chats passaram. A publicação do frontend no Lovable e o smoke test
+autenticado continuam separados do envio do código ao GitHub.
