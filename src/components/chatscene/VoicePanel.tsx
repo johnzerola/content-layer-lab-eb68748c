@@ -856,7 +856,7 @@ export function VoicePanel(props: VoicePanelProps) {
                       })}
                     </div>
                     <p className="mt-1.5 text-[10px] text-muted-foreground">
-                      Muda o tom sem acelerar a fala. Clique em Ouvir para testar; a alteração gera
+                      Muda o tom e o ritmo da fala. Clique em Ouvir para testar; a alteração gera
                       novo áudio.
                     </p>
                   </div>

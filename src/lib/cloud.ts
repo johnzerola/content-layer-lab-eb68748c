@@ -126,7 +126,8 @@ async function insertTemplateVersions(
   if (!items.length) return;
   // Busca somente a base completa mais recente de cada template. O histórico
   // inteiro contém JSONs grandes e não deve ser descompactado a cada salvamento.
-  const histories = await Promise.all(items.map(async (item) => {
+  const histories: { templateId: string; full: VersionRow | null; diffCount: number }[] = [];
+  for (const item of items) {
     const { data: full, error: fullError } = await supabase
       .from("template_versions")
       .select("id,template_id,data,format,base_id,patch")
@@ -136,7 +137,10 @@ async function insertTemplateVersions(
       .limit(1)
       .maybeSingle();
     if (fullError) throw fullError;
-    if (!full) return { templateId: item.templateId, full: null, diffCount: 0 };
+    if (!full) {
+      histories.push({ templateId: item.templateId, full: null, diffCount: 0 });
+      continue;
+    }
     const { count, error: countError } = await supabase
       .from("template_versions")
       .select("id", { count: "exact", head: true })
@@ -144,12 +148,12 @@ async function insertTemplateVersions(
       .eq("format", "diff")
       .eq("base_id", full.id);
     if (countError) throw countError;
-    return {
+    histories.push({
       templateId: item.templateId,
       full: full as unknown as VersionRow,
       diffCount: count ?? 0,
-    };
-  }));
+    });
+  }
   const fullByTemplate = new Map(
     histories.filter((history) => history.full).map((history) => [history.templateId, history.full as VersionRow]),
   );
