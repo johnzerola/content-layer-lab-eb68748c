@@ -1,4 +1,5 @@
 import io
+import base64
 import math
 import subprocess
 import struct
@@ -15,6 +16,7 @@ from unittest.mock import patch
 from backend.chatscene_voice.service import (
     PIPER_VOICES,
     cached_synthetic_audio,
+    gpu_synthesize,
     list_reference_metadata,
     synthesize_piper,
     transform_speech,
@@ -49,6 +51,29 @@ def metrics(audio):
 
 
 class VoiceServiceTests(unittest.TestCase):
+    def test_gpu_synthesis_uses_relay_health_and_forwards_fidelity_mode(self):
+        response = unittest.mock.MagicMock()
+        response.read.return_value = json.dumps(
+            {"audio": base64.b64encode(tone_wav(seconds=0.1)).decode("ascii")}
+        ).encode("utf-8")
+        response.status = 200
+        urlopen = unittest.mock.MagicMock()
+        urlopen.return_value.__enter__.return_value = response
+        with (
+            patch("backend.chatscene_voice.service.GPU_RELAY_TOKEN", "test-token"),
+            patch(
+                "backend.chatscene_voice.service.relay_health",
+                return_value={"ready": True, "device": "cuda", "modelLoaded": True},
+            ),
+            patch("backend.chatscene_voice.service.urllib.request.urlopen", urlopen),
+        ):
+            audio, device = gpu_synthesize("Oi", tone_wav(seconds=0.1), True)
+
+        self.assertEqual(device, "cuda")
+        self.assertTrue(audio)
+        request = urlopen.call_args.args[0]
+        self.assertTrue(json.loads(request.data)["fidelityMode"])
+
     def test_lists_saved_references_from_private_account_storage(self):
         with tempfile.TemporaryDirectory() as directory:
             user_id = str(uuid.uuid4())

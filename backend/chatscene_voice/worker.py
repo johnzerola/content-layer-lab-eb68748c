@@ -12,6 +12,7 @@ runtime_config = json.loads(config_path.read_text(encoding="utf-8-sig")) if conf
 runtime_config.update({
     "pythonPath": os.environ.get("CHATSCENE_VOICE_PYTHON_PATH", runtime_config.get("pythonPath")),
     "modelPath": os.environ.get("CHATSCENE_VOICE_MODEL_PATH", runtime_config.get("modelPath")),
+    "modelVariant": os.environ.get("CHATSCENE_VOICE_MODEL_VARIANT", runtime_config.get("modelVariant", "multilingual-v2")),
     "storagePath": os.environ.get("CHATSCENE_VOICE_STORAGE_PATH", runtime_config.get("storagePath")),
     "device": os.environ.get("CHATSCENE_VOICE_DEVICE", runtime_config.get("device", "auto")),
 })
@@ -51,6 +52,10 @@ import numpy as np
 import soundfile as sf
 import torch
 from chatterbox.mtl_tts import ChatterboxMultilingualTTS
+try:
+    from .ptbr_v3 import load_ptbr_v3
+except ImportError:  # standalone worker entry point
+    from ptbr_v3 import load_ptbr_v3
 
 
 def respond(value):
@@ -71,14 +76,20 @@ def main():
             return original_torch_load(*args, **kwargs)
         torch.load = cpu_torch_load
     try:
-        model = ChatterboxMultilingualTTS.from_local(config["modelPath"], device)
+        variant = config.get("modelVariant", "multilingual-v2")
+        if variant == "ptbr-v3":
+            model = load_ptbr_v3(config["modelPath"], device)
+        elif variant == "multilingual-v2":
+            model = ChatterboxMultilingualTTS.from_local(config["modelPath"], device)
+        else:
+            raise ValueError("Unsupported ChatScene voice model variant")
     except Exception as exc:
         print(f"Voice model load failed ({type(exc).__name__})", file=sys.stderr, flush=True)
         respond({"error": "O motor local não conseguiu carregar os pesos instalados."})
         return
     finally:
         torch.load = original_torch_load
-    respond({"ready": True, "device": device})
+    respond({"ready": True, "device": device, "modelVariant": variant})
     for line in sys.stdin:
         request = json.loads(line)
         started = time.monotonic()
@@ -90,12 +101,14 @@ def main():
             reference = Path(request["referencePath"])
             if not reference.is_file():
                 raise ValueError("Reference missing")
+            fidelity_mode = request.get("fidelityMode") is True
             torch.manual_seed(42)
             if device == "cuda":
                 torch.cuda.reset_peak_memory_stats()
             with torch.inference_mode():
                 wav = model.generate(text, language_id="pt", audio_prompt_path=str(reference),
-                                     exaggeration=0.5, cfg_weight=0.5, temperature=0.7)
+                                     exaggeration=0.5, cfg_weight=0.5,
+                                     temperature=0.35 if fidelity_mode else 0.7)
             samples = wav.squeeze(0).detach().cpu().numpy()
             if not len(samples) or not np.isfinite(samples).all():
                 raise ValueError("Invalid generated audio")

@@ -17,13 +17,15 @@ CONFIG = Path(os.environ.get("CHATSCENE_VOICE_CONFIG", "backend/data/chatscene-v
 WORKER = Path(os.environ.get("CHATSCENE_VOICE_WORKER", "backend/chatscene_voice/worker.py")).resolve()
 MAX_BODY = 16 * 1024 * 1024
 IDLE_SECONDS = int(os.environ.get("CHATSCENE_GPU_IDLE_SECONDS", "120"))
+LOG_PATH = os.environ.get("CHATSCENE_GPU_LOG_PATH")
 
 
 class VoiceWorker:
     def __init__(self):
+        self.log = open(LOG_PATH, "a", encoding="utf-8") if LOG_PATH else subprocess.DEVNULL
         self.process = subprocess.Popen(
             [os.environ.get("CHATSCENE_VOICE_PYTHON_PATH", "python"), "-u", str(WORKER), str(CONFIG)],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.log, text=True,
         )
         ready_line = self.process.stdout.readline()
         ready = json.loads(ready_line) if ready_line else {}
@@ -31,14 +33,19 @@ class VoiceWorker:
             self.close()
             raise RuntimeError("voice worker did not become ready")
 
-    def synthesize(self, text, reference):
+    def synthesize(self, text, reference, fidelity_mode=False):
         if self.process.poll() is not None:
             raise RuntimeError("voice worker exited")
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp:
             temp.write(reference)
             reference_path = temp.name
         try:
-            request = {"id": str(uuid.uuid4()), "text": text, "referencePath": reference_path}
+            request = {
+                "id": str(uuid.uuid4()),
+                "text": text,
+                "referencePath": reference_path,
+                "fidelityMode": fidelity_mode,
+            }
             self.process.stdin.write(json.dumps(request, ensure_ascii=False) + "\n")
             self.process.stdin.flush()
             response_line = self.process.stdout.readline()
@@ -59,6 +66,8 @@ class VoiceWorker:
                 self.process.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 self.process.kill()
+        if self.log is not subprocess.DEVNULL:
+            self.log.close()
 
 
 class WorkerManager:
@@ -89,13 +98,13 @@ class WorkerManager:
                 self.worker = VoiceWorker()
             self._schedule_idle_locked()
 
-    def synthesize(self, text, reference):
+    def synthesize(self, text, reference, fidelity_mode=False):
         with self.lock:
             self._cancel_idle_locked()
             if not self.loaded:
                 self.worker = VoiceWorker()
             try:
-                return self.worker.synthesize(text, reference)
+                return self.worker.synthesize(text, reference, fidelity_mode)
             except Exception:
                 self._close_locked()
                 raise
@@ -155,7 +164,11 @@ class Handler(BaseHTTPRequestHandler):
             reference = base64.b64decode(body.get("referenceAudio", ""), validate=True)
             if not isinstance(text, str) or not 1 <= len(text) <= 600 or not reference or len(reference) > 12 * 1024 * 1024:
                 raise ValueError("invalid request")
-            result = self.server.worker_manager.synthesize(text, reference)
+            result = self.server.worker_manager.synthesize(
+                text,
+                reference,
+                body.get("fidelityMode") is True,
+            )
             payload = json.dumps(result, ensure_ascii=False).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")

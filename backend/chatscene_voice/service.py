@@ -344,16 +344,20 @@ def gpu_warm():
             raise RuntimeError("GPU relay warmup failed")
 
 
-def gpu_synthesize(text, reference):
+def gpu_synthesize(text, reference, fidelity_mode=False):
     if not GPU_RELAY_TOKEN:
         raise RuntimeError("GPU relay unavailable")
-    relay = gpu_health()
-    if not relay or not relay.get("installed"):
+    relay = relay_health()
+    if not relay or not relay.get("ready") or relay.get("device") != "cuda":
         raise RuntimeError("GPU relay is not ready")
     request = urllib.request.Request(
         f"{GPU_RELAY_URL}/synthesize",
         data=json.dumps(
-            {"text": text, "referenceAudio": base64.b64encode(reference).decode("ascii")},
+            {
+                "text": text,
+                "referenceAudio": base64.b64encode(reference).decode("ascii"),
+                "fidelityMode": fidelity_mode,
+            },
             ensure_ascii=False,
         ).encode("utf-8"),
         headers={
@@ -385,13 +389,18 @@ class CpuWorker:
             self.close()
             raise RuntimeError("CPU voice worker did not become ready")
 
-    def synthesize(self, text, path):
+    def synthesize(self, text, path, fidelity_mode=False):
         if self.process.poll() is not None:
             raise RuntimeError("CPU voice worker exited")
         request_id = str(uuid.uuid4())
         self.process.stdin.write(
             json.dumps(
-                {"id": request_id, "text": text, "referencePath": str(path)},
+                {
+                    "id": request_id,
+                    "text": text,
+                    "referencePath": str(path),
+                    "fidelityMode": fidelity_mode,
+                },
                 ensure_ascii=False,
             )
             + "\n"
@@ -439,13 +448,13 @@ class CpuWorkerManager:
                 self.worker = CpuWorker()
             self._schedule_idle_locked()
 
-    def synthesize(self, text, path):
+    def synthesize(self, text, path, fidelity_mode=False):
         with self.lock:
             self._cancel_idle_locked()
             if not self.loaded:
                 self.worker = CpuWorker()
             try:
-                return self.worker.synthesize(text, path)
+                return self.worker.synthesize(text, path, fidelity_mode)
             except Exception:
                 self.close_locked()
                 raise
@@ -625,6 +634,10 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(text, str) or not 1 <= len(text) <= 600:
                     raise ValueError("Texto deve ter entre 1 e 600 caracteres.")
                 path = catalog_reference_path(ROOT, voice)
+                fidelity_mode = any(
+                    item.get("id") == voice and item.get("provenance") == "authorized"
+                    for item in load_catalog(ROOT)
+                )
                 if not INFERENCE_SLOTS.acquire(blocking=False):
                     self.respond(429, {"detail": "A fila de vozes está cheia. Tente novamente."})
                     return
@@ -635,9 +648,14 @@ class Handler(BaseHTTPRequestHandler):
                     def produce_catalog_audio():
                         reference = path.read_bytes()
                         try:
-                            audio_value, device_value = gpu_synthesize(text, reference)
-                        except Exception:
-                            audio_value, device_value = CPU.synthesize(text, path), "cpu"
+                            audio_value, device_value = gpu_synthesize(text, reference, fidelity_mode)
+                        except Exception as error:
+                            print(
+                                f"GPU catalog synthesis failed ({type(error).__name__}: {error})",
+                                file=sys.stderr,
+                                flush=True,
+                            )
+                            audio_value, device_value = CPU.synthesize(text, path, fidelity_mode), "cpu"
                         device_used["value"] = device_value
                         return audio_value
 
@@ -649,6 +667,7 @@ class Handler(BaseHTTPRequestHandler):
                             "voice": voice,
                             "referenceMtime": reference_stat.st_mtime_ns,
                             "referenceSize": reference_stat.st_size,
+                            "fidelityPipeline": 2 if fidelity_mode else 1,
                         },
                         produce_catalog_audio,
                     )
@@ -693,9 +712,14 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     reference = path.read_bytes()
                     try:
-                        audio, device = gpu_synthesize(text, reference)
-                    except Exception:
-                        audio, device = CPU.synthesize(text, path), "cpu"
+                        audio, device = gpu_synthesize(text, reference, True)
+                    except Exception as error:
+                        print(
+                            f"GPU reference synthesis failed ({type(error).__name__}: {error})",
+                            file=sys.stderr,
+                            flush=True,
+                        )
+                        audio, device = CPU.synthesize(text, path, True), "cpu"
                 finally:
                     INFERENCE_SLOTS.release()
                 self.respond(
