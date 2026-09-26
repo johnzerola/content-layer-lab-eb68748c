@@ -13,6 +13,7 @@ import {
   Clock,
   Mic,
   Mic2,
+  Music,
   MessageSquare,
   Pause,
   Palette,
@@ -40,6 +41,9 @@ import { ParticipantStylePanel } from "@/components/chatscene/ParticipantStylePa
 import { BrandPanel } from "@/components/chatscene/BrandPanel";
 import { ThemePanel } from "@/components/chatscene/ThemePanel";
 import { MusicPanel } from "@/components/chatscene/MusicPanel";
+import { ChatWorkspaceHeader } from './ChatWorkspaceHeader';
+import { BackgroundLibrary } from './BackgroundLibrary';
+import { appendThreadMessage, duplicateThread, removeThreadKeepingMessages } from '@/lib/chatscene/threads';
 import { StoryPanel } from "@/components/chatscene/StoryPanel";
 import { CreatorFormatPicker } from "./CreatorFormatPicker";
 import {
@@ -102,7 +106,6 @@ import { loadLocalDraft, saveLocalDraft } from "@/lib/chatscene/serialize";
 import { parseConversationScript } from "@/lib/chatscene/import-script";
 import {
   ANIMATION_PRESETS,
-  BACKGROUND_CATEGORY_LABELS,
   BACKGROUND_PRESETS,
   DEFAULT_BRANDING,
   DEFAULT_LAYOUT,
@@ -117,6 +120,7 @@ import {
   renderSize,
   createThread,
   threadsOf,
+  threadIdOf,
   type ChatSceneAspect,
   type ChatMessage,
   type ChatSceneProject,
@@ -133,19 +137,21 @@ type StudioTab =
   | "tempo"
   | "fundo"
   | "vozes"
+  | "musica"
   | "estilo"
   | "exportar";
 
 /** Abas do editor: cada assunto em uma tela, com a prévia sempre ao lado. */
 const STUDIO_TABS: { id: StudioTab; label: string; icon: typeof Palette }[] = [
+  { id: "mensagens", label: "Mensagens", icon: MessageSquare },
+  { id: "estilo", label: "Chat e visual", icon: Palette },
+  { id: "fundo", label: "Vídeo de fundo", icon: ImageIcon },
+  { id: "vozes", label: "Vozes", icon: Mic },
+  { id: "musica", label: "Música", icon: Music },
   { id: "historia", label: "Criar roteiro", icon: Wand2 },
   { id: "participantes", label: "Personagens", icon: Users },
   { id: "clonar", label: "Clonar voz", icon: Mic2 },
-  { id: "mensagens", label: "Revisar falas", icon: MessageSquare },
   { id: "tempo", label: "Linha do tempo", icon: Clock },
-  { id: "fundo", label: "Fundo", icon: ImageIcon },
-  { id: "vozes", label: "Vozes e atuação", icon: Mic },
-  { id: "estilo", label: "Estilo", icon: Palette },
   { id: "exportar", label: "Exportar", icon: Download },
 ];
 
@@ -166,7 +172,9 @@ export function ChatSceneStudio() {
   );
   const [recordId, setRecordId] = useState<string | null>(null);
   const [script, setScript] = useState("");
-  const [tab, setTab] = useState<StudioTab>("historia");
+  const [tab, setTab] = useState<StudioTab>("mensagens");
+  const [activeThreadId, setActiveThreadId] = useState('main');
+  const activeThread = threadsOf(project).find(t => t.id === activeThreadId) ?? threadsOf(project)[0]!;
   const [frame, setFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -480,15 +488,12 @@ export function ChatSceneStudio() {
   }, []);
 
   const addMessage = useCallback(() => {
-    setProject((prev) => {
-      const last = prev.messages.at(-1);
-      const lastAuthor = last ? participantOf(prev, last.participantId) : null;
-      const next = prev.participants.find((p) => p.id !== lastAuthor?.id) ?? prev.participants[0]!;
-      const message = createMessage(next.id, { text: "" });
-      setSelected(message.id);
-      return { ...prev, messages: [...prev.messages, message] };
-    });
-  }, []);
+    const result = appendThreadMessage(project, activeThread.id);
+    setProject(result.project);
+    setSelected(result.message.id);
+    setPlaying(false);
+    setFrame(Math.max(0, (buildPlan(result.project).byId[result.message.id]?.endFrame ?? 1) - 1));
+  }, [project, activeThread.id]);
 
   const importScript = useCallback(() => {
     const text = script;
@@ -499,22 +504,27 @@ export function ChatSceneStudio() {
       return {
         ...prev,
         participants: parsed.participants,
-        messages: [...prev.messages, ...parsed.messages],
+        messages: [...prev.messages, ...parsed.messages.map(m => ({ ...m, threadId: activeThread.id }))],
       };
     });
     setScript("");
     toast.success("Conversa adicionada.");
-  }, [script]);
+  }, [script, activeThread.id]);
 
   const addThread = useCallback(() => {
+    const thread = createThread({ name: `Chat ${threadsOf(project).length + 1}` });
+    setActiveThreadId(thread.id);
+    setPlaying(false);
+    setSelected(null);
+    setTab('mensagens');
     setProject((prev) => {
       const threads = threadsOf(prev);
       return {
         ...prev,
-        threads: [...threads, createThread({ name: `Conversa ${threads.length + 1}` })],
+        threads: [...threads, thread],
       };
     });
-  }, []);
+  }, [project]);
 
   const updateThread = useCallback((id: string, changes: Partial<ChatSceneThread>) => {
     setProject((prev) => ({
@@ -524,17 +534,7 @@ export function ChatSceneStudio() {
   }, []);
 
   const removeThread = useCallback((id: string) => {
-    setProject((prev) => {
-      const threads = threadsOf(prev);
-      if (threads.length < 2) return prev;
-      const rest = threads.filter((t) => t.id !== id);
-      const fallback = rest[0]!.id;
-      return {
-        ...prev,
-        threads: rest,
-        messages: prev.messages.map((m) => (m.threadId === id ? { ...m, threadId: fallback } : m)),
-      };
-    });
+    setProject(prev => removeThreadKeepingMessages(prev, id));
   }, []);
 
   const removeMessage = useCallback((id: string) => {
@@ -930,6 +930,8 @@ export function ChatSceneStudio() {
   }, [project, plan, effectiveClips]);
 
   const selectedMessage = project.messages.find((m) => m.id === selected) ?? null;
+  const emptySelectedChat = !playing && !project.messages.some(m => threadIdOf(project, m) === activeThread.id);
+  const previewProject = emptySelectedChat ? { ...project, threads: [activeThread], messages: [] } : project;
   const { width, height } = renderSize(project.render);
 
   return (
@@ -1010,8 +1012,24 @@ export function ChatSceneStudio() {
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_430px]">
         {/* --------------------------------------------------- editor em abas */}
         <section className="min-w-0 rounded-2xl border border-border bg-card p-4 lg:p-5">
+          <ChatWorkspaceHeader project={project} activeId={activeThread.id}
+            onSelect={id => {
+              setActiveThreadId(id); setSelected(null); setPlaying(false);
+              const first = project.messages.find(m => threadIdOf(project, m) === id && !m.initial);
+              if (first && plan.byId[first.id]) setFrame(Math.max(0, plan.byId[first.id]!.endFrame - 1));
+            }}
+            onAdd={addThread} onUpdate={changes => updateThread(activeThread.id, changes)}
+            onRemove={() => removeThread(activeThread.id)}
+            onDuplicate={() => { const result = duplicateThread(project, activeThread.id); setProject(result.project); setActiveThreadId(result.thread.id); setTab('mensagens'); }}
+            uploading={uploading === `thread-${activeThread.id}`}
+            onAvatar={async file => {
+              const id = activeThread.id; setUploading(`thread-${id}`);
+              try { const { asset } = await addFileToLibrary(file, 'avatar'); updateThread(id, { avatarUrl: asset.url }); if (asset.temporary) toast.warning('Foto disponível somente nesta sessão. Tente enviá-la novamente antes de salvar.'); }
+              catch (error) { toast.error(error instanceof Error ? error.message : 'Não foi possível enviar a foto.'); }
+              finally { setUploading(null); }
+            }} />
           <nav
-            className="mb-6 flex flex-wrap gap-1.5 border-b border-border pb-4"
+            className="mb-6 grid grid-cols-2 gap-2 border-b border-border pb-4 sm:grid-cols-5"
             aria-label="Abas do editor"
           >
             {STUDIO_TABS.map((t) => {
@@ -1022,7 +1040,7 @@ export function ChatSceneStudio() {
                   type="button"
                   onClick={() => setTab(t.id)}
                   aria-pressed={tab === t.id}
-                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition ${
+                  className={`flex min-h-14 flex-col justify-center items-center gap-1.5 rounded-xl border px-2.5 py-2 text-xs transition focus-visible:ring-2 focus-visible:ring-ring ${
                     tab === t.id
                       ? "border-primary bg-primary/10 text-foreground"
                       : "border-border text-muted-foreground hover:border-primary/50"
@@ -1070,6 +1088,7 @@ export function ChatSceneStudio() {
             <MessagesPanel
               project={project}
               selected={selected}
+              activeThreadId={activeThread.id}
               onSelect={setSelected}
               updateMessage={updateMessage}
               removeMessage={removeMessage}
@@ -1524,99 +1543,7 @@ export function ChatSceneStudio() {
 
           {tab === "fundo" && (
             <div>
-              <p className="mono-label mb-1.5 text-muted-foreground">Galeria de fundos</p>
-              <p className="mb-2 text-[11px] text-muted-foreground">
-                Vídeos de gameplay gerados por IA — livres de direitos autorais, pode usar nos seus
-                Shorts.
-              </p>
-              {(["gameplay", "satisfatorio", "cenario", "cor"] as const).map((cat) => (
-                <div key={cat} className="mb-3">
-                  <p className="mono-label mb-1.5 text-muted-foreground/80">
-                    {BACKGROUND_CATEGORY_LABELS[cat]}
-                  </p>
-                  <div
-                    className="grid grid-cols-2 gap-2 sm:grid-cols-3"
-                    role="list"
-                    aria-label={BACKGROUND_CATEGORY_LABELS[cat]}
-                  >
-                    {BACKGROUND_PRESETS.filter((b) => b.category === cat).map((b) => {
-                      const active =
-                        (project.background?.kind ?? "theme") === b.value.kind &&
-                        (project.background?.color ?? null) === (b.value.color ?? null) &&
-                        (project.background?.imageUrl ?? null) === (b.value.imageUrl ?? null) &&
-                        (project.background?.videoUrl ?? null) === (b.value.videoUrl ?? null);
-                      return (
-                        <button
-                          key={b.id}
-                          type="button"
-                          onClick={() => patch({ background: { ...b.value } })}
-                          aria-pressed={active}
-                          aria-label={`Usar fundo ${b.label}`}
-                          role="listitem"
-                          className={`group overflow-hidden rounded-lg border text-left text-xs transition ${
-                            active
-                              ? "border-primary bg-primary/10 ring-1 ring-primary/40"
-                              : "border-border hover:border-primary/50"
-                          }`}
-                        >
-                          <span className="relative block aspect-[9/16] overflow-hidden bg-muted">
-                            {b.value.kind === "video" && b.value.videoUrl ? (
-                              <video
-                                src={b.value.videoUrl}
-                                muted
-                                loop
-                                autoPlay
-                                playsInline
-                                preload="auto"
-                                className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
-                              />
-                            ) : b.value.kind === "image" && b.value.imageUrl ? (
-                              <img
-                                src={b.value.imageUrl}
-                                alt=""
-                                loading="lazy"
-                                className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
-                              />
-                            ) : b.value.kind === "gradient" ? (
-                              <span
-                                className="block size-full"
-                                style={{
-                                  background: `linear-gradient(145deg, ${b.value.color}, ${b.value.colorB})`,
-                                }}
-                              />
-                            ) : b.value.kind === "solid" ? (
-                              <span
-                                className="block size-full"
-                                style={{ backgroundColor: b.value.color ?? undefined }}
-                              />
-                            ) : (
-                              <span className="grid size-full place-items-center bg-secondary text-muted-foreground">
-                                Tema
-                              </span>
-                            )}
-                            {b.value.kind === "video" ? (
-                              <span className="absolute bottom-1.5 left-1.5 rounded bg-background/80 px-1.5 py-0.5 text-[9px] font-medium text-foreground">
-                                LOOP
-                              </span>
-                            ) : null}
-                            {b.value.kind === "image" ? (
-                              <span className="absolute bottom-1.5 left-1.5 rounded bg-background/80 px-1.5 py-0.5 text-[9px] font-medium text-foreground">
-                                PARADO
-                              </span>
-                            ) : null}
-                            {active ? (
-                              <span className="absolute right-1.5 top-1.5 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold text-primary-foreground">
-                                ATIVO
-                              </span>
-                            ) : null}
-                          </span>
-                          <span className="block px-2 py-1.5 font-medium">{b.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+              <BackgroundLibrary value={project.background} onChange={background => patch({ background })} onUpload={file => void handleBackgroundVideo(file)} busy={uploading === "background-video"} />
 
               <div className="mt-3 rounded-lg border border-dashed border-border bg-background/35 p-3">
                 <p className="text-xs font-medium">Usar meu próprio vídeo ou imagem</p>
@@ -1850,7 +1777,11 @@ export function ChatSceneStudio() {
                 onPlay={handlePlayClip}
                 onStop={handleStopClip}
               />
-              <div className="mt-4 border-t border-border pt-3 text-xs">
+            </div>
+          )}
+
+          {tab === 'musica' && (
+              <div className="text-sm">
                 <MusicPanel
                   project={project}
                   patch={patch}
@@ -1858,7 +1789,6 @@ export function ChatSceneStudio() {
                   onUpload={(file) => void handleMusic(file)}
                 />
               </div>
-            </div>
           )}
 
           {tab === "estilo" && (
@@ -2215,7 +2145,7 @@ export function ChatSceneStudio() {
             </div>
           </div>
           <ChatScenePreview
-            project={project}
+            project={previewProject}
             plan={plan}
             frame={frame}
             playing={playing}

@@ -29,6 +29,7 @@ import {
 
 export interface MessagesPanelProps {
   project: ChatSceneProject;
+  activeThreadId?: string;
   selected: string | null;
   onSelect: (id: string | null) => void;
   updateMessage: (id: string, changes: Partial<ChatMessage>) => void;
@@ -51,6 +52,7 @@ export interface MessagesPanelProps {
 
 export function MessagesPanel({
   project,
+  activeThreadId,
   selected,
   onSelect,
   updateMessage,
@@ -73,10 +75,12 @@ export function MessagesPanel({
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const threads = threadsOf(project);
+  const visibleMessages = project.messages.map((message, index) => ({ message, index }))
+    .filter(({ message }) => !activeThreadId || threadIdOf(project, message) === activeThreadId);
 
   return (
     <div>
-      <div className="mb-3 rounded-xl border border-border bg-background/30 p-3">
+      {!activeThreadId && <div className="mb-3 rounded-xl border border-border bg-background/30 p-3">
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs font-semibold">Conversas da história</p>
           <button
@@ -112,10 +116,16 @@ export function MessagesPanel({
             </li>
           ))}
         </ul>
+      </div>}
+
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">Mensagens</h2>
+        <span className="text-xs text-muted-foreground">{visibleMessages.length} mensagens · {visibleMessages.reduce((n, { message }) => n + message.text.length, 0)} caracteres</span>
       </div>
+      {!visibleMessages.length && <p className="mb-3 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">Este chat está vazio. Adicione a primeira mensagem abaixo.</p>}
 
       <ul className="flex max-h-[56vh] flex-col gap-2 overflow-y-auto pr-1">
-        {project.messages.map((m, i) => {
+        {visibleMessages.map(({ message: m, index: i }, visibleIndex) => {
           const author = participantOf(project, m.participantId);
           const active = m.id === selected;
           const isOver = overIndex === i && dragIndex !== null && dragIndex !== i;
@@ -205,8 +215,8 @@ export function MessagesPanel({
                 <span className="ml-auto flex shrink-0 items-center gap-0.5">
                   <button
                     type="button"
-                    onClick={() => moveMessage(m.id, -1)}
-                    disabled={i === 0}
+                    onClick={() => activeThreadId ? reorderMessage(i, visibleMessages[visibleIndex - 1]!.index) : moveMessage(m.id, -1)}
+                    disabled={visibleIndex === 0}
                     className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"
                     aria-label="Mover para cima"
                   >
@@ -214,8 +224,8 @@ export function MessagesPanel({
                   </button>
                   <button
                     type="button"
-                    onClick={() => moveMessage(m.id, 1)}
-                    disabled={i === project.messages.length - 1}
+                    onClick={() => activeThreadId ? reorderMessage(i, visibleMessages[visibleIndex + 1]!.index) : moveMessage(m.id, 1)}
+                    disabled={visibleIndex === visibleMessages.length - 1}
                     className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"
                     aria-label="Mover para baixo"
                   >

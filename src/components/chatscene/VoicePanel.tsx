@@ -16,6 +16,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/base";
+import { VoiceCatalog } from './VoiceCatalog';
 import {
   attachElevenLabsVoice,
   attachPreset,
@@ -667,6 +668,12 @@ export function VoicePanel(props: VoicePanelProps) {
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-2 top-2.5 size-4 text-muted-foreground" />
               </div>
+
+              {!voice?.reference && <VoiceCatalog name={participant.name} selected={voice?.presetId}
+                previewing={previewing !== null}
+                unavailable={preset => (preset.provider === 'piper' && preset.providerVoice !== 'pt_BR-faber-medium' && !installedLocalVoices?.includes(preset.providerVoice)) || (preset.provider === 'chatterbox-catalog' && !installedCatalogVoices?.includes(preset.providerVoice))}
+                onChoose={id => setProject(attachPreset(project, participant.id, id))}
+                onPreview={id => onPreview(participant.id, profileFromPreset(id))} />}
 
               {voice ? (
                 <>

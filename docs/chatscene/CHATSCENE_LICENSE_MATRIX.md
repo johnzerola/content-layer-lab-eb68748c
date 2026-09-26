@@ -19,6 +19,12 @@ Toda entrada precisa de seis campos. Licença desconhecida = BLOCKED.
 
 ## Regras
 
+| Item | Source | License | Commercial | Attribution | Author | Version | Verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Loops Aurora, Ondas e Entardecer | `scripts/generate-chatscene-original-backgrounds.ps1` | internal; uso autorizado nos vídeos exportados do VaiViral | sim | não exigida | VaiViral; animação matemática original sem assets externos | 2026-09-24, 540×960, 24 fps, 8 s | ALLOWED |
+
+Os fundos antigos permanecem no projeto, mas a geração por IA e a existência de uma URL não comprovam isenção de direitos. Não anunciar gameplay de terceiros como domínio público sem fonte e licença verificadas.
+
 - Código permissivo não implica pesos de modelo permissivos: avaliar separado.
 - Item com atribuição obrigatória precisa de plano de crédito visível antes do uso.
 - Nenhum item entra no aplicativo sem os seis campos preenchidos.

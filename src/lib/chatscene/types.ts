@@ -128,14 +128,17 @@ export const DEFAULT_BACKGROUND: ChatSceneBackground = { kind: "theme" };
 export type BackgroundCategory = "gameplay" | "satisfatorio" | "cenario" | "cor";
 
 export const BACKGROUND_CATEGORY_LABELS: Record<BackgroundCategory, string> = {
-  gameplay: "Gameplay (livre de direitos)",
+  gameplay: "Gameplay",
   satisfatorio: "Satisfatório",
   cenario: "Cenários",
   cor: "Cores e degradês",
 };
 
-/** Fundos prontos, para escolher com um clique. Vídeos gerados por IA = livres de direitos autorais. */
+/** Fundos existentes; geração por IA não implica liberação de direitos de terceiros. */
 export const BACKGROUND_PRESETS: { id: string; label: string; category: BackgroundCategory; value: ChatSceneBackground }[] = [
+  { id: 'original-aurora', label: 'Aurora em movimento', category: 'cenario', value: { kind: 'video', videoUrl: '/chatscene/backgrounds/original-aurora.mp4', loop: true } },
+  { id: 'original-waves', label: 'Ondas suaves', category: 'satisfatorio', value: { kind: 'video', videoUrl: '/chatscene/backgrounds/original-waves.mp4', loop: true } },
+  { id: 'original-sunset', label: 'Luz do entardecer', category: 'cenario', value: { kind: 'video', videoUrl: '/chatscene/backgrounds/original-sunset.mp4', loop: true } },
   { id: "theme", label: "Do tema", category: "cor", value: { kind: "theme" } },
   { id: "block-parkour", label: "Parkour de Blocos", category: "gameplay", value: { kind: "video", videoUrl: "/__l5e/assets-v1/e8658151-859d-4fde-92b7-ee2a5cb486db/block-parkour.mp4", loop: true } },
   { id: "subway-runner", label: "Corrida no Metrô", category: "gameplay", value: { kind: "video", videoUrl: "/__l5e/assets-v1/e610568a-8c0a-40ed-8f70-bed5b420ec4c/subway-runner.mp4", loop: true } },
@@ -654,6 +657,7 @@ export function createMessage(participantId: string, init: Partial<ChatMessage> 
     voiceDirection: init.voiceDirection ?? null,
     threadId: init.threadId ?? null,
     initial: init.initial ?? false,
+    soundEffect: init.soundEffect ?? null,
   };
 }
 
@@ -681,6 +685,7 @@ export function createChatSceneProject(init: Partial<ChatSceneProject> = {}): Ch
     chatKind: init.chatKind ?? "direct",
     groupName: init.groupName ?? null,
     groupAvatarUrl: init.groupAvatarUrl ?? null,
+    threads: init.threads?.map(thread => createThread(thread)) ?? [],
     startClock: init.startClock ?? "21:14",
     receipts: init.receipts ?? true,
     background: init.background ?? { ...DEFAULT_BACKGROUND },
