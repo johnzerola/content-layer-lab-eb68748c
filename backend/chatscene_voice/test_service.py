@@ -10,7 +10,12 @@ from pathlib import Path
 import tempfile
 from unittest.mock import patch
 
-from backend.chatscene_voice.service import PIPER_VOICES, synthesize_piper, transform_speech
+from backend.chatscene_voice.service import (
+    PIPER_VOICES,
+    cached_synthetic_audio,
+    synthesize_piper,
+    transform_speech,
+)
 from backend.chatscene_voice.catalog import catalog_reference_path, load_catalog
 
 
@@ -41,6 +46,21 @@ def metrics(audio):
 
 
 class VoiceServiceTests(unittest.TestCase):
+    def test_synthetic_cache_reuses_identical_audio(self):
+        calls = 0
+
+        def produce():
+            nonlocal calls
+            calls += 1
+            return tone_wav(seconds=0.1)
+
+        with tempfile.TemporaryDirectory() as directory:
+            with patch("backend.chatscene_voice.service.ROOT", Path(directory)):
+                first = cached_synthetic_audio("test", {"voice": "ana", "text": "Oi"}, produce)
+                second = cached_synthetic_audio("test", {"text": "Oi", "voice": "ana"}, produce)
+        self.assertEqual(first, second)
+        self.assertEqual(calls, 1)
+
     def test_pitch_changes_without_changing_duration(self):
         source = tone_wav()
         config = lambda pitch: {

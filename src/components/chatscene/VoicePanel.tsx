@@ -16,10 +16,11 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/base";
-import { VoiceCatalog } from './VoiceCatalog';
+import { VoiceCatalog } from "./VoiceCatalog";
 import {
   attachElevenLabsVoice,
   attachPreset,
+  attachVoiceReference,
   preselectLocalVoices,
   voiceProfileOf,
 } from "@/lib/chatscene/voice-resolution";
@@ -35,7 +36,11 @@ import {
   voicePreset,
   type VoiceProfile,
 } from "@/lib/chatscene/voice";
-import { getVoiceEngineStatus } from "@/lib/chatscene/voice.functions";
+import {
+  getVoiceEngineStatus,
+  listVoiceReferences,
+  type SavedVoiceReference,
+} from "@/lib/chatscene/voice.functions";
 import type { ChatSceneProject } from "@/lib/chatscene/types";
 import {
   VOICE_TRANSFORM_PRESETS,
@@ -65,6 +70,7 @@ export interface VoicePanelProps {
   onRetry: () => void;
   onContinue: () => void;
   onChangeVoice: () => void;
+  onManageClones: () => void;
 }
 
 const CHARACTER_MODIFIER_PRESET_IDS = [
@@ -98,29 +104,69 @@ export function VoicePanel(props: VoicePanelProps) {
     onRetry,
     onContinue,
     onChangeVoice,
+    onManageClones,
   } = props;
   const setProject = (next: ChatSceneProject) => patch(next);
   const connectionFn = useServerFn(getElevenLabsConnection);
   const connectFn = useServerFn(connectElevenLabs);
   const voicesFn = useServerFn(listElevenLabsVoices);
   const engineStatusFn = useServerFn(getVoiceEngineStatus);
+  const referencesFn = useServerFn(listVoiceReferences);
   const [installedLocalVoices, setInstalledLocalVoices] = useState<string[] | null>(null);
   const [installedCatalogVoices, setInstalledCatalogVoices] = useState<string[] | null>(null);
+  const [savedReferences, setSavedReferences] = useState<SavedVoiceReference[]>([]);
+  const [referencesLoading, setReferencesLoading] = useState(true);
+  const [referencesError, setReferencesError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
-    void engineStatusFn().then((status) => {
-      if (active) {
-        setInstalledLocalVoices(status.piperVoices);
-        setInstalledCatalogVoices(status.catalogVoices);
-      }
-    }).catch(() => {
-      if (active) {
-        setInstalledLocalVoices([]);
-        setInstalledCatalogVoices([]);
-      }
-    });
-    return () => { active = false; };
+    void engineStatusFn()
+      .then((status) => {
+        if (active) {
+          setInstalledLocalVoices(status.piperVoices);
+          setInstalledCatalogVoices(status.catalogVoices);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setInstalledLocalVoices([]);
+          setInstalledCatalogVoices([]);
+        }
+      });
+    return () => {
+      active = false;
+    };
   }, [engineStatusFn]);
+  useEffect(() => {
+    let active = true;
+    const attached = project.participants
+      .map((participant) => voiceProfileOf(project, participant)?.reference)
+      .filter((reference): reference is NonNullable<VoiceProfile["reference"]> =>
+        Boolean(reference),
+      )
+      .map((reference) => ({ ...reference, createdAt: "" }));
+    setReferencesLoading(true);
+    void referencesFn()
+      .then((remote) => {
+        if (!active) return;
+        const merged = new Map<string, SavedVoiceReference>();
+        for (const reference of [...remote, ...attached]) merged.set(reference.id, reference);
+        setSavedReferences(Array.from(merged.values()));
+        setReferencesError(null);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSavedReferences(attached);
+        setReferencesError(
+          "A biblioteca privada ainda não foi ativada no Supabase. Vozes já ligadas a este projeto continuam disponíveis.",
+        );
+      })
+      .finally(() => {
+        if (active) setReferencesLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [project, referencesFn]);
   const [elevenConnection, setElevenConnection] = useState<
     "checking" | "connected" | "disconnected" | "error"
   >("checking");
@@ -314,9 +360,10 @@ export function VoicePanel(props: VoicePanelProps) {
     const base = AUDIO_MODIFIER_PRESET_IDS.has(current.presetId)
       ? selectionFromTransformPreset("adam_natural")
       : current;
-    const effect = value === "none"
-      ? "none"
-      : value.slice("effect:".length) as NonNullable<VoiceTransformConfig["effect"]>;
+    const effect =
+      value === "none"
+        ? "none"
+        : (value.slice("effect:".length) as NonNullable<VoiceTransformConfig["effect"]>);
     updateProfile(voice.id, {
       pitch: 0,
       transform: {
@@ -366,9 +413,24 @@ export function VoicePanel(props: VoicePanelProps) {
       </p>
       <p className="text-xs text-muted-foreground">
         Cadu e Jeff são vozes-base distintas do{" "}
-        <a className="underline underline-offset-2 hover:text-foreground" href="https://github.com/OHF-Voice/piper1-gpl" target="_blank" rel="noopener noreferrer">Piper</a>
-        {" "}e exigem instalação no servidor. A clonagem autorizada usa o{" "}
-        <a className="underline underline-offset-2 hover:text-foreground" href="https://github.com/resemble-ai/chatterbox" target="_blank" rel="noopener noreferrer">Chatterbox Multilingual</a>.
+        <a
+          className="underline underline-offset-2 hover:text-foreground"
+          href="https://github.com/OHF-Voice/piper1-gpl"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Piper
+        </a>{" "}
+        e exigem instalação no servidor. A clonagem autorizada usa o{" "}
+        <a
+          className="underline underline-offset-2 hover:text-foreground"
+          href="https://github.com/resemble-ai/chatterbox"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Chatterbox Multilingual
+        </a>
+        .
       </p>
       <section
         className="rounded-lg border border-primary/25 bg-primary/5 p-3"
@@ -650,18 +712,28 @@ export function VoicePanel(props: VoicePanelProps) {
                   {Array.from(new Set(VOICE_PRESETS.map((p) => p.group))).map((group) => (
                     <optgroup key={group} label={group}>
                       {VOICE_PRESETS.filter((p) => p.group === group).map((preset) => (
-                          <option
-                            key={preset.id}
-                            value={preset.id}
-                            disabled={
-                              (preset.provider === "piper" && preset.providerVoice !== "pt_BR-faber-medium" && !installedLocalVoices?.includes(preset.providerVoice)) ||
-                              (preset.provider === "chatterbox-catalog" && !installedCatalogVoices?.includes(preset.providerVoice))
-                            }
-                          >
-                            {voiceDisplayLabel(preset)}
-                            {preset.provider === "piper" && preset.providerVoice !== "pt_BR-faber-medium" && !installedLocalVoices?.includes(preset.providerVoice) ? " (instalar no servidor)" : ""}
-                            {preset.provider === "chatterbox-catalog" && !installedCatalogVoices?.includes(preset.providerVoice) ? " (preparando catálogo)" : ""}
-                          </option>
+                        <option
+                          key={preset.id}
+                          value={preset.id}
+                          disabled={
+                            (preset.provider === "piper" &&
+                              preset.providerVoice !== "pt_BR-faber-medium" &&
+                              !installedLocalVoices?.includes(preset.providerVoice)) ||
+                            (preset.provider === "chatterbox-catalog" &&
+                              !installedCatalogVoices?.includes(preset.providerVoice))
+                          }
+                        >
+                          {voiceDisplayLabel(preset)}
+                          {preset.provider === "piper" &&
+                          preset.providerVoice !== "pt_BR-faber-medium" &&
+                          !installedLocalVoices?.includes(preset.providerVoice)
+                            ? " (instalar no servidor)"
+                            : ""}
+                          {preset.provider === "chatterbox-catalog" &&
+                          !installedCatalogVoices?.includes(preset.providerVoice)
+                            ? " (preparando catálogo)"
+                            : ""}
+                        </option>
                       ))}
                     </optgroup>
                   ))}
@@ -669,11 +741,36 @@ export function VoicePanel(props: VoicePanelProps) {
                 <ChevronDown className="pointer-events-none absolute right-2 top-2.5 size-4 text-muted-foreground" />
               </div>
 
-              {!voice?.reference && <VoiceCatalog name={participant.name} selected={voice?.presetId}
-                previewing={previewing !== null}
-                unavailable={preset => (preset.provider === 'piper' && preset.providerVoice !== 'pt_BR-faber-medium' && !installedLocalVoices?.includes(preset.providerVoice)) || (preset.provider === 'chatterbox-catalog' && !installedCatalogVoices?.includes(preset.providerVoice))}
-                onChoose={id => setProject(attachPreset(project, participant.id, id))}
-                onPreview={id => onPreview(participant.id, profileFromPreset(id))} />}
+              <VoiceCatalog
+                name={participant.name}
+                selected={voice?.presetId}
+                selectedReferenceId={voice?.reference?.id}
+                previewing={previewing}
+                references={savedReferences}
+                referencesLoading={referencesLoading}
+                referencesError={referencesError}
+                unavailable={(preset) =>
+                  (preset.provider === "piper" &&
+                    preset.providerVoice !== "pt_BR-faber-medium" &&
+                    !installedLocalVoices?.includes(preset.providerVoice)) ||
+                  (preset.provider === "chatterbox-catalog" &&
+                    !installedCatalogVoices?.includes(preset.providerVoice))
+                }
+                onChoose={(id) => setProject(attachPreset(project, participant.id, id))}
+                onPreview={(id, previewId) =>
+                  onPreview(previewId, profileFromPreset(id), "Olá! Esta é minha voz.")
+                }
+                onChooseReference={(reference) =>
+                  setProject(attachVoiceReference(project, participant.id, reference))
+                }
+                onPreviewReference={(reference, previewId) => {
+                  const next = attachVoiceReference(project, participant.id, reference);
+                  const person = next.participants.find((item) => item.id === participant.id);
+                  const profile = person ? voiceProfileOf(next, person) : null;
+                  if (profile) onPreview(previewId, profile, "Olá! Esta é minha voz.");
+                }}
+                onManageReferences={onManageClones}
+              />
 
               {voice ? (
                 <>
@@ -725,14 +822,20 @@ export function VoicePanel(props: VoicePanelProps) {
                         : voiceTransformPreset(voice.transform.presetId).description}
                     </p>
                   ) : null}
-                  <div className="mt-3" role="group" aria-label={`Altura da voz de ${participant.name}`}>
+                  <div
+                    className="mt-3"
+                    role="group"
+                    aria-label={`Altura da voz de ${participant.name}`}
+                  >
                     <p className="mb-1.5 text-[11px] font-medium">Altura da voz</p>
                     <div className="grid grid-cols-3 gap-2">
-                      {([
-                        { label: "Grave", pitch: -4 },
-                        { label: "Original", pitch: 0 },
-                        { label: "Fina", pitch: 4 },
-                      ] as const).map(({ label, pitch }) => {
+                      {(
+                        [
+                          { label: "Grave", pitch: -4 },
+                          { label: "Original", pitch: 0 },
+                          { label: "Fina", pitch: 4 },
+                        ] as const
+                      ).map(({ label, pitch }) => {
                         const selectedPitch = voice.transform
                           ? effectiveTransformPitch(voice.transform.config) + (voice.pitch ?? 0)
                           : (voice.pitch ?? 0);
@@ -752,7 +855,10 @@ export function VoicePanel(props: VoicePanelProps) {
                         );
                       })}
                     </div>
-                    <p className="mt-1.5 text-[10px] text-muted-foreground">Muda o tom sem acelerar a fala. Clique em Ouvir para testar; a alteração gera novo áudio.</p>
+                    <p className="mt-1.5 text-[10px] text-muted-foreground">
+                      Muda o tom sem acelerar a fala. Clique em Ouvir para testar; a alteração gera
+                      novo áudio.
+                    </p>
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-2 has-[details[open]]:grid-cols-1">
                     <Button
@@ -811,7 +917,8 @@ export function VoicePanel(props: VoicePanelProps) {
                             </optgroup>
                           </select>
                           <span className="mt-1 block text-[10px] font-normal text-muted-foreground">
-                            Os perfis de idade alteram tom e ritmo; são efeitos de personagem, não identidades etárias reais.
+                            Os perfis de idade alteram tom e ritmo; são efeitos de personagem, não
+                            identidades etárias reais.
                           </span>
                         </label>
                         {caps?.controls.energy ? (
@@ -827,7 +934,12 @@ export function VoicePanel(props: VoicePanelProps) {
                         {caps?.controls.pitch ? (
                           <VoiceRange
                             label="Tom fino ou grave"
-                            value={voice.transform ? effectiveTransformPitch(voice.transform.config) + (voice.pitch ?? 0) : (voice.pitch ?? 0)}
+                            value={
+                              voice.transform
+                                ? effectiveTransformPitch(voice.transform.config) +
+                                  (voice.pitch ?? 0)
+                                : (voice.pitch ?? 0)
+                            }
                             min={PITCH_MIN}
                             max={PITCH_MAX}
                             step={0.5}

@@ -65,6 +65,35 @@ MODEL_FILES = (
     "t3_mtl23ls_v2.safetensors",
     "grapheme_mtl_merged_expanded_v1.json",
 )
+SYNTH_CACHE_LOCK = threading.Lock()
+SYNTH_CACHE_KEY_LOCKS = {}
+
+
+def cached_synthetic_audio(namespace, payload, producer):
+    """Cache only public/synthetic speech; authorized cloned identities stay uncached."""
+    digest = hashlib.sha256(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
+    ).hexdigest()
+    directory = ROOT / "cache" / "synthesis" / namespace
+    path = directory / f"{digest}.wav"
+    with SYNTH_CACHE_LOCK:
+        key_lock = SYNTH_CACHE_KEY_LOCKS.setdefault(str(path), threading.Lock())
+    with key_lock:
+        try:
+            cached = path.read_bytes()
+            if cached:
+                return cached
+        except FileNotFoundError:
+            pass
+        audio = producer()
+        directory.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(f".{uuid.uuid4().hex}.tmp")
+        temporary.write_bytes(audio)
+        os.chmod(temporary, 0o600)
+        temporary.replace(path)
+        return audio
 
 
 def runtime_config():
@@ -530,7 +559,13 @@ class Handler(BaseHTTPRequestHandler):
                     )
                     return
                 try:
-                    audio = synthesize_piper(text, body.get("speed", 1), body.get("voice", "pt_BR-faber-medium"))
+                    speed = body.get("speed", 1)
+                    voice = body.get("voice", "pt_BR-faber-medium")
+                    audio = cached_synthetic_audio(
+                        "piper",
+                        {"text": text, "speed": speed, "voice": voice},
+                        lambda: synthesize_piper(text, speed, voice),
+                    )
                 finally:
                     INFERENCE_SLOTS.release()
                 self.respond(
@@ -548,11 +583,30 @@ class Handler(BaseHTTPRequestHandler):
                     self.respond(429, {"detail": "A fila de vozes está cheia. Tente novamente."})
                     return
                 try:
-                    reference = path.read_bytes()
-                    try:
-                        audio, device = gpu_synthesize(text, reference)
-                    except Exception:
-                        audio, device = CPU.synthesize(text, path), "cpu"
+                    reference_stat = path.stat()
+                    device_used = {"value": "cache"}
+
+                    def produce_catalog_audio():
+                        reference = path.read_bytes()
+                        try:
+                            audio_value, device_value = gpu_synthesize(text, reference)
+                        except Exception:
+                            audio_value, device_value = CPU.synthesize(text, path), "cpu"
+                        device_used["value"] = device_value
+                        return audio_value
+
+                    audio = cached_synthetic_audio(
+                        "catalog",
+                        {
+                            "text": text,
+                            "speed": body.get("speed", 1),
+                            "voice": voice,
+                            "referenceMtime": reference_stat.st_mtime_ns,
+                            "referenceSize": reference_stat.st_size,
+                        },
+                        produce_catalog_audio,
+                    )
+                    device = device_used["value"]
                 finally:
                     INFERENCE_SLOTS.release()
                 self.respond(

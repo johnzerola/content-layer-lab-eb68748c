@@ -41,9 +41,13 @@ import { ParticipantStylePanel } from "@/components/chatscene/ParticipantStylePa
 import { BrandPanel } from "@/components/chatscene/BrandPanel";
 import { ThemePanel } from "@/components/chatscene/ThemePanel";
 import { MusicPanel } from "@/components/chatscene/MusicPanel";
-import { ChatWorkspaceHeader } from './ChatWorkspaceHeader';
-import { BackgroundLibrary } from './BackgroundLibrary';
-import { appendThreadMessage, duplicateThread, removeThreadKeepingMessages } from '@/lib/chatscene/threads';
+import { ChatWorkspaceHeader } from "./ChatWorkspaceHeader";
+import { BackgroundLibrary } from "./BackgroundLibrary";
+import {
+  appendThreadMessage,
+  duplicateThread,
+  removeThreadKeepingMessages,
+} from "@/lib/chatscene/threads";
 import { StoryPanel } from "@/components/chatscene/StoryPanel";
 import { CreatorFormatPicker } from "./CreatorFormatPicker";
 import {
@@ -173,8 +177,9 @@ export function ChatSceneStudio() {
   const [recordId, setRecordId] = useState<string | null>(null);
   const [script, setScript] = useState("");
   const [tab, setTab] = useState<StudioTab>("mensagens");
-  const [activeThreadId, setActiveThreadId] = useState('main');
-  const activeThread = threadsOf(project).find(t => t.id === activeThreadId) ?? threadsOf(project)[0]!;
+  const [activeThreadId, setActiveThreadId] = useState("main");
+  const activeThread =
+    threadsOf(project).find((t) => t.id === activeThreadId) ?? threadsOf(project)[0]!;
   const [frame, setFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -292,7 +297,8 @@ export function ChatSceneStudio() {
               clip.key !== voiceKey(text, resolved.profile, resolved.direction) ||
               !duration ||
               Math.abs((message.voiceMs ?? 0) - duration) < 30
-            ) return message;
+            )
+              return message;
             changed = true;
             return { ...message, voiceMs: duration };
           });
@@ -504,7 +510,10 @@ export function ChatSceneStudio() {
       return {
         ...prev,
         participants: parsed.participants,
-        messages: [...prev.messages, ...parsed.messages.map(m => ({ ...m, threadId: activeThread.id }))],
+        messages: [
+          ...prev.messages,
+          ...parsed.messages.map((m) => ({ ...m, threadId: activeThread.id })),
+        ],
       };
     });
     setScript("");
@@ -516,7 +525,7 @@ export function ChatSceneStudio() {
     setActiveThreadId(thread.id);
     setPlaying(false);
     setSelected(null);
-    setTab('mensagens');
+    setTab("mensagens");
     setProject((prev) => {
       const threads = threadsOf(prev);
       return {
@@ -534,7 +543,7 @@ export function ChatSceneStudio() {
   }, []);
 
   const removeThread = useCallback((id: string) => {
-    setProject(prev => removeThreadKeepingMessages(prev, id));
+    setProject((prev) => removeThreadKeepingMessages(prev, id));
   }, []);
 
   const removeMessage = useCallback((id: string) => {
@@ -930,8 +939,11 @@ export function ChatSceneStudio() {
   }, [project, plan, effectiveClips]);
 
   const selectedMessage = project.messages.find((m) => m.id === selected) ?? null;
-  const emptySelectedChat = !playing && !project.messages.some(m => threadIdOf(project, m) === activeThread.id);
-  const previewProject = emptySelectedChat ? { ...project, threads: [activeThread], messages: [] } : project;
+  const emptySelectedChat =
+    !playing && !project.messages.some((m) => threadIdOf(project, m) === activeThread.id);
+  const previewProject = emptySelectedChat
+    ? { ...project, threads: [activeThread], messages: [] }
+    : project;
   const { width, height } = renderSize(project.render);
 
   return (
@@ -1012,22 +1024,48 @@ export function ChatSceneStudio() {
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_430px]">
         {/* --------------------------------------------------- editor em abas */}
         <section className="min-w-0 rounded-2xl border border-border bg-card p-4 lg:p-5">
-          <ChatWorkspaceHeader project={project} activeId={activeThread.id}
-            onSelect={id => {
-              setActiveThreadId(id); setSelected(null); setPlaying(false);
-              const first = project.messages.find(m => threadIdOf(project, m) === id && !m.initial);
-              if (first && plan.byId[first.id]) setFrame(Math.max(0, plan.byId[first.id]!.endFrame - 1));
+          <ChatWorkspaceHeader
+            project={project}
+            activeId={activeThread.id}
+            onSelect={(id) => {
+              setActiveThreadId(id);
+              setSelected(null);
+              setPlaying(false);
+              const first = project.messages.find(
+                (m) => threadIdOf(project, m) === id && !m.initial,
+              );
+              if (first && plan.byId[first.id])
+                setFrame(Math.max(0, plan.byId[first.id]!.endFrame - 1));
             }}
-            onAdd={addThread} onUpdate={changes => updateThread(activeThread.id, changes)}
+            onAdd={addThread}
+            onUpdate={(changes) => updateThread(activeThread.id, changes)}
             onRemove={() => removeThread(activeThread.id)}
-            onDuplicate={() => { const result = duplicateThread(project, activeThread.id); setProject(result.project); setActiveThreadId(result.thread.id); setTab('mensagens'); }}
+            onDuplicate={() => {
+              const result = duplicateThread(project, activeThread.id);
+              setProject(result.project);
+              setActiveThreadId(result.thread.id);
+              setTab("mensagens");
+            }}
             uploading={uploading === `thread-${activeThread.id}`}
-            onAvatar={async file => {
-              const id = activeThread.id; setUploading(`thread-${id}`);
-              try { const { asset } = await addFileToLibrary(file, 'avatar'); updateThread(id, { avatarUrl: asset.url }); if (asset.temporary) toast.warning('Foto disponível somente nesta sessão. Tente enviá-la novamente antes de salvar.'); }
-              catch (error) { toast.error(error instanceof Error ? error.message : 'Não foi possível enviar a foto.'); }
-              finally { setUploading(null); }
-            }} />
+            onAvatar={async (file) => {
+              const id = activeThread.id;
+              setUploading(`thread-${id}`);
+              try {
+                const { asset } = await addFileToLibrary(file, "avatar");
+                updateThread(id, { avatarUrl: asset.url });
+                if (asset.temporary)
+                  toast.warning(
+                    "Foto disponível somente nesta sessão. Tente enviá-la novamente antes de salvar.",
+                  );
+              } catch (error) {
+                toast.error(
+                  error instanceof Error ? error.message : "Não foi possível enviar a foto.",
+                );
+              } finally {
+                setUploading(null);
+              }
+            }}
+          />
           <nav
             className="mb-6 grid grid-cols-2 gap-2 border-b border-border pb-4 sm:grid-cols-5"
             aria-label="Abas do editor"
@@ -1142,7 +1180,11 @@ export function ChatSceneStudio() {
                       {project.messages.length} falas · {timeLabel(plan.durationMs / 1000)}
                     </span>
                   </div>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2" role="group" aria-label="Modo de duração">
+                  <div
+                    className="mt-3 grid gap-2 sm:grid-cols-2"
+                    role="group"
+                    aria-label="Modo de duração"
+                  >
                     {CONVERSATION_TIMING_PRESETS.map((preset) => {
                       const active = (project.timing.mode ?? "standard") === preset.id;
                       return (
@@ -1151,7 +1193,9 @@ export function ChatSceneStudio() {
                           type="button"
                           aria-pressed={active}
                           title={preset.description}
-                          onClick={() => setProject((prev) => applyConversationTimingPreset(prev, preset.id))}
+                          onClick={() =>
+                            setProject((prev) => applyConversationTimingPreset(prev, preset.id))
+                          }
                           className={`min-h-12 rounded-md border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:bg-accent"}`}
                         >
                           <span className="block text-xs font-semibold">{preset.label}</span>
@@ -1197,8 +1241,9 @@ export function ChatSceneStudio() {
                     }
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Ajuste sem gerar de novo e ouça na prévia. Acima de 1×, a fala fica mais curta e o tom sobe;
-                    abaixo de 1×, o tom desce. Velocidades muito altas podem soar artificiais.
+                    Ajuste sem gerar de novo e ouça na prévia. Acima de 1×, a fala fica mais curta e
+                    o tom sobe; abaixo de 1×, o tom desce. Velocidades muito altas podem soar
+                    artificiais.
                   </p>
                 </div>
                 <Range
@@ -1543,7 +1588,12 @@ export function ChatSceneStudio() {
 
           {tab === "fundo" && (
             <div>
-              <BackgroundLibrary value={project.background} onChange={background => patch({ background })} onUpload={file => void handleBackgroundVideo(file)} busy={uploading === "background-video"} />
+              <BackgroundLibrary
+                value={project.background}
+                onChange={(background) => patch({ background })}
+                onUpload={(file) => void handleBackgroundVideo(file)}
+                busy={uploading === "background-video"}
+              />
 
               <div className="mt-3 rounded-lg border border-dashed border-border bg-background/35 p-3">
                 <p className="text-xs font-medium">Usar meu próprio vídeo ou imagem</p>
@@ -1766,6 +1816,7 @@ export function ChatSceneStudio() {
                 onRetry={() => void handleGenerateVoices()}
                 onContinue={() => setCastFailures([])}
                 onChangeVoice={() => setCastFailures([])}
+                onManageClones={() => setTab("clonar")}
               />
               <VoiceUploadPanel
                 project={project}
@@ -1780,15 +1831,15 @@ export function ChatSceneStudio() {
             </div>
           )}
 
-          {tab === 'musica' && (
-              <div className="text-sm">
-                <MusicPanel
-                  project={project}
-                  patch={patch}
-                  uploading={uploading}
-                  onUpload={(file) => void handleMusic(file)}
-                />
-              </div>
+          {tab === "musica" && (
+            <div className="text-sm">
+              <MusicPanel
+                project={project}
+                patch={patch}
+                uploading={uploading}
+                onUpload={(file) => void handleMusic(file)}
+              />
+            </div>
           )}
 
           {tab === "estilo" && (
