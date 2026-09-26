@@ -1,6 +1,6 @@
 import { selectionFromTransformPreset, type VoiceTransformSelection } from "./voice-transform";
 
-/** Identidades vocais sintéticas do ChatScene. Nenhum preset representa pessoa real. */
+/** Identidades sintéticas e vozes-base adultas com autorização registrada. */
 export type VoiceGender = "feminina" | "masculina" | "neutra";
 export type VoiceAge = "juvenil" | "teen" | "adulta" | "madura";
 export type VoiceStyle =
@@ -71,7 +71,7 @@ export function pitchRate(pitch: number | undefined): number {
 export interface VoicePreset {
   id: string;
   label: string;
-  group: "Catálogo PT-BR · 15 locutores" | "Voz local gratuita" | "Presets de atuação" | "Juvenil sintética" | "Teen" | "Adulto masculino" | "Adulto feminino" | "Família" | "Personagens";
+  group: "Vozes autorizadas · 7 locutores" | "Catálogo PT-BR · 15 locutores" | "Voz local gratuita" | "Presets de atuação" | "Juvenil sintética" | "Teen" | "Adulto masculino" | "Adulto feminino" | "Família" | "Personagens";
   description: string;
   gender: VoiceGender;
   age: VoiceAge;
@@ -87,6 +87,11 @@ const preset = (
 ): VoicePreset => ({ id, label, group, description, gender, age, providerVoice, profile, ...(provider ? { provider } : {}) });
 
 export const VOICE_PRESETS: VoicePreset[] = [
+  ...Array.from({ length: 7 }, (_, index) => {
+    const number = index + 1;
+    const id = `authorized-base-${String(number).padStart(2, "0")}`;
+    return preset(id, `Voz base ${number}`, "Vozes autorizadas · 7 locutores", `Locutor autorizado · identidade ${number}`, "neutra", "adulta", id, { style:"natural",speed:1,energy:.55,expressiveness:.6,roughness:.1,warmth:.55,brightness:.5,pitch:0 }, "chatterbox-catalog");
+  }),
   ...[
     ["bia-child-bright", "Bia · criança alegre", "Criança sintética, clara e espontânea", "feminina", "juvenil", "animada", 1.05, .75, .78, .72, .82, 1],
     ["lucas-child-playful", "Lucas · criança divertida", "Criança sintética, brincalhona e expressiva", "masculina", "juvenil", "comedy", 1.06, .8, .82, .58, .78, 1],

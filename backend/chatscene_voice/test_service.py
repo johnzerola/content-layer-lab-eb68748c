@@ -138,6 +138,30 @@ class VoiceServiceTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     catalog_reference_path(root, "../escape")
 
+    def test_authorized_base_catalog_is_separate_from_synthetic_license(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            catalog = root / "authorized-catalog"
+            catalog.mkdir()
+            (catalog / "catalog.json").write_text(json.dumps({
+                "schemaVersion": 1,
+                "license": "User-authorized",
+                "voices": [{"id": "authorized-base-01", "name": "Voz base 1"}],
+            }), encoding="utf-8")
+            (catalog / "authorized-base-01.wav").write_bytes(tone_wav(seconds=0.1))
+            with patch.dict(os.environ, {
+                "CHATSCENE_QWEN_CATALOG_LICENSE_APPROVED": "0",
+                "CHATSCENE_AUTHORIZED_CATALOG_APPROVED": "1",
+                "CHATSCENE_AUTHORIZED_CATALOG_DIR": str(catalog),
+            }):
+                voices = load_catalog(root)
+                self.assertEqual([voice["id"] for voice in voices], ["authorized-base-01"])
+                self.assertEqual(voices[0]["provenance"], "authorized")
+                self.assertEqual(
+                    catalog_reference_path(root, "authorized-base-01"),
+                    catalog / "authorized-base-01.wav",
+                )
+
 
 if __name__ == "__main__":
     unittest.main()
