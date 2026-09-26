@@ -516,13 +516,13 @@ export function TemplateEditor({
       setT(next);
       return;
     }
-    const geometry = {
-      x: next.video.x,
-      y: next.video.y,
-      w: next.video.w,
-      h: next.video.h,
-      radius: next.video.radius,
-    };
+    const current = videoBoxAt(t, time);
+    const geometry = Object.fromEntries(
+      (["x", "y", "w", "h", "radius"] as VideoKeyframeProperty[])
+        .filter((property) => next.video[property] !== current[property])
+        .map((property) => [property, next.video[property]]),
+    );
+    if (!Object.keys(geometry).length) return;
     setT(
       patchVideoAtTime(
         { ...next, video: t.video, videoKeyframes: t.videoKeyframes ?? [] },
