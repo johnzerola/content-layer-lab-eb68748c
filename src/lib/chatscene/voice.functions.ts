@@ -14,6 +14,7 @@ import { z } from "zod";
 
 import {
   deleteRemoteVoiceReference,
+  listRemoteVoiceReferences,
   remoteCloneEngineStatus,
   remoteVoiceServiceConfigured,
   remoteVoiceTransformSupported,
@@ -35,6 +36,15 @@ export interface SavedVoiceReference {
 export const listVoiceReferences = createServerFn({ method: "GET" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .handler(async ({ context }) => {
+    if (remoteVoiceServiceConfigured()) {
+      const references = await listRemoteVoiceReferences(context.userId);
+      return references.map((reference) => ({
+        id: reference.id,
+        name: reference.name,
+        durationSec: reference.durationSec,
+        createdAt: new Date((reference.createdAt || 0) * 1000).toISOString(),
+      })) satisfies SavedVoiceReference[];
+    }
     const { data, error } = await (
       context.supabase.from("voice_reference_profiles" as never) as any
     )
@@ -110,7 +120,7 @@ export const uploadVoiceReference = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     let result: { id: string; durationSec: number };
     if (remoteVoiceServiceConfigured()) {
-      result = await saveRemoteVoiceReference(context.userId, data.audio);
+      result = await saveRemoteVoiceReference(context.userId, data.audio, data.name);
     } else {
       const { saveVoiceReference } = await import("./voice-clone.server");
       result = await saveVoiceReference(context.userId, data.audio);
@@ -124,13 +134,9 @@ export const uploadVoiceReference = createServerFn({ method: "POST" })
       duration_sec: result.durationSec,
       authorization_version: "adult-own-or-written-1",
     });
-    if (error) {
-      if (remoteVoiceServiceConfigured())
-        await deleteRemoteVoiceReference(context.userId, result.id).catch(() => undefined);
-      else {
-        const { deleteVoiceReference } = await import("./voice-clone.server");
-        await deleteVoiceReference(context.userId, result.id).catch(() => undefined);
-      }
+    if (error && !remoteVoiceServiceConfigured()) {
+      const { deleteVoiceReference } = await import("./voice-clone.server");
+      await deleteVoiceReference(context.userId, result.id).catch(() => undefined);
       throw new Error("A voz foi validada, mas não pôde ser salva na sua biblioteca.");
     }
     return { ...result, name: data.name };
@@ -158,7 +164,8 @@ export const removeVoiceReference = createServerFn({ method: "POST" })
       .delete()
       .eq("id", data.id)
       .eq("user_id", context.userId);
-    if (error) throw new Error("A amostra foi removida, mas a biblioteca não pôde ser atualizada.");
+    if (error && !remoteVoiceServiceConfigured())
+      throw new Error("A amostra foi removida, mas a biblioteca não pôde ser atualizada.");
     return { removed: true };
   });
 

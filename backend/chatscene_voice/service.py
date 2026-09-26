@@ -19,6 +19,7 @@ import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 import wave
@@ -235,6 +236,33 @@ def account_directory(user_id):
 def reference_path(user_id, reference_id):
     uuid.UUID(reference_id)
     return account_directory(user_id) / f"{reference_id}.wav"
+
+
+def list_reference_metadata(user_id):
+    directory = account_directory(user_id)
+    references = []
+    for metadata_path in directory.glob("*.json"):
+        try:
+            reference_id = metadata_path.stem
+            uuid.UUID(reference_id)
+            if not (directory / f"{reference_id}.wav").is_file():
+                continue
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            duration = float(metadata.get("durationSec", 0))
+            if duration < 3 or duration > 30:
+                continue
+            references.append(
+                {
+                    "id": reference_id,
+                    "name": str(metadata.get("name") or f"Voz {reference_id[:8]}")[:100],
+                    "durationSec": duration,
+                    "createdAt": int(metadata.get("createdAt", 0)),
+                }
+            )
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            continue
+    references.sort(key=lambda item: item["createdAt"], reverse=True)
+    return references
 
 
 def decode_reference(audio):
@@ -494,7 +522,19 @@ class Handler(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(length))
 
     def do_GET(self):
-        if self.path != "/v1/voice/health" or not self.authorized():
+        if not self.authorized():
+            self.respond(404, {"detail": "not found"})
+            return
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/v1/voice/references":
+            query = urllib.parse.parse_qs(parsed.query)
+            user_id = str(query.get("userId", [""])[0])
+            try:
+                self.respond(200, {"references": list_reference_metadata(user_id)})
+            except (ValueError, TypeError):
+                self.respond(400, {"detail": "Conta de voz inválida."})
+            return
+        if parsed.path != "/v1/voice/health":
             self.respond(404, {"detail": "not found"})
             return
         relay = relay_health()
@@ -525,6 +565,11 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if self.path == "/v1/voice/references":
                 user_id = str(body.get("userId", ""))
+                # Keep older published clients compatible while the new batch
+                # importer rolls out. New clients always send the file name.
+                name = str(body.get("name") or "Voz importada").strip()
+                if len(name) > 100:
+                    raise ValueError("Informe um nome de voz com até 100 caracteres.")
                 audio = base64.b64decode(body.get("audio", ""), validate=True)
                 wav, duration = decode_reference(audio)
                 reference_id = str(uuid.uuid4())
@@ -538,6 +583,7 @@ class Handler(BaseHTTPRequestHandler):
                         {
                             "authorized": True,
                             "authorizationVersion": "adult-own-or-written-1",
+                            "name": name,
                             "createdAt": int(time.time()),
                             "durationSec": duration,
                         }
@@ -546,7 +592,7 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 os.chmod(metadata, 0o600)
                 request_warm()
-                self.respond(201, {"id": reference_id, "durationSec": duration})
+                self.respond(201, {"id": reference_id, "name": name, "durationSec": duration})
                 return
             if self.path == "/v1/voice/generic":
                 text = body.get("text")

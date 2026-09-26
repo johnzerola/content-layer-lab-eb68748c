@@ -87,11 +87,28 @@ export async function warmRemoteCloneEngine() {
   );
 }
 
-export async function saveRemoteVoiceReference(userId: string, audioBase64: string) {
-  return await remoteVoiceRequest<{ id: string; durationSec: number }>("/references", {
-    method: "POST",
-    body: JSON.stringify({ userId, audio: audioBase64 }),
-  });
+export interface RemoteVoiceReference {
+  id: string;
+  name: string;
+  durationSec: number;
+  createdAt: number;
+}
+
+export async function listRemoteVoiceReferences(userId: string) {
+  const result = await remoteVoiceRequest<{ references: RemoteVoiceReference[] }>(
+    `/references?userId=${encodeURIComponent(userId)}`,
+  );
+  return result.references;
+}
+
+export async function saveRemoteVoiceReference(userId: string, audioBase64: string, name: string) {
+  return await remoteVoiceRequest<{ id: string; name: string; durationSec: number }>(
+    "/references",
+    {
+      method: "POST",
+      body: JSON.stringify({ userId, audio: audioBase64, name }),
+    },
+  );
 }
 
 export async function deleteRemoteVoiceReference(userId: string, id: string) {
@@ -113,7 +130,11 @@ export async function synthesizeRemoteVoice(userId: string, referenceId: string,
   return result.audio;
 }
 
-export async function synthesizeRemoteGenericVoice(text: string, speed = 1, voice = "pt_BR-faber-medium") {
+export async function synthesizeRemoteGenericVoice(
+  text: string,
+  speed = 1,
+  voice = "pt_BR-faber-medium",
+) {
   const result = await remoteVoiceRequest<{ audio: string; device: string }>(
     "/generic",
     {
@@ -140,21 +161,25 @@ export async function synthesizeRemoteCatalogVoice(text: string, speed = 1, voic
 let transformCapability: { value: boolean; expiresAt: number } | null = null;
 export async function remoteVoiceTransformSupported(): Promise<boolean> {
   if (!remoteVoiceServiceConfigured()) return false;
-  if (transformCapability && transformCapability.expiresAt > Date.now()) return transformCapability.value;
+  if (transformCapability && transformCapability.expiresAt > Date.now())
+    return transformCapability.value;
   const status = await remoteCloneEngineStatus();
   const value = status?.pitchTransform === true;
   transformCapability = { value, expiresAt: Date.now() + 15_000 };
   return value;
 }
 
-export async function transformRemoteVoice(audio: string, config: {
-  mode: string;
-  speedMultiplier: number;
-  pitchSemitones: number;
-  linkedPitchToSpeed: boolean;
-  effect?: "none" | "radio" | "telephone" | "megaphone" | "robot" | "cave" | "horror";
-  normalization: { enabled: boolean };
-}) {
+export async function transformRemoteVoice(
+  audio: string,
+  config: {
+    mode: string;
+    speedMultiplier: number;
+    pitchSemitones: number;
+    linkedPitchToSpeed: boolean;
+    effect?: "none" | "radio" | "telephone" | "megaphone" | "robot" | "cave" | "horror";
+    normalization: { enabled: boolean };
+  },
+) {
   return remoteVoiceRequest<{ audio: string; mime: string }>(
     "/transform",
     { method: "POST", body: JSON.stringify({ audio, config }) },

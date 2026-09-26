@@ -6,6 +6,8 @@ import unittest
 import wave
 import json
 import os
+import hashlib
+import uuid
 from pathlib import Path
 import tempfile
 from unittest.mock import patch
@@ -13,6 +15,7 @@ from unittest.mock import patch
 from backend.chatscene_voice.service import (
     PIPER_VOICES,
     cached_synthetic_audio,
+    list_reference_metadata,
     synthesize_piper,
     transform_speech,
 )
@@ -46,6 +49,42 @@ def metrics(audio):
 
 
 class VoiceServiceTests(unittest.TestCase):
+    def test_lists_saved_references_from_private_account_storage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            user_id = str(uuid.uuid4())
+            reference_id = str(uuid.uuid4())
+            account = Path(directory) / hashlib.sha256(user_id.encode("utf-8")).hexdigest()
+            account.mkdir()
+            (account / f"{reference_id}.wav").write_bytes(tone_wav(seconds=0.1))
+            (account / f"{reference_id}.json").write_text(
+                json.dumps(
+                    {
+                        "name": "Narrador autorizado",
+                        "durationSec": 7.5,
+                        "createdAt": 123,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch(
+                "backend.chatscene_voice.service.runtime_config",
+                return_value={"storagePath": directory},
+            ):
+                references = list_reference_metadata(user_id)
+
+        self.assertEqual(
+            references,
+            [
+                {
+                    "id": reference_id,
+                    "name": "Narrador autorizado",
+                    "durationSec": 7.5,
+                    "createdAt": 123,
+                }
+            ],
+        )
+
     def test_synthetic_cache_reuses_identical_audio(self):
         calls = 0
 
