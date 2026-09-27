@@ -33,7 +33,7 @@ class VoiceWorker:
             self.close()
             raise RuntimeError("voice worker did not become ready")
 
-    def synthesize(self, text, reference, fidelity_mode=False):
+    def synthesize(self, text, reference, fidelity_mode=False, voice_conversion_pass=False):
         if self.process.poll() is not None:
             raise RuntimeError("voice worker exited")
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp:
@@ -45,6 +45,7 @@ class VoiceWorker:
                 "text": text,
                 "referencePath": reference_path,
                 "fidelityMode": fidelity_mode,
+                "voiceConversionPass": voice_conversion_pass,
             }
             self.process.stdin.write(json.dumps(request, ensure_ascii=False) + "\n")
             self.process.stdin.flush()
@@ -98,13 +99,18 @@ class WorkerManager:
                 self.worker = VoiceWorker()
             self._schedule_idle_locked()
 
-    def synthesize(self, text, reference, fidelity_mode=False):
+    def synthesize(self, text, reference, fidelity_mode=False, voice_conversion_pass=False):
         with self.lock:
             self._cancel_idle_locked()
             if not self.loaded:
                 self.worker = VoiceWorker()
             try:
-                return self.worker.synthesize(text, reference, fidelity_mode)
+                return self.worker.synthesize(
+                    text,
+                    reference,
+                    fidelity_mode,
+                    voice_conversion_pass,
+                )
             except Exception:
                 self._close_locked()
                 raise
@@ -168,6 +174,7 @@ class Handler(BaseHTTPRequestHandler):
                 text,
                 reference,
                 body.get("fidelityMode") is True,
+                body.get("voiceConversionPass") is True,
             )
             payload = json.dumps(result, ensure_ascii=False).encode("utf-8")
             self.send_response(200)

@@ -63,6 +63,7 @@ def _load_manifest(root: Path, expected_license: str, provenance: str) -> list[d
                 "style": str(item.get("style", "natural"))[:40],
                 "description": str(item.get("description", ""))[:160],
                 "provenance": provenance,
+                "voiceConversionPass": item.get("voiceConversionPass") is True,
             }
         )
     return installed

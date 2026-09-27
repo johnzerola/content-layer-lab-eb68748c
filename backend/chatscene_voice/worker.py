@@ -49,9 +49,10 @@ protocol = sys.stdout
 sys.stdout = sys.stderr
 
 import numpy as np
+import librosa
 import soundfile as sf
 import torch
-from chatterbox.mtl_tts import ChatterboxMultilingualTTS
+from chatterbox.mtl_tts import ChatterboxMultilingualTTS, S3_SR
 try:
     from .ptbr_v3 import load_ptbr_v3
 except ImportError:  # standalone worker entry point
@@ -102,6 +103,7 @@ def main():
             if not reference.is_file():
                 raise ValueError("Reference missing")
             fidelity_mode = request.get("fidelityMode") is True
+            voice_conversion_pass = request.get("voiceConversionPass") is True
             torch.manual_seed(42)
             if device == "cuda":
                 torch.cuda.reset_peak_memory_stats()
@@ -110,6 +112,23 @@ def main():
                                      exaggeration=0.5, cfg_weight=0.5,
                                      temperature=0.35 if fidelity_mode else 0.7)
             samples = wav.squeeze(0).detach().cpu().numpy()
+            if voice_conversion_pass:
+                # A second, measured tone-color pass improves only selected
+                # authorized short references. The catalog manifest opts each
+                # identity in; all other voices retain the direct TTS path.
+                source_16k = librosa.resample(
+                    samples,
+                    orig_sr=model.sr,
+                    target_sr=S3_SR,
+                )
+                source_tensor = torch.from_numpy(source_16k).float().to(device)[None]
+                speech_tokens, _ = model.s3gen.tokenizer(source_tensor)
+                converted, _ = model.s3gen.inference(
+                    speech_tokens=speech_tokens,
+                    ref_dict=model.conds.gen,
+                )
+                samples = converted.squeeze(0).detach().cpu().numpy()
+                samples = model.watermarker.apply_watermark(samples, sample_rate=model.sr)
             if not len(samples) or not np.isfinite(samples).all():
                 raise ValueError("Invalid generated audio")
             output = io.BytesIO()

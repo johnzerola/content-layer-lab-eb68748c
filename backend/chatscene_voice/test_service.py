@@ -67,12 +67,13 @@ class VoiceServiceTests(unittest.TestCase):
             ),
             patch("backend.chatscene_voice.service.urllib.request.urlopen", urlopen),
         ):
-            audio, device = gpu_synthesize("Oi", tone_wav(seconds=0.1), True)
+            audio, device = gpu_synthesize("Oi", tone_wav(seconds=0.1), True, True)
 
         self.assertEqual(device, "cuda")
         self.assertTrue(audio)
         request = urlopen.call_args.args[0]
         self.assertTrue(json.loads(request.data)["fidelityMode"])
+        self.assertTrue(json.loads(request.data)["voiceConversionPass"])
 
     def test_lists_saved_references_from_private_account_storage(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -171,7 +172,11 @@ class VoiceServiceTests(unittest.TestCase):
             (catalog / "catalog.json").write_text(json.dumps({
                 "schemaVersion": 1,
                 "license": "User-authorized",
-                "voices": [{"id": "authorized-base-01", "name": "Voz base 1"}],
+                "voices": [{
+                    "id": "authorized-base-01",
+                    "name": "Voz base 1",
+                    "voiceConversionPass": True,
+                }],
             }), encoding="utf-8")
             (catalog / "authorized-base-01.wav").write_bytes(tone_wav(seconds=0.1))
             with patch.dict(os.environ, {
@@ -182,6 +187,7 @@ class VoiceServiceTests(unittest.TestCase):
                 voices = load_catalog(root)
                 self.assertEqual([voice["id"] for voice in voices], ["authorized-base-01"])
                 self.assertEqual(voices[0]["provenance"], "authorized")
+                self.assertTrue(voices[0]["voiceConversionPass"])
                 self.assertEqual(
                     catalog_reference_path(root, "authorized-base-01"),
                     catalog / "authorized-base-01.wav",
