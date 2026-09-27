@@ -108,6 +108,16 @@ describe("voice synthesis request contract", () => {
 });
 
 describe("participant preset assignment", () => {
+  it("oferece as oito vozes-base autorizadas como identidades separadas", () => {
+    const authorized = VOICE_PRESETS.filter((preset) => preset.id.startsWith("authorized-base-"));
+    expect(authorized).toHaveLength(8);
+    expect(authorized.at(-1)).toMatchObject({
+      id: "authorized-base-08",
+      provider: "chatterbox-catalog",
+      providerVoice: "authorized-base-08",
+    });
+  });
+
   it("seleciona a voz local Faber como provedor Piper", () => {
     const profile = profileFromPreset("piper-faber-local");
     expect(profile).toMatchObject({ provider: "piper", providerVoiceId: "pt_BR-faber-medium", locale: "pt-BR" });
