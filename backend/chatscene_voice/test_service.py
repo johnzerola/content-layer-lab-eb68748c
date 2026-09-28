@@ -16,6 +16,7 @@ from unittest.mock import patch
 from backend.chatscene_voice.service import (
     PIPER_VOICES,
     cached_synthetic_audio,
+    decode_reference,
     gpu_synthesize,
     list_reference_metadata,
     synthesize_piper,
@@ -52,6 +53,10 @@ def metrics(audio):
 
 
 class VoiceServiceTests(unittest.TestCase):
+    def test_long_reference_uses_first_thirty_seconds(self):
+        _wav, duration = decode_reference(tone_wav(seconds=30.2))
+        self.assertAlmostEqual(duration, 30.0, places=2)
+
     def test_short_voice_generation_has_bounded_speech_tokens(self):
         self.assertLessEqual(speech_token_limit("Olá! Esta é minha voz."), 225)
 
