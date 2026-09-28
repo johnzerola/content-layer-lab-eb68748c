@@ -17,11 +17,13 @@ export function VoiceClonePanel({
   patch,
   onGenerate,
   castState,
+  castProgress,
 }: {
   project: ChatSceneProject;
   patch: (changes: Partial<ChatSceneProject>) => void;
   onGenerate: (participantId: string) => void;
   castState: string;
+  castProgress: { done: number; total: number };
 }) {
   const statusFn = useServerFn(getVoiceEngineStatus);
   const prepareFn = useServerFn(prepareVoiceEngine);
@@ -269,9 +271,9 @@ export function VoiceClonePanel({
         >
           <Sparkles className="mr-2 size-4" aria-hidden />
           {castState === "running"
-              ? "Gerando falas…"
-              : reference && modelReady === false && missingCount
-                ? `Preparar e gerar ${missingCount} fala${missingCount === 1 ? "" : "s"}`
+            ? `Gerando ${castProgress.done}/${castProgress.total} falas…`
+            : reference && modelReady === false && missingCount
+              ? `Preparar e gerar ${missingCount} fala${missingCount === 1 ? "" : "s"}`
               : missingCount
                 ? `Gerar ${missingCount} fala${missingCount === 1 ? "" : "s"} com esta voz`
                 : "Todas as falas já têm áudio"}

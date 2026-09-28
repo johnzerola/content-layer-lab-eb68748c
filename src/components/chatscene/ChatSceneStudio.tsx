@@ -1118,6 +1118,7 @@ export function ChatSceneStudio() {
               project={project}
               patch={patch}
               castState={castState}
+              castProgress={castProgress}
               onGenerate={(participantId) => void handleGenerateVoices(participantId)}
             />
           )}
