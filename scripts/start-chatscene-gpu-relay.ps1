@@ -5,6 +5,13 @@ param(
   [int]$RemotePort = 18096
 )
 $ErrorActionPreference = 'Stop'
+$minimumFreeRamBytes = 6GB
+$freeRamBytes = [int64](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory * 1KB
+if ($freeRamBytes -lt $minimumFreeRamBytes) {
+  $freeRamGb = [math]::Round($freeRamBytes / 1GB, 1)
+  Write-Warning "Relay GPU não iniciado: somente ${freeRamGb} GB de RAM livre. A Hostear continuará como fallback."
+  exit 0
+}
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $python = Join-Path $InstallRoot '.venv\Scripts\python.exe'
 $tokenFile = Join-Path $InstallRoot 'relay-token'
