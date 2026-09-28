@@ -199,15 +199,6 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .validator((input: unknown) => voiceSynthesisInput.parse(input))
   .handler(async ({ data, context }) => {
-    if (
-      data.transform?.presetId === "user-pitch" &&
-      !nativeVoicePipelineConfigured() &&
-      !(await remoteVoiceTransformSupported())
-    ) {
-      throw new Error(
-        "O ajuste de tom ainda não está disponível no servidor de voz. Atualize e reinicie o serviço antes de gerar.",
-      );
-    }
     if (data.provider === "chatterbox" && !data.referenceId)
       throw new Error("Envie a referência de voz deste personagem.");
     const isClone = data.provider === "chatterbox";
@@ -370,11 +361,6 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
       } catch (error) {
         const reason = error instanceof Error ? error.message : "Falha no processamento de áudio.";
         if (/not found/i.test(reason)) {
-          if (transform.presetId === "user-pitch") {
-            throw new Error(
-              "O servidor de voz ainda não tem o ajuste de tom. Atualize e reinicie o serviço de voz.",
-            );
-          }
           // Existing projects used these presets before the remote renderer
           // existed. Keep their previous audio path until the worker upgrades.
           return { mime, audio: buffer.toString("base64"), provider: providerName };
