@@ -256,21 +256,22 @@ export function VoiceClonePanel({
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
           Depois do upload, clique abaixo para narrar os textos ainda sem áudio de {target.name}. A
-          duração real será aplicada à linha do tempo.
+          duração real será aplicada à linha do tempo. Você pode iniciar enquanto o modelo carrega;
+          a primeira geração pode levar alguns minutos.
         </p>
         <Button
           type="button"
           className="mt-3 min-h-11 w-full"
           disabled={
-            !reference || modelReady !== true || castState === "running" || missingCount === 0
+            !reference || available !== true || castState === "running" || missingCount === 0
           }
           onClick={() => onGenerate(target.id)}
         >
           <Sparkles className="mr-2 size-4" aria-hidden />
-          {reference && modelReady === false
-            ? "Preparando modelo…"
-            : castState === "running"
+          {castState === "running"
               ? "Gerando falas…"
+              : reference && modelReady === false && missingCount
+                ? `Preparar e gerar ${missingCount} fala${missingCount === 1 ? "" : "s"}`
               : missingCount
                 ? `Gerar ${missingCount} fala${missingCount === 1 ? "" : "s"} com esta voz`
                 : "Todas as falas já têm áudio"}

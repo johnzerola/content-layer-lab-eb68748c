@@ -87,8 +87,9 @@ export function VoiceReferenceControl({
           const name = file.name.replace(/\.[^.]+$/, "").slice(0, 100);
           const result = await upload({ data: { audio, authorized: true, name } });
           firstImported ??= { ...result, name };
-        } catch {
-          failed.push(file.name);
+        } catch (cause) {
+          const reason = chatSceneClientError(cause, "Falha desconhecida ao importar o áudio.");
+          failed.push(`${file.name}: ${reason}`);
         }
       }
       if (firstImported) onAttach(firstImported);
@@ -96,7 +97,7 @@ export function VoiceReferenceControl({
       setProgress({ done: files.length, total: files.length, current: "", failed: [...failed] });
       if (failed.length) {
         setError(
-          `${files.length - failed.length} vozes importadas; ${failed.length} falharam: ${failed.join(", ")}`,
+          `${files.length - failed.length} vozes importadas; ${failed.length} falharam. ${failed.join(" | ")}`,
         );
       }
     } finally {
@@ -126,8 +127,9 @@ export function VoiceReferenceControl({
       </summary>
       <div className="space-y-3 pb-2 pt-1">
         <p className="text-xs text-muted-foreground">
-          Importe áudios de 3 a 30 segundos, com fala limpa e sem música. Cada arquivo vira uma voz
-          reutilizável e privada desta conta.
+          Importe áudios com pelo menos 3 segundos, fala limpa e sem música. Em arquivos maiores,
+          os primeiros 30 segundos são usados. Cada arquivo vira uma voz reutilizável e privada
+          desta conta.
         </p>
 
         {loadingSaved ? (

@@ -279,7 +279,7 @@ def decode_reference(audio):
             "-i",
             "pipe:0",
             "-t",
-            "30.1",
+            "30.0",
             "-vn",
             "-ac",
             "1",
@@ -299,7 +299,7 @@ def decode_reference(audio):
     if process.returncode or not pcm:
         raise ValueError("Formato de áudio inválido. Envie WAV, MP3, M4A ou OGG.")
     duration = len(pcm) / 48000
-    if duration < 3 or duration > 30:
+    if duration < 3 or duration > 30.01:
         raise ValueError("Use uma amostra com 3 a 30 segundos de fala limpa.")
     sample_count = len(pcm) // 2
     power = 0.0
