@@ -4,7 +4,7 @@ import { voiceSchedule } from "../audio-mix";
 import { applyConversationTimingPreset } from "../timing-presets";
 import { computeMessageTimings } from "../timing";
 import { createChatSceneProject, createMessage, createParticipant } from "../types";
-import { profileFromPreset } from "../voice";
+import { pitchRate, profileFromPreset } from "../voice";
 
 function referenceScene(count = 46) {
   const me = createParticipant({ name: "Voce", isSelf: true });
@@ -72,7 +72,7 @@ describe("ritmo dinamico de referencia", () => {
     expect(buildPlan(fast).durationMs).toBeLessThan(buildPlan(original).durationMs);
   });
 
-  it("nao reaplica pitch em um clip transformado no servidor", () => {
+  it("aplica apenas o tom manual ao clipe transformado no servidor", () => {
     const dynamic = applyConversationTimingPreset(referenceScene(1), "dynamic-fast");
     const message = dynamic.messages[0]!;
     const profile = profileFromPreset("adult-male-casual", {
@@ -100,6 +100,7 @@ describe("ritmo dinamico de referencia", () => {
     };
     const schedule = voiceSchedule(project, buildPlan(project), new Map([[message.id, sampleClip()]]));
 
-    expect(schedule[0]!.rate).toBe(1);
+    expect(schedule[0]!.rate).toBeCloseTo(pitchRate(2));
+    expect(schedule[0]!.durationSec).toBeCloseTo(3 / pitchRate(2));
   });
 });
