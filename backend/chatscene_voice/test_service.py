@@ -21,6 +21,7 @@ from backend.chatscene_voice.service import (
     synthesize_piper,
     transform_speech,
 )
+from backend.chatscene_voice.limits import speech_token_limit
 from backend.chatscene_voice.catalog import catalog_reference_path, load_catalog
 
 
@@ -51,6 +52,12 @@ def metrics(audio):
 
 
 class VoiceServiceTests(unittest.TestCase):
+    def test_short_voice_generation_has_bounded_speech_tokens(self):
+        self.assertLessEqual(speech_token_limit("Olá! Esta é minha voz."), 225)
+
+    def test_voice_generation_never_exceeds_29_seconds_of_tokens(self):
+        self.assertEqual(speech_token_limit("palavra " * 300), 725)
+
     def test_gpu_synthesis_uses_relay_health_and_forwards_fidelity_mode(self):
         response = unittest.mock.MagicMock()
         response.read.return_value = json.dumps(

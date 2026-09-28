@@ -687,6 +687,7 @@ class Handler(BaseHTTPRequestHandler):
                             "referenceMtime": reference_stat.st_mtime_ns,
                             "referenceSize": reference_stat.st_size,
                             "fidelityPipeline": 3 if voice_conversion_pass else (2 if fidelity_mode else 1),
+                            "durationGuardPipeline": 1,
                         },
                         produce_catalog_audio,
                     )

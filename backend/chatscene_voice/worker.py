@@ -55,8 +55,10 @@ import torch
 from chatterbox.mtl_tts import ChatterboxMultilingualTTS, S3_SR
 try:
     from .ptbr_v3 import load_ptbr_v3
+    from .limits import speech_token_limit
 except ImportError:  # standalone worker entry point
     from ptbr_v3 import load_ptbr_v3
+    from limits import speech_token_limit
 
 
 def respond(value):
@@ -107,10 +109,22 @@ def main():
             torch.manual_seed(42)
             if device == "cuda":
                 torch.cuda.reset_peak_memory_stats()
+            max_speech_tokens = speech_token_limit(text)
+            original_t3_inference = model.t3.inference
+
+            def bounded_t3_inference(*args, **kwargs):
+                requested = kwargs.get("max_new_tokens", max_speech_tokens)
+                kwargs["max_new_tokens"] = min(requested or max_speech_tokens, max_speech_tokens)
+                return original_t3_inference(*args, **kwargs)
+
+            model.t3.inference = bounded_t3_inference
             with torch.inference_mode():
-                wav = model.generate(text, language_id="pt", audio_prompt_path=str(reference),
-                                     exaggeration=0.5, cfg_weight=0.5,
-                                     temperature=0.35 if fidelity_mode else 0.7)
+                try:
+                    wav = model.generate(text, language_id="pt", audio_prompt_path=str(reference),
+                                         exaggeration=0.5, cfg_weight=0.5,
+                                         temperature=0.35 if fidelity_mode else 0.7)
+                finally:
+                    model.t3.inference = original_t3_inference
             samples = wav.squeeze(0).detach().cpu().numpy()
             if voice_conversion_pass:
                 # A second, measured tone-color pass improves only selected
@@ -131,6 +145,8 @@ def main():
                 samples = model.watermarker.apply_watermark(samples, sample_rate=model.sr)
             if not len(samples) or not np.isfinite(samples).all():
                 raise ValueError("Invalid generated audio")
+            if len(samples) / model.sr > 30.0:
+                raise ValueError("Generated audio exceeded the message duration limit")
             output = io.BytesIO()
             sf.write(output, samples, model.sr, format="WAV", subtype="PCM_16")
             respond({"id": request["id"], "audio": base64.b64encode(output.getvalue()).decode("ascii"),
